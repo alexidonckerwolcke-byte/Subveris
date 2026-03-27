@@ -1,5 +1,5 @@
-node_modules
-
+.venv/
+__pycache__/
+*.pyc
+.vscode/
 .env
-.env.local
-.env.*.local
