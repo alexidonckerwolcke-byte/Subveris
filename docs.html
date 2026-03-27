@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Subveris Documentation</title>
+    <link rel="stylesheet" href="/src/index.css" />
+    <link rel="icon" href="/favicon.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from "https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js";
+      import ReactDOM from "https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js";
+      import DocsPage from "../src/pages/docs";
+      ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(DocsPage));
+    </script>
+  </body>
+</html>
