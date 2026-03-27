@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="description" content="Subveris - AI-powered subscription management. Detect, analyze, and optimize your recurring expenses. Save money effortlessly by cutting unused subscriptions." />
+    <meta name="keywords" content="subscription management, save money, recurring payments, AI finance, budget optimization" />
+    <meta property="og:title" content="Subveris - Smart Subscription Management" />
+    <meta property="og:description" content="Stop paying for what you don't use. Subveris automatically detects and optimizes your subscriptions using AI." />
+    <meta property="og:type" content="website" />
+    <title>Subveris - Smart Subscription Management | Save Money on Recurring Payments</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        const stored = localStorage.getItem('theme');
+        if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

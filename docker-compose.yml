@@ -1,0 +1,28 @@
+version: '3.8'
+services:
+  server:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      # Add other vars via .env file
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+  client:
+    build:
+      context: ./client
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./client:/app
+    command: npm run dev
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+# To scale app horizontally, run: docker-compose up --scale server=3

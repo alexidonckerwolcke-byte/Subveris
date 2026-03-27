@@ -1,0 +1,30 @@
+
+> rest-express@1.0.0 dev
+> tsx server/index.ts
+
+{"level":30,"time":1774386989018,"pid":43311,"hostname":"MacBook-Pro-van-Alexi.local","msg":"Server starting up"}
+[Routes] registering GET /api/family-groups/me/membership
+10:16:29 PM [express] serving on 127.0.0.1:5000
+[Email] Failed to send contact email: {
+  statusCode: 403,
+  name: 'validation_error',
+  message: 'You can only send testing emails to your own email address (alexi.donckerwolcke@gmail.com). To send emails to other recipients, please verify a domain at resend.com/domains, and change the `from` address to an email using this domain.'
+}
+[Contact] Failed to send email: {
+  statusCode: 403,
+  name: 'validation_error',
+  message: 'You can only send testing emails to your own email address (alexi.donckerwolcke@gmail.com). To send emails to other recipients, please verify a domain at resend.com/domains, and change the `from` address to an email using this domain.'
+}
+[Contact] New contact form submission: {
+  name: 'Test',
+  email: 'test@example.com',
+  subject: 'Test',
+  message: 'Test message',
+  timestamp: '2026-03-24T21:16:45.062Z',
+  ip: '127.0.0.1',
+  emailSent: false
+}
+10:16:45 PM [express] POST /api/contact 200 in 647ms :: {"message":"Thank you for your message! We'll get back to you soon.","success":true}
+{"level":30,"time":1774387005071,"pid":43311,"hostname":"MacBook-Pro-van-Alexi.local","method":"POST","url":"/api/contact","status":200,"duration":648,"msg":"request"}
+[Server] Running initial renewal checks on startup...
+[Renewal] Running renewal checks (scheduled)...

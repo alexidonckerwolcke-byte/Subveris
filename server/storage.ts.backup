@@ -1,0 +1,768 @@
+import { randomUUID } from "crypto";
+import type {
+  User,
+  InsertUser,
+  Subscription,
+  InsertSubscription,
+  Transaction,
+  InsertTransaction,
+  Insight,
+  InsertInsight,
+  BankConnection,
+  InsertBankConnection,
+  DashboardMetrics,
+  MonthlySpending,
+  SpendingByCategory,
+  CostPerUseAnalysis,
+  OpportunityCost,
+  AIRecommendation,
+  SubscriptionStatus,
+  SubscriptionCategory,
+  BillingFrequency,
+} from "@shared/schema";
+
+export interface IStorage {
+  getUser(id: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUserEmail(id: string, email: string): Promise<User | undefined>;
+  updateUserPassword(id: string, password: string): Promise<User | undefined>;
+  
+  getSubscriptions(userId: string): Promise<Subscription[]>;
+  getSubscription(id: string, userId: string): Promise<Subscription | undefined>;
+  createSubscription(subscription: InsertSubscription): Promise<Subscription>;
+  updateSubscriptionStatus(id: string, status: SubscriptionStatus, userId: string): Promise<Subscription | undefined>;
+  updateSubscriptionUsage(id: string, usageCount: number, userId: string): Promise<Subscription | undefined>;
+  recordSubscriptionUsage(id: string, userId: string): Promise<Subscription | undefined>;
+  deleteSubscription(id: string, userId: string): Promise<boolean>;
+  
+  getTransactions(userId: string): Promise<Transaction[]>;
+  createTransaction(transaction: InsertTransaction): Promise<Transaction>;
+  
+  getInsights(userId: string): Promise<Insight[]>;
+  createInsight(insight: InsertInsight): Promise<Insight>;
+  
+  getBankConnections(userId: string): Promise<BankConnection[]>;
+  getBankConnection(id: string, userId: string): Promise<BankConnection | undefined>;
+  createBankConnection(connection: InsertBankConnection): Promise<BankConnection>;
+  updateBankConnectionSync(id: string, userId: string): Promise<BankConnection | undefined>;
+  deleteBankConnection(id: string, userId: string): Promise<boolean>;
+  
+  getMetrics(userId: string): Promise<DashboardMetrics>;
+  getMonthlySpending(userId: string): Promise<MonthlySpending[]>;
+  getSpendingByCategory(userId: string): Promise<SpendingByCategory[]>;
+  getCostPerUseAnalysis(userId: string): Promise<CostPerUseAnalysis[]>;
+  getBehavioralInsights(userId: string): Promise<OpportunityCost[]>;
+  getRecommendations(userId: string): Promise<AIRecommendation[]>;
+}
+
+function calculateMonthlyCost(amount: number, frequency: string): number {
+  switch (frequency) {
+    case "yearly":
+      return amount / 12;
+    case "quarterly":
+      return amount / 3;
+    case "weekly":
+      return amount * 4;
+    default:
+      return amount;
+  }
+}
+
+function generateOpportunityCosts(monthlyAmount: number): { item: string; count: number; icon: string }[] {
+  const items = [
+    { item: "coffee drinks", unitCost: 5, icon: "coffee" },
+    { item: "movie tickets", unitCost: 15, icon: "film" },
+    { item: "lunch meals", unitCost: 12, icon: "utensils" },
+  ];
+
+  return items
+    .map((item) => ({
+      item: item.item,
+      count: Math.floor(monthlyAmount / item.unitCost),
+      icon: item.icon,
+    }))
+    .filter((item) => item.count >= 1)
+    .slice(0, 3);
+}
+
+export class MemStorage implements IStorage {
+  private users: Map<string, User>;
+  private subscriptions: Map<string, Subscription>;
+  private transactions: Map<string, Transaction>;
+  private insights: Map<string, Insight>;
+  private bankConnections: Map<string, BankConnection>;
+
+  constructor() {
+    this.users = new Map();
+    this.subscriptions = new Map();
+    this.transactions = new Map();
+    this.insights = new Map();
+    this.bankConnections = new Map();
+    
+    this.initializeMockData();
+  }
+
+  private initializeMockData() {
+    const defaultUserId = "00000000-0000-0000-0000-000000000001"; // Mock user ID (matches dev user)
+    
+    const mockSubscriptions: Subscription[] = [
+      {
+        id: randomUUID(),
+        userId: defaultUserId,
+        name: "Netflix",
+        category: "streaming",
+        amount: 15.99,
+        currency: "USD",
+        frequency: "monthly",
+        nextBillingDate: "2024-02-15",
+        status: "active",
+        usageCount: 12,
+        lastUsedDate: "2024-01-28",
+        logoUrl: null,
+        description: "Streaming service",
+        isDetected: true,
+      },
+      {
+        id: randomUUID(),
+        userId: defaultUserId,
+        name: "Spotify Premium",
+        category: "streaming",
+        amount: 10.99,
+        currency: "USD",
+        frequency: "monthly",
+        nextBillingDate: "2024-02-10",
+        status: "active",
+        usageCount: 25,
+        lastUsedDate: "2024-01-29",
+        logoUrl: null,
+        description: "Music streaming",
+        isDetected: true,
+      },
+      {
+        id: randomUUID(),
+        userId: defaultUserId,
+        name: "Adobe Creative Cloud",
+        category: "software",
+        amount: 54.99,
+        currency: "USD",
+        frequency: "monthly",
+        nextBillingDate: "2024-02-05",
+        status: "active",
+        usageCount: 3,
+        lastUsedDate: "2024-01-15",
+        logoUrl: null,
+        description: "Design software suite",
+        isDetected: true,
+      },
+      {
+        id: randomUUID(),
+        userId: defaultUserId,
+        name: "Planet Fitness",
+        category: "fitness",
+        amount: 24.99,
+        currency: "USD",
+        frequency: "monthly",
+        nextBillingDate: "2024-02-01",
+        status: "unused",
+        usageCount: 1,
+        lastUsedDate: "2024-01-02",
+        logoUrl: null,
+        description: "Gym membership",
+        isDetected: true,
+      },
+      {
+        id: randomUUID(),
+        userId: defaultUserId,
+        name: "Dropbox Plus",
+        category: "cloud-storage",
+        amount: 11.99,
+        currency: "USD",
+        frequency: "monthly",
+        nextBillingDate: "2024-02-20",
+        status: "active",
+        usageCount: 8,
+        lastUsedDate: "2024-01-27",
+        logoUrl: null,
+        description: "Cloud storage",
+        isDetected: true,
+      },
+      {
+        id: randomUUID(),
+        userId: defaultUserId,
+        name: "New York Times",
+        category: "news",
+        amount: 17.00,
+        currency: "USD",
+        frequency: "monthly",
+        nextBillingDate: "2024-02-08",
+        status: "unused",
+        usageCount: 2,
+        lastUsedDate: "2024-01-10",
+        logoUrl: null,
+        description: "News subscription",
+        isDetected: true,
+      },
+      {
+        id: randomUUID(),
+        userId: defaultUserId,
+        name: "Xbox Game Pass",
+        category: "gaming",
+        amount: 14.99,
+        currency: "USD",
+        frequency: "monthly",
+        nextBillingDate: "2024-02-12",
+        status: "active",
+        usageCount: 15,
+        lastUsedDate: "2024-01-29",
+        logoUrl: null,
+        description: "Gaming subscription",
+        isDetected: true,
+      },
+      {
+        id: randomUUID(),
+        userId: defaultUserId,
+        name: "LinkedIn Premium",
+        category: "productivity",
+        amount: 29.99,
+        currency: "USD",
+        frequency: "monthly",
+        nextBillingDate: "2024-02-18",
+        status: "to-cancel",
+        usageCount: 0,
+        lastUsedDate: null,
+        logoUrl: null,
+        description: "Professional networking",
+        isDetected: true,
+      },
+    ];
+
+    for (const sub of mockSubscriptions) {
+      this.subscriptions.set(sub.id, sub);
+    }
+
+    const mockBankConnection: BankConnection = {
+      id: randomUUID(),
+      userId: defaultUserId,
+      bankName: "Chase Bank",
+      accountType: "checking",
+      accountSubtype: "checking",
+      lastSync: new Date().toISOString(),
+      isConnected: true,
+      accountMask: "4521",
+      plaidAccessToken: "mock_access_token",
+      plaidItemId: "mock_item_id",
+    };
+    this.bankConnections.set(mockBankConnection.id, mockBankConnection);
+
+    const mockInsights: Insight[] = [
+      {
+        id: randomUUID(),
+        userId: defaultUserId,
+        type: "savings",
+        title: "Cancel unused gym membership",
+        description: "You've only used Planet Fitness once this month. Consider cancelling to save $24.99/mo.",
+        potentialSavings: 24.99,
+        subscriptionId: null,
+        priority: 1,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: randomUUID(),
+        userId: defaultUserId,
+        type: "alternative",
+        title: "Switch to Affinity Photo",
+        description: "Affinity Photo offers similar features to Adobe Photoshop for a one-time payment of $69.99.",
+        potentialSavings: 54.99,
+        subscriptionId: null,
+        priority: 2,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: randomUUID(),
+        userId: defaultUserId,
+        type: "tip",
+        title: "Bundle your streaming services",
+        description: "Consider Disney+ Bundle to get Hulu and ESPN+ included, potentially saving on separate subscriptions.",
+        potentialSavings: 10.00,
+        subscriptionId: null,
+        priority: 3,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    for (const insight of mockInsights) {
+      this.insights.set(insight.id, insight);
+    }
+  }
+
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.username === username,
+    );
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = randomUUID();
+    const user: User = { ...insertUser, id };
+    this.users.set(id, user);
+    return user;
+  }
+
+  async updateUserEmail(id: string, email: string): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updated = { ...user, email };
+    this.users.set(id, updated);
+    return updated;
+  }
+
+  async updateUserPassword(id: string, password: string): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updated = { ...user, password };
+    this.users.set(id, updated);
+    return updated;
+  }
+
+  async getSubscriptions(userId: string): Promise<Subscription[]> {
+    return Array.from(this.subscriptions.values()).filter(sub => sub.userId === userId);
+  }
+
+  async getSubscription(id: string, userId: string): Promise<Subscription | undefined> {
+    const subscription = this.subscriptions.get(id);
+    return subscription && subscription.userId === userId ? subscription : undefined;
+  }
+
+  async createSubscription(insertSubscription: InsertSubscription): Promise<Subscription> {
+    const id = randomUUID();
+    const subscription: Subscription = { 
+      id,
+      userId: insertSubscription.userId,
+      name: insertSubscription.name,
+      category: insertSubscription.category as SubscriptionCategory,
+      amount: insertSubscription.amount,
+      currency: insertSubscription.currency || "USD",
+      frequency: insertSubscription.frequency as BillingFrequency,
+      nextBillingDate: insertSubscription.nextBillingDate,
+      status: (insertSubscription.status || "active") as SubscriptionStatus,
+      usageCount: insertSubscription.usageCount || 0,
+      lastUsedDate: insertSubscription.lastUsedDate || null,
+      logoUrl: insertSubscription.logoUrl || null,
+      description: insertSubscription.description || null,
+      isDetected: insertSubscription.isDetected ?? false,
+    };
+    this.subscriptions.set(id, subscription);
+    return subscription;
+  }
+
+  async updateSubscriptionStatus(id: string, status: SubscriptionStatus, userId: string): Promise<Subscription | undefined> {
+    const subscription = this.subscriptions.get(id);
+    if (!subscription || subscription.userId !== userId) return undefined;
+    
+    const updated = { ...subscription, status };
+    this.subscriptions.set(id, updated);
+    return updated;
+  }
+
+  async updateSubscriptionUsage(id: string, usageCount: number, userId: string): Promise<Subscription | undefined> {
+    const subscription = this.subscriptions.get(id);
+    if (!subscription || subscription.userId !== userId) return undefined;
+    
+    const updated = { 
+      ...subscription, 
+      usageCount,
+      lastUsedDate: new Date().toISOString().split('T')[0],
+      status: usageCount > 0 ? "active" : "unused"
+    };
+    this.subscriptions.set(id, updated);
+    return updated;
+  }
+
+  async recordSubscriptionUsage(id: string, userId: string): Promise<Subscription | undefined> {
+    const subscription = this.subscriptions.get(id);
+    if (!subscription || subscription.userId !== userId) return undefined;
+    
+    const updated = { 
+      ...subscription, 
+      usageCount: subscription.usageCount + 1,
+      lastUsedDate: new Date().toISOString().split('T')[0],
+      status: subscription.usageCount + 1 > 0 ? "active" as SubscriptionStatus : subscription.status
+    };
+    this.subscriptions.set(id, updated);
+    return updated;
+  }
+
+  async deleteSubscription(id: string, userId: string): Promise<boolean> {
+    const subscription = this.subscriptions.get(id);
+    if (!subscription || subscription.userId !== userId) return false;
+    
+    return this.subscriptions.delete(id);
+  }
+
+  async getTransactions(userId: string): Promise<Transaction[]> {
+    return Array.from(this.transactions.values()).filter(tx => tx.userId === userId);
+  }
+
+  async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
+    const id = randomUUID();
+    const transaction: Transaction = { 
+      ...insertTransaction, 
+      id,
+      category: insertTransaction.category || null,
+      isRecurring: insertTransaction.isRecurring ?? false,
+      merchantName: insertTransaction.merchantName || null,
+      subscriptionId: insertTransaction.subscriptionId || null,
+    };
+    this.transactions.set(id, transaction);
+    return transaction;
+  }
+
+  async getInsights(userId: string): Promise<Insight[]> {
+    return Array.from(this.insights.values()).filter(insight => insight.userId === userId);
+  }
+
+  async createInsight(insertInsight: InsertInsight): Promise<Insight> {
+    const id = randomUUID();
+    const insight: Insight = { 
+      ...insertInsight, 
+      id,
+      potentialSavings: insertInsight.potentialSavings || null,
+      subscriptionId: insertInsight.subscriptionId || null,
+      priority: insertInsight.priority ?? 1,
+      isRead: insertInsight.isRead ?? false,
+    };
+    this.insights.set(id, insight);
+    return insight;
+  }
+
+  async getBankConnections(userId: string): Promise<BankConnection[]> {
+    return Array.from(this.bankConnections.values()).filter(conn => conn.userId === userId);
+  }
+
+  async getBankConnection(id: string, userId: string): Promise<BankConnection | undefined> {
+    const connection = this.bankConnections.get(id);
+    return connection && connection.userId === userId ? connection : undefined;
+  }
+
+  async createBankConnection(insertConnection: InsertBankConnection): Promise<BankConnection> {
+    const id = randomUUID();
+    const connection: BankConnection = { 
+      ...insertConnection, 
+      id,
+      accountSubtype: insertConnection.accountSubtype || null,
+      accountMask: insertConnection.accountMask || null,
+      plaidAccessToken: insertConnection.plaidAccessToken || null,
+      plaidItemId: insertConnection.plaidItemId || null,
+      isConnected: insertConnection.isConnected ?? true,
+    };
+    this.bankConnections.set(id, connection);
+    return connection;
+  }
+
+  async updateBankConnectionSync(id: string, userId: string): Promise<BankConnection | undefined> {
+    const connection = this.bankConnections.get(id);
+    if (!connection || connection.userId !== userId) return undefined;
+    
+    const updated = { ...connection, lastSync: new Date().toISOString() };
+    this.bankConnections.set(id, updated);
+    return updated;
+  }
+
+  async deleteBankConnection(id: string, userId: string): Promise<boolean> {
+    const connection = this.bankConnections.get(id);
+    if (!connection || connection.userId !== userId) return false;
+    
+    return this.bankConnections.delete(id);
+  }
+
+  async getMetrics(userId: string): Promise<DashboardMetrics> {
+    const subscriptions = await this.getSubscriptions(userId);
+    
+    const totalMonthlySpend = subscriptions.reduce((sum, sub) => {
+      if (sub.status === "to-cancel" || sub.status === "deleted") return sum;
+      return sum + calculateMonthlyCost(sub.amount, sub.frequency);
+    }, 0);
+
+    const activeSubscriptions = subscriptions.filter(s => s.status === "active").length;
+    const unusedSubscriptions = subscriptions.filter(s => s.status === "unused").length;
+    
+    // Potential savings only from unused and to-cancel subscriptions (not deleted)
+    const potentialSavings = subscriptions
+      .filter(s => s.status === "unused" || s.status === "to-cancel")
+      .reduce((sum, sub) => sum + calculateMonthlyCost(sub.amount, sub.frequency), 0);
+
+    const totalUsage = subscriptions.reduce((sum, sub) => sum + sub.usageCount, 0);
+    const averageCostPerUse = totalUsage > 0 ? totalMonthlySpend / totalUsage : 0;
+
+    // Calculate actual savings only from deleted subscriptions
+    const thisMonthSavings = subscriptions
+      .filter(s => s.status === "deleted")
+      .reduce((sum, sub) => sum + calculateMonthlyCost(sub.amount, sub.frequency), 0);
+
+    return {
+      totalMonthlySpend,
+      activeSubscriptions,
+      potentialSavings,
+      thisMonthSavings,
+      unusedSubscriptions,
+      averageCostPerUse,
+    };
+  }
+
+  async getMonthlySpending(userId: string): Promise<MonthlySpending[]> {
+    const transactions = await this.getTransactions(userId);
+    const subscriptions = await this.getSubscriptions(userId);
+
+    // Get date range for last 6 months
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+
+    // Create a map to aggregate spending by date
+    const spendingByDate = new Map<string, number>();
+
+    // Process subscriptions - add spending on their actual billing dates
+    for (const sub of subscriptions) {
+      if (sub.status === "to-cancel") continue;
+
+      const nextBillingDate = new Date(sub.nextBillingDate);
+      let billingDate = new Date(nextBillingDate);
+
+      // Go back 6 months and add billing dates
+      for (let i = 0; i < 24; i++) { // Check up to 24 billing cycles
+        if (billingDate < sixMonthsAgo) {
+          // Move forward to next billing date
+          switch (sub.frequency) {
+            case "weekly":
+              billingDate.setDate(billingDate.getDate() + 7);
+              break;
+            case "monthly":
+              billingDate.setMonth(billingDate.getMonth() + 1);
+              break;
+            case "quarterly":
+              billingDate.setMonth(billingDate.getMonth() + 3);
+              break;
+            case "yearly":
+              billingDate.setFullYear(billingDate.getFullYear() + 1);
+              break;
+          }
+          continue;
+        }
+
+        if (billingDate > endDate) break;
+
+        const dateKey = billingDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+        const currentAmount = spendingByDate.get(dateKey) || 0;
+        spendingByDate.set(dateKey, currentAmount + sub.amount);
+      }
+    }
+
+    // Process transactions - add them on their actual dates
+    for (const transaction of transactions) {
+      const transactionDate = new Date(transaction.date);
+      if (transactionDate >= sixMonthsAgo && transactionDate <= endDate) {
+        const dateKey = transactionDate.toISOString().split('T')[0];
+        const currentAmount = spendingByDate.get(dateKey) || 0;
+        spendingByDate.set(dateKey, currentAmount + transaction.amount);
+      }
+    }
+
+    // Convert to daily data points for chart display
+    const dailyData: MonthlySpending[] = [];
+
+    // Generate data points for each day in the 6-month period
+    for (let d = new Date(sixMonthsAgo); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const dateKey = d.toISOString().split('T')[0];
+      const amount = spendingByDate.get(dateKey) || 0;
+
+      // Format date as "DD MMM" (e.g., "13 Feb", "14 Feb")
+      const dateStr = d.toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'short'
+      });
+
+      dailyData.push({
+        month: dateStr,
+        amount: amount
+      });
+    }
+
+    return dailyData;
+  }    const subscriptions = await this.getSubscriptions(userId);
+    const categoryMap = new Map<SubscriptionCategory, { amount: number; count: number }>();
+
+    for (const sub of subscriptions) {
+      if (sub.status === "to-cancel") continue;
+      const monthlyAmount = calculateMonthlyCost(sub.amount, sub.frequency);
+      const existing = categoryMap.get(sub.category) || { amount: 0, count: 0 };
+      categoryMap.set(sub.category, {
+        amount: existing.amount + monthlyAmount,
+        count: existing.count + 1,
+      });
+    }
+
+    const totalAmount = Array.from(categoryMap.values()).reduce((sum, cat) => sum + cat.amount, 0);
+
+    return Array.from(categoryMap.entries()).map(([category, data]) => ({
+      category,
+      amount: data.amount,
+      percentage: totalAmount > 0 ? (data.amount / totalAmount) * 100 : 0,
+      count: data.count,
+    }));
+  }
+
+  async getCostPerUseAnalysis(userId: string): Promise<CostPerUseAnalysis[]> {
+    const subscriptions = await this.getSubscriptions(userId);
+    
+    return subscriptions
+      .filter(sub => sub.status !== "to-cancel")
+      .map(sub => {
+        const monthlyAmount = calculateMonthlyCost(sub.amount, sub.frequency);
+        const costPerUse = sub.usageCount > 0 ? sub.amount / sub.usageCount : sub.amount;
+        
+        let valueRating: "excellent" | "good" | "fair" | "poor";
+        if (costPerUse <= 2) valueRating = "excellent";
+        else if (costPerUse <= 5) valueRating = "good";
+        else if (costPerUse <= 10) valueRating = "fair";
+        else valueRating = "poor";
+
+        return {
+          subscriptionId: sub.id,
+          name: sub.name,
+          monthlyAmount,
+          usageCount: sub.usageCount,
+          costPerUse,
+          currency: sub.currency,
+          valueRating,
+        };
+      })
+      .sort((a, b) => b.costPerUse - a.costPerUse)
+      .slice(0, 5);
+  }
+
+  async getBehavioralInsights(userId: string): Promise<OpportunityCost[]> {
+    const subscriptions = await this.getSubscriptions(userId);
+    
+    return subscriptions
+      .filter(sub => sub.status === "unused")
+      .map(sub => {
+        const monthlyAmount = calculateMonthlyCost(sub.amount, sub.frequency);
+        return {
+          subscriptionId: sub.id,
+          subscriptionName: sub.name,
+          monthlyAmount,
+          currency: sub.currency,
+          equivalents: generateOpportunityCosts(monthlyAmount),
+        };
+      });
+  }
+
+  async getRecommendations(userId: string): Promise<AIRecommendation[]> {
+    const subscriptions = await this.getSubscriptions(userId);
+    const recommendations: AIRecommendation[] = [];
+
+    const adobeSub = subscriptions.find(s => s.name.toLowerCase().includes("adobe"));
+    if (adobeSub) {
+      recommendations.push({
+        id: randomUUID(),
+        type: "alternative",
+        title: "Switch from Adobe to Affinity",
+        description: "Affinity offers similar professional design tools with a one-time purchase instead of monthly fees.",
+        currentCost: calculateMonthlyCost(adobeSub.amount, adobeSub.frequency),
+        suggestedCost: 0,
+        savings: calculateMonthlyCost(adobeSub.amount, adobeSub.frequency),
+        currency: adobeSub.currency,
+        subscriptionId: adobeSub.id,
+        alternativeName: "Affinity Suite",
+        confidence: 0.85,
+      });
+    }
+
+    // Only recommend cancelling if actually unused (0 uses) or manually marked as unused
+    const unusedSubs = subscriptions.filter(s => s.usageCount === 0 || s.status === "unused");
+    for (const sub of unusedSubs) {
+      recommendations.push({
+        id: randomUUID(),
+        type: "cancel",
+        title: `Cancel ${sub.name}`,
+        description: `You've barely used ${sub.name} this month. Consider cancelling to save money.`,
+        currentCost: calculateMonthlyCost(sub.amount, sub.frequency),
+        suggestedCost: 0,
+        savings: calculateMonthlyCost(sub.amount, sub.frequency),
+        currency: sub.currency,
+        subscriptionId: sub.id,
+        confidence: 0.92,
+      });
+    }
+
+    const streamingSubs = subscriptions.filter(s => s.category === "streaming" && s.status === "active");
+    if (streamingSubs.length > 1) {
+      const totalStreaming = streamingSubs.reduce((sum, s) => sum + calculateMonthlyCost(s.amount, s.frequency), 0);
+      if (totalStreaming > 25) {
+        recommendations.push({
+          id: randomUUID(),
+          type: "negotiate",
+          title: "Rotate streaming services",
+          description: "Consider subscribing to one streaming service at a time and rotating monthly based on what you want to watch.",
+          currentCost: totalStreaming,
+          suggestedCost: 15.99,
+          savings: totalStreaming - 15.99,
+          currency: streamingSubs[0].currency,
+          subscriptionId: streamingSubs[0].id,
+          confidence: 0.78,
+        });
+      }
+    }
+
+    return recommendations;
+  }
+}
+
+// Use Supabase storage if available with valid URL, otherwise fall back to in-memory
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const isValidSupabaseUrl = supabaseUrl && supabaseUrl.includes('.supabase.co') && !supabaseUrl.includes('/dashboard/');
+// Enable Supabase storage with provided credentials
+const useSupabase = isValidSupabaseUrl && supabaseKey;
+async function initStorage(): Promise<IStorage> {
+  if (useSupabase) {
+    console.log('[storage] Using Supabase storage');
+    const { SupabaseStorage } = await import("./supabaseStorage");
+    return new SupabaseStorage();
+  } else {
+    console.log('[storage] Using in-memory storage (Supabase not configured or invalid URL)');
+    return new MemStorage();
+  }
+}
+
+let storageInstance: IStorage | null = null;
+
+async function getStorage(): Promise<IStorage> {
+  if (!storageInstance) {
+    storageInstance = await initStorage();
+  }
+  return storageInstance;
+}
+
+export const storage: IStorage = new Proxy({} as IStorage, {
+  get(target, prop) {
+    return async (...args: any[]) => {
+      const instance = await getStorage();
+      const method = (instance as any)[prop];
+      if (typeof method === 'function') {
+        return method.apply(instance, args);
+      }
+      return (instance as any)[prop];
+    };
+  }
+});

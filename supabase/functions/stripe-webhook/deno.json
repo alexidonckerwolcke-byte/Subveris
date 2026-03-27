@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "@supabase/functions-js": "https://esm.sh/@supabase/functions-js@2.1.5",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3",
+    "stripe": "https://esm.sh/stripe@14.21.0"
+  }
+}
