@@ -1,4 +1,4 @@
-# Subveris-2
+# Subveris
 
 A SaaS web app for managing recurring payments and subscriptions with Supabase Auth, Supabase Database, and Stripe integration.
 
