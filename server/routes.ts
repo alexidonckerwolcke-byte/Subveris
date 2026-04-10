@@ -894,42 +894,23 @@ export async function registerRoutes(
         if (authHeader) userId = extractUserIdFromToken(authHeader) || undefined;
       }
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-      // Instead of hard-deleting the row, mark it as deleted so we can
-      // correctly attribute monthly savings to the month the deletion
-      // occurred. This prevents saved amounts from disappearing when
-      // rows are purged or when metrics are recalculated.
+      // Perform a hard delete from the database as requested
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('subscriptions')
-        .update({ status: 'deleted', deleted_at: new Date().toISOString() })
+        .delete()
         .eq('id', req.params.id)
         .eq('user_id', userId)
         .select()
         .single();
 
       if (error || !data) {
-        // If error mentions deleted_at, try without it
-        if (error && error.message && error.message.includes('deleted_at')) {
-          const fallback = await supabase
-            .from('subscriptions')
-            .update({ status: 'deleted' })
-            .eq('id', req.params.id)
-            .eq('user_id', userId)
-            .select()
-            .single();
-          
-          if (fallback.error || !fallback.data) {
-            return res.status(404).json({ error: "Subscription not found" });
-          }
-          
-          clearSubscriptionsCacheForUser(userId);
-          return res.status(200).json(mapSubscriptionFromDb(fallback.data));
-        }
-        return res.status(404).json({ error: "Subscription not found" });
+        console.error('[Routes] DELETE /api/subscriptions/:id error or no data:', error);
+        return res.status(404).json({ error: "Subscription not found or not authorized" });
       }
 
       clearSubscriptionsCacheForUser(userId);
-      res.status(200).json(mapSubscriptionFromDb(data));
+      res.status(200).json({ success: true, message: "Subscription deleted permanently" });
     } catch (error) {
       console.error('[Routes] DELETE /api/subscriptions/:id error:', error);
       res.status(500).json({ error: "Failed to delete subscription" });
