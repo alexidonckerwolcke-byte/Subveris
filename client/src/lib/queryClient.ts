@@ -61,16 +61,25 @@ export async function apiRequest(
   });
 
   if (!res.ok) {
-    // Log response text for debugging before throwing
+    let errorMessage = res.statusText || `HTTP ${res.status}`;
     try {
       const text = await res.text();
       console.warn('[apiRequest] Non-OK response', res.status, url, text);
+      if (text) {
+        try {
+          const json = JSON.parse(text);
+          errorMessage = json.error || json.message || text;
+        } catch {
+          errorMessage = text;
+        }
+      }
     } catch (e) {
       console.warn('[apiRequest] Non-OK response', res.status, url, '(could not read body)');
+      errorMessage = `Request failed with status ${res.status}`;
     }
+    throw new Error(errorMessage);
   }
 
-  await throwIfResNotOk(res);
   return res;
 }
 
