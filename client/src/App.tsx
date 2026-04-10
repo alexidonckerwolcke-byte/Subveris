@@ -85,13 +85,15 @@ function AppContent() {
   // Call ALL hooks unconditionally at the top level
   const [location] = useLocation();
   const { user, loading, signOut, justSignedUp, clearSignUpFlag, pendingMfaSession } = useAuth();
+  const { hasSelectedCurrency } = useCurrency();
   const [postSignupOpen, setPostSignupOpen] = useState(false);
 
   useEffect(() => {
-    if (justSignedUp && user) {
+    // Show flow if just signed up OR if user is logged in but hasn't selected a currency yet
+    if (user && (justSignedUp || !hasSelectedCurrency)) {
       setPostSignupOpen(true);
     }
-  }, [justSignedUp, user]);
+  }, [justSignedUp, user, hasSelectedCurrency]);
 
   // Standalone docs page: render only DocsPage, no app shell
   if (location === "/docs") {

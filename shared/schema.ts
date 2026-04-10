@@ -187,8 +187,8 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   // preferred currency for the user interface; stored so the choice
-  // is remembered across devices and sessions (default USD)
-  currency: text("currency").notNull().default("USD"),
+  // is remembered across devices and sessions (no default, must be selected)
+  currency: text("currency"),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({

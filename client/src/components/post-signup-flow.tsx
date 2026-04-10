@@ -12,7 +12,7 @@ interface PostSignupFlowProps {
 }
 
 export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
-  const { setCurrency } = useCurrency();
+  const { setCurrency, formatAmount } = useCurrency();
   const [step, setStep] = useState<'currency' | 'plan' | 'mfa'>('currency');
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'premium' | null>(null);
 
@@ -23,13 +23,17 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
     { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
     { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
     { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+    { code: 'CHF', name: 'Swiss Franc', symbol: 'Fr' },
+    { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
+    { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
+    { code: 'BRL', name: 'Brazilian Real', symbol: 'R$' },
   ];
 
   const plans = [
     {
       name: 'Free',
       tier: 'free' as const,
-      price: '$0',
+      price: formatAmount(0),
       description: 'Perfect for getting started',
       features: [
         'Track up to 5 subscriptions',
@@ -40,7 +44,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
     {
       name: 'Premium',
       tier: 'premium' as const,
-      price: '$9.99',
+      price: formatAmount(9.99),
       period: '/month',
       description: 'Unlock powerful insights',
       features: [

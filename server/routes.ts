@@ -335,6 +335,8 @@ export async function registerRoutes(
     const from = (page - 1) * perPage;
     const to = page * perPage - 1;
 
+    console.log(`[API/Subscriptions] Fetching for user: ${userId}, from: ${from}, to: ${to}`);
+
     // ask Supabase for an exact row count so we can expose total to client
     const { data, error, count } = await supabase
       .from('subscriptions')
@@ -342,6 +344,8 @@ export async function registerRoutes(
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .range(from, to);
+
+    console.log(`[API/Subscriptions] Query returned ${data?.length || 0} rows, count: ${count}, error: ${error?.message || 'none'}`);
 
     // expose the header for clients that care
     if (typeof count === 'number') {
@@ -1336,97 +1340,8 @@ export async function registerRoutes(
       }
       console.log('[Routes] /api/recommendations fetched subscriptions count:', (subsToConsider || []).length);
       
-      // Generate recommendations based on user's subscriptions — produce per-subscription custom suggestions
-      const recommendations: any[] = [];
-      if (subsToConsider && subsToConsider.length > 0) {
-        const subs = subsToConsider as any[];
-
-        function monthlyAmountFor(sub: any) {
-          if (!sub) return 0;
-          const amt = sub.amount || 0;
-          const freq = sub.frequency || 'monthly';
-          if (freq === 'yearly') return Math.round((amt / 12) * 100) / 100;
-          if (freq === 'quarterly') return Math.round((amt / 3) * 100) / 100;
-          if (freq === 'weekly') return Math.round((amt * 4) * 100) / 100;
-          return Math.round(amt * 100) / 100;
-        }
-
-        const actionableSubs = subs.filter((sub: any) => sub.status === 'unused' || sub.status === 'to-cancel');
-        for (const sub of actionableSubs) {
-          try {
-            const monthly = monthlyAmountFor(sub);
-            const id = randomUUID();
-
-            // If unused, suggest cancel
-            if (sub.status === 'unused') {
-              recommendations.push({
-                id,
-                type: 'cancel',
-                title: `Cancel ${sub.name}`,
-                description: `You've barely used ${sub.name}. Cancelling would save ${monthly} per month.`,
-                currentCost: monthly,
-                suggestedCost: 0,
-                savings: monthly,
-                subscriptionId: sub.id,
-                confidence: 0.95,
-                currency: sub.currency || 'USD',
-              });
-              continue;
-            }
-
-            // Software or productivity: suggest cheaper alternative or downgrade when expensive
-            const nameLower = (sub.name || '').toLowerCase();
-            if ((sub.category === 'software' || sub.category === 'productivity' || nameLower.includes('adobe') || nameLower.includes('office') || nameLower.includes('photoshop') || nameLower.includes('illustrator')) && monthly > 15) {
-              recommendations.push({
-                id,
-                type: 'alternative',
-                title: `Consider cheaper alternative for ${sub.name}`,
-                description: `You could save by switching ${sub.name} to a lower-cost alternative or one-time purchase.`,
-                currentCost: monthly,
-                suggestedCost: Math.max(0, Math.round((monthly * 0.2) * 100) / 100),
-                savings: Math.round((monthly - monthly * 0.2) * 100) / 100,
-                subscriptionId: sub.id,
-                confidence: 0.7,
-                currency: sub.currency || 'USD',
-              });
-              continue;
-            }
-
-            // High cost subscriptions: suggest negotiation or downgrade
-            if (monthly >= 20) {
-              recommendations.push({
-                id,
-                type: 'negotiate',
-                title: `Negotiate or downgrade ${sub.name}`,
-                description: `Contact support or switch to an annual/discounted plan for ${sub.name} to reduce costs.`,
-                currentCost: monthly,
-                suggestedCost: Math.round((monthly * 0.6) * 100) / 100,
-                savings: Math.round((monthly * 0.4) * 100) / 100,
-                subscriptionId: sub.id,
-                confidence: 0.6,
-                currency: sub.currency || 'USD',
-              });
-              continue;
-            }
-
-            // Default low-confidence tip for other subscriptions
-            recommendations.push({
-              id,
-              type: 'downgrade',
-              title: `Review ${sub.name}`,
-              description: `Check if you're on the right plan for ${sub.name}. You might save a small amount by downgrading.`,
-              currentCost: monthly,
-              suggestedCost: Math.round((monthly * 0.9) * 100) / 100,
-              savings: Math.round((monthly * 0.1) * 100) / 100,
-              subscriptionId: sub.id,
-              confidence: 0.35,
-              currency: sub.currency || 'USD',
-            });
-          } catch (e) {
-            console.warn('[Routes] Recommendation generation error for sub', sub?.id, e);
-          }
-        }
-      }
+      const { generateAIRecommendations } = await import('./family-sharing');
+      const recommendations = generateAIRecommendations(subsToConsider || []);
 
       console.log('[Routes] /api/recommendations returning', (recommendations || []).length, 'recommendations');
       res.json(recommendations || []);
@@ -2761,14 +2676,15 @@ export async function registerRoutes(
         userSubscription: userSub || null,
       });
     } catch (err) {
-      console.error('[Routes] GET member dashboard error:', err);
-      res.status(500).json({ error: 'Failed to fetch member dashboard' });
+      console.error('[Routes] GET /api/family-groups/:id/member/:memberId/dashboard error:', err);
+      res.status(500).json({ error: 'Failed to fetch member dashboard data' });
     }
   });
 
   // Get family data (all members' subscriptions when show_family_data is enabled)
   app.get('/api/family-groups/:id/family-data', async (req, res) => {
     try {
+      const { generateAIRecommendations } = await import('./family-sharing');
       const { id: groupId } = req.params;
       const supabase = getSupabaseClient();
 
@@ -2982,6 +2898,7 @@ export async function registerRoutes(
         // Provide detailed shared subscription objects (includes `subscription` field when available)
         sharedSubscriptions: sharedSubscriptionsDetailed || [],
         costSplits: costSplits || [],
+        recommendations: generateAIRecommendations(allSubscriptions || []),
         // compute simple family metrics server-side so client doesn't have to
         metrics: (() => {
           const subs = (allSubscriptions || []).filter((s: any) => s.status !== 'deleted');

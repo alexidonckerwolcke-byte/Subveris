@@ -19,6 +19,124 @@ const supabaseAdmin = createClient(
   }
 );
 
+  // Helper to calculate monthly cost
+function monthlyAmountFor(sub: any) {
+  if (!sub) return 0;
+  const amt = sub.amount || 0;
+  const freq = sub.frequency || 'monthly';
+  if (freq === 'yearly') return Math.round((amt / 12) * 100) / 100;
+  if (freq === 'quarterly') return Math.round((amt / 3) * 100) / 100;
+  if (freq === 'weekly') return Math.round((amt * 52) / 12) * 100 / 100;
+  return Math.round(amt * 100) / 100;
+}
+
+// Helper to generate AI recommendations from a list of subscriptions
+export function generateAIRecommendations(subs: any[]): any[] {
+  const recommendations: any[] = [];
+  if (!subs || subs.length === 0) return recommendations;
+
+  const actionableSubs = subs.filter((sub: any) => 
+    sub.status === 'unused' || 
+    sub.status === 'to-cancel' || 
+    monthlyAmountFor(sub) >= 15
+  );
+
+  for (const sub of actionableSubs) {
+    try {
+      const monthly = monthlyAmountFor(sub);
+      const id = randomUUID();
+
+      // 1. If unused, suggest cancel
+      if (sub.status === 'unused') {
+        recommendations.push({
+          id,
+          type: 'cancel',
+          title: `Cancel ${sub.name}`,
+          description: `You've barely used ${sub.name}. Cancelling would save ${monthly} per month.`,
+          currentCost: monthly,
+          suggestedCost: 0,
+          savings: monthly,
+          subscriptionId: sub.id,
+          confidence: 0.95,
+          currency: sub.currency || 'USD',
+        });
+        continue;
+      }
+
+      // 2. If marked for cancellation, suggest completion
+      if (sub.status === 'to-cancel') {
+        recommendations.push({
+          id,
+          type: 'cancel',
+          title: `Complete cancellation of ${sub.name}`,
+          description: `${sub.name} is marked for cancellation. Finalize the cancellation to stop future charges.`,
+          currentCost: monthly,
+          suggestedCost: 0,
+          savings: monthly,
+          subscriptionId: sub.id,
+          confidence: 0.98,
+          currency: sub.currency || 'USD',
+        });
+        continue;
+      }
+
+      // 3. Software or productivity: suggest cheaper alternative or downgrade when expensive
+      const nameLower = (sub.name || '').toLowerCase();
+      if ((sub.category === 'software' || sub.category === 'productivity' || nameLower.includes('adobe') || nameLower.includes('office') || nameLower.includes('photoshop') || nameLower.includes('illustrator')) && monthly > 15) {
+        recommendations.push({
+          id,
+          type: 'alternative',
+          title: `Consider cheaper alternative for ${sub.name}`,
+          description: `You could save by switching ${sub.name} to a lower-cost alternative or one-time purchase.`,
+          currentCost: monthly,
+          suggestedCost: Math.max(0, Math.round((monthly * 0.2) * 100) / 100),
+          savings: Math.round((monthly - monthly * 0.2) * 100) / 100,
+          subscriptionId: sub.id,
+          confidence: 0.7,
+          currency: sub.currency || 'USD',
+        });
+        continue;
+      }
+
+      // 4. High cost subscriptions: suggest negotiation or downgrade
+      if (monthly >= 20) {
+        recommendations.push({
+          id,
+          type: 'negotiate',
+          title: `Negotiate or downgrade ${sub.name}`,
+          description: `Contact support or switch to an annual/discounted plan for ${sub.name} to reduce costs.`,
+          currentCost: monthly,
+          suggestedCost: Math.round((monthly * 0.6) * 100) / 100,
+          savings: Math.round((monthly * 0.4) * 100) / 100,
+          subscriptionId: sub.id,
+          confidence: 0.6,
+          currency: sub.currency || 'USD',
+        });
+        continue;
+      }
+
+      // 5. Default low-confidence tip for other subscriptions
+      if (monthly >= 10) {
+        recommendations.push({
+          id,
+          type: 'downgrade',
+          title: `Review ${sub.name}`,
+          description: `Check if you're on the right plan for ${sub.name}. You might save a small amount by downgrading.`,
+          currentCost: monthly,
+          suggestedCost: Math.round((monthly * 0.9) * 100) / 100,
+          savings: Math.round((monthly * 0.1) * 100) / 100,
+          subscriptionId: sub.id,
+          confidence: 0.35,
+          currency: sub.currency || 'USD',
+        });
+      }
+    } catch (e) {
+      console.warn('[FamilySharing] Recommendation generation error for sub', sub?.id, e);
+    }
+  }
+  return recommendations;
+}
+
 // Helper function to upgrade user to family plan
 export async function upgradeToPlan(userId: string, planType: 'family'): Promise<void> {
   // First, back up the user's current plan if they're already in family group with a different plan

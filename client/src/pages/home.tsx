@@ -78,27 +78,6 @@ export default function HomePage() {
     },
   ];
 
-  const howItWorks = [
-    {
-      step: 1,
-      title: "Install Browser Extension",
-      description: "Add our lightweight extension to Chrome or Edge. It tracks which services you actually use—nothing more.",
-      icon: Bot,
-    },
-    {
-      step: 2,
-      title: "Add Your Subscriptions",
-      description: "Input your subscriptions manually or let our smart suggestions match them to your subscription list.",
-      icon: TargetIcon,
-    },
-    {
-      step: 3,
-      title: "Get Optimized",
-      description: "See cost-per-use, get AI recommendations, and stop bleeding money on subscriptions you don't use.",
-      icon: TrendingUp,
-    },
-  ];
-
   const featureHighlights = [
     {
       icon: DollarSign,
@@ -161,8 +140,8 @@ export default function HomePage() {
       <header className="border-b border-border/40 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <TrendingUp className="h-6 w-6" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden shadow-sm">
+              <img src="/assets/logo.png" alt="Subveris Logo" className="h-full w-full object-cover" />
             </div>
             <span className="text-xl font-bold tracking-tight">Subveris</span>
           </div>
@@ -170,9 +149,6 @@ export default function HomePage() {
           <nav className="hidden md:flex items-center gap-8">
             <a href="#problem" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Why You Need This
-            </a>
-            <a href="#solution" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              How It Works
             </a>
             <a href="#comparison" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Why Us
@@ -186,7 +162,6 @@ export default function HomePage() {
           </nav>
 
           <div className="flex items-center gap-4">
-            <CurrencySelector />
             <ThemeToggle />
             <Button onClick={() => setAuthModalOpen(true)} size="lg" className="bg-primary hover:bg-primary/90">
               Get Started
@@ -222,10 +197,6 @@ export default function HomePage() {
             <Button size="lg" className="text-lg px-10 py-7 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all" onClick={() => setAuthModalOpen(true)}>
               Get Started Free
               <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button size="lg" variant="outline" className="text-lg px-10 py-7 border-2">
-              <Play className="mr-2 h-5 w-5" />
-              See How It Works
             </Button>
           </div>
 
@@ -277,201 +248,72 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">
-              Subscriptions Are Quietly Draining Your Money
+              Subscriptions are designed to be forgotten.
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              The average person wastes <span className="font-semibold">$300+ per year</span> on unused subscriptions. That's money you could save.
+              Companies spend millions making it easy to sign up and impossible to track value. We're leveling the playing field.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {problems.map((problem, index) => (
-              <Card key={index} className="border border-border/50 shadow-sm hover:shadow-md transition-all bg-card/50 backdrop-blur hover:bg-card">
-                <CardContent className="p-8 flex items-start gap-6">
-                  <div className="p-3 rounded-lg bg-red-500/10 flex-shrink-0">
-                    <problem.icon className="h-6 w-6 text-red-500" />
-                  </div>
-                  <p className="text-lg font-medium leading-relaxed">{problem.text}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 3️⃣ SOLUTION SECTION - NOT ANOTHER BUDGETING APP */}
-      <section id="solution" className="container mx-auto px-4 py-28">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-20">
-            <h2 className="text-5xl font-bold mb-6 tracking-tight">
-              Not Another Budgeting App
-            </h2>
-            <p className="text-xl text-muted-foreground mb-12">
-              We're different because we focus on what matters: <span className="font-semibold text-foreground">actual usage.</span>
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8 mb-16">
-            <Card className="border border-red-500/20 bg-red-500/5">
-              <CardContent className="p-8">
-                <h3 className="text-lg font-bold mb-6 text-red-600 flex items-center gap-2">
-                  <X className="h-5 w-5" />
-                  We DON'T
-                </h3>
-                <ul className="space-y-4 text-muted-foreground">
-                  <li className="flex gap-3">
-                    <span className="text-red-500 font-bold">❌</span>
-                    <span>Connect to your bank</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="text-red-500 font-bold">❌</span>
-                    <span>Sell your financial data</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="text-red-500 font-bold">❌</span>
-                    <span>Track your transactions</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="text-red-500 font-bold">❌</span>
-                    <span>Complicate your finances</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="border border-green-500/20 bg-green-500/5">
-              <CardContent className="p-8">
-                <h3 className="text-lg font-bold mb-6 text-green-600 flex items-center gap-2">
-                  <Check className="h-5 w-5" />
-                  We DO
-                </h3>
-                <ul className="space-y-4 text-muted-foreground">
-                  <li className="flex gap-3">
-                    <span className="text-green-500 font-bold">✅</span>
-                    <span>Track actual usage via browser extension</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="text-green-500 font-bold">✅</span>
-                    <span>Calculate cost per use</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="text-green-500 font-bold">✅</span>
-                    <span>Rank subscriptions by value</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="text-green-500 font-bold">✅</span>
-                    <span>Show exactly how much you're wasting</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="bg-primary/5 border border-primary/20 rounded-lg p-8 text-center">
-            <p className="text-lg font-semibold text-foreground mb-2">
-              We are the <span className="text-primary">Subscription Optimization Platform</span>
-            </p>
-            <p className="text-muted-foreground">
-              Built for subscription-heavy users who want control, not complexity.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 4️⃣ HOW IT WORKS - SIMPLE 3-STEP */}
-      <section className="bg-muted/30 py-28">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-20">
-            <h2 className="text-5xl font-bold mb-6 tracking-tight">
-              Get Started in 3 Simple Steps
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              No complexity. Just results.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {howItWorks.map((item, index) => (
-              <div key={index} className="relative">
-                {/* Step number */}
-                <div className="flex justify-center mb-8">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary to-blue-600 text-white font-bold text-2xl">
-                    {item.step}
-                  </div>
+          <div className="grid md:grid-cols-4 gap-8">
+            {problems.map((item, index) => (
+              <div key={index} className="bg-background p-8 rounded-2xl shadow-sm border border-border/50 hover:shadow-md transition-all group">
+                <div className="h-12 w-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <item.icon className="h-6 w-6 text-primary" />
                 </div>
-
-                {/* Connecting line */}
-                {index < howItWorks.length - 1 && (
-                  <div className="hidden md:block absolute top-8 left-[60%] w-[40%] h-1 bg-gradient-to-r from-primary to-transparent" />
-                )}
-
-                <Card className="border border-border/50 shadow-md hover:shadow-lg hover:border-primary/50 transition-all">
-                  <CardContent className="p-8 text-center">
-                    <div className="flex justify-center mb-6">
-                      <div className="p-4 rounded-xl bg-primary/10">
-                        <item.icon className="h-8 w-8 text-primary" />
-                      </div>
-                    </div>
-                    <h3 className="text-xl font-bold mb-3">{item.title}</h3>
-                    <p className="text-muted-foreground leading-relaxed">{item.description}</p>
-                  </CardContent>
-                </Card>
+                <p className="text-lg font-medium leading-snug">{item.text}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* 5️⃣ FEATURE HIGHLIGHTS */}
-      <section className="container mx-auto px-4 py-28">
-        <div className="text-center mb-20">
-          <h2 className="text-5xl font-bold mb-6 tracking-tight">
-            Core Features That Save You Money
-          </h2>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          {featureHighlights.map((feature, index) => (
-            <Card key={index} className="border border-border/50 shadow-md hover:shadow-lg hover:border-primary/50 transition-all bg-card/50 backdrop-blur hover:bg-card">
-              <CardContent className="p-8">
-                <div className="text-4xl mb-6">{feature.title.split(' ')[0]}</div>
-                <h3 className="text-lg font-bold mb-3">{feature.title.split(' ').slice(1).join(' ')}</h3>
-                <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
-              </CardContent>
-            </Card>
-          ))}
+      {/* 3️⃣ FEATURES SECTION */}
+      <section id="features" className="container mx-auto px-4 py-28">
+        <div className="max-w-4xl mx-auto">
+          <Badge variant="outline" className="mb-6 border-primary text-primary px-4 py-1">Features</Badge>
+          <h2 className="text-5xl font-bold mb-8 tracking-tight">Everything you need to stop overpaying.</h2>
+          <div className="grid md:grid-cols-3 gap-10">
+            {featureHighlights.map((feature, index) => (
+              <div key={index} className="flex flex-col gap-6">
+                <div className="h-14 w-14 bg-primary/10 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <feature.icon className="h-7 w-7 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* 6️⃣ WHY WE'RE DIFFERENT - Comparison */}
+      {/* 4️⃣ COMPARISON SECTION */}
       <section id="comparison" className="bg-muted/30 py-28">
         <div className="container mx-auto px-4">
           <div className="text-center mb-20">
-            <h2 className="text-5xl font-bold mb-6 tracking-tight">
-              How We Compare
-            </h2>
+            <h2 className="text-5xl font-bold mb-6 tracking-tight">Why Subveris?</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              See what makes Subveris the better choice for subscription management.
+              Most "subscription managers" just read your bank transactions. We track actual usage.
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="max-w-4xl mx-auto bg-background rounded-3xl shadow-xl border border-border/50 overflow-hidden">
+            <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-4 px-6 font-semibold">Feature</th>
-                  <th className="text-center py-4 px-6 font-semibold text-muted-foreground">Other Apps</th>
-                  <th className="text-center py-4 px-6 font-semibold text-primary bg-primary/5 rounded-t">Subveris</th>
+                  <th className="p-8 text-lg font-bold">Feature</th>
+                  <th className="p-8 text-lg font-bold text-muted-foreground text-center">Others</th>
+                  <th className="p-8 text-lg font-bold text-primary text-center bg-primary/5">Subveris</th>
                 </tr>
               </thead>
               <tbody>
-                {comparison.map((row, index) => (
-                  <tr key={index} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                    <td className="py-4 px-6 font-medium">{row.feature}</td>
-                    <td className="text-center py-4 px-6 text-muted-foreground">{row.others}</td>
-                    <td className={`text-center py-4 px-6 font-semibold ${row.us === 'Yes' || row.us === 'High' || row.us === 'Advanced' ? 'text-green-600 bg-green-500/5' : ''}`}>
-                      {row.us}
-                    </td>
+                {comparison.map((item, index) => (
+                  <tr key={index} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                    <td className="p-8 font-medium">{item.feature}</td>
+                    <td className="p-8 text-center text-muted-foreground">{item.others}</td>
+                    <td className="p-8 text-center font-bold text-primary bg-primary/5">{item.us}</td>
                   </tr>
                 ))}
               </tbody>
@@ -480,25 +322,34 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 7️⃣ SOCIAL PROOF - Testimonials */}
+      {/* 5️⃣ TESTIMONIALS SECTION */}
       <section className="container mx-auto px-4 py-28">
         <div className="text-center mb-20">
-          <h2 className="text-5xl font-bold mb-6 tracking-tight">
-            Trusted by Early Optimizers
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Real people are already saving thousands. Join them.
-          </p>
+          <h2 className="text-5xl font-bold mb-6 tracking-tight">Loved by 50,000+ users</h2>
         </div>
-
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-8">
           {[
-            { name: "Alex R.", role: "Tech Company CEO", saving: "$480/month", quote: "Finally know exactly what I'm paying for. Cut 12 unused subscriptions in 30 minutes." },
-            { name: "Maria S.", role: "Small Business Owner", saving: "$240/month", quote: "The cost-per-use analysis changed how I think about digital tools. Best decision." },
-            { name: "James P.", role: "Software Engineer", saving: "$360/month", quote: "Lightweight, privacy-focused, and actually useful. This is how it should be." },
+            {
+              name: "Sarah Jenkins",
+              role: "Freelance Designer",
+              quote: "Subveris showed me I was paying for three different stock photo sites but only using one. Saved me $45/month instantly.",
+              saving: "$540/year"
+            },
+            {
+              name: "Michael Chen",
+              role: "Software Engineer",
+              quote: "The cost-per-use feature is a game changer. It made me realize my 'cheap' $10 streaming service was costing me $5 per movie.",
+              saving: "$210/year"
+            },
+            {
+              name: "Emma Rodriguez",
+              role: "Marketing Manager",
+              quote: "I love the privacy focus. No bank connection needed, just real insights into my digital spending habits.",
+              saving: "$380/year"
+            }
           ].map((testimonial, index) => (
-            <Card key={index} className="border border-border/50 shadow-md hover:shadow-lg hover:border-primary/50 transition-all">
-              <CardContent className="p-8">
+            <Card key={index} className="border-border/50 shadow-md hover:shadow-xl transition-all bg-card/50">
+              <CardContent className="pt-8">
                 <div className="flex gap-1 mb-6">
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
@@ -546,7 +397,6 @@ export default function HomePage() {
           </div>
 
           <div className="flex flex-wrap justify-center items-center gap-12 opacity-60">
-            {/* Placeholder for company logos - you can replace with actual logos */}
             <div className="text-lg font-semibold text-muted-foreground">TechCrunch</div>
             <div className="text-lg font-semibold text-muted-foreground">Product Hunt</div>
             <div className="text-lg font-semibold text-muted-foreground">Forbes</div>
@@ -669,10 +519,6 @@ export default function HomePage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Export reports (CSV/PDF)</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
                     <span className="text-sm font-medium">Priority support</span>
                   </li>
                 </ul>
@@ -733,10 +579,6 @@ export default function HomePage() {
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
                     <span className="text-sm font-medium">Up to 5 family members</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Family calendar view</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
@@ -830,7 +672,7 @@ export default function HomePage() {
                     <td className="py-4 px-6 font-medium">Support</td>
                     <td className="text-center py-4 px-6 text-sm text-muted-foreground">Email</td>
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Priority</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">VIP</td>
+                    <td className="text-center py-4 px-6 font-semibold text-purple-600 bg-purple-500/5">VIP</td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">Family Sharing</td>
@@ -840,12 +682,6 @@ export default function HomePage() {
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">Up to 5 Family Members</td>
-                    <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
-                    <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-purple-500/5"><Check className="h-5 w-5 text-purple-600 mx-auto" /></td>
-                  </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
-                    <td className="py-4 px-6 font-medium">Family Calendar</td>
                     <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
                     <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
                     <td className="text-center py-4 px-6 bg-purple-500/5"><Check className="h-5 w-5 text-purple-600 mx-auto" /></td>
@@ -985,9 +821,6 @@ export default function HomePage() {
                 Get Started Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-12 py-8 border-2">
-                Schedule Demo
-              </Button>
             </div>
 
             <div className="text-center">
@@ -1018,7 +851,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="max-w-md mx-auto">
               <Card className="border border-border/50 shadow-md hover:shadow-lg transition-all text-center">
                 <CardContent className="p-8">
                   <div className="flex justify-center mb-6">
@@ -1038,175 +871,31 @@ export default function HomePage() {
                   </a>
                 </CardContent>
               </Card>
-
-              <Card className="border border-border/50 shadow-md hover:shadow-lg transition-all text-center">
-                <CardContent className="p-8">
-                  <div className="flex justify-center mb-6">
-                    <div className="p-4 rounded-xl bg-blue-500/10">
-                      <MessageCircle className="h-8 w-8 text-blue-500" />
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-bold mb-3">Live Chat</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Chat with our support team in real-time during business hours.
-                  </p>
-                  <Button variant="outline" className="w-full">
-                    Start Chat
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="border border-border/50 shadow-md hover:shadow-lg transition-all text-center">
-                <CardContent className="p-8">
-                  <div className="flex justify-center mb-6">
-                    <div className="p-4 rounded-xl bg-green-500/10">
-                      <Bot className="h-8 w-8 text-green-500" />
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-bold mb-3">Help Center</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Browse our comprehensive knowledge base and tutorials.
-                  </p>
-                  <Button variant="outline" className="w-full">
-                    Visit Help Center
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="mt-12 text-center">
-              <p className="text-muted-foreground mb-4">
-                Have a question or need help getting started?
-              </p>
-              <Link href="/contact">
-                <Button variant="outline" size="lg">
-                  Contact Support
-                </Button>
-              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="border-t border-border/40 bg-muted/20 py-16">
+      {/* Footer */}
+      <footer className="bg-background border-t border-border/40 py-12">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-5 gap-8 mb-12">
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <TrendingUp className="h-6 w-6" />
-                </div>
-                <span className="text-xl font-bold">Subveris</span>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden shadow-sm">
+                <img src="/assets/logo.png" alt="Subveris Logo" className="h-full w-full object-cover" />
               </div>
-              <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-                The Subscription Optimization Platform. Take control of your recurring spending with AI-powered insights and real usage tracking.
-              </p>
-
-              {/* Contact Information */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 text-sm">
-                  <Mail className="h-4 w-4 text-primary" />
-                  <a href="mailto:help.subveris@gmail.com" className="text-muted-foreground hover:text-primary transition-colors">
-                    help.subveris@gmail.com
-                  </a>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <MessageCircle className="h-4 w-4 text-primary" />
-                  <span className="text-muted-foreground">24/7 Support Available</span>
-                </div>
-              </div>
-
-              {/* Trust Badges */}
-              <div className="flex flex-wrap gap-4 mt-6">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Shield className="h-4 w-4 text-green-500" />
-                  <span>SOC 2 Certified</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Lock className="h-4 w-4 text-blue-500" />
-                  <span>256-bit SSL</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>GDPR Compliant</span>
-                </div>
-              </div>
+              <span className="text-lg font-bold tracking-tight">Subveris</span>
             </div>
+            
+            <nav className="flex flex-wrap justify-center gap-8 text-sm font-medium text-muted-foreground">
+              <a href="#" className="hover:text-foreground transition-colors">Terms</a>
+              <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
+              <a href="#" className="hover:text-foreground transition-colors">Security</a>
+              <a href="#" className="hover:text-foreground transition-colors">Cookies</a>
+            </nav>
 
-            <div>
-              <h4 className="font-semibold text-sm mb-4">Product</h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li><a href="#solution" className="hover:text-primary transition-colors">Features</a></li>
-                <li><a href="#comparison" className="hover:text-primary transition-colors">How We Compare</a></li>
-                <li><a href="/pricing" className="hover:text-primary transition-colors">Pricing</a></li>
-                <li><a href="/docs" className="hover:text-primary transition-colors">Documentation</a></li>
-                <li><a href="/security" className="hover:text-primary transition-colors">Security</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-sm mb-4">Support</h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li><a href="/support" className="hover:text-primary transition-colors">Help Center</a></li>
-                <li><a href="/contact" className="hover:text-primary transition-colors">Contact Us</a></li>
-                <li><a href="/blog" className="hover:text-primary transition-colors">Blog</a></li>
-                <li><a href="/community" className="hover:text-primary transition-colors">Community</a></li>
-                <li><a href="mailto:help.subveris@gmail.com" className="hover:text-primary transition-colors">Email Support</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-sm mb-4">Company</h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li><a href="/about" className="hover:text-primary transition-colors">About Us</a></li>
-                <li><a href="/careers" className="hover:text-primary transition-colors">Careers</a></li>
-                <li><a href="/press" className="hover:text-primary transition-colors">Press Kit</a></li>
-                <li><a href="/partners" className="hover:text-primary transition-colors">Partners</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-sm mb-4">Legal</h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li><a href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</a></li>
-                <li><a href="/terms" className="hover:text-primary transition-colors">Terms of Service</a></li>
-                <li><a href="/cookies" className="hover:text-primary transition-colors">Cookie Policy</a></li>
-                <li><a href="/gdpr" className="hover:text-primary transition-colors">GDPR</a></li>
-                <li><a href="/security" className="hover:text-primary transition-colors">Security</a></li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Newsletter Signup */}
-          <div className="border-t border-border/40 pt-8 pb-6">
-            <div className="max-w-md mx-auto text-center">
-              <h4 className="font-semibold text-sm mb-2">Stay Updated</h4>
-              <p className="text-xs text-muted-foreground mb-4">
-                Get the latest updates on subscription optimization and new features.
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="flex-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-                <Button size="sm" className="px-4">
-                  Subscribe
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-border/40 pt-8 flex flex-col md:flex-row justify-between items-center">
-            <div className="text-xs text-muted-foreground mb-4 md:mb-0">
-              © 2025 Subveris. All rights reserved. Made with ❤️ for subscription optimizers worldwide.
-            </div>
-            <div className="flex gap-6 text-xs text-muted-foreground">
-              <a href="https://twitter.com/subveris" className="hover:text-primary transition-colors">Twitter</a>
-              <a href="https://linkedin.com/company/subveris" className="hover:text-primary transition-colors">LinkedIn</a>
-              <a href="https://github.com/subveris" className="hover:text-primary transition-colors">GitHub</a>
-              <a href="mailto:help.subveris@gmail.com" className="hover:text-primary transition-colors">Email</a>
+            <div className="text-sm text-muted-foreground">
+              © {new Date().getFullYear()} Subveris. All rights reserved.
             </div>
           </div>
         </div>

@@ -381,7 +381,10 @@ export default function Dashboard() {
         ? familyData.recommendations
         : computeRecommendationsFromSubs([...(familyData?.subscriptions || []), ...(familyData?.sharedSubscriptions?.map((s:any)=>(s.subscription || s)) || [])])
       )
-    : personalRecommendations;
+    : (personalRecommendations && personalRecommendations.length
+        ? personalRecommendations
+        : computeRecommendationsFromSubs(personalSubscriptions || [])
+      );
   const recommendations = dedupeByKey(recommendationsRaw, "subscriptionId");
   const recsLoading = showFamilyData ? familyDataLoading : personalRecsLoading;
 
