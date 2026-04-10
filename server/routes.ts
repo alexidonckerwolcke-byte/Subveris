@@ -908,11 +908,30 @@ export async function registerRoutes(
         .single();
 
       if (error || !data) {
+        // If error mentions deleted_at, try without it
+        if (error && error.message && error.message.includes('deleted_at')) {
+          const fallback = await supabase
+            .from('subscriptions')
+            .update({ status: 'deleted' })
+            .eq('id', req.params.id)
+            .eq('user_id', userId)
+            .select()
+            .single();
+          
+          if (fallback.error || !fallback.data) {
+            return res.status(404).json({ error: "Subscription not found" });
+          }
+          
+          clearSubscriptionsCacheForUser(userId);
+          return res.status(200).json(mapSubscriptionFromDb(fallback.data));
+        }
         return res.status(404).json({ error: "Subscription not found" });
       }
 
+      clearSubscriptionsCacheForUser(userId);
       res.status(200).json(mapSubscriptionFromDb(data));
     } catch (error) {
+      console.error('[Routes] DELETE /api/subscriptions/:id error:', error);
       res.status(500).json({ error: "Failed to delete subscription" });
     }
   });
