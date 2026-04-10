@@ -67,6 +67,10 @@ function extractUserIdFromToken(token: string): string | undefined {
 import { asyncHandler, notFoundHandler, errorHandler, AppError, UnauthorizedError, NotFoundError } from './middleware/errorHandler';
 const cache = new CacheService();
 
+function isValidBillingFrequency(freq: any): freq is 'weekly' | 'monthly' | 'quarterly' | 'yearly' {
+  return ['weekly', 'monthly', 'quarterly', 'yearly'].includes(freq);
+}
+
 // centralized handler for cost-per-use endpoint; defined above so
 // it exists outside the registration function (and can be imported by tests).
 export async function handleCostPerUse(req: express.Request, res: express.Response) {
