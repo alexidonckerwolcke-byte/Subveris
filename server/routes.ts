@@ -494,12 +494,21 @@ export async function registerRoutes(
       .select('*')
       .single();
 
-    if (insertError || !inserted) {
+    if (insertError) {
+      // Check for unique constraint violation
+      if (insertError.code === '23505' || (insertError.message && insertError.message.includes('unique constraint'))) {
+        throw new AppError(409, 'A subscription with this name, amount, and billing date already exists');
+      }
+
       console.error('[Routes] Failed to insert subscription', {
         insertPayload,
         insertError,
       });
-      throw new AppError(500, insertError?.message || 'Failed to create subscription');
+      throw new AppError(500, insertError.message || 'Failed to create subscription');
+    }
+
+    if (!inserted) {
+      throw new AppError(500, 'Failed to create subscription (no data returned)');
     }
 
     res.status(201).json(mapSubscriptionFromDb(inserted));
