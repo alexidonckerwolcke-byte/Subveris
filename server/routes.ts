@@ -30,6 +30,7 @@ function mapSubscriptionFromDb(sub: any) {
 
 
 import express from 'express';
+import { randomUUID } from 'crypto';
 import { emailService } from './email.js';
 
 // Helper for pagination params
