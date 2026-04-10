@@ -5,6 +5,34 @@ import { createClient } from '@supabase/supabase-js';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Exchange rates relative to USD (matching client/src/lib/currency-context.tsx)
+const EXCHANGE_RATES: Record<string, number> = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  CAD: 1.35,
+  AUD: 1.52,
+  JPY: 152.0,
+  CHF: 0.88,
+  SEK: 10.85,
+  NOK: 10.75,
+  DKK: 6.95,
+  PLN: 4.05,
+  CZK: 23.5,
+  HUF: 365.0,
+  BRL: 5.25,
+  MXN: 18.5,
+  ARS: 950.0,
+  TRY: 34.0,
+  ZAR: 18.5,
+  INR: 84.0,
+  CNY: 7.25,
+  KRW: 1350.0,
+  SGD: 1.35,
+  HKD: 7.8,
+  NZD: 1.65,
+};
+
 // Helper to get currency symbol
 function getCurrencySymbol(currency: string): string {
   const currencySymbols: Record<string, string> = {
@@ -18,13 +46,55 @@ function getCurrencySymbol(currency: string): string {
     'CNY': '¥',
     'INR': '₹',
     'NZD': 'NZ$',
+    'SEK': 'kr',
+    'NOK': 'kr',
+    'DKK': 'kr',
+    'PLN': 'zł',
+    'CZK': 'Kč',
+    'HUF': 'Ft',
+    'BRL': 'R$',
+    'MXN': '$',
+    'ARS': '$',
+    'TRY': '₺',
+    'ZAR': 'R',
+    'KRW': '₩',
+    'SGD': 'S$',
+    'HKD': 'HK$',
   };
   return currencySymbols[currency.toUpperCase()] || currency;
 }
 
+// Helper to get user's preferred currency
+async function getUserCurrency(userId: string): Promise<string> {
+  try {
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data } = await supabase
+      .from('users')
+      .select('currency')
+      .eq('id', userId)
+      .single();
+    return data?.currency || 'USD';
+  } catch (err) {
+    return 'USD';
+  }
+}
+
+// Helper to format amount in user's currency
+function formatAmountForEmail(amount: number, fromCurrency: string, toCurrency: string): string {
+  const fromRate = EXCHANGE_RATES[fromCurrency.toUpperCase()] || 1;
+  const toRate = EXCHANGE_RATES[toCurrency.toUpperCase()] || 1;
+  const convertedAmount = (amount / fromRate) * toRate;
+  const symbol = getCurrencySymbol(toCurrency);
+  return `${symbol}${convertedAmount.toFixed(2)}`;
+}
+
 const emailTemplate = (title: string, content: string) => `
   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-    <div style="background-color: #f0f7ff; padding: 20px; border-radius: 8px 8px 0 0; border-left: 4px solid #007bff;">
+    <div style="background-color: #f0f7ff; padding: 20px; border-radius: 8px 8px 0 0; border-left: 4px solid #007bff; display: flex; align-items: center; gap: 15px;">
+      <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663486926530/yZNjWlFaCygNTvdJ.png" alt="Subveris Logo" style="height: 40px; width: 40px; border-radius: 8px; object-fit: cover;" />
       <h1 style="color: #007bff; margin: 0; font-size: 24px;">${title}</h1>
     </div>
     <div style="padding: 30px; background-color: #fff; border: 1px solid #e0e0e0; border-top: none;">
@@ -93,14 +163,22 @@ export const emailService = {
         return { success: true, skipped: true };
       }
 
+      const userCurrency = await getUserCurrency(userId);
+      const formattedAmount = formatAmountForEmail(data.amount, data.currency, userCurrency);
+      const annualAmount = data.frequency === 'yearly' ? data.amount : 
+                         data.frequency === 'monthly' ? data.amount * 12 :
+                         data.frequency === 'quarterly' ? data.amount * 4 :
+                         data.frequency === 'weekly' ? data.amount * 52 : data.amount * 12;
+      const formattedAnnual = formatAmountForEmail(annualAmount, data.currency, userCurrency);
+
       const content = `
         <p>Hi there,</p>
         <p>You've successfully added a new subscription to your Subveris dashboard!</p>
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <p style="margin: 0;">
             <strong>Subscription:</strong> ${data.subscriptionName}<br/>
-            <strong>Amount:</strong> ${data.currency} ${data.amount}/${data.frequency}<br/>
-            <strong>Annual Cost:</strong> ${data.currency} ${(data.amount * 12).toFixed(2)}
+            <strong>Amount:</strong> ${formattedAmount}/${data.frequency}<br/>
+            <strong>Annual Cost:</strong> ${formattedAnnual}
           </p>
         </div>
         <p>Your subscription is now being tracked. You can:</p>
@@ -146,14 +224,18 @@ export const emailService = {
         return { success: true, skipped: true };
       }
 
+      const userCurrency = await getUserCurrency(userId);
+      const formattedAmount = formatAmountForEmail(data.amount, data.currency, userCurrency);
+      const formattedAnnual = formatAmountForEmail(data.amount * 12, data.currency, userCurrency);
+
       const content = `
         <p>Hi there,</p>
         <p>You've successfully removed <strong>${data.subscriptionName}</strong> from your subscriptions.</p>
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <p style="margin: 0;">
             <strong>Subscription:</strong> ${data.subscriptionName}<br/>
-            <strong>Monthly Savings:</strong> ${data.currency} ${data.amount}<br/>
-            <strong>Annual Savings:</strong> ${data.currency} ${(data.amount * 12).toFixed(2)}
+            <strong>Monthly Savings:</strong> ${formattedAmount}<br/>
+            <strong>Annual Savings:</strong> ${formattedAnnual}
           </p>
         </div>
         <p>🎉 Great job optimizing your subscriptions! You're saving money every month.</p>
@@ -499,6 +581,10 @@ export const emailService = {
         return { success: true, skipped: true };
       }
 
+      const userCurrency = await getUserCurrency(userId);
+      const formattedAmount = formatAmountForEmail(data.amount, data.currency, userCurrency);
+      const formattedAnnual = formatAmountForEmail(data.amount * 12, data.currency, userCurrency);
+
       const content = `
         <p>Hi there,</p>
         <p>Your <strong>${data.subscriptionName}</strong> subscription has been successfully cancelled.</p>
@@ -506,12 +592,12 @@ export const emailService = {
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <p style="margin: 0;">
             <strong>Subscription:</strong> ${data.subscriptionName}<br/>
-            <strong>Monthly Savings:</strong> ${data.currency} ${data.amount}<br/>
-            <strong>Annual Savings:</strong> ${data.currency} ${(data.amount * 12).toFixed(2)}
+            <strong>Monthly Savings:</strong> ${formattedAmount}<br/>
+            <strong>Annual Savings:</strong> ${formattedAnnual}
           </p>
         </div>
 
-        <p>Great job optimizing your subscriptions! You're now saving <strong>${data.currency} ${data.amount} per month</strong>.</p>
+        <p>Great job optimizing your subscriptions! You're now saving <strong>${formattedAmount} per month</strong>.</p>
       `;
 
       const { data: result, error } = await resend.emails.send({
@@ -542,7 +628,9 @@ export const emailService = {
     cancellationUrl?: string;
   }) {
     try {
-      const currencySymbol = getCurrencySymbol(data.currency);
+      const userCurrency = await getUserCurrency(userId);
+      const formattedAmount = formatAmountForEmail(data.amount, data.currency, userCurrency);
+      const formattedAnnual = formatAmountForEmail(data.amount * 12, data.currency, userCurrency);
       
       let actionButton = '';
       if (data.cancellationUrl) {
@@ -558,16 +646,15 @@ export const emailService = {
         `;
       }
 
-      const annualCost = (data.amount * 12).toFixed(2);
       const content = `
         <p>Hi there,</p>
         <p>Today is the day you scheduled to cancel <strong>${data.subscriptionName}</strong>!</p>
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
           <p style="margin: 0;">
             <strong>Subscription:</strong> ${data.subscriptionName}<br/>
-            <strong>Monthly Cost:</strong> ${currencySymbol} ${data.amount}<br/>
-            <strong>Annual Cost:</strong> ${currencySymbol} ${annualCost}<br/>
-            <strong>Potential Annual Savings:</strong> ${currencySymbol} ${annualCost}
+            <strong>Monthly Cost:</strong> ${formattedAmount}<br/>
+            <strong>Annual Cost:</strong> ${formattedAnnual}<br/>
+            <strong>Potential Annual Savings:</strong> ${formattedAnnual}
           </p>
         </div>
 
@@ -591,7 +678,7 @@ export const emailService = {
         const { data: result, error } = await resend.emails.send({
           from: 'Subveris <onboarding@resend.dev>',
           to: userEmail,
-          subject: `Time to cancel ${data.subscriptionName}? Save ${currencySymbol} ${annualCost}/year`,
+          subject: `Time to cancel ${data.subscriptionName}? Save ${formattedAnnual}/year`,
           html: emailTemplate('Cancellation Reminder', content),
         });
 
@@ -697,13 +784,16 @@ export const emailService = {
         return { success: true, skipped: true };
       }
 
-      const annualSpending = (data.monthlySpending * 12).toFixed(2);
+      const userCurrency = await getUserCurrency(userId);
+      const formattedMonthly = formatAmountForEmail(data.monthlySpending, data.currency, userCurrency);
+      const formattedAnnual = formatAmountForEmail(data.monthlySpending * 12, data.currency, userCurrency);
+      
       const topSubscriptionsHtml = data.topSubscriptions
         .map(
           (sub) =>
             `<tr style="border-bottom: 1px solid #e0e0e0;">
               <td style="padding: 12px; text-align: left;">${sub.name}</td>
-              <td style="padding: 12px; text-align: right;"><strong>${data.currency} ${sub.amount}/month</strong></td>
+              <td style="padding: 12px; text-align: right;"><strong>${formatAmountForEmail(sub.amount, data.currency, userCurrency)}/month</strong></td>
             </tr>`
         )
         .join('');
@@ -721,11 +811,11 @@ export const emailService = {
               </td>
               <td style="padding: 12px;">
                 <p style="margin: 0; color: #666; font-size: 12px;">Monthly Spending</p>
-                <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: bold; color: #007bff;">${data.currency} ${data.monthlySpending.toFixed(2)}</p>
+                <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: bold; color: #007bff;">${formattedMonthly}</p>
               </td>
               <td style="padding: 12px;">
                 <p style="margin: 0; color: #666; font-size: 12px;">Annual Cost</p>
-                <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: bold; color: #28a745;">${data.currency} ${annualSpending}</p>
+                <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: bold; color: #28a745;">${formattedAnnual}</p>
               </td>
             </tr>
           </table>
@@ -753,7 +843,7 @@ export const emailService = {
       const { data: result, error } = await resend.emails.send({
         from: 'Subveris <onboarding@resend.dev>',
         to: userEmail,
-        subject: `Your Weekly Subscription Summary - ${data.currency} ${data.monthlySpending.toFixed(2)}/month`,
+        subject: `Your Weekly Subscription Summary - ${formattedMonthly}/month`,
         html: emailTemplate('Weekly Digest', content),
       });
 
@@ -799,7 +889,7 @@ export const emailService = {
 
       const { data: result, error } = await resend.emails.send({
         from: 'Subveris <onboarding@resend.dev>',
-        to: 'alexi.donckerwolcke@gmail.com',
+        to: 'help.subveris@gmail.com',
         replyTo: contactData.email,
         subject: `Contact Form: ${contactData.subject}`,
         html: emailTemplate('New Contact Form Submission', content),
@@ -811,7 +901,7 @@ export const emailService = {
         return { success: false, error };
       }
 
-      console.log('[Email] Contact email sent to alexi.donckerwolcke@gmail.com (forwarded to help.subveris@gmail.com), reply-to:', contactData.email);
+      console.log('[Email] Contact email sent to help.subveris@gmail.com, reply-to:', contactData.email);
       console.log('[Email] Email ID:', result?.id);
       return { success: true, data: result };
     } catch (error) {

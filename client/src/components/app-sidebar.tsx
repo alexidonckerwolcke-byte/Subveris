@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
+import { useCurrency } from "@/lib/currency-context";
 import {
   LayoutDashboard,
   CreditCard,
@@ -126,22 +127,18 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
   const ownerMonthlySavings = data?.ownerMonthlySavings ?? 0;
   const memberMonthlySavings = data?.memberMonthlySavings ?? 0;
   const loading = isLoading;
+  const { formatAmount } = useCurrency();
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(amount);
+    return formatAmount(amount);
   };
 
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-6 py-4 bg-gradient-to-r from-primary/90 to-indigo-500/80 text-primary-foreground">
         <Link href={disabled ? "#" : "/"} className={`flex items-center gap-3 ${disabled ? 'pointer-events-none opacity-70' : ''}`}>
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white shadow-md backdrop-blur">
-            <TrendingUp className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden shadow-md">
+            <img src="/assets/logo.png" alt="Subveris Logo" className="h-full w-full object-cover" />
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-bold tracking-tight text-white">Subveris</span>

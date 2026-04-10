@@ -9,6 +9,7 @@ import { useLocation } from "wouter";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useCurrency } from "@/lib/currency-context";
 
 interface Plan {
   name: string;
@@ -20,72 +21,75 @@ interface Plan {
   popular: boolean;
 }
 
-const plans: Plan[] = [
-  {
-    name: "Free",
-    tier: "free",
-    price: "$0",
-    period: "forever",
-    description: "Perfect for getting started with subscription tracking",
-    features: [
-      "Track up to 5 subscriptions",
-      "Basic spending overview",
-      "Monthly spending reports",
-      "Manual subscription entry",
-      "Email support",
-    ],
-    popular: false,
-  },
-  {
-    name: "Premium",
-    tier: "premium",
-    price: "€9.99",
-    period: "per month",
-    description: "Unlock powerful insights and automation features",
-    features: [
-      "Unlimited subscriptions",
-      "AI-powered recommendations",
-      "Browser extension tracking",
-      "Cost-per-use analytics",
-      "Behavioral insights",
-      "Savings projections",
-      "Priority support",
-      "Export reports (CSV/PDF)",
-    ],
-    popular: false,
-  },
-  {
-    name: "Family",
-    tier: "family",
-    price: "€14.99",
-    period: "per month",
-    description: "Share subscriptions and manage family finances together",
-    features: [
-      "All Premium Features",
-      "Unlimited subscriptions",
-      "AI-powered recommendations",
-      "Browser extension tracking",
-      "Cost-per-use analytics",
-      "Behavioral insights",
-      "Savings projections",
-      "Family group management",
-      "Share subscriptions with family",
-      "Split costs with family members",
-      "Family spending overview",
-      "Priority support",
-      "Export reports (CSV/PDF)",
-    ],
-    popular: true,
-  },
-];
+// Plans are now defined inside the component to use localized currency
 
 export default function PricingPage() {
   const { tier: currentTier, subscriptionStatus } = useSubscription();
   const { toast } = useToast();
   const { familyGroupId, isInFamily } = useFamilyDataMode();
+  const { formatAmount } = useCurrency();
   const [, setLocation] = useLocation();
   // Message state for redirect
   const [redirectMsg, setRedirectMsg] = useState<string | null>(null);
+
+  const plans: Plan[] = [
+    {
+      name: "Free",
+      tier: "free",
+      price: formatAmount(0),
+      period: "forever",
+      description: "Perfect for getting started with subscription tracking",
+      features: [
+        "Track up to 5 subscriptions",
+        "Basic spending overview",
+        "Monthly spending reports",
+        "Manual subscription entry",
+        "Email support",
+      ],
+      popular: false,
+    },
+    {
+      name: "Premium",
+      tier: "premium",
+      price: formatAmount(9.99),
+      period: "per month",
+      description: "Unlock powerful insights and automation features",
+      features: [
+        "Unlimited subscriptions",
+        "AI-powered recommendations",
+        "Browser extension tracking",
+        "Cost-per-use analytics",
+        "Behavioral insights",
+        "Savings projections",
+        "Priority support",
+        "Export reports (CSV/PDF)",
+      ],
+      popular: false,
+    },
+    {
+      name: "Family",
+      tier: "family",
+      price: formatAmount(14.99),
+      period: "per month",
+      description: "Share subscriptions and manage family finances together",
+      features: [
+        "All Premium Features",
+        "Unlimited subscriptions",
+        "AI-powered recommendations",
+        "Browser extension tracking",
+        "Cost-per-use analytics",
+        "Behavioral insights",
+        "Savings projections",
+        "Family group management",
+        "Share subscriptions with family",
+        "Split costs with family members",
+        "Family spending overview",
+        "Priority support",
+        "Export reports (CSV/PDF)",
+      ],
+      popular: true,
+    },
+  ];
 
   const createCheckoutMutation = useMutation({
     mutationFn: async (tier: "premium" | "family") => {

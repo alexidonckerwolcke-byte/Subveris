@@ -198,11 +198,43 @@ export async function sendRenewalReminders(userId?: string): Promise<RenewalRemi
 
         summary.emailAttempted += 1;
 
+        // Get user's preferred currency
+        const { data: userRecord } = await supabase
+          .from('users')
+          .select('currency')
+          .eq('id', uid)
+          .single();
+        const userCurrency = userRecord?.currency || 'USD';
+
+        // Exchange rates relative to USD (matching email.ts)
+        const EXCHANGE_RATES: Record<string, number> = {
+          USD: 1, EUR: 0.92, GBP: 0.79, CAD: 1.35, AUD: 1.52, JPY: 152.0,
+          CHF: 0.88, SEK: 10.85, NOK: 10.75, DKK: 6.95, PLN: 4.05, CZK: 23.5,
+          HUF: 365.0, BRL: 5.25, MXN: 18.5, ARS: 950.0, TRY: 34.0, ZAR: 18.5,
+          INR: 84.0, CNY: 7.25, KRW: 1350.0, SGD: 1.35, HKD: 7.8, NZD: 1.65,
+        };
+
+        const currencySymbols: Record<string, string> = {
+          'USD': '$', 'EUR': '€', 'GBP': '£', 'JPY': '¥', 'CAD': 'C$', 'AUD': 'A$',
+          'CHF': 'CHF', 'CNY': '¥', 'INR': '₹', 'NZD': 'NZ$', 'SEK': 'kr',
+          'NOK': 'kr', 'DKK': 'kr', 'PLN': 'zł', 'CZK': 'Kč', 'HUF': 'Ft',
+          'BRL': 'R$', 'MXN': '$', 'ARS': '$', 'TRY': '₺', 'ZAR': 'R',
+          'KRW': '₩', 'SGD': 'S$', 'HKD': 'HK$',
+        };
+
+        function formatForEmail(amount: number, from: string, to: string) {
+          const fromRate = EXCHANGE_RATES[from.toUpperCase()] || 1;
+          const toRate = EXCHANGE_RATES[to.toUpperCase()] || 1;
+          const converted = (amount / fromRate) * toRate;
+          const symbol = currencySymbols[to.toUpperCase()] || to;
+          return `${symbol}${converted.toFixed(2)}`;
+        }
+
         // Create email content
         const subscriptionList = subs
           .map(
             (s) =>
-              `<li><strong>${s.name}</strong>: $${s.amount} ${s.currency} (${s.frequency}) - Renews: ${s.next_billing_at}</li>`
+              `<li><strong>${s.name}</strong>: ${formatForEmail(s.amount, s.currency, userCurrency)} (${s.frequency}) - Renews: ${s.next_billing_at}</li>`
           )
           .join("");
 

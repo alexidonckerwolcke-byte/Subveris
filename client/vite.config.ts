@@ -36,6 +36,11 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    allowedHosts: [
+      "5173-i1972mewu5sdpdlv7msqp-aeb8a8cf.us1.manus.computer",
+      "localhost",
+      "0.0.0.0"
+    ],
     fs: {
       strict: true,
       deny: ["**/.*"],

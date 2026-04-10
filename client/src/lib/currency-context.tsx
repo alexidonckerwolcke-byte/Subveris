@@ -8,6 +8,7 @@ interface CurrencyContextType {
   setCurrency: (currency: Currency) => void;
   convertAmount: (amount: number, fromCurrency?: Currency, toCurrency?: Currency) => number;
   formatAmount: (amount: number, fromCurrency?: Currency) => string;
+  hasSelectedCurrency: boolean;
 }
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
@@ -42,11 +43,35 @@ const EXCHANGE_RATES: Record<Currency, number> = {
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const { user, getToken } = useAuth();
-  const [currency, setCurrencyState] = useState<Currency>('USD');
+  const [currency, setCurrencyState] = useState<Currency>(() => {
+    // Try to get from localStorage first for immediate UI
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('subveris-currency');
+      if (saved && Object.keys(EXCHANGE_RATES).includes(saved)) {
+        return saved as Currency;
+      }
+    }
+    return 'USD'; // Default to USD but we'll prompt if not explicitly set
+  });
+
+  const [hasSelectedCurrency, setHasSelectedCurrency] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return !!localStorage.getItem('subveris-currency');
+    }
+    return false;
+  });
 
   const setCurrency = (newCurrency: Currency) => {
     if (Object.keys(EXCHANGE_RATES).includes(newCurrency)) {
       setCurrencyState(newCurrency);
+      setHasSelectedCurrency(true);
+      
+      // Persist to localStorage immediately
+      try {
+        localStorage.setItem('subveris-currency', newCurrency);
+      } catch (error) {
+        console.warn('Failed to save currency preference to localStorage:', error);
+      }
 
       // persist to server if logged in
       if (user) {
@@ -74,25 +99,20 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Load currency preference from localStorage
+  // Load currency preference from localStorage on mount
   useEffect(() => {
     try {
       const savedCurrency = localStorage.getItem('subveris-currency');
       if (savedCurrency && Object.keys(EXCHANGE_RATES).includes(savedCurrency)) {
-        setCurrency(savedCurrency as Currency);
-      } else if (savedCurrency && !Object.keys(EXCHANGE_RATES).includes(savedCurrency)) {
-        // If saved currency is invalid, remove it and default to USD
-        console.warn(`Invalid currency "${savedCurrency}" found in localStorage, resetting to USD`);
-        localStorage.removeItem('subveris-currency');
+        setCurrencyState(savedCurrency as Currency);
+        setHasSelectedCurrency(true);
       }
     } catch (error) {
       console.warn('Failed to load currency preference from localStorage:', error);
     }
   }, []);
 
-  // If the user is logged in, fetch their saved currency from the server and
-  // override whatever we loaded from localStorage. We watch `user` so that
-  // this effect fires once after login/sign-up.
+  // Sync with server when user logs in
   useEffect(() => {
     if (user) {
       getToken()
@@ -103,8 +123,10 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         )
         .then((res) => res.json())
         .then((data) => {
-          if (data.currency && data.currency !== currency) {
+          if (data.currency && Object.keys(EXCHANGE_RATES).includes(data.currency)) {
             setCurrencyState(data.currency);
+            setHasSelectedCurrency(true);
+            localStorage.setItem('subveris-currency', data.currency);
           }
         })
         .catch((err) => {
@@ -112,15 +134,6 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         });
     }
   }, [user]);
-
-  // Save currency preference to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('subveris-currency', currency);
-    } catch (error) {
-      console.warn('Failed to save currency preference to localStorage:', error);
-    }
-  }, [currency]);
 
   const convertAmount = (amount: number, fromCurrency: Currency = 'USD', toCurrency: Currency = currency): number => {
     // Convert to USD first, then to target currency
@@ -144,6 +157,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
       setCurrency,
       convertAmount,
       formatAmount,
+      hasSelectedCurrency,
     }}>
       {children}
     </CurrencyContext.Provider>
