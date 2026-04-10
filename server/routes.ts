@@ -511,6 +511,9 @@ export async function registerRoutes(
       throw new AppError(500, 'Failed to create subscription (no data returned)');
     }
 
+    // Clear cache for this user
+    clearSubscriptionsCacheForUser(userId);
+
     res.status(201).json(mapSubscriptionFromDb(inserted));
   }));
 
