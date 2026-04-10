@@ -31,7 +31,7 @@ import FamilySharingPage from "@/pages/family-sharing";
 import DocsPage from "@/pages/docs";
 import { ContactPage } from "@/pages/contact";
 import { useLocation } from "wouter";
-import { CurrencyProvider } from "@/lib/currency-context";
+import { CurrencyProvider, useCurrency } from "@/lib/currency-context";
 import { CurrencySelector } from "@/components/currency-selector";
 import { ErrorBoundary } from "@/components/error-boundary";
 import {
