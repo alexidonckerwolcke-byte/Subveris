@@ -94,8 +94,16 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
 
   if (step === 'currency') {
     return (
-      <Dialog open={open}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={open} onOpenChange={(val) => {
+        // Prevent closing via backdrop/escape if on currency step
+        if (!val) return;
+        onClose();
+      }}>
+        <DialogContent 
+          className="sm:max-w-[500px]" 
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <div className="flex items-center gap-2">
               <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center">
@@ -104,7 +112,8 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
               <DialogTitle>Select Your Currency</DialogTitle>
             </div>
             <DialogDescription className="mt-2">
-              Choose your preferred currency for displaying all subscription amounts
+              Choose your preferred currency for displaying all subscription amounts. 
+              <strong> This is required to continue.</strong>
             </DialogDescription>
           </DialogHeader>
 

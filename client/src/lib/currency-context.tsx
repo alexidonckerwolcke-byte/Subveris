@@ -47,30 +47,33 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     // Try to get from localStorage first for immediate UI
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('subveris-currency');
-      if (saved && Object.keys(EXCHANGE_RATES).includes(saved)) {
+      if (saved && EXCHANGE_RATES[saved as Currency]) {
         return saved as Currency;
       }
     }
-    return 'USD'; // Default to USD but we'll prompt if not explicitly set
+    return 'USD';
   });
 
   const [hasSelectedCurrency, setHasSelectedCurrency] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      return !!localStorage.getItem('subveris-currency');
+      const saved = localStorage.getItem('subveris-currency');
+      return !!saved && !!EXCHANGE_RATES[saved as Currency];
     }
     return false;
   });
 
   const setCurrency = (newCurrency: Currency) => {
-    if (Object.keys(EXCHANGE_RATES).includes(newCurrency)) {
+    if (EXCHANGE_RATES[newCurrency]) {
       setCurrencyState(newCurrency);
       setHasSelectedCurrency(true);
       
       // Persist to localStorage immediately
-      try {
-        localStorage.setItem('subveris-currency', newCurrency);
-      } catch (error) {
-        console.warn('Failed to save currency preference to localStorage:', error);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('subveris-currency', newCurrency);
+        } catch (error) {
+          console.warn('Failed to save currency preference to localStorage:', error);
+        }
       }
 
       // persist to server if logged in
@@ -99,22 +102,16 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Load currency preference from localStorage on mount
-  useEffect(() => {
-    try {
-      const savedCurrency = localStorage.getItem('subveris-currency');
-      if (savedCurrency && Object.keys(EXCHANGE_RATES).includes(savedCurrency)) {
-        setCurrencyState(savedCurrency as Currency);
-        setHasSelectedCurrency(true);
-      }
-    } catch (error) {
-      console.warn('Failed to load currency preference from localStorage:', error);
-    }
-  }, []);
-
-  // Sync with server when user logs in
+  // Sync with server when user logs in, but ONLY if localStorage is empty
   useEffect(() => {
     if (user) {
+      const saved = localStorage.getItem('subveris-currency');
+      if (saved && EXCHANGE_RATES[saved as Currency]) {
+        // We already have a local preference, don't let server overwrite it
+        // unless we want server to be source of truth. Usually local is faster.
+        return;
+      }
+
       getToken()
         .then((token) =>
           fetch('/api/user/premium-status', {
@@ -123,8 +120,8 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         )
         .then((res) => res.json())
         .then((data) => {
-          if (data.currency && Object.keys(EXCHANGE_RATES).includes(data.currency)) {
-            setCurrencyState(data.currency);
+          if (data.currency && EXCHANGE_RATES[data.currency as Currency]) {
+            setCurrencyState(data.currency as Currency);
             setHasSelectedCurrency(true);
             localStorage.setItem('subveris-currency', data.currency);
           }
