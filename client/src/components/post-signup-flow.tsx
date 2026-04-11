@@ -12,9 +12,8 @@ interface PostSignupFlowProps {
 }
 
 export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
-  const { setCurrency, formatAmount } = useCurrency();
+  const { setCurrency } = useCurrency();
   const [step, setStep] = useState<'currency' | 'plan' | 'mfa'>('currency');
-  const [selectedPlan, setSelectedPlan] = useState<'free' | 'premium' | null>(null);
 
   const currencies: Array<{ code: Currency; name: string; symbol: string }> = [
     { code: 'USD', name: 'US Dollar', symbol: '$' },
@@ -33,7 +32,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
     {
       name: 'Free',
       tier: 'free' as const,
-      price: formatAmount(0),
+      price: "0,00 €",
       description: 'Perfect for getting started',
       features: [
         'Track up to 5 subscriptions',
@@ -44,7 +43,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
     {
       name: 'Premium',
       tier: 'premium' as const,
-      price: formatAmount(9.99),
+      price: "9,99 €",
       period: '/month',
       description: 'Unlock powerful insights',
       features: [
@@ -58,7 +57,6 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
   ];
 
   const handlePlanSelect = (tier: 'free' | 'premium') => {
-    setSelectedPlan(tier);
     if (tier === 'premium') {
       // Store selection and redirect after closing
       localStorage.setItem('postSignupPlan', 'premium');
