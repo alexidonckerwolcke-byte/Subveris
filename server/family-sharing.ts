@@ -37,8 +37,7 @@ export function generateAIRecommendations(subs: any[]): any[] {
 
   const actionableSubs = subs.filter((sub: any) => 
     sub.status === 'unused' || 
-    sub.status === 'to-cancel' || 
-    monthlyAmountFor(sub) >= 15
+    sub.status === 'to-cancel'
   );
 
   for (const sub of actionableSubs) {
