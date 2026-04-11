@@ -36,7 +36,7 @@ export default function PricingPage() {
     {
       name: "Free",
       tier: "free",
-      price: formatAmount(0),
+      price: "0,00 €",
       period: "forever",
       description: "Perfect for getting started with subscription tracking",
       features: [
@@ -51,7 +51,7 @@ export default function PricingPage() {
     {
       name: "Premium",
       tier: "premium",
-      price: formatAmount(9.99),
+      price: "9,99 €",
       period: "per month",
       description: "Unlock powerful insights and automation features",
       features: [
@@ -69,7 +69,7 @@ export default function PricingPage() {
     {
       name: "Family",
       tier: "family",
-      price: formatAmount(14.99),
+      price: "14,99 €",
       period: "per month",
       description: "Share subscriptions and manage family finances together",
       features: [
