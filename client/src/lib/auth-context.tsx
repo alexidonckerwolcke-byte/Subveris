@@ -63,11 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check if user has subscriptions and premium status
   const checkUserSubscriptions = async (userId: string) => {
     try {
+      const tokenValue = session?.access_token || JSON.parse(localStorage.getItem('supabase.auth.token') || '{}').access_token;
+      const authHeader = tokenValue ? { 'Authorization': `Bearer ${tokenValue}` } : {};
+
       // Check regular subscriptions
       const response = await fetch('/api/subscriptions', {
-        headers: {
-          'Authorization': `Bearer ${JSON.parse(localStorage.getItem('supabase.auth.token') || '{}').access_token}`,
-        },
+        headers: authHeader,
       });
       if (response.ok) {
         const subscriptions = await response.json();
@@ -76,9 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Check premium status
       const premiumResponse = await fetch('/api/user/premium-status', {
-        headers: {
-          'Authorization': `Bearer ${JSON.parse(localStorage.getItem('supabase.auth.token') || '{}').access_token}`,
-        },
+        headers: authHeader,
       });
       if (premiumResponse.ok) {
         const premiumData = await premiumResponse.json();
@@ -110,14 +109,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      console.warn('[Auth] Supabase client not initialized; skipping auth bootstrap.');
+      setLoading(false);
+      return;
+    }
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        // Mirror the current Supabase session token into our localStorage helper
+        if (session?.access_token) {
+          localStorage.setItem('supabase.auth.token', JSON.stringify({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+          }));
+        } else {
+          localStorage.removeItem('supabase.auth.token');
+        }
+
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error('[Auth] getSession failed:', error);
+        setLoading(false);
+      });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

@@ -3,7 +3,17 @@ import { checkNotificationPreference } from './notification-preferences.js';
 import { sendBatchPushNotifications } from './push-notifications.js';
 import { createClient } from '@supabase/supabase-js';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resendApiKey = process.env.RESEND_API_KEY;
+const resend = resendApiKey
+  ? new Resend(resendApiKey)
+  : ({
+      emails: {
+        send: async () => {
+          console.warn('[Email] RESEND_API_KEY not configured. Skipping email send.');
+          return { data: null, error: null };
+        },
+      },
+    } as unknown as Resend);
 
 // Exchange rates relative to USD (matching client/src/lib/currency-context.tsx)
 const EXCHANGE_RATES: Record<string, number> = {
