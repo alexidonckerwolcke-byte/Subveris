@@ -87,6 +87,7 @@ export type RenewalReminderSummary = {
   emailSkippedNoAddress: number;
   emailSendErrors: number;
   notices: string[];
+  shouldPersist?: boolean;
 };
 
 export type RenewalRunLogRecord = {
@@ -115,6 +116,7 @@ export async function sendRenewalReminders(userId?: string): Promise<RenewalRemi
     emailSkippedNoAddress: 0,
     emailSendErrors: 0,
     notices: [],
+    shouldPersist: true,
   };
 
   try {
@@ -158,6 +160,9 @@ export async function sendRenewalReminders(userId?: string): Promise<RenewalRemi
     if (error) {
       console.error("[Renewal] Error fetching upcoming renewals:", error);
       summary.notices.push("Error querying upcoming renewals");
+      if (error.message?.includes('fetch failed') || error.details?.includes('ConnectTimeoutError')) {
+        summary.shouldPersist = false;
+      }
       return summary;
     }
 
@@ -348,6 +353,13 @@ export async function runRenewalChecks(options: { mode?: "scheduled" | "manual";
   try {
     const summary = await sendRenewalReminders(options.userId);
     console.log("[Renewal] Renewal checks completed", summary);
+
+    if (summary.shouldPersist === false) {
+      const msg = "[Renewal] Skipping renewal run persistence because upstream Supabase fetch failed.";
+      console.warn(msg);
+      summary.notices.push(msg);
+      return { summary, runLogId: '' };
+    }
 
     const logResult = await persistRenewalRun(summary, { mode, userId: options.userId });
     if (logResult.error) {

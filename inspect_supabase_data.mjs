@@ -1,0 +1,13 @@
+import 'dotenv/config';
+import { createClient } from '@supabase/supabase-js';
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const { data: subs, error: subsErr } = await supabase.from('subscriptions').select('user_id,status,name,amount,currency,frequency,created_at').order('created_at',{ascending:true}).limit(100);
+const { data: users, error: usersErr } = await supabase.from('auth.users').select('id,email,created_at').limit(100);
+const counts = subs ? subs.reduce((acc, sub) => { acc[sub.user_id] = (acc[sub.user_id] || 0) + 1; return acc; }, {}) : {};
+console.log('subsErr', subsErr);
+console.log('subs count', subs ? subs.length : 0);
+console.log('counts', counts);
+console.log('subs sample', subs);
+console.log('usersErr', usersErr);
+console.log('users count', users ? users.length : 0);
+console.log('users sample', users);

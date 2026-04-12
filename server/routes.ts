@@ -32,6 +32,7 @@ function mapSubscriptionFromDb(sub: any) {
 import express from 'express';
 import { randomUUID } from 'crypto';
 import { emailService } from './email.js';
+import { runRenewalChecks } from './renewal-manager.js';
 
 // Helper for pagination params
 function getPaginationParams(req: any) {
@@ -217,10 +218,15 @@ export async function registerRoutes(
 
     // Get user's subscriptions only
     const supabase = getSupabaseClient();
-    const { data: subscriptions } = await supabase
+    const { data: subscriptions, error: subscriptionsError } = await supabase
       .from('subscriptions')
       .select('*')
       .eq('user_id', userId);
+
+    if (subscriptionsError) {
+      console.error('[Routes] /api/metrics supabase error', subscriptionsError);
+      throw new AppError(500, 'Failed to load metrics');
+    }
 
     if (!subscriptions) {
       const emptyMetrics = {
@@ -330,7 +336,7 @@ export async function registerRoutes(
 
     // Auto-advance renewal dates for expired subscriptions (if supported by renewal manager)
     try {
-      await runRenewalChecks(userId);
+      await runRenewalChecks({ userId });
     } catch (err) {
       console.error("[Routes] Error auto-advancing renewal dates:", err);
     }
