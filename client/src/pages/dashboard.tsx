@@ -306,6 +306,7 @@ export default function Dashboard() {
           subscriptionId: sub.id,
           subscriptionName: sub.name,
           monthlyAmount: Math.round(monthlyAmount * 100) / 100,
+          currency: sub.currency || 'USD',
           equivalents,
         };
       });
@@ -320,9 +321,9 @@ export default function Dashboard() {
     queryKey: ["/api/recommendations"],
   });
 
-  function computeRecommendationsFromSubs(subs: any[] | undefined) {
+  function computeRecommendationsFromSubs(subs: any[] | undefined): AIRecommendation[] {
     if (!subs || subs.length === 0) return [];
-    const recommendations: any[] = [];
+    const recommendations: AIRecommendation[] = [];
     const allSubs = subs.filter(s => s && s.status !== 'deleted');
 
     const adobeSub = allSubs.find(s => s.name && s.name.toLowerCase().includes('adobe'));
@@ -376,9 +377,9 @@ export default function Dashboard() {
     return recommendations;
   }
 
-  const recommendationsRaw = showFamilyData
+  const recommendationsRaw: AIRecommendation[] = showFamilyData
     ? (familyData?.recommendations && familyData.recommendations.length
-        ? familyData.recommendations
+        ? (familyData.recommendations as AIRecommendation[])
         : computeRecommendationsFromSubs([...(familyData?.subscriptions || []), ...(familyData?.sharedSubscriptions?.map((s:any)=>(s.subscription || s)) || [])])
       )
     : (personalRecommendations && personalRecommendations.length

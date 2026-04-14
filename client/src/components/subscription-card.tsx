@@ -255,7 +255,7 @@ export function SubscriptionCard({
             <p className="text-xs text-muted-foreground mt-1">
               Next billing: {
                 (() => {
-                  const raw = subscription.nextBillingDate || subscription.next_billing_at || subscription.next_billing_date || subscription.nextBillingDate || subscription.createdAt || subscription.created_at;
+                  const raw = (subscription as any).nextBillingDate || (subscription as any).next_billing_at || (subscription as any).next_billing_date;
                   if (!raw) return '—';
                   const d = new Date(raw);
                   if (!isNaN(d.getTime())) return d.toLocaleDateString();
@@ -275,7 +275,7 @@ export function SubscriptionCard({
               <p className="text-xs text-chart-5 mt-1 font-medium">
                 Scheduled to cancel: {
                   (() => {
-                    const raw = subscription.scheduledCancellationDate || subscription.scheduled_cancellation_date;
+                    const raw = (subscription as any).scheduledCancellationDate || (subscription as any).scheduled_cancellation_date;
                     if (!raw) return '—';
                     const d = new Date(raw);
                     if (!isNaN(d.getTime())) return d.toLocaleDateString();
@@ -289,6 +289,11 @@ export function SubscriptionCard({
                     return '—';
                   })()
                 }
+              </p>
+            )}
+            {subscription.status === 'deleted' && (
+              <p className="text-xs text-muted-foreground mt-2">
+                This subscription is marked deleted and is automatically removed on the first day of the next month.
               </p>
             )}
           </div>

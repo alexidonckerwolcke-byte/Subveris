@@ -14,9 +14,7 @@ export function generateVapidKeys(): { publicKey: string; privateKey: string } {
     .createPublicKey(vapidKeys.publicKey)
     .export({ type: 'spki', format: 'pem' });
 
-  const privateKey = crypto
-    .createPrivateKey(vapidKeys.privateKey)
-    .export({ type: 'pkcs8', format: 'pem' });
+const privateKey = vapidKeys.privateKey.export({ type: 'pkcs8', format: 'pem' });
 
   // Convert to base64 for use in Web Push
   const publicKeyB64 = Buffer.from(publicKey).toString('base64');
@@ -51,13 +49,8 @@ export function createVapidJwt(subject: string, vapidPrivateKey: string): string
   const message = `${headerEncoded}.${payloadEncoded}`;
 
   // Sign with private key
-  const privateKeyObj = crypto.createPrivateKey({
-    key: Buffer.from(vapidPrivateKey, 'base64').toString('utf-8'),
-    format: 'pem',
-    type: 'pkcs8',
-  });
-
-  const signature = crypto.sign('SHA256', Buffer.from(message), privateKeyObj);
+  const privateKeyPem = Buffer.from(vapidPrivateKey, 'base64').toString('utf-8');
+  const signature = crypto.sign('SHA256', Buffer.from(message), { key: privateKeyPem });
   const signatureB64 = Buffer.from(signature).toString('base64url');
 
   return `${message}.${signatureB64}`;

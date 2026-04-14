@@ -29,8 +29,12 @@ function mapSubscriptionFromDb(sub: any) {
 }
 
 
-import express from 'express';
+import express, { type Request, type Response, type Express } from 'express';
+import { type Server } from 'http';
 import { randomUUID } from 'crypto';
+import { join } from 'path';
+import { createClient } from '@supabase/supabase-js';
+import { z } from 'zod';
 import { emailService } from './email.js';
 import { runRenewalChecks } from './renewal-manager.js';
 
@@ -57,6 +61,9 @@ function clearSubscriptionsCacheForUser(userId: string) {
 
 import { CacheService } from './cache';
 import { getSupabaseClient } from './supabase';
+
+type SessionRequest = Request & { session?: { user?: { id?: string } } };
+import { storage } from './storage';
 // Helper to extract userId from a JWT (Supabase or custom)
 function extractUserIdFromToken(token: string): string | undefined {
   try {
@@ -66,7 +73,21 @@ function extractUserIdFromToken(token: string): string | undefined {
     return undefined;
   }
 }
-import { asyncHandler, notFoundHandler, errorHandler, AppError, UnauthorizedError, NotFoundError } from './middleware/errorHandler';
+
+function isTimestampInCurrentMonth(timestamp?: string | null) {
+  if (!timestamp) return false;
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const now = new Date();
+  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return parsed >= currentMonth && parsed < nextMonth;
+}
+
+function getSubscriptionDeletedTimestamp(sub: any) {
+  return sub.deleted_at || sub.deletedAt || sub.updated_at || sub.updatedAt || null;
+}
+import { asyncHandler, notFoundHandler, errorHandler, AppError, UnauthorizedError, ForbiddenError, NotFoundError } from './middleware/errorHandler';
 const cache = new CacheService();
 
 function isValidBillingFrequency(freq: any): freq is 'weekly' | 'monthly' | 'quarterly' | 'yearly' {
@@ -75,7 +96,7 @@ function isValidBillingFrequency(freq: any): freq is 'weekly' | 'monthly' | 'qua
 
 // centralized handler for cost-per-use endpoint; defined above so
 // it exists outside the registration function (and can be imported by tests).
-export async function handleCostPerUse(req: express.Request, res: express.Response) {
+export async function handleCostPerUse(req: SessionRequest, res: Response) {
   try {
     // Get user ID from auth
     let userId = req.session?.user?.id;
@@ -155,11 +176,13 @@ export async function handleCostPerUse(req: express.Request, res: express.Respon
       return res.json([]);
     }
 
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
     const analysis = subscriptions
       .filter(sub => sub.status !== 'deleted')
       .map(sub => {
         const monthlyAmount = sub.frequency === 'yearly' ? sub.amount / 12 : sub.frequency === 'quarterly' ? sub.amount / 3 : sub.frequency === 'weekly' ? sub.amount * 4 : sub.amount;
-        const usageCount = sub.usage_count || 0;
+        const monthlyUsageCount = sub.usage_month === currentMonth ? (sub.monthly_usage_count || 0) : 0;
+        const usageCount = monthlyUsageCount;
         const costPerUse = usageCount > 0 ? monthlyAmount / usageCount : monthlyAmount;
         let valueRating: 'excellent' | 'good' | 'fair' | 'poor';
         if (usageCount <= 1) {
@@ -194,7 +217,7 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   // Root route for health/status
-  app.get("/", (req, res) => {
+  app.get("/", (req: SessionRequest, res: Response) => {
     res.json({
       status: "ok",
       message: "Welcome to the Subveris API",
@@ -202,7 +225,7 @@ export async function registerRoutes(
     });
   });
 
-  app.get("/api/metrics", asyncHandler(async (req, res) => {
+  app.get("/api/metrics", asyncHandler(async (req: SessionRequest, res: Response) => {
     // Cache key based on user
     let userId = req.session?.user?.id;
     if (!userId) {
@@ -286,12 +309,8 @@ export async function registerRoutes(
     const deletedSavings = subscriptions
       .filter(s => s.status === 'deleted')
       .filter(s => {
-        if (s.updated_at) {
-          const d = new Date(s.updated_at);
-          return d >= currentMonth && d < nextMonth;
-        }
-        // If updated_at is unavailable, include all deleted subscriptions as an approximate fallback
-        return true;
+        const ts = getSubscriptionDeletedTimestamp(s);
+        return isTimestampInCurrentMonth(ts);
       })
       .reduce((sum, s) => {
         const monthlyAmount = s.frequency === 'yearly' ? s.amount / 12 : s.frequency === 'quarterly' ? s.amount / 3 : s.frequency === 'weekly' ? s.amount * 4 : s.amount;
@@ -317,7 +336,7 @@ export async function registerRoutes(
     res.json(metrics);
   }));
 
-  app.get("/api/subscriptions", asyncHandler(async (req, res) => {
+  app.get("/api/subscriptions", asyncHandler(async (req: SessionRequest, res: Response) => {
     // parse pagination
     const { page, perPage } = getPaginationParams(req);
 
@@ -373,7 +392,7 @@ export async function registerRoutes(
     res.json(result);
   }));
 
-  app.get("/api/subscriptions/:id", asyncHandler(async (req, res) => {
+  app.get("/api/subscriptions/:id", asyncHandler(async (req: SessionRequest, res: Response) => {
     // Get user ID from session or authorization header
     let userId = req.session?.user?.id;
     if (!userId) {
@@ -398,7 +417,7 @@ export async function registerRoutes(
       res.json(mapSubscriptionFromDb(data));
   }));
 
-  app.post("/api/subscriptions", asyncHandler(async (req, res) => {
+  app.post("/api/subscriptions", asyncHandler(async (req: SessionRequest, res: Response) => {
     // Get user ID from session or token
     let userId = req.session?.user?.id;
     if (!userId) {
@@ -523,7 +542,7 @@ export async function registerRoutes(
     res.status(201).json(mapSubscriptionFromDb(inserted));
   }));
 
-  app.patch("/api/subscriptions/:id/usage", asyncHandler(async (req, res) => {
+  app.patch("/api/subscriptions/:id/usage", asyncHandler(async (req: SessionRequest, res: Response) => {
     const { usageCount } = req.body;
     if (typeof usageCount !== "number" || usageCount < 0) {
       throw new AppError(400, "Usage count must be a non-negative number");
@@ -604,7 +623,7 @@ export async function registerRoutes(
     res.json(mapSubscriptionFromDb(data));
   }));
 
-  app.patch("/api/subscriptions/:id", asyncHandler(async (req, res) => {
+  app.patch("/api/subscriptions/:id", asyncHandler(async (req: SessionRequest, res: Response) => {
     const subscriptionId = req.params.id;
     const { nextBillingDate } = req.body;
     console.log('[Routes] PATCH /api/subscriptions/:id', { subscriptionId, nextBillingDate });
@@ -680,7 +699,7 @@ export async function registerRoutes(
     res.json(mapSubscriptionFromDb(data));
   }));
 
-  app.patch("/api/subscriptions/:id/status", asyncHandler(async (req, res) => {
+  app.patch("/api/subscriptions/:id/status", asyncHandler(async (req: SessionRequest, res: Response) => {
     const subscriptionId = req.params.id;
     const { status } = req.body;
 
@@ -775,7 +794,7 @@ export async function registerRoutes(
     res.json(mapSubscriptionFromDb(updatedSub));
   }));
 
-  app.post("/api/subscriptions/:id/log-usage", async (req, res) => {
+  app.post("/api/subscriptions/:id/log-usage", async (req: SessionRequest, res: Response) => {
     console.log(`[Routes] hit log-usage for id=${req.params.id}`);
     try {
       // first, validate that the user is authenticated
@@ -847,7 +866,7 @@ export async function registerRoutes(
   });
 
   // Track usage by domain (used by browser extension)
-  app.post("/api/track-usage-by-domain", async (req, res) => {
+  app.post("/api/track-usage-by-domain", async (req: SessionRequest, res: Response) => {
     try {
       const authHeader = req.headers.authorization?.replace('Bearer ', '');
       if (!authHeader) {
@@ -891,7 +910,7 @@ export async function registerRoutes(
 
 
 
-  app.delete("/api/subscriptions/:id", async (req, res) => {
+  app.delete("/api/subscriptions/:id", async (req: SessionRequest, res: Response) => {
     try {
       // Get user ID for authorization check
       let userId = req.session?.user?.id;
@@ -924,7 +943,7 @@ export async function registerRoutes(
   });
 
   // Get calendar events for the user (includes both db events and renewal dates from subscriptions)
-  app.get("/api/calendar-events", async (req, res) => {
+  app.get("/api/calendar-events", async (req: SessionRequest, res: Response) => {
     try {
       // Get userId from auth
       let userId = req.session?.user?.id;
@@ -1019,7 +1038,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/spending/monthly", async (req, res) => {
+  app.get("/api/spending/monthly", async (req: SessionRequest, res: Response) => {
     try {
       // Get user ID from auth
       let userId = req.session?.user?.id;
@@ -1122,7 +1141,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/spending/category", async (req, res) => {
+  app.get("/api/spending/category", async (req: SessionRequest, res: Response) => {
     try {
       // Get user ID from auth
       let userId = req.session?.user?.id;
@@ -1172,7 +1191,7 @@ export async function registerRoutes(
   app.get("/api/analysis/cost-per-use", asyncHandler(handleCostPerUse));
 
 
-  app.get("/api/insights/behavioral", async (req, res) => {
+  app.get("/api/insights/behavioral", async (req: SessionRequest, res: Response) => {
     try {
       // Get user ID from auth
       let userId = req.session?.user?.id;
@@ -1263,7 +1282,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/insights", async (req, res) => {
+  app.get("/api/insights", async (req: SessionRequest, res: Response) => {
     try {
       // Get user ID from auth (support session or raw Bearer token)
       let userId = req.session?.user?.id;
@@ -1289,7 +1308,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/recommendations", async (req, res) => {
+  app.get("/api/recommendations", async (req: SessionRequest, res: Response) => {
     try {
       // Get user ID from auth (support session or Bearer token). Be defensive about token formats.
       let userId = req.session?.user?.id;
@@ -1374,7 +1393,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/bank-connections", async (req, res) => {
+  app.get("/api/bank-connections", async (req: SessionRequest, res: Response) => {
     try {
       const connections = await storage.getBankConnections();
       res.json(connections);
@@ -1383,7 +1402,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/bank-connections", async (req, res) => {
+  app.post("/api/bank-connections", async (req: SessionRequest, res: Response) => {
     try {
       // TODO: insertBankConnectionSchema not available in schema
       res.status(501).json({ error: "Bank connection creation not implemented" });
@@ -1400,7 +1419,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/bank-connections/:id/sync", async (req, res) => {
+  app.patch("/api/bank-connections/:id/sync", async (req: SessionRequest, res: Response) => {
     try {
       const connection = await storage.updateBankConnectionSync(req.params.id);
       if (!connection) {
@@ -1412,7 +1431,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/bank-connections/:id", async (req, res) => {
+  app.delete("/api/bank-connections/:id", async (req: SessionRequest, res: Response) => {
     try {
       const deleted = await storage.deleteBankConnection(req.params.id);
       if (!deleted) {
@@ -1425,7 +1444,7 @@ export async function registerRoutes(
   });
 
   // Account management endpoints
-  app.patch("/api/account/email", async (req, res) => {
+  app.patch("/api/account/email", async (req: SessionRequest, res: Response) => {
     try {
       const { email } = req.body;
       if (!email || !email.includes("@")) {
@@ -1444,7 +1463,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/account/password", async (req, res) => {
+  app.patch("/api/account/password", async (req: SessionRequest, res: Response) => {
     try {
       const { currentPassword, newPassword } = req.body;
       if (!currentPassword || !newPassword) {
@@ -1465,7 +1484,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/account/2fa", async (req, res) => {
+  app.post("/api/account/2fa", async (req: SessionRequest, res: Response) => {
     try {
       const { code } = req.body;
       if (!code || code.length !== 6) {
@@ -1478,7 +1497,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/account/export", async (req, res) => {
+  app.get("/api/account/export", async (req: SessionRequest, res: Response) => {
     try {
       const subscriptions = await storage.getSubscriptions();
       const transactions = await storage.getTransactions();
@@ -1499,7 +1518,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/account", async (req, res) => {
+  app.delete("/api/account", async (req: SessionRequest, res: Response) => {
     try {
       let userId = req.session?.user?.id;
       if (!userId) {
@@ -1575,7 +1594,7 @@ export async function registerRoutes(
   });
 
   // Get notification preferences
-  app.get("/api/account/notification-preferences", async (req, res) => {
+  app.get("/api/account/notification-preferences", async (req: SessionRequest, res: Response) => {
     try {
       let userId = req.session?.user?.id;
       if (!userId) {
@@ -1612,7 +1631,7 @@ export async function registerRoutes(
   });
 
   // Update notification preferences
-  app.patch("/api/account/notification-preferences", async (req, res) => {
+  app.patch("/api/account/notification-preferences", async (req: SessionRequest, res: Response) => {
     try {
       let userId = req.session?.user?.id;
       if (!userId) {
@@ -1680,7 +1699,7 @@ export async function registerRoutes(
   //
   // Normalization is performed on the incoming status values in the patch
   // route to avoid 400s from quirky inputs.
-  app.get("/api/analytics/monthly-savings", async (req, res) => {
+  app.get("/api/analytics/monthly-savings", async (req: SessionRequest, res: Response) => {
     try {
       // Get user ID from auth
       let userId = req.session?.user?.id;
@@ -1735,13 +1754,8 @@ export async function registerRoutes(
       const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
       const isInCurrentMonth = (sub: any) => {
-        const timestamp = sub.deleted_at || sub.deletedAt || sub.updated_at || sub.updatedAt;
-        if (timestamp) {
-          const deletedDate = new Date(timestamp);
-          return deletedDate >= currentMonth && deletedDate < nextMonth;
-        }
-        // If no timestamp is available, treat as a fallback deletion that counts.
-        return true;
+        const timestamp = getSubscriptionDeletedTimestamp(sub);
+        return isTimestampInCurrentMonth(timestamp);
       };
 
       const calculateSavings = (subs: any[]) =>
@@ -1778,7 +1792,7 @@ export async function registerRoutes(
   });
 
   // User: Premium status
-  app.get("/api/user/premium-status", async (req, res) => {
+  app.get("/api/user/premium-status", async (req: SessionRequest, res: Response) => {
     try {
       // Get the user from the authorization header or session
       let userId = req.session?.user?.id;
@@ -1888,7 +1902,7 @@ export async function registerRoutes(
   });
 
   // Update currency preference for logged-in user
-  app.patch('/api/user/currency', async (req, res) => {
+  app.patch('/api/user/currency', async (req: SessionRequest, res: Response) => {
     try {
       // Determine user ID from session or token (re-use logic from premium-status)
       let userId = req.session?.user?.id;
@@ -1900,6 +1914,7 @@ export async function registerRoutes(
           token = authHeader;
           userId = extractUserIdFromToken(authHeader) || undefined;
           if (!userId) {
+            const supabase = getSupabaseClient();
             const { data: { user } } = await supabase.auth.getUser(authHeader);
             if (user) userId = user.id;
           }
@@ -1914,6 +1929,7 @@ export async function registerRoutes(
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
+      const supabase = getSupabaseClient();
       const currency = String(req.body.currency || '').toUpperCase();
       if (!currency || !/^[A-Z]{3}$/.test(currency)) {
         return res.status(400).json({ error: 'Invalid currency code' });
@@ -1937,9 +1953,11 @@ export async function registerRoutes(
 
       // also persist to the custom users table so that premium-status can
       // reliably return the value for tests and legacy clients
-      await supabase.from('users').upsert({ id: userId, currency }).catch((e) => {
+      try {
+        await supabase.from('users').upsert({ id: userId, currency });
+      } catch (e: unknown) {
         console.warn('[Routes] failed to upsert currency into users table', e);
-      });
+      }
 
       res.json({ currency });
     } catch (err) {
@@ -1949,7 +1967,7 @@ export async function registerRoutes(
   });
 
   // Family group endpoints (use server/family-sharing helpers)
-  app.get('/api/family-groups', async (req, res) => {
+  app.get('/api/family-groups', async (req: SessionRequest, res: Response) => {
     try {
       // Try to get user id from session or authorization header
       let userId = req.session?.user?.id;
@@ -1972,7 +1990,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post('/api/family-groups', async (req, res) => {
+  app.post('/api/family-groups', async (req: SessionRequest, res: Response) => {
     try {
       console.log('[Routes] POST /api/family-groups body:', req.body);
       const name = req.body?.name;
@@ -2003,7 +2021,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete('/api/family-groups/:id', async (req, res) => {
+  app.delete('/api/family-groups/:id', async (req: SessionRequest, res: Response) => {
     try {
       // user must be owner
       let userId = req.session?.user?.id;
@@ -2023,7 +2041,7 @@ export async function registerRoutes(
   });
 
   // Get family group settings
-  app.get('/api/family-groups/:id/settings', async (req, res) => {
+  app.get('/api/family-groups/:id/settings', async (req: SessionRequest, res: Response) => {
     try {
       const groupId = req.params.id;
       const supabase = getSupabaseClient();
@@ -2082,7 +2100,7 @@ export async function registerRoutes(
   // membership lookup for current user
   // log registration so we can confirm the route is added when server starts
   console.log('[Routes] registering GET /api/family-groups/me/membership');
-  app.get('/api/family-groups/me/membership', async (req, res) => {
+  app.get('/api/family-groups/me/membership', async (req: SessionRequest, res: Response) => {
     try {
       // resolve user id from session or bearer token
       let userId = req.session?.user?.id;
@@ -2162,7 +2180,7 @@ export async function registerRoutes(
   });
 
   // Update family group settings (owner only)
-  app.put('/api/family-groups/:id/settings', async (req, res) => {
+  app.put('/api/family-groups/:id/settings', async (req: SessionRequest, res: Response) => {
     try {
       const groupId = req.params.id;
 
@@ -2211,7 +2229,7 @@ export async function registerRoutes(
   });
 
   // Get family group members
-  app.get('/api/family-groups/:id/members', async (req, res) => {
+  app.get('/api/family-groups/:id/members', async (req: SessionRequest, res: Response) => {
     try {
       const groupId = req.params.id;
       const supabase = getSupabaseClient();
@@ -2258,7 +2276,7 @@ export async function registerRoutes(
   });
 
   // Add family group member
-  app.post('/api/family-groups/:id/members', async (req, res) => {
+  app.post('/api/family-groups/:id/members', async (req: SessionRequest, res: Response) => {
     try {
       const groupId = req.params.id;
       const { memberEmail, memberId, memberIdentifier } = req.body;
@@ -2314,12 +2332,8 @@ export async function registerRoutes(
       if (!memberUserId && isEmail) {
         const emailCandidate = rawIdentifier.trim().toLowerCase();
         try {
-          if (supabase.auth.admin.getUserByEmail) {
-            const { data: userDataByEmail, error: emailErr } = await supabase.auth.admin.getUserByEmail(emailCandidate);
-            if (!emailErr && userDataByEmail?.user) {
-              memberUserId = userDataByEmail.user.id;
-            }
-          }
+          // Supabase admin API does not expose getUserByEmail in this version.
+        // Fall back to the local users table and listUsers lookup instead.
         } catch (e) {
           // fallback
         }
@@ -2397,7 +2411,7 @@ export async function registerRoutes(
   });
 
   // Remove family group member
-  app.delete('/api/family-groups/:id/members/:memberId', async (req, res) => {
+  app.delete('/api/family-groups/:id/members/:memberId', async (req: SessionRequest, res: Response) => {
     try {
       const groupId = req.params.id;
       const memberUserId = req.params.memberId;
@@ -2420,7 +2434,7 @@ export async function registerRoutes(
   });
 
   // Get shared subscriptions for a family group
-  app.get('/api/family-groups/:id/shared-subscriptions', async (req, res) => {
+  app.get('/api/family-groups/:id/shared-subscriptions', async (req: SessionRequest, res: Response) => {
     try {
       const { id: groupId } = req.params;
       const supabase = getSupabaseClient();
@@ -2482,7 +2496,7 @@ export async function registerRoutes(
   });
 
   // Share a subscription with family group
-  app.post('/api/family-groups/:id/share-subscription', async (req, res) => {
+  app.post('/api/family-groups/:id/share-subscription', async (req: SessionRequest, res: Response) => {
     try {
       const { id: groupId } = req.params;
       const { subscriptionId } = req.body;
@@ -2547,7 +2561,7 @@ export async function registerRoutes(
   });
 
   // Unshare a subscription (delete shared record)
-  app.delete('/api/family-groups/:id/shared-subscriptions/:sharedId', async (req, res) => {
+  app.delete('/api/family-groups/:id/shared-subscriptions/:sharedId', async (req: SessionRequest, res: Response) => {
     try {
       const { sharedId } = req.params;
 
@@ -2572,7 +2586,7 @@ export async function registerRoutes(
   });
 
   // Cost splits endpoints
-  app.post('/api/family-groups/:id/shared-subscriptions/:sharedId/cost-splits', async (req, res) => {
+  app.post('/api/family-groups/:id/shared-subscriptions/:sharedId/cost-splits', async (req: SessionRequest, res: Response) => {
     try {
       const { id: groupId, sharedId } = req.params;
       const { userId, percentage } = req.body;
@@ -2598,7 +2612,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get('/api/family-groups/:id/shared-subscriptions/:sharedId/cost-splits', async (req, res) => {
+  app.get('/api/family-groups/:id/shared-subscriptions/:sharedId/cost-splits', async (req: SessionRequest, res: Response) => {
     try {
       const { id: groupId, sharedId } = req.params;
 
@@ -2620,7 +2634,7 @@ export async function registerRoutes(
   });
 
   // Get member's dashboard data
-  app.get('/api/family-groups/:id/members/:memberId/dashboard', async (req, res) => {
+  app.get('/api/family-groups/:id/members/:memberId/dashboard', async (req: SessionRequest, res: Response) => {
     try {
       const { id: groupId, memberId } = req.params;
       const supabase = getSupabaseClient();
@@ -2705,7 +2719,7 @@ export async function registerRoutes(
   });
 
   // Get family data (all members' subscriptions when show_family_data is enabled)
-  app.get('/api/family-groups/:id/family-data', async (req, res) => {
+  app.get('/api/family-groups/:id/family-data', async (req: SessionRequest, res: Response) => {
     try {
       const { generateAIRecommendations } = await import('./family-sharing');
       const { id: groupId } = req.params;
@@ -2784,7 +2798,7 @@ export async function registerRoutes(
         const sharedSubscriptionIds = (sharedSubs || []).map(s => s.subscription_id).filter(Boolean);
         const sharedByUserIds = Array.from(new Set((sharedSubs || []).map(s => s.shared_by_user_id).filter(Boolean)));
         let sharedRows = [];
-        let userRows = [];
+        let userRows: Record<string, { email: string; name: string }> = {};
         if (sharedSubscriptionIds.length > 0) {
           const { data: _sharedRows } = await supabase
             .from('subscriptions')
@@ -2794,14 +2808,17 @@ export async function registerRoutes(
         }
         if (sharedByUserIds.length > 0) {
           // Try to get user info from auth.users (admin API)
-          let usersById = {};
+          let usersById: Record<string, { email: string; name: string }> = {};
           try {
             const { data: { users } = {} } = await supabase.auth.admin.listUsers();
             if (users) {
               usersById = users.reduce((acc, u) => {
-                acc[u.id] = { email: u.email, name: u.user_metadata?.name || u.email };
+                acc[u.id] = {
+                  email: u.email || '',
+                  name: u.user_metadata?.name || u.email || '',
+                };
                 return acc;
-              }, {});
+              }, usersById);
             }
           } catch (err) {
             console.warn('[Routes] Failed to fetch user info for shared subscriptions', err);
@@ -2980,7 +2997,7 @@ export async function registerRoutes(
   });
 
   // Upgrade current user to family plan
-  app.post('/api/user/upgrade-to-family', async (req, res) => {
+  app.post('/api/user/upgrade-to-family', async (req: SessionRequest, res: Response) => {
     try {
       // Resolve user id from session or authorization header
       let userId = req.session?.user?.id;
@@ -3005,7 +3022,7 @@ export async function registerRoutes(
   });
 
   // Trigger renewal checks (for testing/manual trigger)
-  app.post("/api/admin/renewal-checks", async (req, res) => {
+  app.post("/api/admin/renewal-checks", async (req: SessionRequest, res: Response) => {
     try {
       // Basic API key check for security
       const apiKey = req.headers["x-api-key"];
@@ -3024,7 +3041,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/renewal-checks/logs", asyncHandler(async (req, res) => {
+  app.get("/api/admin/renewal-checks/logs", asyncHandler(async (req: SessionRequest, res: Response) => {
     const apiKey = req.headers["x-api-key"];
     if (apiKey !== process.env.ADMIN_API_KEY) {
       return res.status(403).json({ error: "Unauthorized - invalid API key" });
@@ -3051,7 +3068,7 @@ export async function registerRoutes(
   }));
 
   // Stripe: Create checkout session
-  app.post("/api/stripe/create-checkout-session", async (req, res) => {
+  app.post("/api/stripe/create-checkout-session", async (req: SessionRequest, res: Response) => {
     try {
       console.log("[Stripe] Create checkout session request received");
       console.log("[Stripe] Request body:", req.body);
@@ -3091,7 +3108,7 @@ export async function registerRoutes(
   });
 
   // Stripe: Get subscription status
-  app.get("/api/stripe/subscription-status", async (req, res) => {
+  app.get("/api/stripe/subscription-status", async (req: SessionRequest, res: Response) => {
     try {
       // Get user ID from session or auth header
       let userId = req.session?.user?.id;
@@ -3127,7 +3144,7 @@ export async function registerRoutes(
   });
 
   // Stripe: Cancel subscription
-  app.post("/api/stripe/cancel-subscription", async (req, res) => {
+  app.post("/api/stripe/cancel-subscription", async (req: SessionRequest, res: Response) => {
     try {
       // Get user ID from session or auth header
       let userId = req.session?.user?.id;
@@ -3152,7 +3169,7 @@ export async function registerRoutes(
   });
 
   // Stripe: Reactivate subscription
-  app.post("/api/stripe/reactivate-subscription", async (req, res) => {
+  app.post("/api/stripe/reactivate-subscription", async (req: SessionRequest, res: Response) => {
     try {
       // Get user ID from session or auth header
       let userId = req.session?.user?.id;
@@ -3176,7 +3193,7 @@ export async function registerRoutes(
   });
 
   // Stripe webhook - handles payment completion and subscription updates
-  app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req: SessionRequest, res: Response) => {
     try {
       const sig = req.headers["stripe-signature"] as string;
       const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -3197,8 +3214,7 @@ export async function registerRoutes(
         "price_1T3jikJpTYwzr88xIxkKHkKu": "family",
       };
 
-      const { supabase } = await import("./db");
-      const supabaseAdmin = supabase();
+      const supabaseAdmin = getSupabaseClient();
 
       switch (event.type) {
         case "checkout.session.completed": {
@@ -3295,7 +3311,7 @@ export async function registerRoutes(
                 // --- Family group downgrade logic ---
                 try {
                   // Only trigger if new plan is 'premium' or 'free'
-                  if (planType === 'premium' || planType === 'free') {
+                  if (planType === 'premium') {
                     // Dynamically import family-sharing helpers
                     const { getFamilyGroups, getFamilyMembers } = await import('./family-sharing');
                     // Find all groups where this user is the owner
@@ -3382,7 +3398,7 @@ export async function registerRoutes(
   });
 
   // Contact form endpoint
-  app.post("/api/contact", async (req, res) => {
+  app.post("/api/contact", async (req: SessionRequest, res: Response) => {
     try {
       const { name, email, subject, message } = req.body;
 
@@ -3444,7 +3460,7 @@ export async function registerRoutes(
   });
 
   // Download extension endpoint
-  app.get("/api/extension/download", async (req, res) => {
+  app.get("/api/extension/download", async (req: SessionRequest, res: Response) => {
     try {
       console.log("[Extension] Download requested");
       
@@ -3468,7 +3484,7 @@ export async function registerRoutes(
       res.setHeader('Content-Type', 'application/zip');
       res.setHeader('Content-Disposition', 'attachment; filename=subveris-extension.zip');
 
-      archive.on('error', (err) => {
+archive.on('error', (err: Error) => {
         console.error('[Extension] Archive error:', err);
         res.status(500).json({ error: 'Failed to create archive' });
       });

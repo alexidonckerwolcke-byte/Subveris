@@ -18,7 +18,7 @@ interface SubscriptionContextType {
   subscriptionStatus: {
     status: string;
     tier: SubscriptionTier;
-    currentPeriodEnd?: string;
+    currentPeriodEnd?: string | null;
     cancelAtPeriodEnd?: boolean;
   } | null;
   isLoading: boolean;

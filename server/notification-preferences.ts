@@ -25,7 +25,7 @@ export async function checkNotificationPreference(
     }
 
     const column = getPreferenceColumn(preferenceType);
-    return data[column] === true;
+    return (data as any)[column] === true;
   } catch (error) {
     console.error('[NotificationPreference] Error checking preference:', error);
     // Default to true on error to ensure notifications are sent

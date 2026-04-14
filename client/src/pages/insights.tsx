@@ -155,13 +155,13 @@ export default function Insights() {
           ? filteredFamilyBehavioral
           : computedFamilyBehavioral)
       : (
-          (personalBehavioralInsights || []).filter(i =>
+          (personalBehavioralInsights || []).filter((i: any) =>
             i && (
               (i.subStatus === 'unused' || i.subStatus === 'to-cancel') ||
               (i.status === 'unused' || i.status === 'to-cancel')
             )
           ).length > 0
-            ? (personalBehavioralInsights || []).filter(i =>
+            ? (personalBehavioralInsights || []).filter((i: any) =>
                 i && (
                   (i.subStatus === 'unused' || i.subStatus === 'to-cancel') ||
                   (i.status === 'unused' || i.status === 'to-cancel')

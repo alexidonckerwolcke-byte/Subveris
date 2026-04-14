@@ -3,6 +3,12 @@
  * Handles Web Push API integration with Subveris backend
  */
 
+export interface PushNotificationAction {
+  action: string;
+  title: string;
+  icon?: string;
+}
+
 export interface PushNotificationOptions {
   title: string;
   body: string;
@@ -11,7 +17,7 @@ export interface PushNotificationOptions {
   tag?: string;
   requireInteraction?: boolean;
   data?: Record<string, any>;
-  actions?: NotificationAction[];
+  actions?: PushNotificationAction[];
 }
 
 /**

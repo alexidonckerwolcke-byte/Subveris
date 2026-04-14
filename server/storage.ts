@@ -37,6 +37,9 @@ export interface InsertSubscriptionData {
   currency?: string;
   scheduledCancellationDate?: string;
   cancellationUrl?: string;
+  lastUsedDate?: string | null;
+  monthlyUsageCount?: number;
+  usageMonth?: string | null;
 }
 
 export interface IStorage {
@@ -125,8 +128,18 @@ export class MemStorage implements IStorage {
   }
 
   private initializeMockData() {
+    const mockSubscriptionBase = {
+      userId: randomUUID(),
+      websiteDomain: null,
+      scheduledCancellationDate: null,
+      cancellationUrl: null,
+      monthlyUsageCount: 0,
+      usageMonth: null,
+    };
+
     const mockSubscriptions: Subscription[] = [
       {
+        ...mockSubscriptionBase,
         id: randomUUID(),
         name: "Netflix",
         category: "streaming",
@@ -142,6 +155,7 @@ export class MemStorage implements IStorage {
         isDetected: true,
       },
       {
+        ...mockSubscriptionBase,
         id: randomUUID(),
         name: "Spotify Premium",
         category: "streaming",
@@ -157,6 +171,7 @@ export class MemStorage implements IStorage {
         isDetected: true,
       },
       {
+        ...mockSubscriptionBase,
         id: randomUUID(),
         name: "Adobe Creative Cloud",
         category: "software",
@@ -172,6 +187,7 @@ export class MemStorage implements IStorage {
         isDetected: true,
       },
       {
+        ...mockSubscriptionBase,
         id: randomUUID(),
         name: "Planet Fitness",
         category: "fitness",
@@ -187,6 +203,7 @@ export class MemStorage implements IStorage {
         isDetected: true,
       },
       {
+        ...mockSubscriptionBase,
         id: randomUUID(),
         name: "Dropbox Plus",
         category: "cloud-storage",
@@ -202,6 +219,7 @@ export class MemStorage implements IStorage {
         isDetected: true,
       },
       {
+        ...mockSubscriptionBase,
         id: randomUUID(),
         name: "New York Times",
         category: "news",
@@ -217,6 +235,7 @@ export class MemStorage implements IStorage {
         isDetected: true,
       },
       {
+        ...mockSubscriptionBase,
         id: randomUUID(),
         name: "Xbox Game Pass",
         category: "gaming",
@@ -232,6 +251,7 @@ export class MemStorage implements IStorage {
         isDetected: true,
       },
       {
+        ...mockSubscriptionBase,
         id: randomUUID(),
         name: "LinkedIn Premium",
         category: "productivity",
@@ -254,6 +274,7 @@ export class MemStorage implements IStorage {
 
     const mockBankConnection: BankConnection = {
       id: randomUUID(),
+      provider: "Chase",
       bankName: "Chase Bank",
       accountType: "checking",
       lastSync: new Date().toISOString(),
@@ -265,6 +286,7 @@ export class MemStorage implements IStorage {
     const mockInsights: Insight[] = [
       {
         id: randomUUID(),
+        userId: mockSubscriptionBase.userId,
         type: "savings",
         title: "Cancel unused gym membership",
         description: "You've only used Planet Fitness once this month. Consider cancelling to save $24.99/mo.",
@@ -276,6 +298,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: randomUUID(),
+        userId: mockSubscriptionBase.userId,
         type: "alternative",
         title: "Switch to Affinity Photo",
         description: "Affinity Photo offers similar features to Adobe Photoshop for a one-time payment of $69.99.",
@@ -287,6 +310,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: randomUUID(),
+        userId: mockSubscriptionBase.userId,
         type: "tip",
         title: "Bundle your streaming services",
         description: "Consider Disney+ Bundle to get Hulu and ESPN+ included, potentially saving on separate subscriptions.",
@@ -354,7 +378,7 @@ export class MemStorage implements IStorage {
     return this.subscriptions.get(id);
   }
 
-  async createSubscription(insertSubscription: InsertSubscription): Promise<Subscription> {
+  async createSubscription(insertSubscription: InsertSubscriptionData): Promise<Subscription> {
     const id = randomUUID();
     const subscription: Subscription = { 
       id,
@@ -374,6 +398,8 @@ export class MemStorage implements IStorage {
       websiteDomain: insertSubscription.websiteDomain || null,
       scheduledCancellationDate: insertSubscription.scheduledCancellationDate || null,
       cancellationUrl: insertSubscription.cancellationUrl || null,
+      monthlyUsageCount: insertSubscription.monthlyUsageCount || 0,
+      usageMonth: insertSubscription.usageMonth || null,
     };
     this.subscriptions.set(id, subscription);
     return subscription;
@@ -427,6 +453,28 @@ export class MemStorage implements IStorage {
 
   async deleteSubscription(id: string): Promise<boolean> {
     return this.subscriptions.delete(id);
+  }
+
+  async trackUsageByDomain(userId: string, domain: string, timeSpent: number): Promise<Subscription | undefined> {
+    const subscription = Array.from(this.subscriptions.values()).find(
+      (sub) => sub.userId === userId && sub.websiteDomain === domain,
+    );
+    if (!subscription) {
+      return undefined;
+    }
+
+    subscription.usageCount += 1;
+    const month = new Date().toISOString().slice(0, 7);
+    if (subscription.usageMonth !== month) {
+      subscription.monthlyUsageCount = 1;
+      subscription.usageMonth = month;
+    } else {
+      subscription.monthlyUsageCount += 1;
+    }
+    subscription.lastUsedDate = new Date().toISOString().split('T')[0];
+    subscription.status = 'active';
+    this.subscriptions.set(subscription.id, subscription);
+    return subscription;
   }
 
   async updateSubscriptionNextBilling(id: string, nextBillingDate: string): Promise<Subscription | undefined> {
@@ -603,6 +651,7 @@ export class MemStorage implements IStorage {
           monthlyAmount,
           usageCount: sub.usageCount,
           costPerUse,
+          currency: sub.currency || 'USD',
           valueRating,
         };
       })
@@ -621,6 +670,7 @@ export class MemStorage implements IStorage {
           subscriptionId: sub.id,
           subscriptionName: sub.name,
           monthlyAmount,
+          currency: sub.currency || 'USD',
           equivalents: generateOpportunityCosts(monthlyAmount),
         };
       });
@@ -643,6 +693,7 @@ export class MemStorage implements IStorage {
         subscriptionId: adobeSub.id,
         alternativeName: "Affinity Suite",
         confidence: 0.85,
+        currency: adobeSub.currency || 'USD',
       });
     }
 
@@ -658,6 +709,7 @@ export class MemStorage implements IStorage {
         savings: calculateMonthlyCost(sub.amount, sub.frequency),
         subscriptionId: sub.id,
         confidence: 0.92,
+        currency: sub.currency || 'USD',
       });
     }
 
@@ -675,6 +727,7 @@ export class MemStorage implements IStorage {
           savings: totalStreaming - 15.99,
           subscriptionId: streamingSubs[0].id,
           confidence: 0.78,
+          currency: streamingSubs[0].currency || 'USD',
         });
       }
     }

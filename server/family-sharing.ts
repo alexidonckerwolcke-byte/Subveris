@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { FamilyGroup, FamilyGroupMember, FamilyGroupMemberWithSubscription, SharedSubscription, CostSplit, CalendarEvent } from '@shared/schema';
+import type { FamilyGroup, FamilyGroupMember, SharedSubscription, CostSplit, CalendarEvent } from '@shared/schema';
 import { randomUUID } from 'crypto';
 
 const supabase = createClient(
@@ -216,7 +216,7 @@ export async function upgradeToPlan(userId: string, planType: 'family'): Promise
 }
 
 // Helper function to downgrade user from family plan to their original plan
-async function downgradeFromFamilyPlan(userId: string, familyGroupId: string): Promise<void> {
+export async function downgradeFromFamilyPlan(userId: string, familyGroupId: string): Promise<void> {
   // Get the user's original plan from backup
   const { data: backup, error: backupError } = await supabase
     .from('family_group_plan_backups')
@@ -319,7 +319,7 @@ export async function createFamilyGroup(userId: string, name: string): Promise<F
     if (supabaseAdmin.auth && supabaseAdmin.auth.admin) {
       const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId);
       if (!userError && userData.user) {
-        ownerEmail = userData.user.email;
+        ownerEmail = userData.user.email || null;
       }
     }
 
@@ -638,7 +638,7 @@ export async function addFamilyMember(groupId: string, userId: string, memberUse
     if (supabaseAdmin.auth && supabaseAdmin.auth.admin) {
       const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(memberUserId);
       if (!userError && userData.user) {
-        memberEmail = userData.user.email;
+        memberEmail = userData.user.email || null;
       }
     }
     

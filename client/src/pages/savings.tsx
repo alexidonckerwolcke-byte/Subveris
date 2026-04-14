@@ -30,6 +30,26 @@ import { useCurrency } from "@/lib/currency-context";
 import { calculateMonthlyCost } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
  
+function isTimestampInCurrentMonth(timestamp?: string | null) {
+  if (!timestamp) return false;
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return false;
+  const now = new Date();
+  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return date >= currentMonth && date < nextMonth;
+}
+
+function getSubscriptionDeletedTimestamp(sub: Subscription) {
+  return (
+    (sub as any).deleted_at ||
+    (sub as any).deletedAt ||
+    (sub as any).updated_at ||
+    (sub as any).updatedAt ||
+    null
+  ) as string | null;
+}
+
 export default function Savings() {
   const { formatAmount, convertAmount } = useCurrency();
   const { user } = useAuth();
@@ -50,7 +70,7 @@ export default function Savings() {
 
 
   // compute metrics depending on mode
-  let metrics: DashboardMetrics | undefined = personalMetrics;
+  let metrics: DashboardMetrics & { thisMonthSavingsOwner?: number; thisMonthSavingsMembers?: number } | undefined = personalMetrics;
   let metricsLoading = showFamilyData ? familyDataLoading : personalMetricsLoading;
 
   if (showFamilyData) {
@@ -76,17 +96,12 @@ export default function Savings() {
 
       const isDeletedThisMonth = (s: Subscription) => {
         if (s.status !== "deleted") return false;
-        const ts = (s as any).deletedAt || (s as any).deleted_at || (s as any).updatedAt || (s as any).updated_at;
-        if (ts) {
-          const d = new Date(ts);
-          return d >= currentMonth && d < nextMonth;
-        }
-        // fallback to counting deleted entries without a timestamp
-        return true;
+        const ts = getSubscriptionDeletedTimestamp(s);
+        return isTimestampInCurrentMonth(ts);
       };
 
       const ownerSavings = subs
-        .filter((s) => isDeletedThisMonth(s) && s.user_id === ownerId)
+        .filter((s) => isDeletedThisMonth(s) && s.userId === ownerId)
         .reduce((sum: number, s) => {
           const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
           // Convert to USD for consistent goal comparison
@@ -94,7 +109,7 @@ export default function Savings() {
         }, 0);
 
       const memberSavings = subs
-        .filter((s) => isDeletedThisMonth(s) && s.user_id !== ownerId)
+        .filter((s) => isDeletedThisMonth(s) && s.userId !== ownerId)
         .reduce((sum: number, s) => {
           const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
           // Convert to USD for consistent goal comparison
@@ -487,7 +502,7 @@ export default function Savings() {
                     {showFamilyData ? "Family progress this month" : "Progress this month"}
                   </span>
                   <span className="font-medium">
-                    {formatAmount(convertAmount(currentSavings, 'USD', currency))} of {formatAmount(computedDisplayGoal, currency)}
+                    {formatAmount(currentSavings)} of {formatAmount(computedDisplayGoal, currency)}
                   </span>
                 </div>
                 <div className="relative h-4 w-full overflow-hidden rounded-full bg-muted">
