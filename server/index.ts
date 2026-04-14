@@ -8,6 +8,7 @@ import { metricsRouter } from "./metrics";
 import { healthRouter } from "./health";
 import { logger } from './logger';
 import { logRequest } from './logRequest';
+import { getSupabaseClient } from './supabase';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 
@@ -80,6 +81,32 @@ app.use(logRequest);
 
 logger.info('Server starting up');
 
+async function cleanupDeletedSubscriptions() {
+  try {
+    const supabase = getSupabaseClient();
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const { data, error }: { data: any; error: any } = await supabase
+      .from('subscriptions')
+      .delete()
+      .eq('status', 'deleted')
+      .lt('deleted_at', currentMonthStart);
+
+    if (error) {
+      console.error('[Server] Failed to purge old deleted subscriptions:', error);
+      return 0;
+    }
+
+    const deletedCount = Array.isArray(data) ? data.length : 0;
+    console.log(`[Server] Purged ${deletedCount} deleted subscription(s) older than ${currentMonthStart}`);
+    return deletedCount;
+  } catch (err) {
+    console.error('[Server] Error during deleted subscription cleanup:', err);
+    return 0;
+  }
+}
+
+
 
 
 (async () => {
@@ -144,6 +171,16 @@ logger.info('Server starting up');
           console.error("[Server] Error in initial renewal check:", err);
         }
       }, 30 * 1000);
+
+      setTimeout(async () => {
+        console.log("[Server] Running initial deleted subscription cleanup on startup...");
+        await cleanupDeletedSubscriptions();
+      }, 30 * 1000);
+
+      setInterval(async () => {
+        console.log("[Server] Running scheduled deleted subscription cleanup...");
+        await cleanupDeletedSubscriptions();
+      }, 24 * 60 * 60 * 1000); // daily
     },
   );
 })();

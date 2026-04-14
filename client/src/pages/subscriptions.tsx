@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useSubscription } from "@/lib/subscription-context";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
-import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -117,8 +117,9 @@ export default function Subscriptions() {
     isFetchingNextPage,
     fetchNextPage,
     hasNextPage,
-  } = useInfiniteQuery<SubscriptionsPage>({
+  } = useInfiniteQuery<SubscriptionsPage, Error, InfiniteData<SubscriptionsPage>, [string, number]>({
     queryKey: ["/api/subscriptions", PER_PAGE],
+    initialPageParam: 1,
     queryFn: async ({ pageParam = 1 }) => {
       const res = await apiRequest("GET", `/api/subscriptions?page=${pageParam}&perPage=${PER_PAGE}`);
       const items: Subscription[] = await res.json();
@@ -145,6 +146,12 @@ export default function Subscriptions() {
   const { data: familyData, isLoading: familyLoading } = useQuery<any>({
     queryKey: ["/api/family-groups", familyGroupId, "family-data"],
     enabled: !!familyGroupId,
+    queryFn: async () => {
+      if (!familyGroupId) return null;
+      const response = await fetch(`/api/family-groups/${familyGroupId}/family-data`);
+      if (!response.ok) throw new Error('Failed to load family data');
+      return response.json();
+    },
   });
 
   // Use family subscriptions if enabled, otherwise personal (paginated)
@@ -720,15 +727,20 @@ export default function Subscriptions() {
           <TabsContent value="deleted" className="mt-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {deletedSubscriptions.length > 0 ? (
-                deletedSubscriptions.map((sub: Subscription) => (
-                  <SubscriptionCard
-                    key={sub.id}
-                    subscription={sub}
-                    onStatusChange={handleStatusChange}
-                    onDelete={handleDelete}
-                    isPremium={tier === "premium"}
-                  />
-                ))
+                <>
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground mb-4">
+                    Subscriptions marked deleted are kept for the current month and are permanently removed on the first day of the next month.
+                  </div>
+                  {deletedSubscriptions.map((sub: Subscription) => (
+                    <SubscriptionCard
+                      key={sub.id}
+                      subscription={sub}
+                      onStatusChange={handleStatusChange}
+                      onDelete={handleDelete}
+                      isPremium={tier === "premium"}
+                    />
+                  ))}
+                </>
               ) : (
                 <div className="col-span-full text-center py-12 text-muted-foreground">
                   <p>No deleted subscriptions yet.</p>

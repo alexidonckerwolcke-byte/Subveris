@@ -46,6 +46,8 @@ export const subscriptions = pgTable("subscriptions", {
   websiteDomain: text("website_domain"), // e.g., "netflix.com", "spotify.com"
   scheduledCancellationDate: text("scheduled_cancellation_date"), // ISO 8601 date string for scheduled cancellation
   cancellationUrl: text("cancellation_url"), // URL to cancel the subscription
+  monthlyUsageCount: integer("monthly_usage_count").notNull().default(0),
+  usageMonth: text("usage_month"),
 });
 
 export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
@@ -126,6 +128,8 @@ export interface DashboardMetrics {
   averageCostPerUse: number;
   monthlySpendChange?: number; // percentage change vs last month
   newServicesTracked?: number; // number of services added this month
+  thisMonthSavingsOwner?: number;
+  thisMonthSavingsMembers?: number;
 }
 
 // Spending by category type
@@ -164,6 +168,8 @@ export interface OpportunityCost {
     count: number;
     icon: string;
   }[];
+  status?: string;
+  subStatus?: string;
 }
 
 // AI Recommendation
@@ -197,6 +203,33 @@ export const insertUserSchema = createInsertSchema(users).omit({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export type Transaction = {
+  id: string;
+  userId?: string | null;
+  amount: number;
+  date: string;
+  description: string | null;
+  category: string | null;
+  isRecurring: boolean;
+  merchantName: string | null;
+  subscriptionId: string | null;
+};
+
+export type InsertTransaction = Omit<Transaction, 'id'>;
+
+export type BankConnection = {
+  id: string;
+  userId?: string | null;
+  accountMask: string | null;
+  provider: string | null;
+  bankName?: string | null;
+  accountType?: string | null;
+  isConnected: boolean;
+  lastSync?: string | null;
+};
+
+export type InsertBankConnection = Omit<BankConnection, 'id'>;
 
 // Notification preferences table
 export const notificationPreferences = pgTable("notification_preferences", {

@@ -150,6 +150,7 @@ export class SupabaseStorage implements IStorage {
   private mapSubscription(data: any): Subscription {
     return {
       id: data.id,
+      userId: data.user_id,
       name: data.name,
       category: data.category,
       amount: data.amount,
@@ -157,13 +158,15 @@ export class SupabaseStorage implements IStorage {
       frequency: data.frequency,
       nextBillingDate: data.next_billing_at || data.next_billing_date,
       status: data.status,
-      usageCount: data.usage_count,
+      usageCount: typeof data.usage_count === 'number' ? data.usage_count : 0,
       lastUsedDate: data.last_used_at,
       logoUrl: data.logo_url,
       description: data.description,
       isDetected: data.is_detected,
-      // new fields introduced for analytics
-      monthlyUsageCount: data.monthly_usage_count || 0,
+      websiteDomain: data.website_domain || null,
+      scheduledCancellationDate: data.scheduled_cancellation_date || null,
+      cancellationUrl: data.cancellation_url || null,
+      monthlyUsageCount: typeof data.monthly_usage_count === 'number' ? data.monthly_usage_count : 0,
       usageMonth: data.usage_month || null,
     };
   }
@@ -192,6 +195,10 @@ export class SupabaseStorage implements IStorage {
     if (insertSubscription.logoUrl) insertData.logo_url = insertSubscription.logoUrl;
     if (insertSubscription.description) insertData.description = insertSubscription.description;
     if (insertSubscription.websiteDomain) insertData.website_domain = insertSubscription.websiteDomain;
+    if (insertSubscription.scheduledCancellationDate) insertData.scheduled_cancellation_date = insertSubscription.scheduledCancellationDate;
+    if (insertSubscription.cancellationUrl) insertData.cancellation_url = insertSubscription.cancellationUrl;
+    if (insertSubscription.monthlyUsageCount !== undefined) insertData.monthly_usage_count = insertSubscription.monthlyUsageCount;
+    if (insertSubscription.usageMonth) insertData.usage_month = insertSubscription.usageMonth;
     
     console.log("[Storage] Insert data:", insertData);
     
@@ -255,11 +262,11 @@ export class SupabaseStorage implements IStorage {
       return undefined;
     }
     
-    const newUsageCount = subscription.usageCount + 1;
+    const newUsageCount = (subscription.usageCount || 0) + 1;
     // determine monthly values
     const month = new Date().toISOString().substr(0,7); // YYYY-MM
     let newMonthly = (subscription.monthlyUsageCount || 0) + 1;
-    let newMonth = subscription.usageMonth;
+    let newMonth = subscription.usageMonth || month;
     if (subscription.usageMonth !== month) {
       newMonthly = 1;
       newMonth = month;
@@ -420,6 +427,7 @@ export class SupabaseStorage implements IStorage {
   private mapInsight(data: any): Insight {
     return {
       id: data.id,
+      userId: data.user_id,
       type: data.type,
       title: data.title,
       description: data.description,
@@ -435,6 +443,7 @@ export class SupabaseStorage implements IStorage {
     const id = randomUUID();
     const insight = {
       id,
+      user_id: insertInsight.userId,
       type: insertInsight.type,
       title: insertInsight.title,
       description: insertInsight.description,
@@ -478,11 +487,13 @@ export class SupabaseStorage implements IStorage {
   private mapBankConnection(data: any): BankConnection {
     return {
       id: data.id,
+      userId: data.user_id,
       bankName: data.bank_name,
       accountType: data.account_type,
       lastSync: data.last_sync,
       isConnected: data.is_connected,
       accountMask: data.account_mask,
+      provider: data.provider || null,
     };
   }
 
@@ -490,11 +501,13 @@ export class SupabaseStorage implements IStorage {
     const id = randomUUID();
     const connection = {
       id,
+      user_id: insertConnection.userId,
       bank_name: insertConnection.bankName,
       account_type: insertConnection.accountType,
       last_sync: insertConnection.lastSync,
       is_connected: insertConnection.isConnected,
       account_mask: insertConnection.accountMask || null,
+      provider: insertConnection.provider || null,
     };
     
     const { data, error } = await supabase
@@ -556,8 +569,9 @@ export class SupabaseStorage implements IStorage {
     const deletedSavings = subscriptions
       .filter(s => s.status === 'deleted')
       .filter(s => {
-        if (s.deleted_at) {
-          const d = new Date(s.deleted_at);
+        const deletedAt = (s as any).deleted_at || (s as any).deletedAt;
+        if (deletedAt) {
+          const d = new Date(deletedAt);
           return d >= currentMonth && d < nextMonth;
         }
         return false;
@@ -623,6 +637,7 @@ export class SupabaseStorage implements IStorage {
           monthlyAmount,
           usageCount: sub.usageCount,
           costPerUse,
+          currency: sub.currency || 'USD',
           valueRating,
         };
       })
@@ -634,26 +649,15 @@ export class SupabaseStorage implements IStorage {
     const subscriptions = await this.getSubscriptions();
     // Strictly filter only unused and to-cancel, never active
     return subscriptions
-      .filter(sub => {
-        if (!sub) return false;
-        // If subStatus exists, both status and subStatus must be unused or to-cancel
-        if (typeof sub.subStatus === 'string') {
-          return (
-            (sub.status === 'unused' || sub.status === 'to-cancel') &&
-            (sub.subStatus === 'unused' || sub.subStatus === 'to-cancel')
-          );
-        }
-        // If no subStatus, only status must be unused or to-cancel
-        return (sub.status === 'unused' || sub.status === 'to-cancel');
-      })
+      .filter(sub => !sub ? false : (sub.status === 'unused' || sub.status === 'to-cancel'))
       .map(sub => {
         const monthlyAmount = calculateMonthlyCost(sub.amount, sub.frequency);
         return {
           subscriptionId: sub.id,
           subscriptionName: sub.name,
-          subStatus: sub.subStatus,
           status: sub.status,
           monthlyAmount,
+          currency: sub.currency || 'USD',
           equivalents: generateOpportunityCosts(monthlyAmount),
         };
       });
@@ -678,6 +682,7 @@ export class SupabaseStorage implements IStorage {
         subscriptionId: adobeSub.id,
         alternativeName: "Affinity Suite",
         confidence: 0.85,
+        currency: adobeSub.currency || 'USD',
       });
     }
 
@@ -693,6 +698,7 @@ export class SupabaseStorage implements IStorage {
         savings: calculateMonthlyCost(sub.amount, sub.frequency),
         subscriptionId: sub.id,
         confidence: 0.92,
+        currency: sub.currency || 'USD',
       });
     }
 
@@ -710,6 +716,7 @@ export class SupabaseStorage implements IStorage {
           savings: totalStreaming - 15.99,
           subscriptionId: streamingSubs[0].id,
           confidence: 0.78,
+          currency: streamingSubs[0].currency || 'USD',
         });
       }
     }

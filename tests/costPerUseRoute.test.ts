@@ -63,19 +63,17 @@ function makeFakeClient() {
 
 // simple token generator matching extractUserIdFromToken logic
 function generateToken(userId: string) {
-  // create a minimal JWT-like string with header.payload.suffix so that
-  // extractUserIdFromToken is able to split it and decode the payload.
   const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64');
   const payload = Buffer.from(JSON.stringify({ sub: userId })).toString('base64');
-  // suffix can be empty; we just need at least two dots
-  return `a.${header}.${payload}.`;
+  return `${header}.${payload}.signature`;
 }
 
-// minimal mock response object
 function makeRes() {
-  const json = vi.fn().mockReturnThis();
-  const status = vi.fn().mockReturnThis();
-  return { json, status } as any;
+  const res: any = {};
+  res.status = vi.fn().mockReturnValue(res);
+  res.json = vi.fn().mockReturnValue(res);
+  res.send = vi.fn().mockReturnValue(res);
+  return res;
 }
 
 describe('handleCostPerUse route', () => {
@@ -106,5 +104,70 @@ describe('handleCostPerUse route', () => {
     expect(res.status).not.toHaveBeenCalledWith(403);
     const result = res.json.mock.calls[0][0];
     expect(result.length).toBe(2);
+  });
+
+  it('resets stale monthly usage to zero when computing cost per use', async () => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const staleMonth = '2000-01';
+    const fakeClient = {
+      from: (table: string) => {
+        const chain: any = { _table: table, _query: [] };
+        ['select', 'eq', 'in', 'neq'].forEach((op) => {
+          chain[op] = (...args: any[]) => {
+            chain._query.push({ op, args });
+            return chain;
+          };
+        });
+        chain.single = async () => {
+          if (table === 'subscriptions') {
+            return {
+              data: [
+                {
+                  id: 's3',
+                  user_id: 'owner123',
+                  amount: 20,
+                  frequency: 'monthly',
+                  status: 'active',
+                  monthly_usage_count: 5,
+                  usage_month: staleMonth,
+                  currency: 'USD',
+                },
+              ],
+              error: null,
+            };
+          }
+          return { data: null, error: null };
+        };
+        chain.then = (arg1: any, arg2?: any) => {
+          const rows = chain._table === 'subscriptions' ? [{
+            id: 's3',
+            user_id: 'owner123',
+            amount: 20,
+            frequency: 'monthly',
+            status: 'active',
+            monthly_usage_count: 5,
+            usage_month: staleMonth,
+            currency: 'USD',
+          }] : null;
+          const result = { data: rows, error: null };
+          if (typeof arg1 === 'function') {
+            return arg1(result);
+          }
+          arg1(result);
+        };
+        return chain;
+      },
+    };
+    vi.spyOn(supabaseModule, 'getSupabaseClient').mockImplementation(() => fakeClient as any);
+
+    const req: any = { headers: { authorization: `Bearer ${generateToken('owner123')}` }, query: {} };
+    const res = makeRes();
+
+    await handleCostPerUse(req, res);
+
+    const result = res.json.mock.calls[0][0];
+    expect(result.length).toBe(1);
+    expect(result[0].usageCount).toBe(0);
+    expect(result[0].costPerUse).toBe(20);
   });
 });

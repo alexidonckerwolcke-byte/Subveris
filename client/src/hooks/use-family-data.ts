@@ -5,11 +5,13 @@ export function useFamilyDataMode() {
   const { user } = useAuth();
 
   // Get family groups for this user
-  const { data: familyGroups } = useQuery<any[]>({
+  const { data: familyGroups } = useQuery<any[], Error>({
     queryKey: ["/api/family-groups"],
     enabled: !!user?.id,
-    onSuccess: (data) => {
-      console.log('[DEBUG] /api/family-groups response:', data);
+    queryFn: async () => {
+      const response = await fetch('/api/family-groups');
+      if (!response.ok) throw new Error('Failed to load family groups');
+      return response.json();
     },
   });
 
@@ -17,11 +19,14 @@ export function useFamilyDataMode() {
   const familyGroupId = familyGroups?.[0]?.id;
 
   // Get family settings if user is in a family group
-  const { data: familySettings } = useQuery<any>({
+  const { data: familySettings } = useQuery<any, Error>({
     queryKey: ["/api/family-groups", familyGroupId, "settings"],
     enabled: !!familyGroupId,
-    onSuccess: (data) => {
-      console.log('[DEBUG] /api/family-groups/[id]/settings response:', data);
+    queryFn: async () => {
+      if (!familyGroupId) return null;
+      const response = await fetch(`/api/family-groups/${familyGroupId}/settings`);
+      if (!response.ok) throw new Error('Failed to load family group settings');
+      return response.json();
     },
   });
 

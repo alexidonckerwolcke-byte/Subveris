@@ -19,6 +19,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [mfaChallengeOpen, setMfaChallengeOpen] = useState(false);
+  const [postSignupOpen, setPostSignupOpen] = useState(false);
 
   const [signInData, setSignInData] = useState({ email: '', password: '' });
   const [signUpData, setSignUpData] = useState({ email: '', password: '', confirmPassword: '' });

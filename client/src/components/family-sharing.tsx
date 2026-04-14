@@ -473,10 +473,10 @@ export function FamilySharing() {
                           <span className="text-sm font-medium">
                             {member.userId === user?.id ? `You (${member.email})` : (member.email || `User: ${member.userId.slice(0, 8)}`)}
                           </span>
-                          {member.subscription && (
+                          {((member as any).subscription) && (
                             <span className="text-xs text-muted-foreground">
-                              Plan: <span className="font-medium capitalize">{member.subscription.plan_type}</span> • 
-                              Status: <span className="font-medium capitalize">{member.subscription.status}</span>
+                              Plan: <span className="font-medium capitalize">{(member as any).subscription.plan_type}</span> • 
+                              Status: <span className="font-medium capitalize">{(member as any).subscription.status}</span>
                             </span>
                           )}
                         </div>
@@ -562,8 +562,7 @@ export function FamilySharing() {
                 <div className="grid grid-cols-1 gap-2">
                   {familyData.subscriptions && familyData.subscriptions
                     .filter((sub: any) =>
-                      (sub.status === 'unused' || sub.status === 'to-cancel') ||
-                      (sub.subStatus === 'unused' || sub.subStatus === 'to-cancel')
+                      sub.status === 'unused' || sub.status === 'to-cancel'
                     )
                     .map((sub: any) => (
                       <div key={sub.id} className="flex items-center justify-between p-3 rounded border">
@@ -581,8 +580,7 @@ export function FamilySharing() {
                       </div>
                     ))}
                   {(!familyData.subscriptions || familyData.subscriptions.filter((sub: any) =>
-                    (sub.status === 'unused' || sub.status === 'to-cancel') ||
-                    (sub.subStatus === 'unused' || sub.subStatus === 'to-cancel')
+                    sub.status === 'unused' || sub.status === 'to-cancel'
                   ).length === 0) && (
                     <p className="text-sm text-muted-foreground">No actionable subscriptions</p>
                   )}
@@ -686,8 +684,7 @@ export function FamilySharing() {
                   <div className="grid grid-cols-1 gap-2">
                     {memberData.subscriptions
                       .filter((sub: Subscription) =>
-                        (sub.status === 'unused' || sub.status === 'to-cancel') ||
-                        (sub.subStatus === 'unused' || sub.subStatus === 'to-cancel')
+                        sub.status === 'unused' || sub.status === 'to-cancel'
                       )
                       .map((sub: Subscription) => (
                         <div key={sub.id} className="flex items-center justify-between p-3 rounded border">

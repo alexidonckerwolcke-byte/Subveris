@@ -18,10 +18,12 @@ interface FamilyMembershipData {
 }
 
 export function FamilyMembershipBanner() {
-  const { data: membershipData, isLoading } = useQuery<FamilyMembershipData>({
+  const { data: membershipData, isLoading } = useQuery<FamilyMembershipData, Error>({
     queryKey: ["/api/family-groups/me/membership"],
-    onSuccess: (data) => {
-      console.log('[DEBUG] /api/family-groups/me/membership response:', data);
+    queryFn: async () => {
+      const response = await fetch('/api/family-groups/me/membership');
+      if (!response.ok) throw new Error('Failed to load family membership');
+      return response.json();
     },
   });
 

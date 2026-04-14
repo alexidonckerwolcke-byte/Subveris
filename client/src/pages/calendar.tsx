@@ -211,39 +211,36 @@ export default function Calendar() {
       console.log('[calendar] ⚠️ FIRST SUBSCRIPTION HAS NO nextBillingDate!', subscriptions[0]);
     }
 
-    const renewalEvents: CalendarEvent[] = subscriptions
-      .filter(sub => (sub.status === 'active' || sub.status === 'unused') && sub.nextBillingDate)
-      .map(sub => {
-        let dateOnly: string;
-        
-        if (typeof sub.nextBillingDate === 'string') {
-          dateOnly = sub.nextBillingDate.split('T')[0];
-        } else if (sub.nextBillingDate) {
-          const date = new Date(sub.nextBillingDate);
-          // Check if the date is valid before calling toISOString()
-          if (isNaN(date.getTime())) {
-            console.warn('[calendar] Invalid date for subscription', sub.id, sub.nextBillingDate);
-            return null;
-          }
-          dateOnly = date.toISOString().split('T')[0];
-        } else {
-          console.log('[calendar] Skipping subscription without nextBillingDate:', sub.id, sub.name);
-          return null;
-        }
+    const renewalEvents: CalendarEvent[] = subscriptions.reduce<CalendarEvent[]>((acc, sub) => {
+      if (!(sub.status === 'active' || sub.status === 'unused') || !sub.nextBillingDate) {
+        return acc;
+      }
 
-        return {
-          id: `renewal-${sub.id}`,
-          subscriptionId: sub.id,
-          eventDate: dateOnly,
-          title: `${sub.name} Renewal`,
-          eventType: 'renewal' as const,
-          amount: sub.amount,
-          userId: '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-      })
-      .filter((event): event is CalendarEvent => event !== null);
+      let dateOnly: string;
+      if (typeof sub.nextBillingDate === 'string') {
+        dateOnly = sub.nextBillingDate.split('T')[0];
+      } else {
+        const date = new Date(sub.nextBillingDate);
+        if (isNaN(date.getTime())) {
+          console.warn('[calendar] Invalid date for subscription', sub.id, sub.nextBillingDate);
+          return acc;
+        }
+        dateOnly = date.toISOString().split('T')[0];
+      }
+
+      acc.push({
+        id: `renewal-${sub.id}`,
+        subscriptionId: sub.id,
+        eventDate: dateOnly,
+        title: `${sub.name} Renewal`,
+        eventType: 'renewal',
+        amount: sub.amount,
+        userId: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      return acc;
+    }, []);
 
     console.log('[calendar] Renewal events generated:', renewalEvents);
 

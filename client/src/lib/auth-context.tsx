@@ -38,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [hasSubscriptions, setHasSubscriptions] = useState<boolean | null>(null);
   const [isPremium, setIsPremium] = useState<boolean>(false);
   const [premiumStatus, setPremiumStatus] = useState<string>('free');
+  const [planType, setPlanType] = useState<string>('free');
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState<boolean>(false);
   const [currentPeriodEnd, setCurrentPeriodEnd] = useState<string | null>(null);
   const [aal, setAal] = useState<'aal1' | 'aal2' | null>(null);
@@ -64,11 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkUserSubscriptions = async (userId: string) => {
     try {
       const tokenValue = session?.access_token || JSON.parse(localStorage.getItem('supabase.auth.token') || '{}').access_token;
-      const authHeader = tokenValue ? { 'Authorization': `Bearer ${tokenValue}` } : {};
+      const headers: Record<string, string> = {};
+      if (tokenValue) {
+        headers['Authorization'] = `Bearer ${tokenValue}`;
+      }
 
       // Check regular subscriptions
       const response = await fetch('/api/subscriptions', {
-        headers: authHeader,
+        headers,
       });
       if (response.ok) {
         const subscriptions = await response.json();
@@ -77,12 +81,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Check premium status
       const premiumResponse = await fetch('/api/user/premium-status', {
-        headers: authHeader,
+        headers,
       });
       if (premiumResponse.ok) {
         const premiumData = await premiumResponse.json();
         setIsPremium(premiumData.isPremium);
         setPremiumStatus(premiumData.status);
+        setPlanType(premiumData.planType || 'free');
         setCancelAtPeriodEnd(premiumData.cancelAtPeriodEnd);
         setCurrentPeriodEnd(premiumData.currentPeriodEnd);
       }
@@ -172,9 +177,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem('subverisApiUrl', window.location.origin);
           
           // Sync to Chrome extension storage for background scripts
-          if (typeof chrome !== 'undefined' && chrome.storage) {
+          const chromeGlobal = (globalThis as any).chrome;
+          if (chromeGlobal?.storage?.local) {
             try {
-              chrome.storage.local.set({
+              chromeGlobal.storage.local.set({
                 authToken: session.access_token,
                 supabaseUserUUID: session.user.id
               });
@@ -234,7 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     
     // Check if MFA is required
-    if (data?.session?.mfa_required) {
+    if ((data?.session as any)?.mfa_required) {
       // User has 2FA set up — store pending MFA session and available factors
       if (data.session) {
         setPendingMfaSession(data.session);
@@ -296,9 +302,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       }
 
+      const challengeId = (data as any)?.id;
       // Verify the challenge with the code
       const { error: verifyError } = await supabase.auth.mfa.verify({
         factorId: data.id,
+        challengeId,
         code: code,
       });
 
@@ -346,6 +354,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pendingMfaSession,
     isPremium,
     premiumStatus,
+    planType,
     cancelAtPeriodEnd,
     currentPeriodEnd,
     getToken,
