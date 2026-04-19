@@ -398,9 +398,9 @@ export class MemStorage implements IStorage {
       websiteDomain: insertSubscription.websiteDomain || null,
       scheduledCancellationDate: insertSubscription.scheduledCancellationDate || null,
       cancellationUrl: insertSubscription.cancellationUrl || null,
-      monthlyUsageCount: insertSubscription.monthlyUsageCount || 0,
-      usageMonth: insertSubscription.usageMonth || null,
-    };
+      monthlyUsageCount: insertSubscription.monthlyUsageCount,
+      usageMonth: insertSubscription.usageMonth ?? null,
+    } as any;
     this.subscriptions.set(id, subscription);
     return subscription;
   }
@@ -633,11 +633,13 @@ export class MemStorage implements IStorage {
   async getCostPerUseAnalysis(): Promise<CostPerUseAnalysis[]> {
     const subscriptions = await this.getSubscriptions();
     
+    const currentMonth = new Date().toISOString().slice(0, 7);
     return subscriptions
       .filter(sub => sub.status !== "to-cancel")
       .map(sub => {
         const monthlyAmount = calculateMonthlyCost(sub.amount, sub.frequency);
-        const costPerUse = sub.usageCount > 0 ? monthlyAmount / sub.usageCount : monthlyAmount;
+        const usageForCost = sub.usageMonth === currentMonth ? sub.monthlyUsageCount : sub.usageCount;
+        const costPerUse = usageForCost > 0 ? monthlyAmount / usageForCost : monthlyAmount;
         
         let valueRating: "excellent" | "good" | "fair" | "poor";
         if (costPerUse <= 2) valueRating = "excellent";

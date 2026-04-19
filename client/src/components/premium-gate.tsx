@@ -42,6 +42,45 @@ export function PremiumGate({ children, feature, showBlurred = true }: PremiumGa
   );
 }
 
+interface FeatureLimitGateProps {
+  currentCount: number;
+  maxAllowed: number;
+  feature: string;
+  children: ReactNode;
+}
+
+export function FeatureLimitGate({ currentCount, maxAllowed, feature, children }: FeatureLimitGateProps) {
+  const { tier } = useSubscription();
+  const isOverLimit = tier !== "premium" && tier !== "family" && currentCount > maxAllowed;
+
+  return (
+    <>
+      {children}
+      {isOverLimit && (
+        <Card className="border-dashed mt-4">
+          <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-4">
+              <Lock className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">
+              Showing the first {maxAllowed} subscriptions
+            </h3>
+            <p className="text-muted-foreground mb-4 max-w-sm">
+              {feature} is available for up to {maxAllowed} subscriptions on the Free plan. Upgrade to Premium to analyze all of your subscriptions.
+            </p>
+            <Link href="/pricing">
+              <Button>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Upgrade to Premium
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+    </>
+  );
+}
+
 interface SubscriptionLimitGateProps {
   currentCount: number;
   children: ReactNode;

@@ -161,4 +161,28 @@ describe('FamilySharing UI', () => {
       expect(screen.queryByText('sub2')).not.toBeInTheDocument();
     });
   });
+
+  it('shows active family subscriptions in the shared family data view', async () => {
+    mockQueryData[JSON.stringify(['/api/subscriptions'])] = [
+      { id: 'sub1', status: 'active', name: 'Active Personal', amount: 10, currency: 'USD', frequency: 'monthly' },
+    ];
+    mockQueryData[JSON.stringify(['/api/family-groups'])] = [
+      { id: 'g1', name: 'Family Group', ownerId: 'owner-1', memberCount: 1 },
+    ];
+    mockQueryData[JSON.stringify(['/api/family-groups', 'g1', 'settings'])] = { show_family_data: true };
+    mockQueryData[JSON.stringify(['/api/family-groups', 'g1', 'family-data'])] = {
+      subscriptions: [
+        { id: 'shared-sub', status: 'active', name: 'Shared Active', amount: 12, currency: 'USD', frequency: 'monthly' },
+      ],
+      sharedSubscriptions: [],
+      metrics: {},
+    };
+
+    render(<FamilySharing />);
+    const grpEl = await screen.findByText('Family Group');
+    fireEvent.click(grpEl);
+
+    expect(await screen.findByText('Shared Active')).toBeInTheDocument();
+    expect(screen.queryByText('No subscriptions available')).not.toBeInTheDocument();
+  });
 });

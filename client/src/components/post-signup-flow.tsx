@@ -54,12 +54,25 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
       ],
       popular: true,
     },
+    {
+      name: 'Family',
+      tier: 'family' as const,
+      price: "24,99 €",
+      period: '/month',
+      description: 'Share with your family and save together',
+      features: [
+        'Everything in Premium',
+        'Up to 5 family members',
+        'Shared savings dashboard',
+        'Family subscription alerts',
+      ],
+    },
   ];
 
-  const handlePlanSelect = (tier: 'free' | 'premium') => {
-    if (tier === 'premium') {
+  const handlePlanSelect = (tier: 'free' | 'premium' | 'family') => {
+    if (tier === 'premium' || tier === 'family') {
       // Store selection and redirect after closing
-      localStorage.setItem('postSignupPlan', 'premium');
+      localStorage.setItem('postSignupPlan', tier);
       onClose();
       // Redirect after a brief delay to allow modal to close
       setTimeout(() => {
@@ -193,7 +206,11 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
                     className="w-full"
                     variant={plan.popular ? 'default' : 'outline'}
                   >
-                    {plan.tier === 'free' ? 'Get Started Free' : 'Choose Premium'}
+                    {plan.tier === 'free'
+                      ? 'Get Started Free'
+                      : plan.tier === 'premium'
+                      ? 'Choose Premium'
+                      : 'Choose Family'}
                   </Button>
                 </CardContent>
               </Card>

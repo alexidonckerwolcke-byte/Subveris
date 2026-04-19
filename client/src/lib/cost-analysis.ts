@@ -22,8 +22,11 @@ export function computeCostPerUseFromSubs(subs: any[] | undefined): CostPerUseAn
       // support both snake_case (raw rows) and camelCase (API response)
       const currentMonth = new Date().toISOString().slice(0, 7);
       const usageMonth = (sub.usage_month ?? sub.usageMonth) as string | null;
-      const monthlyUsageCount = (sub.monthly_usage_count ?? sub.monthlyUsageCount ?? 0) as number;
-      const usageCount = usageMonth === currentMonth ? monthlyUsageCount : 0;
+      const monthlyUsageCount = (sub.monthly_usage_count ?? sub.monthlyUsageCount) as number | undefined;
+      const fallbackUsageCount = (sub.usage_count ?? sub.usageCount ?? 0) as number;
+      const usageCount = usageMonth === currentMonth && monthlyUsageCount !== undefined
+        ? monthlyUsageCount
+        : fallbackUsageCount;
       const costPerUse = usageCount > 0 ? monthlyAmount / usageCount : monthlyAmount;
       // Determine value rating based on both usage count and cost per use
       let valueRating: 'excellent' | 'good' | 'fair' | 'poor';

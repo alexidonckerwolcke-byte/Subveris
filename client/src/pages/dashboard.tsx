@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { MetricsCards } from "@/components/metrics-cards";
 import { SpendingChart } from "@/components/spending-chart";
 import { CostPerUse } from "@/components/cost-per-use";
@@ -29,7 +29,7 @@ import type {
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { limits } = useSubscription();
+  const { limits, tier } = useSubscription();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
   const { convertAmount } = useCurrency();
 
@@ -39,7 +39,7 @@ export default function Dashboard() {
   });
 
   // Family data (load if in family group)
-  const { data: familyData, isLoading: familyDataLoading } = useQuery<any>({
+  const { data: familyData, isLoading: familyDataLoading, isFetching: familyDataFetching, refetch: refetchFamilyData } = useQuery<any>({
     queryKey: ["/api/family-groups", familyGroupId, "family-data"],
     enabled: !!familyGroupId,
   });
@@ -246,6 +246,9 @@ export default function Dashboard() {
   // Prefer per-member labeled entries when deduping, so put them first
   const mergedAnalyses = showFamilyData ? dedupeByKey([...perMemberAnalyses, ...(baseAnalysis || [])], 'subscriptionId') : baseAnalysis;
   const effectiveCostAnalysis = mergedAnalyses;
+  const displayCostAnalysis = !showFamilyData && tier === "free"
+    ? (effectiveCostAnalysis?.slice(0, limits.maxCostPerUseSubscriptions) ?? [])
+    : effectiveCostAnalysis;
 
   // Compute family-derived metrics after subscriptions are available
   function calculateMonthlyCost(amount: number | null | undefined, frequency: string | null | undefined) {
@@ -317,7 +320,8 @@ export default function Dashboard() {
   const behavioralInsights = baseInsights;
 
   // Personal recommendations (always load)
-  const { data: personalRecommendations, isLoading: personalRecsLoading, refetch: refetchRecs } = useQuery<AIRecommendation[]>({
+  const [refreshingRecommendations, setRefreshingRecommendations] = useState(false);
+  const { data: personalRecommendations, isLoading: personalRecsLoading, isFetching: personalRecsFetching, refetch: refetchRecs } = useQuery<AIRecommendation[]>({
     queryKey: ["/api/recommendations"],
   });
 
@@ -388,6 +392,7 @@ export default function Dashboard() {
       );
   const recommendations = dedupeByKey(recommendationsRaw, "subscriptionId");
   const recsLoading = showFamilyData ? familyDataLoading : personalRecsLoading;
+  const recsRefreshing = showFamilyData ? familyDataFetching : personalRecsFetching;
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: SubscriptionStatus }) => {
@@ -454,13 +459,72 @@ export default function Dashboard() {
     deleteMutation.mutate(id);
   };
 
-  const handleRefreshRecommendations = () => {
-    refetchRecs();
+  const handleRefreshRecommendations = async () => {
+    console.log("[Dashboard] Refresh recommendations clicked", { showFamilyData, familyGroupId });
+    setRefreshingRecommendations(true);
+    try {
+      if (showFamilyData && familyGroupId) {
+        queryClient.removeQueries({ queryKey: ["/api/family-groups", familyGroupId, "family-data"], exact: true });
+        queryClient.removeQueries({ queryKey: ["/api/subscriptions"], exact: true });
+
+        const familyDataResult = await queryClient.fetchQuery({
+          queryKey: ["/api/family-groups", familyGroupId, "family-data"],
+          queryFn: async () => {
+            const res = await apiRequest("GET", `/api/family-groups/${familyGroupId}/family-data`);
+            return res.json();
+          },
+          staleTime: 0,
+        });
+        console.log("[Dashboard] family-data refreshed", familyDataResult);
+
+        const subscriptionsResult = await queryClient.fetchQuery({
+          queryKey: ["/api/subscriptions"],
+          queryFn: async () => {
+            const res = await apiRequest("GET", "/api/subscriptions");
+            return res.json();
+          },
+          staleTime: 0,
+        });
+        console.log("[Dashboard] subscriptions refreshed", subscriptionsResult);
+
+        await refetchFamilyData?.();
+      } else {
+        queryClient.removeQueries({ queryKey: ["/api/recommendations"], exact: true });
+        queryClient.removeQueries({ queryKey: ["/api/subscriptions"], exact: true });
+
+        const recommendationsResult = await queryClient.fetchQuery({
+          queryKey: ["/api/recommendations"],
+          queryFn: async () => {
+            const res = await apiRequest("GET", "/api/recommendations");
+            return res.json();
+          },
+          staleTime: 0,
+        });
+        console.log("[Dashboard] recommendations refreshed", recommendationsResult);
+
+        const subscriptionsResult = await queryClient.fetchQuery({
+          queryKey: ["/api/subscriptions"],
+          queryFn: async () => {
+            const res = await apiRequest("GET", "/api/subscriptions");
+            return res.json();
+          },
+          staleTime: 0,
+        });
+        console.log("[Dashboard] subscriptions refreshed", subscriptionsResult);
+
+        await refetchRecs?.();
+      }
+    } catch (error) {
+      console.error("[Dashboard] Failed to refresh recommendations", error);
+    } finally {
+      setRefreshingRecommendations(false);
+    }
   };
 
   const activeSubscriptions = subscriptions?.filter((s: Subscription) => s.status === "active") || [];
   const unusedCount = subscriptions?.filter((s: Subscription) => s.status === "unused").length || 0;
   const toCancelCount = subscriptions?.filter((s: Subscription) => s.status === "to-cancel").length || 0;
+  const costPerUseSubscriptionCount = subscriptions?.filter((s: Subscription) => s.status !== "deleted").length || 0;
 
   return (
     <div className="flex-1 overflow-auto bg-gradient-to-br from-background via-background to-muted/5">
@@ -508,7 +572,13 @@ export default function Dashboard() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           {limits.hasCostPerUse ? (
-            <CostPerUse analyses={effectiveCostAnalysis} isLoading={analysisLoading} />
+            <CostPerUse
+              analyses={displayCostAnalysis}
+              isLoading={analysisLoading}
+              showUpgradePrompt={tier === "free"}
+              totalSubscriptions={costPerUseSubscriptionCount}
+              maxAllowed={limits.maxCostPerUseSubscriptions}
+            />
           ) : (
             <PremiumGate feature="Cost-per-use analytics" showBlurred={false} />
           )}
@@ -524,7 +594,7 @@ export default function Dashboard() {
             recommendations={recommendations}
             isLoading={recsLoading}
             onRefresh={handleRefreshRecommendations}
-            isRefreshing={recsLoading}
+            isRefreshing={refreshingRecommendations || recsRefreshing}
           />
         ) : (
           <PremiumGate feature="AI-powered recommendations" showBlurred={false} />

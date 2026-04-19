@@ -79,6 +79,16 @@ app.use((req, res, next) => {
 
 app.use(logRequest);
 
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Authorization,Content-Type');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 logger.info('Server starting up');
 
 async function cleanupDeletedSubscriptions() {
@@ -93,6 +103,10 @@ async function cleanupDeletedSubscriptions() {
       .lt('deleted_at', currentMonthStart);
 
     if (error) {
+      if (typeof error.message === 'string' && error.message.includes('deleted_at')) {
+        console.log('[Server] Skipping deleted subscription cleanup: subscriptions.deleted_at column not present');
+        return 0;
+      }
       console.error('[Server] Failed to purge old deleted subscriptions:', error);
       return 0;
     }
@@ -142,6 +156,19 @@ async function cleanupDeletedSubscriptions() {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   const host = process.env.HOST || "127.0.0.1";
+
+  httpServer.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(
+        `[Server] Port ${port} is already in use. ` +
+          `Stop the process using that port or set PORT to another value before restarting.`,
+      );
+    } else {
+      console.error("[Server] Unexpected server error:", err);
+    }
+    process.exit(1);
+  });
+
   httpServer.listen(
     {
       port,

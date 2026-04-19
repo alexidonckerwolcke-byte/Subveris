@@ -1,4 +1,5 @@
 let startTime = Date.now();
+let cachedAuthToken = null;
 
 function getRootDomain(hostname) {
   const parts = hostname.split(".");
@@ -14,6 +15,34 @@ script.onload = function() {
 };
 (document.head || document.documentElement).appendChild(script);
 
+function sendMessageToBackground(message, callback) {
+  if (!window.chrome || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+    console.warn('[Extension] chrome.runtime.sendMessage unavailable in this context:', {
+      chrome: typeof window.chrome,
+      chromeRuntime: typeof chrome?.runtime,
+      sendMessage: typeof chrome?.runtime?.sendMessage,
+    });
+    if (callback) callback(null);
+    return false;
+  }
+
+  try {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn('[Extension] Background message error:', chrome.runtime.lastError);
+        if (callback) callback(null, chrome.runtime.lastError);
+        return;
+      }
+      if (callback) callback(response);
+    });
+    return true;
+  } catch (e) {
+    console.warn('[Extension] Failed to send message to background:', e);
+    if (callback) callback(null, e);
+    return false;
+  }
+}
+
 // Listen for messages from the injected script (page context) and forward/store token
 window.addEventListener('message', (event) => {
   if (event.source !== window) return;
@@ -23,31 +52,68 @@ window.addEventListener('message', (event) => {
   const userId = event.data.userId || null;
   console.log('[Extension] Received SUBVERIS_AUTH_TOKEN from page. Forwarding to background and storing locally.');
 
-  // Store locally so content script can read it later
-  try {
-    chrome.storage.local.set({ authToken: token, supabaseUserUUID: userId }, () => {
-      console.log('[Extension] chrome.storage set authToken result');
-    });
-  } catch (e) {
-    console.warn('[Extension] Failed to set chrome.storage directly:', e);
+  if (token) {
+    cachedAuthToken = token;
   }
 
-  // Also forward to background for any global handling
-  try {
-    chrome.runtime.sendMessage({ type: 'SUBVERIS_AUTH_TOKEN', token, userId });
-  } catch (e) {
-    console.warn('[Extension] Failed to send message to background:', e);
-  }
+  const apiUrl = localStorage.getItem('subverisApiUrl') || null;
+
+  // Forward to background script for storage (content scripts can't reliably set chrome.storage)
+  // Use a timeout to ensure background script is ready
+  setTimeout(() => {
+    const success = sendMessageToBackground({ type: 'SUBVERIS_AUTH_TOKEN', token, userId, apiUrl }, (response, err) => {
+      if (err) {
+        console.error('[Extension] ❌ SUBVERIS_AUTH_TOKEN message failed:', err.message);
+        console.log('[Extension] 💡 Reload the page after reloading the extension.');
+      } else {
+        console.log('[Extension] Background script storage response:', response);
+      }
+    });
+
+    if (!success) {
+      console.error('[Extension] ❌ SUBVERIS_AUTH_TOKEN message could not be sent. Reload the page after reloading the extension.');
+    }
+  }, 100); // Small delay to ensure background is ready
 });
 
 // Get auth token from chrome storage (set by inject script via background)
 function getAuthToken() {
   return new Promise((resolve) => {
+    if (!window.chrome || !chrome.storage || !chrome.storage.local) {
+      console.warn('[Extension] chrome.storage.local unavailable in this context');
+      return resolve(null);
+    }
+
     chrome.storage.local.get(['authToken'], (result) => {
       console.log('[Extension] Auth token check:', result.authToken ? 'FOUND' : 'NOT FOUND');
+      if (result.authToken) cachedAuthToken = result.authToken;
       resolve(result.authToken);
     });
   });
+}
+
+function sendUsageTracking(domain, timeSpent) {
+  const success = sendMessageToBackground({ type: 'TRACK_USAGE', domain, timeSpent }, (response, err) => {
+    if (err) {
+      console.error('[Extension] ❌ TRACK_USAGE message failed:', err.message);
+      console.log('[Extension] 💡 If this error persists, reload the page after reloading the extension.');
+      return;
+    }
+    if (!response || !response.success) {
+      console.warn('[Extension] ⚠️ TRACK_USAGE response was not successful:', response);
+    } else {
+      console.log('[Extension] ✅ Usage tracking successful for:', domain);
+    }
+  });
+
+  if (!success) {
+    console.error('[Extension] ❌ TRACK_USAGE message could not be sent to background.');
+    console.log('[Extension] 💡 Reload the page after reloading the extension in chrome://extensions/');
+  }
+}
+
+function sendUsageTrackingToBackground(domain, timeSpent) {
+  sendUsageTracking(domain, timeSpent);
 }
 
 // Log when script starts
@@ -62,60 +128,21 @@ getAuthToken().then(token => {
   }
 });
 
-window.addEventListener("beforeunload", async () => {
+function trackUsageIfNeeded() {
   const endTime = Date.now();
   const timeSpent = Math.round((endTime - startTime) / 1000);
 
   console.log(`[Extension] Page unload detected. Time spent: ${timeSpent}s on ${window.location.hostname}`);
 
-  // Only track if more than 10 seconds spent
   if (timeSpent < 10) {
     console.log(`[Extension] ⏭️  Skipping - less than 10 seconds`);
     return;
   }
 
-  // Get token from chrome storage (set during login)
-  const token = await getAuthToken();
-  if (!token) {
-    console.log('[Extension] ❌ No auth token - skipping usage tracking');
-    return;
-  }
-
   const domain = getRootDomain(window.location.hostname);
-  const apiUrl = localStorage.getItem('subverisApiUrl') || 'http://localhost:5000';
+  console.log(`[Extension] 📊 Tracking usage for domain: ${domain}`);
+  sendUsageTrackingToBackground(domain, timeSpent);
+}
 
-  console.log(`[Extension] 📊 Tracking usage for domain: ${domain} at ${apiUrl}`);
-
-  // Send usage tracking request
-  try {
-    const response = await fetch(`${apiUrl}/api/track-usage-by-domain`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        domain: domain,
-        timeSpent: timeSpent,
-      }),
-      credentials: "include"
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log(`[Extension] ✅ Usage tracked: ${data.message}`);
-      console.log(`[Extension]     usageCount=${data.usageCount} monthlyUsageCount=${data.monthlyUsageCount} costPerUse=${data.costPerUse?.toFixed?.(2) ?? data.costPerUse}`);
-      if (data.subscription) {
-        console.log(`[Extension]     subscription=${data.subscription.name} (${data.subscription.websiteDomain || 'unknown domain'})`);
-      }
-    } else if (response.status === 404) {
-      const data = await response.json().catch(() => null);
-      console.log(`[Extension] ⚠️  No subscription found for ${domain}. Make sure you added it with the correct website domain in Subveris.`, data?.message || '');
-    } else {
-      const text = await response.text();
-      console.error(`[Extension] ❌ Error: ${response.status} ${response.statusText}: ${text}`);
-    }
-  } catch (error) {
-    console.error('[Extension] Failed to track usage:', error);
-  }
-});
+window.addEventListener('pagehide', trackUsageIfNeeded);
+window.addEventListener('beforeunload', trackUsageIfNeeded);

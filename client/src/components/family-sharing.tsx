@@ -88,10 +88,36 @@ export function FamilySharing() {
     enabled: !!selectedGroupId && familySettings?.show_family_data,
   });
 
+  // Fetch shared subscriptions separately so owners can unshare even when
+  // family data view is disabled.
+  const { data: sharedSubscriptions = [], isLoading: sharedSubscriptionsLoading } = useQuery<any[]>({
+    queryKey: ["/api/family-groups", selectedGroupId, "shared-subscriptions"],
+    enabled: !!selectedGroupId,
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/family-groups/${selectedGroupId}/shared-subscriptions`);
+      return res.json();
+    },
+  });
+
+  const sharedSubscriptionsWithDetails = (sharedSubscriptions || []).map((shared) => ({
+    ...shared,
+    subscription: allSubscriptions.find((sub) => sub.id === shared.subscription_id) || null,
+  }));
+
+  const sharedSubscriptionIds = new Set(
+    ([...(sharedSubscriptions || []), ...(familyData?.sharedSubscriptions || [])] as any[])
+      .map((shared) => shared.subscription_id || shared.subscription?.id)
+      .filter(Boolean)
+  );
+
+  const filteredFamilyDataSubscriptions = (familyData?.subscriptions || []).filter(
+    (sub: any) => sub.status !== 'deleted' && !sharedSubscriptionIds.has(sub.id)
+  );
+
   // compute list of subscriptions that can be shared (excludes already-shared)
   const availableToShare = filterAvailableToShare(
     allSubscriptions,
-    familyData?.sharedSubscriptions
+    [...(sharedSubscriptions || []), ...(familyData?.sharedSubscriptions || [])]
   );
 
   // Compute simple metrics client-side as a fallback when server doesn't provide precomputed metrics
@@ -106,8 +132,15 @@ export function FamilySharing() {
       const response = await apiRequest("POST", "/api/family-groups", { name });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (createdGroup: FamilyGroup) => {
       queryClient.invalidateQueries({ queryKey: ["/api/family-groups"] });
+      queryClient.setQueryData<FamilyGroup[]>(["/api/family-groups"], (currentGroups = []) => {
+        if (!createdGroup || !createdGroup.id) return currentGroups;
+        const exists = currentGroups.some((group) => group.id === createdGroup.id);
+        if (exists) return currentGroups;
+        return [...currentGroups, createdGroup];
+      });
+      setSelectedGroupId(createdGroup.id);
       setNewGroupName("");
       toast({
         title: "Family group created",
@@ -209,6 +242,7 @@ export function FamilySharing() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/family-groups", selectedGroupId, "family-data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/family-groups", selectedGroupId, "shared-subscriptions"] });
       toast({ title: 'Shared', description: 'Subscription has been shared.' });
     },
     onError: (err: any) => {
@@ -224,6 +258,7 @@ export function FamilySharing() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/family-groups", selectedGroupId, "family-data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/family-groups", selectedGroupId, "shared-subscriptions"] });
       toast({ title: 'Unshared', description: 'Subscription removed from family group.' });
     },
     onError: (err: any) => {
@@ -328,6 +363,9 @@ export function FamilySharing() {
   });
 
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
+  const ownedGroups = groups.filter((g) => g.ownerId === user?.id);
+  const canCreateGroup = ownedGroups.length < 1;
+  const canAddMember = members.length < 5;
 
   return (
     <div className="space-y-4">
@@ -355,12 +393,17 @@ export function FamilySharing() {
             />
             <Button
               onClick={() => newGroupName && createGroupMutation.mutate(newGroupName)}
-              disabled={!newGroupName || createGroupMutation.isPending}
+              disabled={!newGroupName || createGroupMutation.isPending || !canCreateGroup}
             >
               <Plus className="h-4 w-4 mr-2" />
               Create
             </Button>
           </div>
+          {!canCreateGroup && (
+            <p className="text-sm text-red-600">
+              You can only create 1 family group.
+            </p>
+          )}
 
           {/* Groups List */}
           {groupsLoading ? (
@@ -446,12 +489,17 @@ export function FamilySharing() {
                 />
                 <Button
                   onClick={() => newMemberEmail && addMemberMutation.mutate(newMemberEmail)}
-                  disabled={!newMemberEmail || addMemberMutation.isPending}
+                  disabled={!newMemberEmail || addMemberMutation.isPending || !canAddMember}
                   size="sm"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+              {!canAddMember && (
+                <p className="text-sm text-red-600">
+                  This family group can contain up to 5 people.
+                </p>
+              )}
 
               {/* Members List */}
               {membersLoading ? (
@@ -556,14 +604,95 @@ export function FamilySharing() {
               </div>
             )}
 
+            {isOwner && (
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold">Share subscriptions</h3>
+                    <p className="text-sm text-muted-foreground">Select subscriptions to share with your family group.</p>
+                  </div>
+                </div>
+
+                {availableToShare.length === 0 ? (
+                  <p className="mt-3 text-sm text-muted-foreground">No subscriptions are available to share right now.</p>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {availableToShare.map((sub) => (
+                      <div key={sub.id} className="flex items-center justify-between p-3 rounded border bg-muted/50">
+                        <div>
+                          <div className="font-medium">{sub.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {formatAmount(sub.amount ?? 0, (sub.currency as Currency) || 'USD')} / {sub.frequency}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => shareSubscriptionMutation.mutate(sub.id)}
+                          disabled={shareSubscriptionMutation.isPending}
+                        >
+                          Share
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-semibold">Shared subscriptions</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Remove a shared subscription from the family group when you no longer want it shared.
+                      </p>
+                    </div>
+                  </div>
+
+                  {sharedSubscriptionsLoading ? (
+                    <div className="space-y-2 mt-4">
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  ) : sharedSubscriptionsWithDetails.length === 0 ? (
+                    <p className="mt-3 text-sm text-muted-foreground">No subscriptions are currently shared.</p>
+                  ) : (
+                    <div className="mt-4 space-y-3">
+                      {sharedSubscriptionsWithDetails.map((shared) => (
+                        <div key={shared.id} className="flex items-center justify-between p-3 rounded border bg-muted/50">
+                          <div>
+                            <div className="font-medium">
+                              {shared.subscription?.name || `Subscription ${shared.subscription_id}`}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                              {shared.subscription?.status && (
+                                <Badge variant={shared.subscription.status === 'active' ? 'default' : 'secondary'}>
+                                  {shared.subscription.status}
+                                </Badge>
+                              )}
+                              <span>Shared by {shared.shared_by_user_id}</span>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => unshareSubscriptionMutation.mutate(shared.id)}
+                            disabled={unshareSubscriptionMutation.isPending}
+                          >
+                            Unshare
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {familySettings?.show_family_data && familyData && (
               <div className="border-t pt-4 space-y-4">
-                {/* Strict actionable subscriptions filtering for dashboard */}
+                {/* Show all family subscriptions in the shared/family data view */}
                 <div className="grid grid-cols-1 gap-2">
-                  {familyData.subscriptions && familyData.subscriptions
-                    .filter((sub: any) =>
-                      sub.status === 'unused' || sub.status === 'to-cancel'
-                    )
+                  {filteredFamilyDataSubscriptions && filteredFamilyDataSubscriptions
                     .map((sub: any) => (
                       <div key={sub.id} className="flex items-center justify-between p-3 rounded border">
                         <div>
@@ -579,11 +708,6 @@ export function FamilySharing() {
                         </div>
                       </div>
                     ))}
-                  {(!familyData.subscriptions || familyData.subscriptions.filter((sub: any) =>
-                    sub.status === 'unused' || sub.status === 'to-cancel'
-                  ).length === 0) && (
-                    <p className="text-sm text-muted-foreground">No actionable subscriptions</p>
-                  )}
                 </div>
               </div>
             )}

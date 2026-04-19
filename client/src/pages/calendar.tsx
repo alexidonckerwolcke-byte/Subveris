@@ -4,6 +4,7 @@ import { useFamilyDataMode } from "@/hooks/use-family-data";
 import type { Subscription, CalendarEvent } from "@shared/schema";
 import { useMemo, useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
+import { dedupeById } from "@/lib/utils";
 
 export default function Calendar() {
   const queryClient = useQueryClient();
@@ -49,6 +50,10 @@ export default function Calendar() {
       nextBillingDate,
     } as Subscription;
   });
+
+  // Deduplicate subscriptions by id before generating calendar events to avoid
+  // duplicate renewal event IDs when the same subscription appears twice.
+  subscriptions = dedupeById(subscriptions);
 
   // Personal calendar events (always load)
   const { data: personalCalendarEvents = [] } = useQuery<CalendarEvent[]>({

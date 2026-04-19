@@ -1,19 +1,240 @@
+import { config } from 'dotenv';
 import { Resend } from 'resend';
 import { checkNotificationPreference } from './notification-preferences.js';
 import { sendBatchPushNotifications } from './push-notifications.js';
 import { createClient } from '@supabase/supabase-js';
 
+// Load environment variables
+config();
+
+// Email provider configuration
+interface EmailProvider {
+  name: string;
+  send: (options: EmailOptions) => Promise<EmailResult>;
+  isConfigured: () => boolean;
+  canSendTo: (email: string) => boolean;
+}
+
+interface EmailOptions {
+  to: string;
+  subject: string;
+  html: string;
+  from?: string;
+  replyTo?: string;
+}
+
+interface EmailResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
+
+// Resend provider
+class ResendProvider implements EmailProvider {
+  name = 'Resend';
+  private client: Resend | null = null;
+
+  constructor() {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (apiKey) {
+      this.client = new Resend(apiKey);
+    }
+  }
+
+  isConfigured(): boolean {
+    return !!this.client;
+  }
+
+  canSendTo(email: string): boolean {
+    // In production, Resend allows sending to any verified domain
+    // In testing mode, only to account owner's email
+    if (process.env.NODE_ENV === 'production') {
+      return true; // Assume domain is verified in production
+    }
+    // Testing restriction - only account owner's email
+    const allowedEmail = process.env.RESEND_TESTING_EMAIL || 'alexi.donckerwolcke@gmail.com';
+    return email === allowedEmail;
+  }
+
+  async send(options: EmailOptions): Promise<EmailResult> {
+    if (!this.client) {
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    if (!this.canSendTo(options.to)) {
+      return {
+        success: false,
+        error: `Cannot send to ${options.to} - ${this.name} restrictions`
+      };
+    }
+
+    try {
+      const from = options.from || 'Subveris <noreply@subveris.com>';
+      const result = await this.client.emails.send({
+        from,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        reply_to: options.replyTo,
+      });
+
+      return {
+        success: true,
+        messageId: result.data?.id,
+      };
+    } catch (error) {
+      console.error(`[${this.name}] Send error:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+}
+
+// SendGrid provider (fallback)
+class SendGridProvider implements EmailProvider {
+  name = 'SendGrid';
+  private apiKey: string | null = null;
+
+  constructor() {
+    this.apiKey = process.env.SENDGRID_API_KEY || null;
+  }
+
+  isConfigured(): boolean {
+    return !!this.apiKey;
+  }
+
+  canSendTo(email: string): boolean {
+    return true; // SendGrid allows sending to any email
+  }
+
+  async send(options: EmailOptions): Promise<EmailResult> {
+    if (!this.apiKey) {
+      return { success: false, error: 'SendGrid not configured' };
+    }
+
+    try {
+      const sgMail = (await import('@sendgrid/mail')).default;
+      sgMail.setApiKey(this.apiKey);
+
+      const msg = {
+        to: options.to,
+        from: options.from || 'noreply@subveris.com',
+        subject: options.subject,
+        html: options.html,
+        replyTo: options.replyTo,
+      };
+
+      const result = await sgMail.send(msg);
+
+      return {
+        success: true,
+        messageId: result[0]?.headers?.['x-message-id'],
+      };
+    } catch (error) {
+      console.error(`[${this.name}] Send error:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+}
+
+// Email service with provider failover
+class EmailService {
+  private providers: EmailProvider[] = [];
+  private supabase: any;
+
+  constructor() {
+    // Initialize Supabase client
+    this.supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Initialize providers in order of preference
+    this.providers.push(new ResendProvider());
+    this.providers.push(new SendGridProvider());
+
+    console.log('[Email] Initialized providers:', this.providers.map(p => ({
+      name: p.name,
+      configured: p.isConfigured()
+    })));
+  }
+
+  private async logEmailAttempt(options: EmailOptions, result: EmailResult, userId?: string) {
+    try {
+      await this.supabase.from('email_logs').insert({
+        user_id: userId,
+        to_email: options.to,
+        subject: options.subject,
+        provider: this.providers.find(p => p.isConfigured())?.name || 'none',
+        success: result.success,
+        error_message: result.error,
+        message_id: result.messageId,
+        created_at: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('[Email] Failed to log email attempt:', error);
+    }
+  }
+
+  async send(options: EmailOptions, userId?: string): Promise<EmailResult> {
+    // Try each configured provider in order
+    for (const provider of this.providers) {
+      if (!provider.isConfigured()) continue;
+      if (!provider.canSendTo(options.to)) continue;
+
+      console.log(`[Email] Attempting to send via ${provider.name} to ${options.to}`);
+
+      const result = await provider.send(options);
+      await this.logEmailAttempt(options, result, userId);
+
+      if (result.success) {
+        console.log(`[Email] Successfully sent via ${provider.name}:`, result.messageId);
+        return result;
+      } else {
+        console.warn(`[Email] Failed via ${provider.name}:`, result.error);
+      }
+    }
+
+    const error = 'All email providers failed or are not configured';
+    console.error('[Email]', error);
+    await this.logEmailAttempt(options, { success: false, error }, userId);
+
+    return { success: false, error };
+  }
+}
+
+// Global email service instance
+const emailServiceInstance = new EmailService();
+
+// Legacy functions for backward compatibility
 const resendApiKey = process.env.RESEND_API_KEY;
-const resend = resendApiKey
-  ? new Resend(resendApiKey)
-  : ({
-      emails: {
-        send: async () => {
-          console.warn('[Email] RESEND_API_KEY not configured. Skipping email send.');
-          return { data: null, error: null };
+console.log('[Email] RESEND_API_KEY check at load time:', !!resendApiKey, resendApiKey ? 'configured' : 'not configured');
+
+// Create resend client function that checks at runtime (deprecated - use emailService instead)
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  return apiKey
+    ? new Resend(apiKey)
+    : ({
+        emails: {
+          send: async () => {
+            console.warn('[Email] RESEND_API_KEY not configured. Skipping email send.');
+            return { data: null, error: null };
+          },
         },
-      },
-    } as unknown as Resend);
+      } as unknown as Resend);
+}
+
+// Check if email can be sent (deprecated - use provider.canSendTo instead)
+function canSendEmail(to: string): boolean {
+  const provider = emailService['providers'].find(p => p.isConfigured());
+  return provider ? provider.canSendTo(to) : false;
+}
 
 // Exchange rates relative to USD (matching client/src/lib/currency-context.tsx)
 const EXCHANGE_RATES: Record<string, number> = {
@@ -137,13 +358,15 @@ export const emailService = {
         <p>Questions? Check out our help center or reply to this email.</p>
         <p>For support, contact us at: <strong>help.subveris@gmail.com</strong></p>
       `;
-      
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+
+      const result = await emailServiceInstance.send({
         to: userEmail,
         subject: 'Welcome to Subveris! 🎉',
         html: emailTemplate('Welcome to Subveris', content),
+        from: 'Subveris <onboarding@subveris.com>',
       });
+
+      return result;
 
       if (error) {
         console.error('[Email] Failed to send welcome email:', error);
@@ -200,20 +423,14 @@ export const emailService = {
         </ul>
       `;
 
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+      const result = await emailServiceInstance.send({
         to: userEmail,
         subject: `New subscription added: ${data.subscriptionName}`,
         html: emailTemplate('Subscription Added', content),
-      });
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
 
-      if (error) {
-        console.error('[Email] Failed to send subscription added email:', error);
-        return { success: false, error };
-      }
-
-      console.log('[Email] Subscription added email sent to', userEmail);
-      return { success: true, data: result };
+      return result;
     } catch (error) {
       console.error('[Email] Error sending subscription added email:', error);
       return { success: false, error };
@@ -251,20 +468,14 @@ export const emailService = {
         <p>🎉 Great job optimizing your subscriptions! You're saving money every month.</p>
       `;
 
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+      const result = await emailServiceInstance.send({
         to: userEmail,
         subject: `Subscription cancelled: ${data.subscriptionName}`,
         html: emailTemplate('Subscription Cancelled', content),
-      });
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
 
-      if (error) {
-        console.error('[Email] Failed to send subscription deleted email:', error);
-        return { success: false, error };
-      }
-
-      console.log('[Email] Subscription deleted email sent to', userEmail);
-      return { success: true, data: result };
+      return result;
     } catch (error) {
       console.error('[Email] Error sending subscription deleted email:', error);
       return { success: false, error };
@@ -303,20 +514,14 @@ export const emailService = {
         </ul>
       `;
 
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+      const result = await emailServiceInstance.send({
         to: userEmail,
         subject: `Bank account connected: ${data.bankName}`,
         html: emailTemplate('Bank Account Connected', content),
-      });
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
 
-      if (error) {
-        console.error('[Email] Failed to send bank connected email:', error);
-        return { success: false, error };
-      }
-
-      console.log('[Email] Bank connected email sent to', userEmail);
-      return { success: true, data: result };
+      return result;
     } catch (error) {
       console.error('[Email] Error sending bank connected email:', error);
       return { success: false, error };
@@ -357,20 +562,14 @@ export const emailService = {
         <p>If you didn't make this change, please log in to your dashboard to review your subscriptions.</p>
       `;
 
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+      const result = await emailServiceInstance.send({
         to: userEmail,
         subject: `Subscription status changed: ${data.subscriptionName}`,
         html: emailTemplate('Status Updated', content),
-      });
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
 
-      if (error) {
-        console.error('[Email] Failed to send status changed email:', error);
-        return { success: false, error };
-      }
-
-      console.log('[Email] Status changed email sent to', userEmail);
-      return { success: true, data: result };
+      return result;
     } catch (error) {
       console.error('[Email] Error sending status changed email:', error);
       return { success: false, error };
@@ -401,20 +600,14 @@ export const emailService = {
         <p><strong>Important:</strong> Keep your recovery codes in a safe place. You can find them in your account settings.</p>
       `;
 
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+      const result = await emailServiceInstance.send({
         to: userEmail,
         subject: 'Two-Factor Authentication Enabled',
         html: emailTemplate('Security Enhanced', content),
-      });
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
 
-      if (error) {
-        console.error('[Email] Failed to send 2FA enabled email:', error);
-        return { success: false, error };
-      }
-
-      console.log('[Email] 2FA enabled email sent to', userEmail);
-      return { success: true, data: result };
+      return result;
     } catch (error) {
       console.error('[Email] Error sending 2FA enabled email:', error);
       return { success: false, error };
@@ -452,20 +645,14 @@ export const emailService = {
         <p>Start using your premium features in your dashboard!</p>
       `;
 
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+      const result = await emailServiceInstance.send({
         to: userEmail,
         subject: 'Welcome to Subveris Premium! 🎉',
         html: emailTemplate('Premium Plan Activated', content),
-      });
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
 
-      if (error) {
-        console.error('[Email] Failed to send premium upgrade email:', error);
-        return { success: false, error };
-      }
-
-      console.log('[Email] Premium upgrade email sent to', userEmail);
-      return { success: true, data: result };
+      return result;
     } catch (error) {
       console.error('[Email] Error sending premium upgrade email:', error);
       return { success: false, error };
@@ -501,20 +688,14 @@ export const emailService = {
         <p>Log in to your Subveris dashboard to review this recommendation and take action.</p>
       `;
 
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+      const result = await emailServiceInstance.send({
         to: userEmail,
         subject: `💡 Money-saving recommendation: ${data.subscriptionName}`,
         html: emailTemplate('New Recommendation', content),
-      });
+        from: 'Subveris <recommendations@subveris.com>',
+      }, userId);
 
-      if (error) {
-        console.error('[Email] Failed to send recommendation email:', error);
-        return { success: false, error };
-      }
-
-      console.log('[Email] Recommendation email sent to', userEmail);
-      return { success: true, data: result };
+      return result;
     } catch (error) {
       console.error('[Email] Error sending recommendation email:', error);
       return { success: false, error };
@@ -557,20 +738,14 @@ export const emailService = {
         <p>If you'd like to cancel this reminder or keep the subscription active, please log in to your Subveris dashboard.</p>
       `;
 
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+      const result = await emailServiceInstance.send({
         to: userEmail,
         subject: `Reminder scheduled for ${data.subscriptionName} on ${cancellationDate}`,
         html: emailTemplate('Cancellation Reminder Scheduled', content),
-      });
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
 
-      if (error) {
-        console.error('[Email] Failed to send cancellation scheduled reminder:', error);
-        return { success: false, error };
-      }
-
-      console.log('[Email] Cancellation scheduled reminder sent to', userEmail);
-      return { success: true, data: result };
+      return result;
     } catch (error) {
       console.error('[Email] Error sending cancellation scheduled reminder:', error);
       return { success: false, error };
@@ -610,20 +785,14 @@ export const emailService = {
         <p>Great job optimizing your subscriptions! You're now saving <strong>${formattedAmount} per month</strong>.</p>
       `;
 
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+      const result = await emailServiceInstance.send({
         to: userEmail,
         subject: `${data.subscriptionName} has been cancelled`,
         html: emailTemplate('Subscription Cancelled', content),
-      });
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
 
-      if (error) {
-        console.error('[Email] Failed to send cancellation confirmation:', error);
-        return { success: false, error };
-      }
-
-      console.log('[Email] Cancellation confirmation sent to', userEmail);
-      return { success: true, data: result };
+      return result;
     } catch (error) {
       console.error('[Email] Error sending cancellation confirmation:', error);
       return { success: false, error };
@@ -685,15 +854,15 @@ export const emailService = {
       // Check email notification preference
       const hasEmailPreference = await checkNotificationPreference(userId, 'email');
       if (hasEmailPreference) {
-        const { data: result, error } = await resend.emails.send({
-          from: 'Subveris <onboarding@resend.dev>',
+        const result = await emailServiceInstance.send({
           to: userEmail,
           subject: `Time to cancel ${data.subscriptionName}? Save ${formattedAnnual}/year`,
           html: emailTemplate('Cancellation Reminder', content),
-        });
+          from: 'Subveris <onboarding@subveris.com>',
+        }, userId);
 
-        if (error) {
-          console.error('[Email] Failed to send cancellation reminder:', error);
+        if (!result.success) {
+          console.error('[Email] Failed to send cancellation reminder:', result.error);
         } else {
           console.log('[Email] Cancellation reminder sent to', userEmail);
         }
@@ -850,20 +1019,20 @@ export const emailService = {
         </p>
       `;
 
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+      // Check if we can send to this email address (Resend testing restriction)
+      if (!canSendEmail(userEmail)) {
+        console.log('[Email] Skipping weekly digest due to Resend testing restriction');
+        return { success: true, skipped: true, reason: 'resend_restriction' };
+      }
+
+      const result = await emailServiceInstance.send({
         to: userEmail,
         subject: `Your Weekly Subscription Summary - ${formattedMonthly}/month`,
         html: emailTemplate('Weekly Digest', content),
-      });
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
 
-      if (error) {
-        console.error('[Email] Failed to send weekly digest:', error);
-        return { success: false, error };
-      }
-
-      console.log('[Email] Weekly digest sent to', userEmail);
-      return { success: true, data: result };
+      return result;
     } catch (error) {
       console.error('[Email] Error sending weekly digest:', error);
       return { success: false, error };
@@ -897,27 +1066,24 @@ export const emailService = {
         </p>
       `;
 
-      const { data: result, error } = await resend.emails.send({
-        from: 'Subveris <onboarding@resend.dev>',
+      const result = await emailServiceInstance.send({
         to: 'help.subveris@gmail.com',
         replyTo: contactData.email,
         subject: `Contact Form: ${contactData.subject}`,
         html: emailTemplate('New Contact Form Submission', content),
+        from: 'Subveris <onboarding@subveris.com>',
       });
 
-      if (error) {
-        console.error('[Email] Failed to send contact email:', error);
-        console.error('[Email] Error details:', JSON.stringify(error, null, 2));
-        return { success: false, error };
-      }
-
-      console.log('[Email] Contact email sent to help.subveris@gmail.com, reply-to:', contactData.email);
-      console.log('[Email] Email ID:', result?.id);
-      return { success: true, data: result };
+      return result;
     } catch (error) {
       console.error('[Email] Error sending contact email:', error);
       return { success: false, error };
     }
+  },
+
+  // Unified send method for direct email sending
+  async send(options: EmailOptions, userId?: string): Promise<EmailResult> {
+    return await emailServiceInstance.send(options, userId);
   },
 };
 

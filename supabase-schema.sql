@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
   stripe_customer_id TEXT UNIQUE,
   stripe_subscription_id TEXT UNIQUE,
   stripe_price_id TEXT,
+  plan_type TEXT NOT NULL DEFAULT 'free',
   status TEXT NOT NULL DEFAULT 'inactive', -- active, canceled, past_due, etc.
   current_period_start TIMESTAMP WITH TIME ZONE,
   current_period_end TIMESTAMP WITH TIME ZONE,

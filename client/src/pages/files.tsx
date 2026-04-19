@@ -383,6 +383,23 @@ export default function Files() {
                 Download the browser extension as a ZIP file. Extract and load it into your browser to start tracking subscription usage.
               </p>
 
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex">
+                  <AlertTriangle className="h-5 w-5 text-amber-400" />
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-amber-800">
+                      Usage Tracking Behavior
+                    </h3>
+                    <div className="mt-2 text-sm text-amber-700">
+                      <p>
+                        The extension tracks time spent on subscription websites when you navigate away from or close tabs.
+                        This means it may track usage even if tabs are left open in the background without active engagement.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <Button
                 onClick={handleDownload}
                 disabled={downloadingData}

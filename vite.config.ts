@@ -12,12 +12,6 @@ const workspaceRoot = path.resolve(__dirname);
 const clientRoot = path.resolve(workspaceRoot, "client");
 const srcRoot = path.resolve(clientRoot, "src");
 
-// diagnostics for debugging alias resolution
-console.log("workspaceRoot", workspaceRoot);
-console.log("clientRoot", clientRoot);
-console.log("srcRoot", srcRoot);
-
-
 export default defineConfig({
   logLevel: 'error',
   plugins: [
@@ -52,6 +46,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    host: true,
     fs: {
       strict: true,
       deny: ["**/.*"],
@@ -68,6 +63,11 @@ export default defineConfig({
       "/auth": {
         target: "http://localhost:5000",
         changeOrigin: true,
+        bypass: (req) => {
+          if (req.url?.startsWith('/auth/callback')) {
+            return req.url;
+          }
+        },
       },
     },
   }

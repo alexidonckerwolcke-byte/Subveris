@@ -36,6 +36,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    host: true,
     allowedHosts: [
       "5173-i1972mewu5sdpdlv7msqp-aeb8a8cf.us1.manus.computer",
       "localhost",
@@ -45,6 +46,12 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+      "Surrogate-Control": "no-store",
+    },
     proxy: {
       "/api": {
         target: "http://localhost:5000",
@@ -53,6 +60,11 @@ export default defineConfig({
       "/auth": {
         target: "http://localhost:5000",
         changeOrigin: true,
+        bypass: (req) => {
+          if (req.url?.startsWith('/auth/callback')) {
+            return req.url;
+          }
+        },
       },
     },
   }

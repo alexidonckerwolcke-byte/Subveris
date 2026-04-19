@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Users, Info, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import type { FamilyGroup } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 interface FamilyMembershipData {
   groups: FamilyGroup[];
@@ -21,8 +22,7 @@ export function FamilyMembershipBanner() {
   const { data: membershipData, isLoading } = useQuery<FamilyMembershipData, Error>({
     queryKey: ["/api/family-groups/me/membership"],
     queryFn: async () => {
-      const response = await fetch('/api/family-groups/me/membership');
-      if (!response.ok) throw new Error('Failed to load family membership');
+      const response = await apiRequest('GET', '/api/family-groups/me/membership');
       return response.json();
     },
   });

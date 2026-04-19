@@ -148,8 +148,7 @@ export default function Subscriptions() {
     enabled: !!familyGroupId,
     queryFn: async () => {
       if (!familyGroupId) return null;
-      const response = await fetch(`/api/family-groups/${familyGroupId}/family-data`);
-      if (!response.ok) throw new Error('Failed to load family data');
+      const response = await apiRequest('GET', `/api/family-groups/${familyGroupId}/family-data`);
       return response.json();
     },
   });
@@ -496,12 +495,13 @@ export default function Subscriptions() {
                     name="websiteDomain"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Website Domain (Optional)</FormLabel>
+                        <FormLabel>Website Domain</FormLabel>
                         <FormControl>
                           <Input placeholder="e.g., netflix.com, spotify.com" {...field} data-testid="input-website-domain" />
                         </FormControl>
                         <div className="text-xs text-muted-foreground">
-                          Used by browser extension to auto-track usage
+                          Add the site domain here if you want browser extension visits to be auto-tracked.
+                          Leave blank if you only want to track the subscription manually.
                         </div>
                         <FormMessage />
                       </FormItem>
