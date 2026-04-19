@@ -26,7 +26,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-const PREMIUM_PRICE_ID = import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID || "price_premium_monthly"; // Replace with your actual Stripe price ID
+const PREMIUM_PRICE_ID = import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID || "price_1T3jhIJpTYwzr88x8pGboTSU"; // Premium Stripe price ID
 
 export function SubscriptionManager() {
   const { toast } = useToast();
@@ -40,8 +40,18 @@ export function SubscriptionManager() {
       });
       return res.json();
     },
-    onSuccess: (data) => {
-      window.location.href = data.url;
+    onSuccess: async (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['/api/stripe/subscription-status'] });
+        await queryClient.invalidateQueries({ queryKey: ['/api/user/premium-status'] });
+        await queryClient.refetchQueries({ queryKey: ['/api/user/premium-status'] });
+        toast({
+          title: "Subscription Updated",
+          description: data.message || "Your plan has been updated successfully.",
+        });
+      }
     },
     onError: () => {
       toast({
@@ -57,8 +67,10 @@ export function SubscriptionManager() {
       const res = await apiRequest("POST", "/api/stripe/cancel-subscription", {});
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription-status"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription-status"] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/user/premium-status'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/user/premium-status'] });
       setShowCancelDialog(false);
       toast({
         title: "Subscription Cancelled",

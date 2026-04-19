@@ -10,11 +10,8 @@ export function generateVapidKeys(): { publicKey: string; privateKey: string } {
     namedCurve: 'prime256v1',
   });
 
-  const publicKey = crypto
-    .createPublicKey(vapidKeys.publicKey)
-    .export({ type: 'spki', format: 'pem' });
-
-const privateKey = vapidKeys.privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const publicKey = vapidKeys.publicKey.export({ type: 'spki', format: 'pem' });
+  const privateKey = vapidKeys.privateKey.export({ type: 'pkcs8', format: 'pem' });
 
   // Convert to base64 for use in Web Push
   const publicKeyB64 = Buffer.from(publicKey).toString('base64');

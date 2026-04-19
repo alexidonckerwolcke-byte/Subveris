@@ -6,7 +6,7 @@ import { useSubscription, SubscriptionTier } from "@/lib/subscription-context";
 import { useToast } from "@/hooks/use-toast";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCurrency } from "@/lib/currency-context";
@@ -41,6 +41,7 @@ export default function PricingPage() {
       description: "Perfect for getting started with subscription tracking",
       features: [
         "Track up to 5 subscriptions",
+        "Cost-per-use analytics for up to 2 subscriptions",
         "Basic spending overview",
         "Monthly spending reports",
         "Manual subscription entry",
@@ -91,26 +92,32 @@ export default function PricingPage() {
     },
   ];
 
+  const priceIdMap = {
+    premium: import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID || "price_1T3jhIJpTYwzr88x8pGboTSU",
+    family: import.meta.env.VITE_STRIPE_FAMILY_PRICE_ID || "price_1T3jikJpTYwzr88xIxkKHkKu",
+  };
+
   const createCheckoutMutation = useMutation({
     mutationFn: async (tier: "premium" | "family") => {
-      // Hardcode the correct Stripe price IDs to guarantee correct value
-      const priceIdMap = {
-        premium: "price_1T3jhIJpTYwzr88x8pGboTSU",
-        family: "price_1T3jikJpTYwzr88xIxkKHkKu",
-      };
+      const selectedPriceId = priceIdMap[tier];
+      if (!selectedPriceId) {
+        throw new Error("Stripe price ID is not configured.");
+      }
       const res = await apiRequest("POST", "/api/stripe/create-checkout-session", {
-        priceId: priceIdMap[tier],
+        priceId: selectedPriceId,
       });
       return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data.url) {
         window.location.href = data.url;
       } else {
+        await queryClient.invalidateQueries({ queryKey: ['/api/stripe/subscription-status'] });
+        await queryClient.invalidateQueries({ queryKey: ['/api/user/premium-status'] });
+        await queryClient.refetchQueries({ queryKey: ['/api/user/premium-status'] });
         toast({
-          title: "Error",
-          description: "No checkout URL received. Please try again.",
-          variant: "destructive",
+          title: "Subscription Updated",
+          description: data.message || "Your plan has been updated successfully.",
         });
       }
     },
@@ -131,7 +138,7 @@ export default function PricingPage() {
       const res = await apiRequest("POST", "/api/stripe/cancel-subscription");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       // Only remove family-related queries and storage, not all user data
       try {
         // Remove family-related localStorage/sessionStorage keys
@@ -148,7 +155,9 @@ export default function PricingPage() {
       queryClient.removeQueries({ queryKey: ["/api/family-groups"] });
       queryClient.removeQueries({ queryKey: ["/api/family-groups", "settings"] });
       queryClient.removeQueries({ queryKey: ["/api/family-groups", "members"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription-status"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription-status"] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/user/premium-status'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/user/premium-status'] });
       // Optionally, refetch personal subscriptions if needed (not required if query is auto-refetched)
       toast({
         title: "Subscription Cancelled",
@@ -169,8 +178,10 @@ export default function PricingPage() {
       const res = await apiRequest("POST", "/api/stripe/reactivate-subscription");
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription-status"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription-status"] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/user/premium-status'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/user/premium-status'] });
       toast({
         title: "Subscription Reactivated",
         description: "Your subscription has been reactivated. Welcome back!",
@@ -235,6 +246,74 @@ export default function PricingPage() {
     
     return "Select Plan";
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const checkoutStatus = params.get('checkout');
+    const sessionId = params.get('session_id');
+    const isCheckoutSuccess = checkoutStatus === 'success' || (!checkoutStatus && !!sessionId);
+
+    if (!checkoutStatus && !sessionId) return;
+
+    const handleRedirect = async () => {
+      if (isCheckoutSuccess) {
+        if (sessionId) {
+          try {
+            const res = await apiRequest('POST', '/api/stripe/complete-checkout-session', {
+              sessionId,
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              throw new Error(data.error || data.message || 'Failed to complete checkout session');
+            }
+            toast({
+              title: 'Checkout completed',
+              description: 'Your subscription was activated. Refreshing status...',
+            });
+          } catch (err) {
+            console.error('[Pricing] Failed to complete checkout session:', err);
+            toast({
+              title: 'Checkout completed',
+              description: 'Unable to complete the session automatically. Refreshing status...',
+              variant: 'destructive',
+            });
+          }
+        } else {
+          toast({
+            title: 'Checkout completed',
+            description: 'Refreshing your subscription status...',
+          });
+        }
+      }
+
+      if (checkoutStatus === 'cancel') {
+        toast({
+          title: 'Checkout canceled',
+          description: 'Your purchase was canceled.',
+          variant: 'destructive',
+        });
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['/api/user/premium-status'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/stripe/subscription-status'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/user/premium-status'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/stripe/subscription-status'] });
+
+      params.delete('checkout');
+      params.delete('session_id');
+      const newSearch = params.toString();
+      const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`;
+      window.history.replaceState({}, '', newUrl);
+
+      if (checkoutStatus === 'success') {
+        window.location.reload();
+      }
+    };
+
+    handleRedirect();
+  }, []);
 
   console.log('VITE_STRIPE_PREMIUM_PRICE_ID:', import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID);
   console.log('VITE_STRIPE_FAMILY_PRICE_ID:', import.meta.env.VITE_STRIPE_FAMILY_PRICE_ID);

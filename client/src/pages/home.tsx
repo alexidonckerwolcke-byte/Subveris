@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AuthModal } from "@/components/auth-modal";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { CurrencySelector } from "@/components/currency-selector";
 import {
   TrendingUp,
@@ -43,6 +42,10 @@ import {
 export default function HomePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [expandedFAQ, setExpandedFAQ] = useState<number | string | null>(null);
+
+  useEffect(() => {
+    document.documentElement.classList.remove("dark");
+  }, []);
 
   // Comparison data for "Why We're Different"
   const comparison = [
@@ -162,7 +165,6 @@ export default function HomePage() {
           </nav>
 
           <div className="flex items-center gap-4">
-            <ThemeToggle />
             <Button onClick={() => setAuthModalOpen(true)} size="lg" className="bg-primary hover:bg-primary/90">
               Get Started
             </Button>
@@ -208,12 +210,7 @@ export default function HomePage() {
             </div>
             <div className="w-px h-8 bg-border hidden sm:block" />
             <div className="text-center">
-              <div className="text-3xl font-bold text-primary">$25M+</div>
-              <div className="text-muted-foreground">Saved Together</div>
-            </div>
-            <div className="w-px h-8 bg-border hidden sm:block" />
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">$180</div>
+              <div className="text-3xl font-bold text-primary">$120</div>
               <div className="text-muted-foreground">Avg. Monthly Savings</div>
             </div>
           </div>
@@ -602,7 +599,7 @@ export default function HomePage() {
           {/* Pricing Details */}
           <div className="max-w-4xl mx-auto text-center mb-16">
             <p className="text-muted-foreground mb-8">
-              <span className="font-semibold text-foreground">Average Premium user saves $180/month</span> — that's $90 per year, which pays for Premium 9x over.
+              <span className="font-semibold text-foreground">Average Premium user saves $120/month</span> — that's $1,440 per year.
             </p>
           </div>
 
@@ -634,7 +631,7 @@ export default function HomePage() {
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">Cost Per Use Analytics</td>
-                    <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 text-muted-foreground">Up to 2 subscriptions</td>
                     <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                     <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
@@ -888,10 +885,10 @@ export default function HomePage() {
             </div>
             
             <nav className="flex flex-wrap justify-center gap-8 text-sm font-medium text-muted-foreground">
-              <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-              <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-              <a href="#" className="hover:text-foreground transition-colors">Security</a>
-              <a href="#" className="hover:text-foreground transition-colors">Cookies</a>
+              <a href="/terms" className="hover:text-foreground transition-colors">Terms</a>
+              <a href="/privacy" className="hover:text-foreground transition-colors">Privacy</a>
+              <a href="/security" className="hover:text-foreground transition-colors">Security</a>
+              <a href="/docs" className="hover:text-foreground transition-colors">Cookies</a>
             </nav>
 
             <div className="text-sm text-muted-foreground">

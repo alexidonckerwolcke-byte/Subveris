@@ -12,17 +12,64 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
 const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
 const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
+const STRIPE_API_VERSION = "2026-03-25.dahlia";
 
 console.log(`[INIT] SUPABASE_URL: ${supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : 'MISSING'}`);
 console.log(`[INIT] SUPABASE_KEY: ${supabaseKey ? supabaseKey.substring(0, 10) + '...' : 'MISSING'}`);
 console.log(`[INIT] STRIPE_KEY: ${stripeKey ? stripeKey.substring(0, 10) + '...' : 'MISSING'}`);
 console.log(`[INIT] WEBHOOK_SECRET: ${endpointSecret ? endpointSecret.substring(0, 10) + '...' : 'MISSING'}`);
+console.log(`[INIT] STRIPE_API_VERSION: ${STRIPE_API_VERSION}`);
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const stripe = new Stripe(stripeKey, {
-  apiVersion: "2024-12-18",
+  apiVersion: STRIPE_API_VERSION,
 });
+
+const PRICE_ID_TO_PLAN_TYPE: Record<string, 'free' | 'premium' | 'family'> = {
+  [Deno.env.get('VITE_STRIPE_PREMIUM_PRICE_ID') || 'price_1T3jhIJpTYwzr88x8pGboTSU']: 'premium',
+  [Deno.env.get('VITE_STRIPE_FAMILY_PRICE_ID') || 'price_1T3jikJpTYwzr88xIxkKHkKu']: 'family',
+};
+
+function getPriceIdFromSubscription(subscription: Stripe.Subscription | any): string | undefined {
+  if (!subscription?.items?.data?.length) {
+    return undefined;
+  }
+
+  const items = subscription.items.data as any[];
+  const recurringItems = items.filter(
+    (item: any) =>
+      item?.price?.type === 'recurring' &&
+      item?.quantity > 0 &&
+      item?.deleted !== true
+  );
+
+  const item =
+    recurringItems[0] ||
+    items.find((item: any) => item?.price?.type === 'recurring') ||
+    items[0];
+
+  return item?.price?.id;
+}
+
+function getPlanTypeFromSubscription(subscription: Stripe.Subscription | any): 'free' | 'premium' | 'family' {
+  try {
+    const priceId = getPriceIdFromSubscription(subscription);
+    if (priceId && PRICE_ID_TO_PLAN_TYPE[priceId]) {
+      return PRICE_ID_TO_PLAN_TYPE[priceId];
+    }
+
+    const item = subscription.items?.data?.[0];
+    const price = item?.price;
+    if (price?.metadata?.plan_type) {
+      return price.metadata.plan_type as 'free' | 'premium' | 'family';
+    }
+  } catch (err) {
+    console.error('[Webhook] Error inferring plan type from subscription:', err);
+  }
+
+  return 'premium';
+}
 
 // Small helper: try to retrieve Stripe subscription, return null when not found
 async function retrieveSubscriptionSafe(id: string | null | undefined) {
@@ -49,6 +96,9 @@ Deno.serve(async (req) => {
 
   const headers = req.headers;
   const stripeSignature = headers.get("stripe-signature");
+  const stripeVersionHeader = headers.get("stripe-version") || headers.get("Stripe-Version") || "missing";
+  console.log(`[Webhook] Stripe-Version header: ${stripeVersionHeader}`);
+  console.log(`[Webhook] Using Stripe API version: ${STRIPE_API_VERSION}`);
   
   // If there's no Stripe signature, this isn't a webhook - might be auth issue
   if (!stripeSignature) {
@@ -127,9 +177,36 @@ Deno.serve(async (req) => {
 });
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const userId = session.metadata?.user_id;
+  let userId = session.metadata?.user_id;
+  const customerId = session.customer as string | undefined;
+
+  if (!userId && customerId) {
+    const { data: existing } = await supabase
+      .from("user_subscriptions")
+      .select("user_id")
+      .eq("stripe_customer_id", customerId)
+      .single();
+
+    if (existing?.user_id) {
+      userId = existing.user_id;
+      console.log(`[Webhook] Resolved user_id from existing subscription row: ${userId}`);
+    }
+  }
+
+  if (!userId && customerId) {
+    try {
+      const customer = await stripe.customers.retrieve(customerId) as any;
+      userId = customer?.metadata?.user_id;
+      if (userId) {
+        console.log(`[Webhook] Resolved user_id from Stripe customer metadata: ${userId}`);
+      }
+    } catch (err) {
+      console.warn('[Webhook] Failed to resolve Stripe customer for checkout completion:', err);
+    }
+  }
+
   if (!userId) {
-    console.error("No user_id in checkout session metadata");
+    console.error("No user_id in checkout session metadata and unable to resolve from customer");
     return;
   }
 
@@ -150,18 +227,20 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       if (dryRun) {
         console.log("[dry-run] upsert user_subscriptions:", payload);
       } else {
-        const { error } = await supabase.from("user_subscriptions").upsert(payload, { onConflict: ["user_id"] });
+        const { error } = await supabase.from("user_subscriptions").upsert(payload, { onConflict: "stripe_customer_id" });
         if (error) console.error("Error upserting user_subscriptions on checkout (missing subscription):", error);
       }
       console.log(`Checkout completed for user ${userId} but subscription not retrievable: ${session.subscription}`);
       return;
     }
 
+    const planType = getPlanTypeFromSubscription(subscription);
     const upsertPayload = {
       user_id: userId,
       stripe_customer_id: session.customer,
       stripe_subscription_id: session.subscription,
-      stripe_price_id: subscription.items.data[0]?.price?.id ?? null,
+      stripe_price_id: getPriceIdFromSubscription(subscription) ?? null,
+      plan_type: planType,
       status: subscription.status,
       current_period_start: new Date((subscription.current_period_start as number) * 1000),
       current_period_end: new Date((subscription.current_period_end as number) * 1000),
@@ -172,12 +251,35 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     if (dryRun) {
       console.log("[dry-run] upsert user_subscriptions:", upsertPayload);
     } else {
-      const { error } = await supabase.from("user_subscriptions").upsert(upsertPayload, { onConflict: ["user_id"] });
-      if (error) {
-        console.error("Error updating user_subscriptions on checkout:", JSON.stringify(error));
-        throw new Error(`Supabase upsert failed: ${error.message}`);
+      const { data: existingRows, error: lookupError } = await supabase
+        .from('user_subscriptions')
+        .select('id')
+        .eq('user_id', userId);
+
+      if (lookupError) {
+        console.error("Error querying existing user_subscriptions rows:", JSON.stringify(lookupError));
+      }
+
+      if (existingRows?.length) {
+        const { error: updateError } = await supabase
+          .from('user_subscriptions')
+          .update(upsertPayload)
+          .eq('user_id', userId);
+
+        if (updateError) {
+          console.error("Error updating user_subscriptions on checkout:", JSON.stringify(updateError));
+          throw new Error(`Supabase update failed: ${updateError.message}`);
+        } else {
+          console.log(`Subscription updated for user ${userId}: ${subscription.id}`);
+        }
       } else {
-        console.log(`Subscription created for user ${userId}: ${subscription.id}`);
+        const { error: insertError } = await supabase.from('user_subscriptions').insert(upsertPayload);
+        if (insertError) {
+          console.error("Error inserting user_subscriptions on checkout:", JSON.stringify(insertError));
+          throw new Error(`Supabase insert failed: ${insertError.message}`);
+        } else {
+          console.log(`Subscription created for user ${userId}: ${subscription.id}`);
+        }
       }
     }
   } catch (error) {
@@ -194,14 +296,21 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
         return;
       }
 
+      const planType = getPlanTypeFromSubscription(subscription);
+      const priceId = getPriceIdFromSubscription(subscription) ?? null;
+      const updatePayload: any = {
+        status: subscription.status,
+        plan_type: planType,
+        current_period_start: new Date((subscription.current_period_start as number) * 1000),
+        current_period_end: new Date((subscription.current_period_end as number) * 1000),
+        updated_at: new Date().toISOString(),
+      };
+      if (priceId) {
+        updatePayload.stripe_price_id = priceId;
+      }
       const { error } = await supabase
         .from("user_subscriptions")
-        .update({
-          status: subscription.status,
-          current_period_start: new Date((subscription.current_period_start as number) * 1000),
-          current_period_end: new Date((subscription.current_period_end as number) * 1000),
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq("stripe_subscription_id", invoice.subscription);
 
       if (error) {
@@ -239,15 +348,22 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   try {
+    const planType = getPlanTypeFromSubscription(subscription);
+    const priceId = getPriceIdFromSubscription(subscription) ?? null;
+    const updatePayload: any = {
+      status: subscription.status,
+      plan_type: planType,
+      current_period_start: new Date((subscription.current_period_start as number) * 1000),
+      current_period_end: new Date((subscription.current_period_end as number) * 1000),
+      cancel_at_period_end: !!subscription.cancel_at_period_end,
+      updated_at: new Date().toISOString(),
+    };
+    if (priceId) {
+      updatePayload.stripe_price_id = priceId;
+    }
     const { error } = await supabase
       .from("user_subscriptions")
-      .update({
-        status: subscription.status,
-        current_period_start: new Date((subscription.current_period_start as number) * 1000),
-        current_period_end: new Date((subscription.current_period_end as number) * 1000),
-        cancel_at_period_end: !!subscription.cancel_at_period_end,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("stripe_subscription_id", subscription.id);
 
     if (error) {

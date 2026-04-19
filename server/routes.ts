@@ -35,15 +35,21 @@ import { randomUUID } from 'crypto';
 import { join } from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import Stripe from 'stripe';
+import { STRIPE_API_VERSION, createStripeClient, stripe, getPriceIdFromSubscription, getPlanTypeFromSubscription, PRICE_ID_TO_PLAN_TYPE } from './stripe';
 import { emailService } from './email.js';
 import { runRenewalChecks } from './renewal-manager.js';
 
 // Helper for pagination params
-function getPaginationParams(req: any) {
+export function getPaginationParams(req: any) {
   let page = parseInt(req.query.page, 10);
   let perPage = parseInt(req.query.perPage, 10);
   if (isNaN(page) || page < 1) page = 1;
-  if (isNaN(perPage) || perPage < 1) perPage = 100;
+  if (isNaN(perPage)) {
+    perPage = 100;
+  } else if (perPage < 1) {
+    perPage = 1;
+  }
   if (perPage > 1000) perPage = 1000;
   return { page, perPage };
 }
@@ -62,12 +68,15 @@ function clearSubscriptionsCacheForUser(userId: string) {
 import { CacheService } from './cache';
 import { getSupabaseClient } from './supabase';
 
-type SessionRequest = Request & { session?: { user?: { id?: string } } };
+type SessionRequest = Request & { session?: { user?: { id?: string } }; rawBody?: unknown };
 import { storage } from './storage';
 // Helper to extract userId from a JWT (Supabase or custom)
-function extractUserIdFromToken(token: string): string | undefined {
+export function extractUserIdFromToken(token: string): string | undefined {
   try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
+    const parts = token.split('.');
+    const payloadPart = parts.length === 3 ? parts[1] : parts.length >= 3 ? parts[parts.length - 2] : undefined;
+    if (!payloadPart) return undefined;
+    const payload = JSON.parse(Buffer.from(payloadPart, 'base64').toString('utf8'));
     return payload.sub || payload.user_id || payload.id || undefined;
   } catch {
     return undefined;
@@ -142,6 +151,9 @@ export async function handleCostPerUse(req: SessionRequest, res: Response) {
         }
       }
     }
+    if (familyGroupId && !showFamilyData) {
+      return res.status(403).json({ error: 'Sharing not enabled for this family group' });
+    }
     if (showFamilyData) {
       // Show all family data
       const { data: members } = await supabase
@@ -176,13 +188,29 @@ export async function handleCostPerUse(req: SessionRequest, res: Response) {
       return res.json([]);
     }
 
+    const { data: userSubscriptionRow } = await supabase
+      .from('user_subscriptions')
+      .select('plan_type')
+      .eq('user_id', userId)
+      .single();
+    const planType = userSubscriptionRow?.plan_type || 'free';
+    const visibleSubscriptions = subscriptions.filter(sub => sub.status !== 'deleted');
+    const FREE_COST_PER_USE_LIMIT = 2;
+
+    const analysisSubscriptions = !showFamilyData && planType === 'free' && visibleSubscriptions.length > FREE_COST_PER_USE_LIMIT
+      ? visibleSubscriptions.slice(0, FREE_COST_PER_USE_LIMIT)
+      : visibleSubscriptions;
+
     const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    const analysis = subscriptions
-      .filter(sub => sub.status !== 'deleted')
+    const analysis = analysisSubscriptions
       .map(sub => {
         const monthlyAmount = sub.frequency === 'yearly' ? sub.amount / 12 : sub.frequency === 'quarterly' ? sub.amount / 3 : sub.frequency === 'weekly' ? sub.amount * 4 : sub.amount;
-        const monthlyUsageCount = sub.usage_month === currentMonth ? (sub.monthly_usage_count || 0) : 0;
-        const usageCount = monthlyUsageCount;
+        const hasUsageMonth = typeof sub.usage_month === 'string' && sub.usage_month !== '';
+        const usageCount = hasUsageMonth
+          ? sub.usage_month === currentMonth
+            ? (sub.monthly_usage_count ?? sub.usage_count ?? 0)
+            : 0
+          : (sub.usage_count ?? 0);
         const costPerUse = usageCount > 0 ? monthlyAmount / usageCount : monthlyAmount;
         let valueRating: 'excellent' | 'good' | 'fair' | 'poor';
         if (usageCount <= 1) {
@@ -885,16 +913,18 @@ export async function registerRoutes(
 
       const subscription = await storage.trackUsageByDomain(userId, domain, timeSpent || 0);
       if (!subscription) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           error: "No subscription found for this domain",
           message: "Make sure the domain matches the website_domain in your subscription settings"
         });
       }
 
       const monthlyAmount = subscription.frequency === 'yearly' ? subscription.amount / 12 : subscription.frequency === 'quarterly' ? subscription.amount / 3 : subscription.frequency === 'weekly' ? subscription.amount * 4 : subscription.amount;
-      const costPerUse = subscription.usageCount > 0 ? monthlyAmount / subscription.usageCount : monthlyAmount;
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const usageForCost = subscription.usageMonth === currentMonth ? subscription.monthlyUsageCount : subscription.usageCount;
+      const costPerUse = usageForCost > 0 ? monthlyAmount / usageForCost : monthlyAmount;
 
-      res.json({ 
+      res.json({
         message: "Usage tracked successfully",
         subscription,
         usageCount: subscription.usageCount,
@@ -1976,7 +2006,11 @@ export async function registerRoutes(
         if (authHeader) {
           const supabase = getSupabaseClient();
           const { data: { user } = {} } = await supabase.auth.getUser(authHeader).catch(() => ({} as any));
-          if (user) userId = user.id;
+          if (user) {
+            userId = user.id;
+          } else {
+            userId = extractUserIdFromToken(authHeader) || undefined;
+          }
         }
       }
 
@@ -2764,17 +2798,72 @@ export async function registerRoutes(
         .eq('family_group_id', groupId)
         .single();
 
-      if (settingsError || !settings?.show_family_data) {
-        return res.status(403).json({ error: 'Family data sharing not enabled' });
+      if (settingsError) {
+        console.warn('[Routes] /api/family-groups/:id/family-data failed to read family group settings', settingsError);
       }
 
-      // Get all members of the group
+      const familyDataSharingEnabled = !!settings?.show_family_data;
+
+      // Get all members of the group regardless of sharing mode so we can return a safe fallback
       const { data: members, error: membersError } = await supabase
         .from('family_group_members')
         .select('user_id, role')
         .eq('family_group_id', groupId);
 
-      if (membersError || !members) {
+      if (membersError) {
+        return res.status(500).json({ error: 'Failed to fetch family members' });
+      }
+
+      if (!familyDataSharingEnabled) {
+        // Family sharing is not enabled; return the requester's own subscriptions and recommendations
+        const { data: personalSubs, error: personalSubsError } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', userId);
+
+        if (personalSubsError) {
+          console.error('[Routes] /api/family-groups/:id/family-data personal fallback failed:', personalSubsError);
+          return res.status(500).json({ error: 'Failed to load personal subscriptions' });
+        }
+
+        const recommendations = generateAIRecommendations(personalSubs || []);
+        const metrics = (() => {
+          const subs = (personalSubs || []).filter((s: any) => s.status !== 'deleted');
+          const totalSubscriptions = subs.length;
+          const activeSubscriptions = subs.filter((s: any) => !s.status || s.status === 'active').length;
+          const monthlyTotal = subs.reduce((acc: number, s: any) => {
+            const amt = Number(s.amount) || 0;
+            const freq = s.frequency || 'monthly';
+            let monthly = amt;
+            if (freq === 'yearly') monthly = amt / 12;
+            if (freq === 'quarterly') monthly = amt / 3;
+            if (freq === 'weekly') monthly = (amt * 52) / 12;
+            return acc + monthly;
+          }, 0);
+          return {
+            totalSubscriptions,
+            activeSubscriptions,
+            totalMonthlySpending: monthlyTotal,
+            memberCount: 1,
+          };
+        })();
+
+        return res.json({
+          members: [
+            { userId: groupRow.owner_id, role: 'owner' },
+            ...((members || []).filter(m => m.user_id !== groupRow.owner_id).map(m => ({ userId: m.user_id, role: m.role })))
+          ],
+          subscriptions: (personalSubs || []).map(transformSubscription),
+          sharedSubscriptions: [],
+          costSplits: [],
+          recommendations,
+          metrics,
+          familyDataSharingEnabled: false,
+        });
+      }
+
+      // Get all members of the group
+      if (!members) {
         return res.status(500).json({ error: 'Failed to fetch family members' });
       }
 
@@ -3078,32 +3167,72 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Price ID required" });
       }
 
-      console.log(`[Stripe] Looking up payment link for price: ${priceId}`);
-
-      // Map price IDs directly to payment links
-      const priceIdToPaymentLink: Record<string, string> = {
-        'price_1T3jhIJpTYwzr88x8pGboTSU': 'https://buy.stripe.com/aFa5kE8Ip1sJf8gbll0Ba02', // Premium
-        'price_1T3jikJpTYwzr88xIxkKHkKu': 'https://buy.stripe.com/5kQdRa5wd3ARd084WX0Ba03', // Family
-      };
-
-      const paymentUrl = priceIdToPaymentLink[priceId];
-      if (!paymentUrl) {
-        console.error(`[Stripe] Unknown price ID: ${priceId}`);
-        return res.status(400).json({ 
-          error: "Invalid price ID",
-          message: `Price ID ${priceId} not found in payment link mapping`
-        });
+      let userId = req.session?.user?.id;
+      if (!userId) {
+        const authHeader = req.headers.authorization?.replace('Bearer ', '');
+        if (authHeader) userId = extractUserIdFromToken(authHeader) || undefined;
+      }
+      if (!userId) {
+        console.warn('[Stripe] Unauthorized checkout session request');
+        return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      console.log(`[Stripe] Found payment link: ${paymentUrl}`);
-      res.json({ url: paymentUrl });
+      const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol;
+      const host = req.headers.host;
+      if (!host) {
+        console.error('[Stripe] Could not determine request host for redirect URLs');
+        return res.status(500).json({ error: 'Unable to create checkout session' });
+      }
+      const origin = `${protocol}://${host}`;
+      const successUrl = process.env.STRIPE_CHECKOUT_SUCCESS_URL || `${origin}/pricing?checkout=success`;
+      const cancelUrl = process.env.STRIPE_CHECKOUT_CANCEL_URL || `${origin}/pricing?checkout=cancel`;
+
+      const { StripeService } = await import('./stripe');
+      const result = await StripeService.createSubscriptionCheckoutSession(
+        userId,
+        priceId,
+        successUrl,
+        cancelUrl,
+      );
+
+      if (result && typeof result === 'object') {
+        if ('url' in result && result.url) {
+          return res.json({ url: result.url });
+        }
+
+        if ('success' in result && result.success) {
+          return res.json(result);
+        }
+      }
+
+      console.error('[Stripe] Stripe checkout session did not return a URL:', result);
+      return res.status(500).json({
+        error: 'Failed to start Stripe checkout session',
+        message: 'Stripe returned no redirect URL. Please check your Stripe configuration.',
+      });
     } catch (err) {
       console.error("[Stripe] Error in create-checkout-session:", err);
       const message = err instanceof Error ? err.message : "Unknown error";
-      res.status(500).json({ 
-        error: "Failed to get payment link",
-        message
-      });
+      res.status(500).json({ error: "Failed to create checkout session", message });
+    }
+  });
+
+  // Stripe: Complete checkout session after redirect
+  app.post("/api/stripe/complete-checkout-session", async (req: SessionRequest, res: Response) => {
+    try {
+      const { sessionId } = req.body;
+      if (!sessionId) {
+        return res.status(400).json({ error: 'sessionId is required' });
+      }
+
+      const { StripeService } = await import('./stripe');
+      await StripeService.completeCheckoutSession(sessionId);
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[Stripe] Error in complete-checkout-session:", err);
+      const message = err instanceof Error ? err.message : "Unknown error";
+      res.status(500).json({ error: "Failed to complete checkout session", message });
     }
   });
 
@@ -3158,9 +3287,16 @@ export async function registerRoutes(
       }
 
       const { StripeService } = await import('./stripe');
-      await StripeService.cancelSubscription(userId);
+      const cancelResult = await StripeService.cancelSubscription(userId);
+      const message = cancelResult.alreadyFree
+        ? 'No active subscription found; already on free plan.'
+        : cancelResult.alreadyCanceled
+        ? 'Subscription already canceled or already on free plan.'
+        : cancelResult.cleaned
+        ? 'Stale Stripe subscription cleared and downgraded to free.'
+        : 'Subscription cancelled';
 
-      res.json({ success: true, message: "Subscription cancelled" });
+      res.json({ success: true, message });
     } catch (err) {
       console.error("[Routes] Error cancelling subscription:", err);
       const message = err instanceof Error ? err.message : "Unknown error";
@@ -3193,8 +3329,16 @@ export async function registerRoutes(
   });
 
   // Stripe webhook - handles payment completion and subscription updates
-  app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req: SessionRequest, res: Response) => {
+  app.post("/api/stripe/webhook", async (req: SessionRequest, res: Response) => {
     try {
+      console.log("[Webhook] Received webhook request", {
+        path: req.path,
+        method: req.method,
+        hasSignature: !!req.headers["stripe-signature"],
+        hasRawBody: !!req.rawBody,
+        stripeVersionHeader: req.headers["stripe-version"] || req.headers["Stripe-Version"],
+      });
+
       const sig = req.headers["stripe-signature"] as string;
       const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -3203,16 +3347,21 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Webhook not configured" });
       }
 
-      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-      const event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+      const payload = req.rawBody
+        ? typeof req.rawBody === 'string'
+          ? req.rawBody
+          : Buffer.isBuffer(req.rawBody)
+          ? req.rawBody.toString('utf8')
+          : JSON.stringify(req.rawBody)
+        : typeof req.body === 'string'
+        ? req.body
+        : JSON.stringify(req.body);
+
+      console.log('[Webhook] Using Stripe API version:', STRIPE_API_VERSION);
+      const stripeWebhookClient = createStripeClient(process.env.STRIPE_SECRET_KEY!);
+      const event = stripeWebhookClient.webhooks.constructEvent(payload, sig, webhookSecret);
 
       console.log("[Webhook] Received event:", event.type);
-
-      // Map price IDs to plan types
-      const priceIdToPlanType: Record<string, "premium" | "family"> = {
-        "price_1T3jhIJpTYwzr88x8pGboTSU": "premium",
-        "price_1T3jikJpTYwzr88xIxkKHkKu": "family",
-      };
 
       const supabaseAdmin = getSupabaseClient();
 
@@ -3223,44 +3372,54 @@ export async function registerRoutes(
 
           if (session.customer && session.subscription) {
             // Get subscription details to get price ID
-            const subscription = await stripe.subscriptions.retrieve(session.subscription);
-            const priceId = subscription.items.data[0]?.price.id;
-            const planType = priceIdToPlanType[priceId];
+            const subscription = await (stripe.subscriptions.retrieve(session.subscription) as any);
+            const priceId = getPriceIdFromSubscription(subscription);
+            const planType = getPlanTypeFromSubscription(subscription) || (priceId ? PRICE_ID_TO_PLAN_TYPE[priceId] : undefined);
 
             if (planType) {
               console.log(`[Webhook] Subscription created with plan: ${planType}`);
 
-              // Get customer to find user by email
-              const customer = await stripe.customers.retrieve(session.customer);
-              const customerEmail = customer.email;
+              let userId = session.metadata?.user_id;
+              if (!userId) {
+                // Fallback to customer email only when metadata is missing
+                const customer = await stripe.customers.retrieve(session.customer) as any;
+                const customerEmail = customer.email;
+                if (customerEmail) {
+                  const { data: userData } = await supabaseAdmin.auth.admin.listUsers();
+                  const user = userData.users.find((u) => u.email === customerEmail);
+                  if (user) {
+                    userId = user.id;
+                    console.log(`[Webhook] Found user ${userId} for email ${customerEmail}`);
+                  }
+                }
+              }
 
-              if (customerEmail) {
-                // Look up user by email in Supabase auth
-                const { data: userData } = await supabaseAdmin.auth.admin.listUsers();
-                const user = userData.users.find((u) => u.email === customerEmail);
+              if (userId) {
+                const { data: existingRow, error: lookupError } = await supabaseAdmin
+                  .from("user_subscriptions")
+                  .select("id")
+                  .eq("user_id", userId)
+                  .single();
 
-                if (user) {
-                  const userId = user.id;
-                  console.log(`[Webhook] Found user ${userId} for email ${customerEmail}`);
+                if (lookupError && lookupError.code !== 'PGRST116') {
+                  console.error("[Webhook] Error looking up existing subscription row:", lookupError);
+                }
 
-                  // Update or create user subscription
+                if (existingRow) {
                   const { error: updateError } = await supabaseAdmin
                     .from("user_subscriptions")
-                    .upsert(
-                      {
-                        user_id: userId,
-                        stripe_customer_id: session.customer,
-                        stripe_subscription_id: session.subscription,
-                        stripe_price_id: priceId,
-                        plan_type: planType,
-                        status: "active",
-                        current_period_start: new Date(subscription.current_period_start * 1000),
-                        current_period_end: new Date(subscription.current_period_end * 1000),
-                        cancel_at_period_end: subscription.cancel_at_period_end,
-                        updated_at: new Date(),
-                      },
-                      { onConflict: "user_id" }
-                    );
+                    .update({
+                      stripe_customer_id: session.customer,
+                      stripe_subscription_id: session.subscription,
+                      stripe_price_id: priceId,
+                      plan_type: planType,
+                      status: "active",
+                      current_period_start: new Date((subscription.current_period_start as any) * 1000),
+                      current_period_end: new Date((subscription.current_period_end as any) * 1000),
+                      cancel_at_period_end: subscription.cancel_at_period_end,
+                      updated_at: new Date(),
+                    })
+                    .eq("user_id", userId);
 
                   if (updateError) {
                     console.error("[Webhook] Error updating subscription:", updateError);
@@ -3268,7 +3427,26 @@ export async function registerRoutes(
                     console.log("[Webhook] Subscription updated successfully for user:", userId);
                   }
                 } else {
-                  console.warn(`[Webhook] No user found for email ${customerEmail}`);
+                  const { error: insertError } = await supabaseAdmin
+                    .from("user_subscriptions")
+                    .insert({
+                      user_id: userId,
+                      stripe_customer_id: session.customer,
+                      stripe_subscription_id: session.subscription,
+                      stripe_price_id: priceId,
+                      plan_type: planType,
+                      status: "active",
+                      current_period_start: new Date((subscription.current_period_start as any) * 1000),
+                      current_period_end: new Date((subscription.current_period_end as any) * 1000),
+                      cancel_at_period_end: subscription.cancel_at_period_end,
+                      updated_at: new Date(),
+                    });
+
+                  if (insertError) {
+                    console.error("[Webhook] Error inserting subscription:", insertError);
+                  } else {
+                    console.log("[Webhook] Subscription created successfully for user:", userId);
+                  }
                 }
               }
             }
@@ -3276,22 +3454,35 @@ export async function registerRoutes(
           break;
         }
 
+        case "customer.subscription.created":
         case "customer.subscription.updated": {
           const subscription = event.data.object as any;
-          console.log("[Webhook] Subscription updated:", subscription.id);
+          console.log("[Webhook] Subscription updated/created:", subscription.id);
 
-          const priceId = subscription.items.data[0]?.price.id;
-          const planType = priceIdToPlanType[priceId];
+          const priceId = getPriceIdFromSubscription(subscription);
+          const planType = getPlanTypeFromSubscription(subscription) || (priceId ? PRICE_ID_TO_PLAN_TYPE[priceId] : undefined);
 
           if (planType) {
-            // Find user by stripe_subscription_id and update their plan
-            const { data: userSub } = await supabaseAdmin
+            // Find user by stripe_subscription_id first, then by stripe_customer_id.
+            let userId: string | undefined;
+            const { data: userSubBySubscription } = await supabaseAdmin
               .from("user_subscriptions")
               .select("user_id")
               .eq("stripe_subscription_id", subscription.id)
               .single();
 
-            if (userSub) {
+            if (userSubBySubscription?.user_id) {
+              userId = userSubBySubscription.user_id;
+            } else if (subscription.customer) {
+              const { data: userSubByCustomer } = await supabaseAdmin
+                .from("user_subscriptions")
+                .select("user_id")
+                .eq("stripe_customer_id", subscription.customer)
+                .single();
+              userId = userSubByCustomer?.user_id;
+            }
+
+            if (userId) {
               const { error: updateError } = await supabaseAdmin
                 .from("user_subscriptions")
                 .update({
@@ -3299,7 +3490,7 @@ export async function registerRoutes(
                   plan_type: planType,
                   status: subscription.status,
                   cancel_at_period_end: subscription.cancel_at_period_end,
-                  current_period_end: new Date(subscription.current_period_end * 1000),
+                  current_period_end: new Date((subscription.current_period_end as any) * 1000),
                   updated_at: new Date(),
                 })
                 .eq("stripe_subscription_id", subscription.id);
@@ -3307,22 +3498,17 @@ export async function registerRoutes(
               if (updateError) {
                 console.error("[Webhook] Error updating subscription:", updateError);
               } else {
-                console.log("[Webhook] Subscription upgraded/downgraded successfully for user:", userSub.user_id);
+                console.log("[Webhook] Subscription upgraded/downgraded successfully for user:", userId);
                 // --- Family group downgrade logic ---
                 try {
-                  // Only trigger if new plan is 'premium' or 'free'
                   if (planType === 'premium') {
-                    // Dynamically import family-sharing helpers
                     const { getFamilyGroups, getFamilyMembers } = await import('./family-sharing');
-                    // Find all groups where this user is the owner
-                    const groups = await getFamilyGroups(userSub.user_id);
-                    const ownedGroups = groups.filter(g => g.ownerId === userSub.user_id);
+                    const groups = await getFamilyGroups(userId);
+                    const ownedGroups = groups.filter(g => g.ownerId === userId);
                     for (const group of ownedGroups) {
-                      // Get all members except the owner
                       const members = await getFamilyMembers(group.id);
                       for (const member of members) {
-                        if (member.userId !== userSub.user_id) {
-                          // Revert member to original plan
+                        if (member.userId !== userId) {
                           try {
                             const { downgradeFromFamilyPlan } = await import('./family-sharing');
                             await downgradeFromFamilyPlan(member.userId, group.id);
@@ -3338,6 +3524,8 @@ export async function registerRoutes(
                   console.error('[Webhook] Error in family group downgrade logic:', err);
                 }
               }
+            } else {
+              console.warn(`[Webhook] Could not resolve user for subscription ${subscription.id}`);
             }
           }
           break;
@@ -3346,6 +3534,34 @@ export async function registerRoutes(
         case "invoice.payment_succeeded": {
           const invoice = event.data.object as any;
           console.log("[Webhook] Invoice payment succeeded:", invoice.id);
+
+          if (invoice.subscription) {
+            const subscription = await (stripe.subscriptions.retrieve(invoice.subscription) as any);
+            const priceId = getPriceIdFromSubscription(subscription);
+            const planType = getPlanTypeFromSubscription(subscription) || (priceId ? PRICE_ID_TO_PLAN_TYPE[priceId] : undefined);
+            const updateData: any = {
+              status: subscription.status,
+              current_period_start: new Date((subscription.current_period_start as any) * 1000),
+              current_period_end: new Date((subscription.current_period_end as any) * 1000),
+              updated_at: new Date(),
+              plan_type: planType,
+            };
+
+            if (priceId) {
+              updateData.stripe_price_id = priceId;
+            }
+
+            const { error: updateError } = await supabaseAdmin
+              .from("user_subscriptions")
+              .update(updateData)
+              .eq("stripe_subscription_id", invoice.subscription);
+
+            if (updateError) {
+              console.error("[Webhook] Error updating subscription on invoice payment success:", updateError);
+            } else {
+              console.log("[Webhook] Subscription updated to active on renewal for subscription:", invoice.subscription);
+            }
+          }
           break;
         }
 
@@ -3456,6 +3672,120 @@ export async function registerRoutes(
         error: "Failed to process contact form",
         message
       });
+    }
+  });
+
+  // Push notification routes
+  app.get("/api/notifications/vapid-public-key", async (req: SessionRequest, res: Response) => {
+    try {
+      const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        console.warn("[Push] VAPID_PUBLIC_KEY not configured");
+        return res.status(500).json({ error: "Push notifications not configured" });
+      }
+      res.json({ vapidPublicKey });
+    } catch (error) {
+      console.error("[Push] Error getting VAPID public key:", error);
+      res.status(500).json({ error: "Failed to get VAPID public key" });
+    }
+  });
+
+  app.post("/api/notifications/subscribe", async (req: SessionRequest, res: Response) => {
+    try {
+      let userId = req.session?.user?.id;
+      if (!userId) {
+        const authHeader = req.headers.authorization?.replace('Bearer ', '');
+        if (authHeader) userId = extractUserIdFromToken(authHeader) || undefined;
+      }
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const { endpoint, keys } = req.body;
+      if (!endpoint || !keys?.auth || !keys?.p256dh) {
+        return res.status(400).json({ error: 'Invalid subscription data' });
+      }
+
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('push_subscriptions')
+        .upsert({
+          user_id: userId,
+          endpoint,
+          auth_key: keys.auth,
+          p256dh_key: keys.p256dh,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,endpoint'
+        });
+
+      if (error) {
+        console.error("[Push] Error saving subscription:", error);
+        return res.status(500).json({ error: 'Failed to save subscription' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[Push] Error subscribing:", error);
+      res.status(500).json({ error: 'Failed to subscribe' });
+    }
+  });
+
+  app.post("/api/notifications/unsubscribe", async (req: SessionRequest, res: Response) => {
+    try {
+      let userId = req.session?.user?.id;
+      if (!userId) {
+        const authHeader = req.headers.authorization?.replace('Bearer ', '');
+        if (authHeader) userId = extractUserIdFromToken(authHeader) || undefined;
+      }
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const { endpoint } = req.body;
+      if (!endpoint) {
+        return res.status(400).json({ error: 'Endpoint required' });
+      }
+
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('user_id', userId)
+        .eq('endpoint', endpoint);
+
+      if (error) {
+        console.error("[Push] Error removing subscription:", error);
+        return res.status(500).json({ error: 'Failed to unsubscribe' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[Push] Error unsubscribing:", error);
+      res.status(500).json({ error: 'Failed to unsubscribe' });
+    }
+  });
+
+  app.get("/api/notifications/subscriptions", async (req: SessionRequest, res: Response) => {
+    try {
+      let userId = req.session?.user?.id;
+      if (!userId) {
+        const authHeader = req.headers.authorization?.replace('Bearer ', '');
+        if (authHeader) userId = extractUserIdFromToken(authHeader) || undefined;
+      }
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('push_subscriptions')
+        .select('endpoint, created_at, updated_at')
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error("[Push] Error fetching subscriptions:", error);
+        return res.status(500).json({ error: 'Failed to fetch subscriptions' });
+      }
+
+      res.json(data || []);
+    } catch (error) {
+      console.error("[Push] Error getting subscriptions:", error);
+      res.status(500).json({ error: 'Failed to get subscriptions' });
     }
   });
 

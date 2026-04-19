@@ -24,6 +24,8 @@ import Support from "@/pages/support";
 import Files from "@/pages/files";
 import HomePage from "@/pages/home";
 import Privacy from "@/pages/privacy";
+import Terms from "@/pages/terms";
+import Security from "@/pages/security";
 import AuthCallback from "@/pages/auth-callback";
 import FamilyCalendar from "@/pages/family-calendar";
 import Calendar from "@/pages/calendar";
@@ -31,8 +33,7 @@ import FamilySharingPage from "@/pages/family-sharing";
 import DocsPage from "@/pages/docs";
 import { ContactPage } from "@/pages/contact";
 import { useLocation } from "wouter";
-import { CurrencyProvider, useCurrency } from "@/lib/currency-context";
-import { CurrencySelector } from "@/components/currency-selector";
+import { CurrencyProvider } from "@/lib/currency-context";
 import { ErrorBoundary } from "@/components/error-boundary";
 import {
   DropdownMenu,
@@ -50,6 +51,8 @@ function Router({ user }: { user: any }) {
       <Switch>
         <Route path="/" component={HomePage} />
         <Route path="/privacy" component={Privacy} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/security" component={Security} />
         <Route path="/contact" component={ContactPage} />
         <Route path="/docs" component={DocsPage} />
         <Route path="/auth/callback" component={AuthCallback} />
@@ -70,6 +73,8 @@ function Router({ user }: { user: any }) {
       <Route path="/settings" component={Settings} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/security" component={Security} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/docs" component={DocsPage} />
       <Route path="/support" component={Support} />
@@ -85,15 +90,14 @@ function AppContent() {
   // Call ALL hooks unconditionally at the top level
   const [location] = useLocation();
   const { user, loading, signOut, justSignedUp, clearSignUpFlag, pendingMfaSession } = useAuth();
-  const { hasSelectedCurrency } = useCurrency();
   const [postSignupOpen, setPostSignupOpen] = useState(false);
 
   useEffect(() => {
-    // Show flow if just signed up OR if user is logged in but hasn't selected a currency yet
-    if (user && (justSignedUp || !hasSelectedCurrency)) {
+    // Show flow only for users who have just signed up
+    if (user && justSignedUp) {
       setPostSignupOpen(true);
     }
-  }, [justSignedUp, user, hasSelectedCurrency]);
+  }, [justSignedUp, user]);
 
   // Standalone docs page: render only DocsPage, no app shell
   if (location === "/docs") {
@@ -141,7 +145,6 @@ function AppContent() {
                 <header className="flex h-14 items-center justify-between gap-4 border-b border-border/70 bg-surface/80 backdrop-blur-md px-4 shrink-0 shadow-sm">
                   <SidebarTrigger data-testid="button-sidebar-toggle" disabled={!user} />
                   <div className="flex items-center gap-3">
-                    <CurrencySelector />
                     <ThemeToggle />
                     {/* Profile dropdown */}
                     {user ? (

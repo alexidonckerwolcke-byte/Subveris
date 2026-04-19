@@ -46,6 +46,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [pendingMfaSession, setPendingMfaSession] = useState<any>(null);
   const [justSignedUp, setJustSignedUp] = useState(false);
 
+  const NEW_USER_THRESHOLD_MS = 5 * 60 * 1000;
+
+  const isOAuthUser = (user: User) => {
+    const identities = (user as any).identities as Array<any> | undefined;
+    return !!identities?.some((identity) => identity.provider && identity.provider !== 'email');
+  };
+
+  const isUserVerified = (user: User) => {
+    return Boolean(
+      user.confirmed_at ||
+      (user as any).email_confirmed_at ||
+      user.user_metadata?.email_verified_at ||
+      isOAuthUser(user)
+    );
+  };
+
+  const isRecentlyCreatedAccount = (user: User) => {
+    const createdAt = new Date(user.created_at).getTime();
+    const ageMs = Date.now() - createdAt;
+    return Math.abs(ageMs) < NEW_USER_THRESHOLD_MS;
+  };
+
   // Check if user is new (account created within last 7 days AND no subscriptions)
   const isNewUser = user && hasSubscriptions === false
     ? (new Date().getTime() - new Date(user.created_at).getTime()) < (7 * 24 * 60 * 60 * 1000)
@@ -59,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearSignUpFlag = () => {
     setJustSignedUp(false);
     localStorage.removeItem('justSignedUp');
+    localStorage.removeItem('postSignupPlan');
+    localStorage.removeItem('postSignupSetup2FA');
   };
 
   // Check if user has subscriptions and premium status
@@ -121,10 +145,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Get initial session
+    const restoreJustSignedUp = (user: User | null) => {
+      if (
+        user &&
+        localStorage.getItem('justSignedUp') === 'true' &&
+        isUserVerified(user) &&
+        isRecentlyCreatedAccount(user)
+      ) {
+        setJustSignedUp(true);
+        return;
+      }
+
+      setJustSignedUp(false);
+      localStorage.removeItem('justSignedUp');
+    };
+
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
         setSession(session);
         setUser(session?.user ?? null);
+
+        // Restore just-signed-up state only when the current session belongs to a fresh user.
+        restoreJustSignedUp(session?.user ?? null);
 
         // Mirror the current Supabase session token into our localStorage helper
         if (session?.access_token) {
@@ -142,6 +184,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('[Auth] getSession failed:', error);
         setLoading(false);
       });
+
+    const isUserEmailVerified = (user: User) => {
+      return Boolean(
+        user.confirmed_at ||
+        (user as any).email_confirmed_at ||
+        user.user_metadata?.email_verified_at
+      );
+    };
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -189,15 +239,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
           
-          // Check if this is a new user (newly confirmed signup)
-          // New users have email_confirmed_at recently and no subscriptions
-          if (session.user && session.user.user_metadata?.email_verified_at) {
-            const accountAge = new Date().getTime() - new Date(session.user.created_at).getTime();
-            // If account is less than 1 minute old, it's a brand new signup confirmation
-            if (accountAge < 60000) {
-              setJustSignedUp(true);
-              localStorage.setItem('justSignedUp', 'true');
-            }
+          // Check if this is a new user (newly confirmed signup or OAuth signup)
+          if (session.user && isUserVerified(session.user) && isRecentlyCreatedAccount(session.user)) {
+            setJustSignedUp(true);
+            localStorage.setItem('justSignedUp', 'true');
           }
         } else {
           localStorage.removeItem('supabase.auth.token');
@@ -219,7 +264,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         // Check if user just signed up
         if (session?.user && localStorage.getItem('justSignedUp') === 'true') {
-          setJustSignedUp(true);
+          if (isUserVerified(session.user) && isRecentlyCreatedAccount(session.user)) {
+            setJustSignedUp(true);
+          } else {
+            setJustSignedUp(false);
+            localStorage.removeItem('justSignedUp');
+          }
         }
       }
     );
@@ -229,8 +279,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     if (!supabase) return { error: { message: 'Supabase not initialized' } as AuthError };
-    const { error } = await supabase.auth.signUp({ email, password });
-    // Don't set justSignedUp here - wait for email confirmation
+    const { data, error } = await supabase.auth.signUp({ email, password });
+
+    if (data?.session?.user && isUserVerified(data.session.user) && isRecentlyCreatedAccount(data.session.user)) {
+      setJustSignedUp(true);
+      localStorage.setItem('justSignedUp', 'true');
+    }
+
     return { error };
   };
 
@@ -280,14 +335,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     if (!supabase) return { error: { message: 'Supabase not initialized' } as AuthError };
-    
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
+        redirectTo: window.location.origin + '/auth/callback'
+      }
     });
-    
+
     return { error };
   };
 

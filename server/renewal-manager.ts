@@ -134,6 +134,30 @@ export async function sendRenewalReminders(userId?: string): Promise<RenewalRemi
 
     const supabase = getSupabaseClient();
 
+    // Check if we've already sent renewal emails to this user today
+    if (userId) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const { data: recentRuns, error: logError } = await supabase
+        .from('renewal_run_logs')
+        .select('id, run_at, email_sent')
+        .eq('user_id', userId)
+        .gte('run_at', today.toISOString())
+        .lt('run_at', tomorrow.toISOString())
+        .gt('email_sent', 0)
+        .limit(1);
+
+      if (!logError && recentRuns && recentRuns.length > 0) {
+        const msg = `[Renewal] Already sent renewal email to user ${userId} today, skipping`;
+        console.log(msg);
+        summary.notices.push(msg);
+        return summary;
+      }
+    }
+
     // Get upcoming renewals (next 3-7 days)
     const startDate = new Date();
     startDate.setHours(0, 0, 0, 0);

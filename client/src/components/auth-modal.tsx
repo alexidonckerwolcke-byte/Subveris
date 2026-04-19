@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,9 +20,16 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const [loading, setLoading] = useState(false);
   const [mfaChallengeOpen, setMfaChallengeOpen] = useState(false);
   const [postSignupOpen, setPostSignupOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
 
   const [signInData, setSignInData] = useState({ email: '', password: '' });
   const [signUpData, setSignUpData] = useState({ email: '', password: '', confirmPassword: '' });
+
+  useEffect(() => {
+    if (justSignedUp) {
+      setPostSignupOpen(true);
+    }
+  }, [justSignedUp]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,11 +72,22 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
     setLoading(false);
 
     if (error) {
-      toast({
-        title: 'Sign Up Failed',
-        description: error.message,
-        variant: 'destructive',
-      });
+      const message = error.message || '';
+      const isExistingUser = /already.*(register|registered|exists|in use)|duplicate|user.*exists|email.*already/i.test(message);
+      if (isExistingUser) {
+        setActiveTab('signin');
+        toast({
+          title: 'Account Already Exists',
+          description: 'This email is already registered. Please sign in instead.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Sign Up Failed',
+          description: message,
+          variant: 'destructive',
+        });
+      }
     } else {
       toast({
         title: 'Check your email',
@@ -99,7 +117,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         <DialogHeader>
           <DialogTitle>Welcome to Subveris</DialogTitle>
         </DialogHeader>
-        <Tabs defaultValue="signin" className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'signin' | 'signup')} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="signin">Sign In</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>

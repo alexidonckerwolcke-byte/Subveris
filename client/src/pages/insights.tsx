@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { BehavioralInsights } from "@/components/behavioral-insights";
 import { CostPerUse } from "@/components/cost-per-use";
 import { PremiumGate } from "@/components/premium-gate";
 import { useSubscription } from "@/lib/subscription-context";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
 import {
   Lightbulb,
@@ -27,10 +28,11 @@ import { dedupeByKey, calculateMonthlyCost } from "@/lib/utils";
 
 export default function Insights() {
   const { formatAmount } = useCurrency();
-  const { limits } = useSubscription();
+  const { limits, tier } = useSubscription();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
 
-  const { data: personalRecommendations, isLoading: personalRecsLoading, refetch: refetchRecs } = useQuery<AIRecommendation[]>({
+  const [refreshingRecommendations, setRefreshingRecommendations] = useState(false);
+  const { data: personalRecommendations, isLoading: personalRecsLoading, isFetching: personalRecsFetching, refetch: refetchRecs } = useQuery<AIRecommendation[]>({
     queryKey: ["/api/recommendations"],
     refetchOnMount: true,
     refetchOnWindowFocus: true,
@@ -42,7 +44,7 @@ export default function Insights() {
   });
 
   // Family recommendations
-  const { data: familyData, isLoading: familyDataLoading } = useQuery<any>({
+  const { data: familyData, isLoading: familyDataLoading, isFetching: familyDataFetching, refetch: refetchFamilyData } = useQuery<any>({
     queryKey: ["/api/family-groups", familyGroupId, "family-data"],
     enabled: !!familyGroupId,
   });
@@ -56,8 +58,73 @@ export default function Insights() {
         ? personalRecommendations
         : computeRecommendationsFromSubs(personalSubscriptions || [])
       );
+
+  const personalSubscriptionCount = (personalSubscriptions || []).filter((s) => s && s.status !== 'deleted').length;
   const recommendations: AIRecommendation[] = dedupeByKey(recommendationsRaw, "subscriptionId") as AIRecommendation[];
   const recsLoading = showFamilyData ? familyDataLoading : personalRecsLoading;
+  const recsRefreshing = showFamilyData ? familyDataFetching : personalRecsFetching;
+
+  const handleRefreshRecommendations = async () => {
+    console.log("[Insights] Refresh recommendations clicked", { showFamilyData, familyGroupId });
+    setRefreshingRecommendations(true);
+    try {
+      if (showFamilyData && familyGroupId) {
+        queryClient.removeQueries({ queryKey: ["/api/family-groups", familyGroupId, "family-data"], exact: true });
+        queryClient.removeQueries({ queryKey: ["/api/subscriptions"], exact: true });
+
+        const familyDataResult = await queryClient.fetchQuery({
+          queryKey: ["/api/family-groups", familyGroupId, "family-data"],
+          queryFn: async () => {
+            const res = await apiRequest("GET", `/api/family-groups/${familyGroupId}/family-data`);
+            return res.json();
+          },
+          staleTime: 0,
+        });
+        console.log("[Insights] family-data refreshed", familyDataResult);
+
+        const subscriptionsResult = await queryClient.fetchQuery({
+          queryKey: ["/api/subscriptions"],
+          queryFn: async () => {
+            const res = await apiRequest("GET", "/api/subscriptions");
+            return res.json();
+          },
+          staleTime: 0,
+        });
+        console.log("[Insights] subscriptions refreshed", subscriptionsResult);
+
+        await refetchFamilyData?.();
+      } else {
+        queryClient.removeQueries({ queryKey: ["/api/recommendations"], exact: true });
+        queryClient.removeQueries({ queryKey: ["/api/subscriptions"], exact: true });
+
+        const recommendationsResult = await queryClient.fetchQuery({
+          queryKey: ["/api/recommendations"],
+          queryFn: async () => {
+            const res = await apiRequest("GET", "/api/recommendations");
+            return res.json();
+          },
+          staleTime: 0,
+        });
+        console.log("[Insights] recommendations refreshed", recommendationsResult);
+
+        const subscriptionsResult = await queryClient.fetchQuery({
+          queryKey: ["/api/subscriptions"],
+          queryFn: async () => {
+            const res = await apiRequest("GET", "/api/subscriptions");
+            return res.json();
+          },
+          staleTime: 0,
+        });
+        console.log("[Insights] subscriptions refreshed", subscriptionsResult);
+
+        await refetchRecs?.();
+      }
+    } catch (error) {
+      console.error("[Insights] Failed to refresh recommendations", error);
+    } finally {
+      setRefreshingRecommendations(false);
+    }
+  };
 
   function computeRecommendationsFromSubs(subs: any[] | undefined) {
     if (!subs || subs.length === 0) return [];
@@ -244,6 +311,9 @@ export default function Insights() {
   const costAnalysis: CostPerUseAnalysis[] | undefined = showFamilyData
     ? (dedupeByKey([...perMemberAnalyses, ...(baseAnalysis || [])], 'subscriptionId') as CostPerUseAnalysis[])
     : baseAnalysis;
+  const displayCostAnalysis = !showFamilyData && tier === "free"
+    ? (costAnalysis?.slice(0, limits.maxCostPerUseSubscriptions) ?? [])
+    : costAnalysis;
 
   // Personal insights
   const { data: personalInsights, isLoading: personalInsightsLoading, refetch: refetchInsights } = useQuery<Insight[]>({
@@ -386,17 +456,27 @@ export default function Insights() {
         <AIRecommendations
           recommendations={recommendations}
           isLoading={recsLoading}
-          onRefresh={() => refetchRecs()}
-          isRefreshing={recsLoading}
+          onRefresh={handleRefreshRecommendations}
+          isRefreshing={refreshingRecommendations || recsRefreshing}
         />
 
         <div className="grid gap-6 lg:grid-cols-2">
           {limits.hasCostPerUse ? (
-            <CostPerUse analyses={costAnalysis} isLoading={analysisLoading} />
+            <CostPerUse
+              analyses={displayCostAnalysis}
+              isLoading={analysisLoading}
+              showUpgradePrompt={tier === "free"}
+              totalSubscriptions={personalSubscriptionCount}
+              maxAllowed={limits.maxCostPerUseSubscriptions}
+            />
           ) : (
             <PremiumGate feature="Cost-per-use analytics" showBlurred={false} />
           )}
-          <BehavioralInsights insights={behavioralInsights} isLoading={behavioralLoading} />
+          {limits.hasBehavioralInsights ? (
+            <BehavioralInsights insights={behavioralInsights} isLoading={behavioralLoading} />
+          ) : (
+            <PremiumGate feature="Behavioral insights" showBlurred={false} />
+          )}
         </div>
 
         {highPriorityCount > 0 && (

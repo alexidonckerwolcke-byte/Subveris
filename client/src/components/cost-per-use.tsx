@@ -1,8 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Lock, Sparkles } from "lucide-react";
+import { Link } from "wouter";
 import type { CostPerUseAnalysis } from "@shared/schema";
 import { getValueRatingColor, dedupeByKey } from "@/lib/utils";
 import { useCurrency, type Currency } from "@/lib/currency-context";
@@ -10,9 +12,12 @@ import { useCurrency, type Currency } from "@/lib/currency-context";
 interface CostPerUseProps {
   analyses: CostPerUseAnalysis[] | undefined;
   isLoading: boolean;
+  showUpgradePrompt?: boolean;
+  totalSubscriptions?: number;
+  maxAllowed?: number;
 }
 
-export function CostPerUse({ analyses, isLoading }: CostPerUseProps) {
+export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, totalSubscriptions = 0, maxAllowed = 2 }: CostPerUseProps) {
   const { formatAmount } = useCurrency();
   if (isLoading) {
     return (
@@ -128,6 +133,27 @@ export function CostPerUse({ analyses, isLoading }: CostPerUseProps) {
           <div className="text-center py-8 text-muted-foreground">
             <p>No usage data available yet.</p>
             <p className="text-sm">Connect your accounts to start tracking.</p>
+          </div>
+        )}
+        {showUpgradePrompt && totalSubscriptions > maxAllowed && (
+          <div className="mt-6 pt-6 border-t border-dashed">
+            <div className="flex flex-col items-center justify-center py-4 text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted mb-3">
+                <Lock className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <h4 className="text-sm font-semibold mb-2">
+                Showing the first {maxAllowed} subscriptions
+              </h4>
+              <p className="text-muted-foreground text-sm mb-4 max-w-sm">
+                Cost-per-use analytics is available for up to {maxAllowed} subscriptions on the Free plan. Upgrade to Premium to analyze all of your subscriptions.
+              </p>
+              <Link href="/pricing">
+                <Button size="sm">
+                  <Sparkles className="h-3 w-3 mr-2" />
+                  Upgrade to Premium
+                </Button>
+              </Link>
+            </div>
           </div>
         )}
       </CardContent>

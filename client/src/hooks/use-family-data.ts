@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
+import { apiRequest } from "@/lib/queryClient";
 
 export function useFamilyDataMode() {
   const { user } = useAuth();
@@ -9,8 +10,7 @@ export function useFamilyDataMode() {
     queryKey: ["/api/family-groups"],
     enabled: !!user?.id,
     queryFn: async () => {
-      const response = await fetch('/api/family-groups');
-      if (!response.ok) throw new Error('Failed to load family groups');
+      const response = await apiRequest('GET', '/api/family-groups');
       return response.json();
     },
   });
@@ -24,8 +24,7 @@ export function useFamilyDataMode() {
     enabled: !!familyGroupId,
     queryFn: async () => {
       if (!familyGroupId) return null;
-      const response = await fetch(`/api/family-groups/${familyGroupId}/settings`);
-      if (!response.ok) throw new Error('Failed to load family group settings');
+      const response = await apiRequest('GET', `/api/family-groups/${familyGroupId}/settings`);
       return response.json();
     },
   });

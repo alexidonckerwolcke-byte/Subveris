@@ -9,6 +9,7 @@ interface SubscriptionContextType {
   setTier: (tier: SubscriptionTier) => void;
   limits: {
     maxSubscriptions: number;
+    maxCostPerUseSubscriptions: number;
     hasAIRecommendations: boolean;
     hasCostPerUse: boolean;
     hasBehavioralInsights: boolean;
@@ -29,14 +30,16 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 const TIER_LIMITS = {
   free: {
     maxSubscriptions: 5,
+    maxCostPerUseSubscriptions: 2,
     hasAIRecommendations: false,
-    hasCostPerUse: false,
+    hasCostPerUse: true,
     hasBehavioralInsights: false,
     hasSavingsProjections: false,
     hasExportReports: false,
   },
   premium: {
     maxSubscriptions: Infinity,
+    maxCostPerUseSubscriptions: Infinity,
     hasAIRecommendations: true,
     hasCostPerUse: true,
     hasBehavioralInsights: true,
@@ -45,6 +48,7 @@ const TIER_LIMITS = {
   },
   family: {
     maxSubscriptions: Infinity,
+    maxCostPerUseSubscriptions: Infinity,
     hasAIRecommendations: true,
     hasCostPerUse: true,
     hasBehavioralInsights: true,

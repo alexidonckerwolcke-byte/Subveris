@@ -13,8 +13,15 @@ SUPABASE_URL=your_supabase_project_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 STRIPE_SECRET_KEY=your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_signing_secret
+VITE_STRIPE_PREMIUM_PRICE_ID=price_1T3jhIJpTYwzr88x8pGboTSU
+VITE_STRIPE_FAMILY_PRICE_ID=price_1T3jikJpTYwzr88xIxkKHkKu
+STRIPE_CHECKOUT_SUCCESS_URL=https://your-domain.com/pricing?checkout=success
+STRIPE_CHECKOUT_CANCEL_URL=https://your-domain.com/pricing?checkout=cancel
 NODE_ENV=development  # or production
 ```
+
+Use `.env.example` as the template and do not commit `.env` to source control.
 
 ### Installation
 
@@ -27,6 +34,29 @@ npm install
 ```bash
 npm run dev
 ```
+
+## Stripe setup
+
+### Required Stripe configuration
+- Create Stripe products/prices for your plans
+- Use these plan IDs in the app:
+  - Premium: `price_1T3jhIJpTYwzr88x8pGboTSU`
+  - Family: `price_1T3jikJpTYwzr88xIxkKHkKu`
+- Add the Stripe secret keys and webhook signing secret to your `.env` file
+
+### Webhook endpoint
+- Configure Stripe to send webhooks to:
+  - `https://<your-domain>/api/stripe/webhook`
+- Subscribe to these event types:
+  - `checkout.session.completed`
+  - `invoice.payment_succeeded`
+  - `invoice.payment_failed`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+
+### Notes
+- `STRIPE_CHECKOUT_SUCCESS_URL` and `STRIPE_CHECKOUT_CANCEL_URL` are optional
+- Your app can use the default fallback URLs if these are not set
 
 ## API Endpoints
 
