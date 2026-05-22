@@ -8,7 +8,7 @@ export const authUsers = pgTable("auth.users", {
 });
 
 // Subscription status types
-export type SubscriptionStatus = "active" | "unused" | "to-cancel" | "deleted";
+export type SubscriptionStatus = "active" | "unused" | "to-cancel" | "canceled" | "deleted";
 
 // Subscription categories
 export type SubscriptionCategory = 
@@ -48,11 +48,10 @@ export const subscriptions = pgTable("subscriptions", {
   cancellationUrl: text("cancellation_url"), // URL to cancel the subscription
   monthlyUsageCount: integer("monthly_usage_count").notNull().default(0),
   usageMonth: text("usage_month"),
+  billingMonth: text("billing_month"), // YYYY-MM format, tracks which month subscription is billed for (persists until end of month)
 });
 
-export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
-  id: true,
-});
+export const insertSubscriptionSchema = (createInsertSchema(subscriptions).omit as any)(['id']);
 
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
 export type Subscription = typeof subscriptions.$inferSelect;
@@ -71,9 +70,7 @@ export const insights = pgTable("insights", {
   createdAt: text("created_at").notNull(),
 });
 
-export const insertInsightSchema = createInsertSchema(insights).omit({
-  id: true,
-});
+export const insertInsightSchema = (createInsertSchema(insights).omit as any)(['id']);
 
 export type InsertInsight = z.infer<typeof insertInsightSchema>;
 export type Insight = typeof insights.$inferSelect;
@@ -94,9 +91,7 @@ export const userSubscriptions = pgTable("user_subscriptions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions).omit({
-  id: true,
-});
+export const insertUserSubscriptionSchema = (createInsertSchema(userSubscriptions).omit as any)(['id']);
 
 export type InsertUserSubscription = z.infer<typeof insertUserSubscriptionSchema>;
 export type UserSubscription = typeof userSubscriptions.$inferSelect;
@@ -111,9 +106,7 @@ export const familyGroupPlanBackups = pgTable("family_group_plan_backups", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
-export const insertFamilyGroupPlanBackupSchema = createInsertSchema(familyGroupPlanBackups).omit({
-  id: true,
-});
+export const insertFamilyGroupPlanBackupSchema = (createInsertSchema(familyGroupPlanBackups).omit as any)(['id']);
 
 export type InsertFamilyGroupPlanBackup = z.infer<typeof insertFamilyGroupPlanBackupSchema>;
 export type FamilyGroupPlanBackup = typeof familyGroupPlanBackups.$inferSelect;
@@ -170,6 +163,7 @@ export interface OpportunityCost {
   }[];
   status?: string;
   subStatus?: string;
+  userId?: string;
 }
 
 // AI Recommendation
@@ -197,9 +191,7 @@ export const users = pgTable("users", {
   currency: text("currency"),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-});
+export const insertUserSchema = (createInsertSchema(users).omit as any)(['id']);
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -242,11 +234,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertNotificationPreferencesSchema = (createInsertSchema(notificationPreferences).omit as any)(['id', 'createdAt', 'updatedAt']);
 
 export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
 export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
@@ -262,11 +250,7 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertPushSubscriptionSchema = (createInsertSchema(pushSubscriptions).omit as any)(['id', 'createdAt', 'updatedAt']);
 
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
@@ -288,6 +272,7 @@ export type FamilyGroupMember = {
   role: 'owner' | 'member';
   joinedAt: string;
   email?: string | null;
+  user_email?: string | null;
 };
 
 export type SharedSubscription = {

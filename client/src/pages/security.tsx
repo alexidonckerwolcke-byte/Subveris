@@ -51,7 +51,7 @@ export default function Security() {
 
             <div>
               <h2 className="text-lg font-semibold">Reporting Security Issues</h2>
-              <p className="mt-3 text-muted-foreground">
+                <p className="mt-3 text-muted-foreground">
                 If you discover a security vulnerability, please notify us immediately at <a href="mailto:help.subveris@gmail.com" className="font-medium text-primary underline">help.subveris@gmail.com</a>.
               </p>
             </div>

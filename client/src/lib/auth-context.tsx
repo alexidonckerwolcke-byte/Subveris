@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { apiFetch } from '@/lib/api';
 import { queryClient } from './queryClient';
 
 interface AuthContextType {
@@ -88,25 +89,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check if user has subscriptions and premium status
   const checkUserSubscriptions = async (userId: string) => {
     try {
-      const tokenValue = session?.access_token || JSON.parse(localStorage.getItem('supabase.auth.token') || '{}').access_token;
-      const headers: Record<string, string> = {};
-      if (tokenValue) {
-        headers['Authorization'] = `Bearer ${tokenValue}`;
-      }
-
-      // Check regular subscriptions
-      const response = await fetch('/api/subscriptions', {
-        headers,
-      });
+      // Use shared apiFetch helper so auth is restored properly after refresh.
+      const response = await apiFetch('/api/subscriptions');
       if (response.ok) {
         const subscriptions = await response.json();
         setHasSubscriptions(subscriptions.length > 0);
       }
 
-      // Check premium status
-      const premiumResponse = await fetch('/api/user/premium-status', {
-        headers,
-      });
+      const premiumResponse = await apiFetch('/api/user/premium-status');
       if (premiumResponse.ok) {
         const premiumData = await premiumResponse.json();
         setIsPremium(premiumData.isPremium);
@@ -165,6 +155,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
 
+        if (session?.user) {
+          queryClient.invalidateQueries();
+        }
+
         // Restore just-signed-up state only when the current session belongs to a fresh user.
         restoreJustSignedUp(session?.user ?? null);
 
@@ -198,6 +192,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        if (session?.user) {
+          queryClient.invalidateQueries();
+        }
         setLoading(false);
         
         // Clear React Query cache when user logs out (session becomes null)
@@ -380,12 +377,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    if (!supabase) return;
-    // Clear React Query cache before signing out to prevent data leakage
-    queryClient.clear();
-    await supabase.auth.signOut();
-    // Redirect to homepage after sign out
-    window.location.href = '/';
+    try {
+      // Clear React Query cache before signing out to prevent data leakage
+      queryClient.clear();
+    } catch (error) {
+      console.warn('Error clearing query cache:', error);
+    }
+    
+    // Clear all auth-related localStorage and sessionStorage
+    try {
+      // Clear Supabase auth token
+      localStorage.removeItem('supabase.auth.token');
+      sessionStorage.removeItem('supabase.auth.token');
+      
+      // Clear any Supabase session data (iterate through all keys)
+      const allKeys = [...Object.keys(localStorage), ...Object.keys(sessionStorage)];
+      allKeys.forEach(key => {
+        if (key.includes('supabase') || key.includes('auth') || key.includes('session')) {
+          try {
+            localStorage.removeItem(key);
+            sessionStorage.removeItem(key);
+          } catch (e) {
+            // Ignore errors
+          }
+        }
+      });
+      
+      // Clear app-specific auth data
+      localStorage.removeItem('justSignedUp');
+      localStorage.removeItem('postSignupPlan');
+      localStorage.removeItem('postSignupSetup2FA');
+      localStorage.removeItem('postSignupFlowCompleted');
+      localStorage.removeItem('tutorialCompleted');
+    } catch (error) {
+      console.warn('Error clearing storage:', error);
+    }
+    
+    // Clear React state
+    setUser(null);
+    setSession(null);
+    setLoading(false);
+    
+    // Attempt Supabase logout but don't wait for it
+    if (supabase) {
+      try {
+        // Fire and forget - don't await this as it may timeout/error
+        supabase.auth.signOut().catch(err => {
+          console.debug('Supabase logout endpoint error (expected):', err?.message);
+        });
+      } catch (error) {
+        // Ignore
+      }
+    }
+    
+    // Redirect to homepage immediately
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 100);
   };
 
   const getToken = async (): Promise<string> => {

@@ -27,7 +27,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PER_PAGE as PER_PAGE_CONST } from "@/lib/constants";
 import type { Subscription, SubscriptionStatus } from "@shared/schema";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
-import { getCategoryIcon, getStatusColor } from "@/lib/utils";
+import { getCategoryIcon, getStatusColor, formatDate } from "@/lib/utils";
 import { useCurrency, type Currency } from "@/lib/currency-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -35,7 +35,6 @@ import { useToast } from "@/hooks/use-toast";
 interface SubscriptionCardProps {
   subscription: Subscription;
   onStatusChange: (id: string, status: SubscriptionStatus) => void;
-  onDelete: (id: string) => void;
   isPremium?: boolean;
 }
 
@@ -56,7 +55,6 @@ export function invalidateAfterUsage(showFamilyData: boolean, familyGroupId?: st
 export function SubscriptionCard({
   subscription,
   onStatusChange,
-  onDelete,
   isPremium = false,
 }: SubscriptionCardProps) {
   const { formatAmount } = useCurrency();
@@ -231,15 +229,6 @@ export function SubscriptionCard({
                   Mark as Deleted
                 </DropdownMenuItem>
               )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => onDelete(subscription.id)}
-                className="text-destructive focus:text-destructive"
-                data-testid={`action-delete-${subscription.id}`}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -257,17 +246,8 @@ export function SubscriptionCard({
                 (() => {
                   const raw = (subscription as any).nextBillingDate || (subscription as any).next_billing_at || (subscription as any).next_billing_date;
                   if (!raw) return '—';
-                  const d = new Date(raw);
-                  if (!isNaN(d.getTime())) return d.toLocaleDateString();
-                  // Try extracting date portion if contains T
-                  try {
-                    const dateOnly = typeof raw === 'string' ? raw.split('T')[0] : null;
-                    if (dateOnly) {
-                      const d2 = new Date(dateOnly);
-                      if (!isNaN(d2.getTime())) return d2.toLocaleDateString();
-                    }
-                  } catch (e) {}
-                  return '—';
+                  const formatted = formatDate(raw);
+                  return formatted || '—';
                 })()
               }
             </p>

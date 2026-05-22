@@ -16,6 +16,7 @@ import {
   Bell,
   BarChart3,
   Shield,
+  Users,
   CheckCircle2,
   X,
   ChevronRight,
@@ -33,262 +34,143 @@ interface TutorialStep {
 
 const tutorialSteps: TutorialStep[] = [
   {
-    title: "Welcome to SubVeris!",
+    title: "Welcome to Subveris!",
     description: "Your personal subscription management assistant",
     icon: CheckCircle2,
     content: (
       <div className="text-center space-y-4">
         <div className="text-6xl">🎉</div>
         <p className="text-lg">
-          Welcome! SubVeris helps you track, manage, and optimize all your subscriptions in one place.
+          Subveris helps you track recurring bills, discover savings, and keep your family subscriptions organized.
         </p>
       </div>
     ),
-    features: [],
+    features: ["Subscription tracking", "Savings insights", "Family sharing"],
   },
   {
-    title: "Track Your Subscriptions",
-    description: "Install our extension and start manual tracking",
-    icon: CreditCard,
-    content: (
-      <div className="space-y-4">
-        <p>SubVeris helps you track subscriptions through:</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-            <CreditCard className="h-5 w-5 text-blue-600" />
-            <span className="text-sm">Manual entry with presets</span>
-          </div>
-          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-            <TrendingUp className="h-5 w-5 text-green-600" />
-            <span className="text-sm">Browser extension tracking</span>
-          </div>
-        </div>
-      </div>
-    ),
-    features: ["Manual tracking", "Smart suggestions", "Extension monitoring"],
-  },
-  {
-    title: "Save Money",
-    description: "Identify unused subscriptions and potential savings",
-    icon: TrendingUp,
-    content: (
-      <div className="space-y-4">
-        <p>Get insights into your spending patterns and find opportunities to save:</p>
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 p-3 border rounded-lg">
-            <div className="h-10 w-10 bg-red-100 rounded-full flex items-center justify-center">
-              <span className="text-red-600 font-bold">!</span>
-            </div>
-            <div>
-              <p className="font-medium">Unused Subscriptions</p>
-              <p className="text-sm text-muted-foreground">Cancel services you don't use</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-3 border rounded-lg">
-            <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
-              <TrendingUp className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <p className="font-medium">Cost Optimization</p>
-              <p className="text-sm text-muted-foreground">Find better deals and alternatives</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    ),
-    features: ["Savings projections", "Cost analysis", "Smart recommendations"],
-  },
-  {
-    title: "Smart Notifications",
-    description: "Never miss a payment or renewal date",
-    icon: Bell,
-    content: (
-      <div className="space-y-4">
-        <p>Stay on top of your subscriptions with intelligent notifications:</p>
-        <div className="space-y-2">
-          <Badge className="bg-blue-100 text-blue-800">Payment reminders</Badge>
-          <Badge className="bg-orange-100 text-orange-800">Renewal alerts</Badge>
-          <Badge className="bg-green-100 text-green-800">Savings opportunities</Badge>
-          <Badge className="bg-purple-100 text-purple-800">Usage tracking</Badge>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Get notified before payments are due and when you can save money.
-        </p>
-      </div>
-    ),
-    features: ["Payment reminders", "Renewal alerts", "Custom notifications"],
-  },
-  {
-    title: "Detailed Analytics",
-    description: "Understand your subscription spending patterns",
+    title: "Dashboard Overview",
+    description: "See your subscriptions at a glance",
     icon: BarChart3,
     content: (
       <div className="space-y-4">
-        <p>Visualize your subscription data with comprehensive analytics:</p>
-        <div className="grid grid-cols-1 gap-3">
-          <div className="p-4 bg-muted rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <BarChart3 className="h-5 w-5" />
-              <span className="font-medium">Spending Charts</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Monthly and yearly spending breakdowns by category
-            </p>
-          </div>
-          <div className="p-4 bg-muted rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-5 w-5" />
-              <span className="font-medium">Usage Insights</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Track how much you use each service and its cost-effectiveness
-            </p>
-          </div>
-        </div>
-      </div>
-    ),
-    features: ["Spending analytics", "Category breakdowns", "Usage tracking"],
-  },
-  {
-    title: "Secure & Private",
-    description: "Your data is protected with enterprise-grade security",
-    icon: Shield,
-    content: (
-      <div className="space-y-4">
-        <div className="text-center">
-          <Shield className="h-16 w-16 mx-auto text-green-600 mb-4" />
-        </div>
-        <p>Your privacy and security are our top priorities:</p>
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <span>Enterprise-grade encryption</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <span>Secure data storage</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <span>No data sharing</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <span>GDPR compliant</span>
-          </div>
-        </div>
-      </div>
-    ),
-    features: ["Enterprise security", "Data encryption", "Privacy protection"],
-  },
-  {
-    title: "Dashboard",
-    description: "Your central hub for subscription overview",
-    icon: BarChart3,
-    content: (
-      <div className="space-y-4">
-        <p>The Dashboard is your command center where you can see:</p>
+        <p>The Dashboard shows what matters most first:</p>
         <div className="space-y-3">
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">📊 Total spending summary</p>
+            <p className="font-medium">📊 Total monthly spending</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">📈 Recent subscriptions</p>
+            <p className="font-medium">⏰ Upcoming renewals and payment dates</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">💡 AI recommendations</p>
+            <p className="font-medium">💡 AI recommendations for savings</p>
+          </div>
+          <div className="p-3 bg-muted rounded-lg">
+            <p className="font-medium">🚫 Unused or inactive subscriptions</p>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Access it from the sidebar menu on the left
-        </p>
       </div>
     ),
-    features: ["Quick overview", "Key metrics", "Recent activity"],
+    features: ["Spend summary", "Renewal alerts", "Savings suggestions"],
   },
   {
-    title: "Subscriptions Page",
-    description: "Manage all your subscriptions",
+    title: "Manage Subscriptions",
+    description: "Add, edit, and organize your services",
     icon: CreditCard,
     content: (
       <div className="space-y-4">
-        <p>Here you can:</p>
+        <p>Use the Subscriptions page to keep everything current:</p>
         <div className="space-y-3">
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">➕ Add new subscriptions manually</p>
+            <p className="font-medium">➕ Add subscriptions manually</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">📋 View all subscriptions organized by status</p>
+            <p className="font-medium">📝 Edit payment amounts and renewal dates</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">🗑️ Delete subscriptions you no longer use</p>
+            <p className="font-medium">🔍 Filter by category or status</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">🔍 Search and filter by category</p>
+            <p className="font-medium">🗑️ Remove services you no longer use</p>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Click on "Subscriptions" in the sidebar to access this page
-        </p>
       </div>
     ),
-    features: ["Manage subscriptions", "Add/Delete items", "Filter & search"],
+    features: ["Add / edit subscriptions", "Renewal tracking", "Category filters"],
   },
   {
-    title: "Insights Page",
-    description: "Discover savings opportunities",
+    title: "Insights & Savings",
+    description: "Find hidden savings and cost-per-use data",
     icon: TrendingUp,
     content: (
       <div className="space-y-4">
-        <p>Get actionable insights including:</p>
+        <p>The Insights page highlights where you can save:</p>
         <div className="space-y-3">
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">🎯 Unused subscriptions to cancel</p>
+            <p className="font-medium">💰 Potential savings from unused services</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">💰 Potential monthly savings</p>
+            <p className="font-medium">📉 Cost-per-use analysis for each subscription</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">📊 Spending patterns analysis</p>
+            <p className="font-medium">📊 Spending trends by month and category</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">🤖 AI-powered recommendations</p>
+            <p className="font-medium">🤖 AI suggestions for better plans</p>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Find it under "Insights" in the sidebar menu
-        </p>
       </div>
     ),
-    features: ["Savings insights", "Usage analysis", "Smart recommendations"],
+    features: ["Savings opportunities", "Cost-per-use", "Spending trends"],
   },
   {
-    title: "Settings Page",
-    description: "Customize your account and preferences",
+    title: "Family Sharing",
+    description: "Share subscriptions and manage family costs",
+    icon: Users,
+    content: (
+      <div className="space-y-4">
+        <p>If you upgrade to Family, you can:</p>
+        <div className="space-y-3">
+          <div className="p-3 bg-muted rounded-lg">
+            <p className="font-medium">👥 Invite family members</p>
+          </div>
+          <div className="p-3 bg-muted rounded-lg">
+            <p className="font-medium">📑 Share subscriptions across the group</p>
+          </div>
+          <div className="p-3 bg-muted rounded-lg">
+            <p className="font-medium">💳 See combined family spending</p>
+          </div>
+          <div className="p-3 bg-muted rounded-lg">
+            <p className="font-medium">⚖️ Manage who sees shared data</p>
+          </div>
+        </div>
+      </div>
+    ),
+    features: ["Family group management", "Shared subscriptions", "Shared spending"],
+  },
+  {
+    title: "Settings & Security",
+    description: "Control your preferences and protect your account",
     icon: Shield,
     content: (
       <div className="space-y-4">
-        <p>Manage your account settings:</p>
+        <p>In Settings, you can:</p>
         <div className="space-y-3">
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">👤 Update profile information</p>
+            <p className="font-medium">🌍 Change your display currency</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">🔑 Change password</p>
+            <p className="font-medium">🔐 Enable two-factor authentication</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">🌙 Toggle dark mode</p>
+            <p className="font-medium">📘 Retake the onboarding tutorial anytime</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">🔐 Enable 2FA for security</p>
+            <p className="font-medium">🧾 Manage account preferences and profile info</p>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Access Settings from the sidebar at the bottom
-        </p>
       </div>
     ),
-    features: ["Profile settings", "Security options", "Preferences"],
+    features: ["Currency settings", "2FA security", "Tutorial retake"],
   },
 ];
 

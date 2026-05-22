@@ -127,7 +127,7 @@ export function ScheduleCancellationReminderModal({
             <input
               id="cancellation-url"
               type="url"
-              placeholder="https://account.example.com/settings/cancel"
+              placeholder="https://account.your-service.com/settings/cancel"
               value={cancellationUrl}
               onChange={(e) => {
                 setCancellationUrl(e.target.value);

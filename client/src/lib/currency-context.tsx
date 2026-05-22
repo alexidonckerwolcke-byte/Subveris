@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 export type Currency = 'USD' | 'EUR' | 'GBP' | 'CAD' | 'AUD' | 'JPY' | 'CHF' | 'SEK' | 'NOK' | 'DKK' | 'PLN' | 'CZK' | 'HUF' | 'BRL' | 'MXN' | 'ARS' | 'TRY' | 'ZAR' | 'INR' | 'CNY' | 'KRW' | 'SGD' | 'HKD' | 'NZD';
@@ -89,7 +90,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         getToken()
           .then((token) => {
-            return fetch('/api/user/currency', {
+            return apiFetch('/api/user/currency', {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json',
@@ -134,7 +135,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
 
       getToken()
         .then((token) =>
-          fetch('/api/user/premium-status', {
+          apiFetch('/api/user/premium-status', {
             headers: { Authorization: `Bearer ${token}` },
           })
         )
@@ -153,9 +154,10 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const convertAmount = (amount: number, fromCurrency: Currency = 'USD', toCurrency: Currency = currency): number => {
-    // Convert to USD first, then to target currency
-    const usdAmount = amount / EXCHANGE_RATES[fromCurrency];
-    return usdAmount * EXCHANGE_RATES[toCurrency];
+    const from = String(fromCurrency || 'USD').trim().toUpperCase() as Currency;
+    const to = String(toCurrency || currency).trim().toUpperCase() as Currency;
+    const usdAmount = amount / (EXCHANGE_RATES[from] ?? 1);
+    return usdAmount * (EXCHANGE_RATES[to] ?? 1);
   };
 
   const formatAmount = (amount: number, fromCurrency: Currency = 'USD'): string => {

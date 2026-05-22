@@ -31,7 +31,7 @@ export function SavingsProjection({
   toCancelCount,
   isLoading,
 }: SavingsProjectionProps) {
-  const { formatAmount, convertAmount } = useCurrency();
+  const { formatAmount, convertAmount, currency } = useCurrency();
   const { user } = useAuth();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
   const [, navigate] = useLocation();
@@ -41,15 +41,48 @@ export function SavingsProjection({
   useEffect(() => {
     // Use family-specific key in family mode, otherwise user-specific
     const keySuffix = showFamilyData && familyGroupId ? `-${familyGroupId}` : (user?.id ? `-${user.id}` : '');
-    const storedGoal = localStorage.getItem(`subveris-savings-goal-usd${keySuffix}`);
-    if (storedGoal) {
-      const goalValue = Number(storedGoal);
+    const stored = localStorage.getItem(`subveris-savings-goal-${currency}${keySuffix}`);
+    const usdStored = localStorage.getItem(`subveris-savings-goal-usd${keySuffix}`);
+    const legacy = localStorage.getItem(`subveris-savings-goal${keySuffix}`);
+
+    if (stored) {
+      const goalValue = Number(stored);
       if (!isNaN(goalValue) && goalValue > 0) {
-        setUserGoalUSD(goalValue);
+        // Convert from user's currency to USD for internal calculations
+        const goalUSD = convertAmount(goalValue, currency, 'USD');
+        setUserGoalUSD(goalUSD);
       }
+      return;
     }
 
-    // Listen for updates dispatched by the Savings page when the user changes the goal
+    if (usdStored) {
+      // Migrate from USD storage to currency-specific storage
+      const usdValue = Number(usdStored);
+      if (!isNaN(usdValue) && usdValue > 0) {
+        setUserGoalUSD(usdValue);
+        localStorage.setItem(`subveris-savings-goal-${currency}${keySuffix}`, String(Math.round(convertAmount(usdValue, 'USD', currency) * 100) / 100));
+        localStorage.removeItem(`subveris-savings-goal-usd${keySuffix}`);
+      }
+      return;
+    }
+
+    if (legacy) {
+      // Legacy value might have been stored in the user's selected currency
+      const legacyNum = Number(legacy);
+      if (!isNaN(legacyNum) && legacyNum > 0) {
+        const goalUSD = convertAmount(legacyNum, currency, 'USD');
+        setUserGoalUSD(goalUSD);
+        localStorage.setItem(`subveris-savings-goal-${currency}${keySuffix}`, String(legacyNum));
+        localStorage.removeItem(`subveris-savings-goal${keySuffix}`);
+      }
+      return;
+    }
+
+    // No stored value found, keep userGoalUSD as null to use default
+  }, [user?.id, showFamilyData, familyGroupId, currency]);
+
+  // Listen for updates dispatched by the Savings page when the user changes the goal
+  useEffect(() => {
     const handler = (e: Event) => {
       try {
         const val = (e as CustomEvent).detail;
@@ -66,7 +99,7 @@ export function SavingsProjection({
     return () => {
       window.removeEventListener('savingsGoalUpdated', handler as EventListener);
     };
-  }, [user?.id, showFamilyData, familyGroupId]);
+  }, []);
   if (isLoading) {
     return (
       <Card>
@@ -116,7 +149,7 @@ export function SavingsProjection({
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Monthly Potential</span>
               <span className="text-2xl font-bold text-chart-2">
-                {formatAmount(potentialSavings)}
+                {formatAmount(potentialSavings, 'USD')}
               </span>
             </div>
             <div className="space-y-2">
@@ -133,8 +166,8 @@ export function SavingsProjection({
                 />
               </div>
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Saved: {formatAmount(currentSavings)}</span>
-                <span>Goal: {formatAmount(effectiveGoal)}</span>
+                <span>Saved: {formatAmount(currentSavings, 'USD')}</span>
+                <span>Goal: {formatAmount(effectiveGoal, 'USD')}</span>
               </div>
             </div>
           </div>
@@ -146,7 +179,7 @@ export function SavingsProjection({
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Yearly Projection</p>
-                <p className="font-semibold">{formatAmount(projectedYearlySavings)}</p>
+                <p className="font-semibold">{formatAmount(projectedYearlySavings, 'USD')}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">

@@ -211,7 +211,9 @@ const DocsPage: React.FC = () => {
             <li><code>metrics</code> object ({'{' }totalSubscriptions, activeSubscriptions, totalMonthlySpending, memberCount{'}'}) computed server-side</li>
           </ul>
         </li>
-        <li><b>GET /api/metrics</b> - Get overall dashboard metrics for the current user, including <code>thisMonthSavings</code> (actual savings based on deleted subscriptions), <code>potentialSavings</code> (unused + to-cancel), active/unused counts, and spend numbers.</li>
+        <li><b>GET /api/metrics</b> - Get overall dashboard metrics for the current user, including <code>thisMonthSavings</code> (actual savings based on deleted subscriptions), <code>potentialSavings</code> (unused + to-cancel), active/unused counts, and spend numbers. <code>totalMonthlySpend</code> counts only subscriptions with renewal dates in the current month.</li>
+        <li><b>GET /api/spending/monthly</b> - Retrieve monthly spending trends based on subscription renewal dates. Shows spending for the last 6 months plus the current month. <b>Important:</b> Spending only increases/appears for a month if one or more subscriptions have their next renewal date falling in that month. Subscriptions are filtered to only include those with status <code>active</code>, <code>unused</code>, or <code>to-cancel</code>.</li>
+        <li><b>GET /api/spending/category</b> - Breakdown of current month spending by category (e.g., streaming, software, fitness). Shows percentages and counts for each category. <b>Important:</b> Only includes subscriptions with renewal dates in the current month, in the same way as the monthly spending overview. Empty categories are excluded if no subscriptions renew in this month.</li>
       </ul>
       <h3>Response Format</h3>
       <p>All responses are returned in JSON format. Successful requests return status code 200, while errors return appropriate HTTP status codes (400, 401, 404, 500).</p>

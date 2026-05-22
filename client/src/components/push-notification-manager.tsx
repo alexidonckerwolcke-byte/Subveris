@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Bell } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -58,7 +59,7 @@ export function PushNotificationManager() {
         if (subscription) {
           await unsubscribeFromPush(subscription);
           // Notify server to remove subscription
-          await fetch('/api/notifications/unsubscribe', {
+          await apiFetch('/api/notifications/unsubscribe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ endpoint: subscription.endpoint }),
@@ -74,7 +75,7 @@ export function PushNotificationManager() {
         const permission = await requestPushPermission();
         if (permission === 'granted') {
           const registration = await registerServiceWorker();
-          const vapidResponse = await fetch('/api/notifications/vapid-public-key');
+          const vapidResponse = await apiFetch('/api/notifications/vapid-public-key');
           const { vapidPublicKey } = await vapidResponse.json();
           const subscription = await subscribeToPush(registration, vapidPublicKey);
           await sendSubscriptionToServer(subscription);

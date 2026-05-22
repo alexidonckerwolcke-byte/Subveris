@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Download, AlertTriangle, Chrome, BookOpen, Settings } from "lucide-react";
 import { useSubscription } from "@/lib/subscription-context";
 import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
 import { apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -24,7 +25,7 @@ export default function Files() {
     try {
       console.log("[1] Starting extension download...");
       
-      const response = await fetch("/api/extension/download", {
+      const response = await apiFetch("/api/extension/download", {
         method: "GET",
         headers: {
           "Accept": "application/zip",
@@ -99,7 +100,7 @@ export default function Files() {
     try {
       console.log("[1] Starting extension download...");
       
-      const response = await fetch("/api/extension/download", {
+      const response = await apiFetch("/api/extension/download", {
         method: "GET",
         headers: {
           "Accept": "application/zip",
@@ -257,12 +258,6 @@ export default function Files() {
                       <p className="text-sm text-muted-foreground">
                         Toggle the "Developer mode" switch in the top-right corner of the Extensions page
                       </p>
-                      <Alert className="bg-yellow-50 border-yellow-200 mt-1">
-                        <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                        <AlertDescription className="text-yellow-900">
-                          <strong>Note:</strong> some browsers or platforms may require a small one-time fee (≈€5) to activate developer mode before you can load unpacked extensions.
-                        </AlertDescription>
-                      </Alert>
                     </div>
                   </div>
 

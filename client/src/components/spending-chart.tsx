@@ -21,9 +21,11 @@ interface SpendingChartProps {
   monthlyData: MonthlySpending[] | undefined;
   categoryData: SpendingByCategory[] | undefined;
   isLoading: boolean;
+  trendLabel?: string;
 }
 
 const COLORS = [
+
   "hsl(var(--chart-1))",
   "hsl(var(--chart-2))",
   "hsl(var(--chart-3))",
@@ -31,8 +33,9 @@ const COLORS = [
   "hsl(var(--chart-5))",
 ];
 
-export function SpendingChart({ monthlyData, categoryData, isLoading }: SpendingChartProps) {
+export function SpendingChart({ monthlyData, categoryData, isLoading, trendLabel }: SpendingChartProps) {
   const { formatAmount } = useCurrency();
+  
   if (isLoading) {
     return (
       <Card>
@@ -46,13 +49,19 @@ export function SpendingChart({ monthlyData, categoryData, isLoading }: Spending
     );
   }
 
+  // API returns spending values in USD. Keep them raw and format as USD at render time.
+  const totalCategoryAmount = categoryData?.reduce((sum, entry) => sum + (entry.amount || 0), 0) ?? 0;
+  const hasMonthlyData = monthlyData && monthlyData.length > 0;
+  const hasCategoryData = categoryData && categoryData.length > 0 && totalCategoryAmount > 0;
+  const hasCategorySeries = categoryData && categoryData.length > 0;
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-popover border border-popover-border rounded-lg p-3 shadow-lg">
           <p className="text-sm font-medium">{label}</p>
           <p className="text-sm text-chart-1">
-            {formatAmount(payload[0].value)}
+            {formatAmount(payload[0].value, 'USD')}
           </p>
         </div>
       );
@@ -68,7 +77,7 @@ export function SpendingChart({ monthlyData, categoryData, isLoading }: Spending
             {payload[0].payload.category.replace("-", " ")}
           </p>
           <p className="text-sm text-muted-foreground">
-            {formatAmount(payload[0].value)} ({payload[0].payload.percentage.toFixed(1)}%)
+            {formatAmount(payload[0].value, 'USD')} ({payload[0].payload.percentage.toFixed(1)}%)
           </p>
           <p className="text-xs text-muted-foreground">
             {payload[0].payload.count} subscription{payload[0].payload.count > 1 ? "s" : ""}
@@ -92,7 +101,7 @@ export function SpendingChart({ monthlyData, categoryData, isLoading }: Spending
         <Tabs defaultValue="trend" className="w-full">
           <TabsList className="mb-4">
             <TabsTrigger value="trend" data-testid="tab-trend">
-              6-Month Trend
+              {trendLabel || "6-Month Trend"}
             </TabsTrigger>
             <TabsTrigger value="category" data-testid="tab-category">
               By Category
@@ -100,6 +109,14 @@ export function SpendingChart({ monthlyData, categoryData, isLoading }: Spending
           </TabsList>
           <TabsContent value="trend">
             <div className="h-[300px]" data-testid="chart-trend">
+              {!hasMonthlyData ? (
+                <div className="flex items-center justify-center h-full text-center">
+                  <div>
+                    <p className="text-muted-foreground text-sm">No spending data available</p>
+                    <p className="text-xs text-muted-foreground mt-1">Add subscriptions to see your spending trends</p>
+                  </div>
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={monthlyData}
@@ -120,7 +137,7 @@ export function SpendingChart({ monthlyData, categoryData, isLoading }: Spending
                     interval="preserveStartEnd"
                   />
                   <YAxis
-                    tickFormatter={(value) => formatAmount(value)}
+                    tickFormatter={(value) => formatAmount(value, 'USD')}
                     tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
                     axisLine={{ stroke: "hsl(var(--border))" }}
                     tickLine={{ stroke: "hsl(var(--border))" }}
@@ -136,10 +153,34 @@ export function SpendingChart({ monthlyData, categoryData, isLoading }: Spending
                   />
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </div>
           </TabsContent>
           <TabsContent value="category">
             <div className="h-[300px]" data-testid="chart-category">
+              {!hasCategorySeries ? (
+                <div className="flex items-center justify-center h-full text-center">
+                  <div>
+                    <p className="text-muted-foreground text-sm">No category data available</p>
+                    <p className="text-xs text-muted-foreground mt-1">Add subscriptions to see spending by category</p>
+                  </div>
+                </div>
+              ) : !hasCategoryData ? (
+                <div className="flex flex-col gap-3 h-full overflow-auto">
+                  <p className="text-muted-foreground text-sm">Category spending is available, but no category totals are present for the selected period.</p>
+                  <div className="grid gap-2">
+                    {categoryData?.map((entry, index) => (
+                      <div key={index} className="rounded-lg border border-border/70 bg-card/80 p-3">
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="font-medium capitalize">{entry.category.replace("-", " ")}</span>
+                          <span>{formatAmount(entry.amount || 0, 'USD')}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{entry.count} subscription{entry.count === 1 ? '' : 's'}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -171,6 +212,7 @@ export function SpendingChart({ monthlyData, categoryData, isLoading }: Spending
                   />
                 </PieChart>
               </ResponsiveContainer>
+              )}
             </div>
           </TabsContent>
         </Tabs>

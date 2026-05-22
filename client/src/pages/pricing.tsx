@@ -93,8 +93,8 @@ export default function PricingPage() {
   ];
 
   const priceIdMap = {
-    premium: import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID || "price_1T3jhIJpTYwzr88x8pGboTSU",
-    family: import.meta.env.VITE_STRIPE_FAMILY_PRICE_ID || "price_1T3jikJpTYwzr88xIxkKHkKu",
+    premium: import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID || "price_1TM9r1JSf7SJ8WWRiocez8wo",
+    family: import.meta.env.VITE_STRIPE_FAMILY_PRICE_ID || "price_1TM9sSJSf7SJ8WWR4H26rSZ9",
   };
 
   const createCheckoutMutation = useMutation({

@@ -10,7 +10,7 @@ interface MetricsCardsProps {
 }
 
 export function MetricsCards({ metrics, isLoading }: MetricsCardsProps) {
-  const { formatAmount } = useCurrency();
+  const { formatAmount, currency } = useCurrency();
   if (isLoading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -30,11 +30,9 @@ export function MetricsCards({ metrics, isLoading }: MetricsCardsProps) {
   const cards = [
     {
       title: "Total Monthly Spend",
-      value: formatAmount(metrics?.totalMonthlySpend ?? 0),
-      change: metrics?.monthlySpendChange !== undefined 
-        ? `${metrics.monthlySpendChange >= 0 ? '+' : ''}${metrics.monthlySpendChange}%`
-        : "-12%",
-      changeType: (metrics?.monthlySpendChange ?? -12) < 0 ? "decrease" as const : "increase" as const,
+      value: formatAmount(metrics?.totalMonthlySpend ?? 0, 'USD'),
+      change: `${(metrics?.monthlySpendChange ?? 0) >= 0 ? '+' : ''}${metrics?.monthlySpendChange ?? 0}%`,
+      changeType: ((metrics?.monthlySpendChange ?? 0) < 0) ? "decrease" as const : "increase" as const,
       icon: DollarSign,
       description: "vs last month",
       testId: "metric-total-spend",
@@ -42,9 +40,7 @@ export function MetricsCards({ metrics, isLoading }: MetricsCardsProps) {
     {
       title: "Active Subscriptions",
       value: metrics?.activeSubscriptions?.toString() ?? "0",
-      change: metrics?.newServicesTracked !== undefined 
-        ? `+${metrics.newServicesTracked}`
-        : "+2",
+      change: `+${metrics?.newServicesTracked ?? 0}`,
       changeType: "neutral" as const,
       icon: CreditCard,
       description: "services tracked",
@@ -52,7 +48,7 @@ export function MetricsCards({ metrics, isLoading }: MetricsCardsProps) {
     },
     {
       title: "Potential Savings",
-      value: formatAmount(metrics?.potentialSavings ?? 0),
+      value: formatAmount(metrics?.potentialSavings ?? 0, 'USD'),
       change: "per month",
       changeType: "highlight" as const,
       icon: PiggyBank,

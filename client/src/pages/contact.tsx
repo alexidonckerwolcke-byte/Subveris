@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, CheckCircle, Mail } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export function ContactPage() {
   const [formData, setFormData] = useState({
@@ -14,6 +15,7 @@ export function ContactPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -29,7 +31,7 @@ export function ContactPage() {
     setStatus(null);
 
     try {
-      const response = await fetch("/api/contact", {
+      const response = await apiFetch("/api/contact", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -47,6 +49,7 @@ export function ContactPage() {
         type: "success",
         message: data.message || "Thank you! We've received your message and will get back to you soon.",
       });
+      setSubmitted(true);
 
       // Reset form
       setFormData({
@@ -55,9 +58,6 @@ export function ContactPage() {
         subject: "",
         message: "",
       });
-
-      // Clear success message after 5 seconds
-      setTimeout(() => setStatus(null), 5000);
     } catch (error) {
       setStatus({
         type: "error",
@@ -67,6 +67,47 @@ export function ContactPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
+        <div className="max-w-2xl mx-auto">
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle>Message Sent</CardTitle>
+              <CardDescription>
+                We received your request and will reply within 24 hours.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center space-y-6 py-8">
+                <div className="mx-auto h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle className="h-8 w-8 text-green-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-900">Thanks for reaching out!</h2>
+                  <p className="text-gray-600 mt-3">
+                    {status?.message || "Your support request is on its way to our team."}
+                  </p>
+                </div>
+                <div className="flex justify-center">
+                  <Button
+                    onClick={() => {
+                      setSubmitted(false);
+                      setStatus(null);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    Send another message
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
@@ -143,7 +184,7 @@ export function ContactPage() {
                   type="text"
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="your.email@example.com"
+                  placeholder="you@company.com"
                   required
                   disabled={isSubmitting}
                   className="w-full"

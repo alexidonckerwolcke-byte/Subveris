@@ -172,7 +172,7 @@ describe('E2E family sharing & cost-per-use', () => {
     const ownerRow = ownerRes.body.find((r: any) => r.name === 'OwnerSub');
     expect(ownerRow.usageCount).toBe(2);
 
-    // member should be allowed as well
+    // member should only see personal subscriptions before explicit shares
     const memberRes = await request(app)
       .get(`/api/analysis/cost-per-use?familyGroupId=${groupId}`)
       .set('Authorization', memberToken);
@@ -180,7 +180,35 @@ describe('E2E family sharing & cost-per-use', () => {
       console.error('member cost-per-use failed', memberRes.status, memberRes.body);
     }
     expect(memberRes.status).toBe(200);
-    expect(memberRes.body.length).toBe(2);
+    expect(memberRes.body.length).toBe(1);
+    expect(memberRes.body[0].name).toBe('MemberSub');
+
+    const { data: otherSub, error: otherSubErr } = await supabase
+      .from('subscriptions')
+      .insert({
+        user_id: otherId,
+        name: 'OtherSub',
+        amount: 5,
+        frequency: 'monthly',
+        status: 'active',
+        usage_count: 1,
+        currency: 'USD',
+        category: 'test',
+        next_billing_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    console.log('other member subscription insert', { otherSub, otherSubErr });
+    expect(otherSub).toBeTruthy();
+
+    const memberResAfterOtherSub = await request(app)
+      .get(`/api/analysis/cost-per-use?familyGroupId=${groupId}`)
+      .set('Authorization', memberToken)
+      .expect(200);
+    expect(memberResAfterOtherSub.body.length).toBe(1);
+    expect(memberResAfterOtherSub.body[0].name).toBe('MemberSub');
+    expect(memberResAfterOtherSub.body.some((r: any) => r.name === 'OtherSub')).toBe(false);
+    expect(memberResAfterOtherSub.body.some((r: any) => r.name === 'OwnerSub')).toBe(false);
 
     // share the owner's subscription explicitly and verify the listing endpoint
     await request(app)
@@ -202,6 +230,16 @@ describe('E2E family sharing & cost-per-use', () => {
       .set('Authorization', memberToken)
       .expect(200);
     expect(memberFamilyData.body.subscriptions.some((s: any) => s.id === ownerSub.id)).toBe(true);
+    expect(memberFamilyData.body.subscriptions.some((s: any) => s.id === otherSub.id)).toBe(false);
+
+    const memberCostAfterShare = await request(app)
+      .get(`/api/analysis/cost-per-use?familyGroupId=${groupId}`)
+      .set('Authorization', memberToken)
+      .expect(200);
+    const memberCostNamesAfterShare = memberCostAfterShare.body.map((r: any) => r.name);
+    expect(memberCostNamesAfterShare).toContain('OwnerSub');
+    expect(memberCostNamesAfterShare).toContain('MemberSub');
+    expect(memberCostNamesAfterShare).not.toContain('OtherSub');
 
     // assign a cost split to the member and verify via the new endpoints
     const sharedId = sharedList.body[0].id;

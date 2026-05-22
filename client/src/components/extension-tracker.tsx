@@ -33,7 +33,7 @@ export function ExtensionTracker({ subscriptions }: ExtensionTrackerProps) {
               No subscriptions have website domains configured yet.
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              Edit your subscriptions and add a website domain (e.g., netflix.com) to enable automatic usage tracking.
+              Edit your subscriptions and add a website domain (for example, spotify.com) to enable automatic usage tracking.
             </p>
           </div>
         </CardContent>

@@ -15,7 +15,7 @@ function calculatePotentialSavings(subscriptions: Subscription[]): number {
       } else if (frequency === 'quarterly') {
         monthlyAmount = amount / 3;
       } else if (frequency === 'weekly') {
-        monthlyAmount = (amount * 52) / 12;
+        monthlyAmount = amount * 4;
       }
       
       return sum + monthlyAmount;

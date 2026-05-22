@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, TrendingUp, Zap } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 interface HealthScore {
   score: number;
@@ -22,7 +23,7 @@ export function SubscriptionHealthScore() {
   useEffect(() => {
     const fetchHealthScore = async () => {
       try {
-        const response = await fetch("/api/health-score");
+        const response = await apiFetch("/api/health-score");
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || `HTTP ${response.status}`);

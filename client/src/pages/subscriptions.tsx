@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useSubscription } from "@/lib/subscription-context";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
+import { useCurrency } from "@/lib/currency-context";
+import { getVisibleFamilySubscriptions } from "@/lib/family-data";
 import { useQuery, useMutation, useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +58,7 @@ type AddSubscriptionForm = z.infer<typeof addSubscriptionSchema>;
 export default function Subscriptions() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { currency } = useCurrency();
   const { limits, tier } = useSubscription();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
   const [location, setLocation] = useLocation();
@@ -100,10 +103,11 @@ export default function Subscriptions() {
     }
   }, [dialogOpen]);
 
-  // when search or category changes, purge paginated cache so we start from page 1
+  // Only purge paginated cache when the data source changes.
+  // Search and category filtering happen client-side, so they should not force a new server fetch.
   useEffect(() => {
     queryClient.removeQueries({ queryKey: ["/api/subscriptions", PER_PAGE] });
-  }, [searchQuery, categoryFilter, showFamilyData]);
+  }, [showFamilyData, familyGroupId]);
 
   // Personal subscriptions (paginated)
   interface SubscriptionsPage {
@@ -154,7 +158,7 @@ export default function Subscriptions() {
   });
 
   // Use family subscriptions if enabled, otherwise personal (paginated)
-  const rawSubscriptions = showFamilyData ? familyData?.subscriptions : personalSubscriptions;
+  const rawSubscriptions = showFamilyData ? getVisibleFamilySubscriptions(familyData, user?.id) : personalSubscriptions;
 
   // dedupe subscriptions by id to avoid duplicate-key warnings and duplicated UI items
   const subscriptions = useMemo(() => {
@@ -193,9 +197,10 @@ export default function Subscriptions() {
       if (!user?.id) {
         throw new Error("User not authenticated");
       }
-      console.log('[Subscriptions] Starting subscription creation', { name: data.name, amount: data.amount });
+      console.log('[Subscriptions] Starting subscription creation', { name: data.name, amount: data.amount, currency });
       const res = await apiRequest("POST", "/api/subscriptions", {
         ...data,
+        currency,
         status: "active",
         usageCount: 0,
         isDetected: false,
@@ -310,10 +315,6 @@ export default function Subscriptions() {
     updateStatusMutation.mutate({ id, status });
   };
 
-  const handleDelete = (id: string) => {
-    deleteMutation.mutate(id);
-  };
-
   const onSubmit = async (data: AddSubscriptionForm) => {
     // Triple-check to prevent duplicate submissions
     if (isSubmittingLocal || addMutation.isPending || submissionInFlightRef.current) {
@@ -409,7 +410,7 @@ export default function Subscriptions() {
                       <FormItem>
                         <FormLabel>Service Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Netflix, Spotify, etc." {...field} data-testid="input-sub-name" />
+                          <Input placeholder="e.g., Spotify" {...field} data-testid="input-sub-name" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -445,7 +446,7 @@ export default function Subscriptions() {
                       name="amount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Amount ($)</FormLabel>
+                          <FormLabel>Amount ({currency})</FormLabel>
                           <FormControl>
                             <Input type="number" step="0.01" placeholder="9.99" {...field} data-testid="input-amount" />
                           </FormControl>
@@ -497,7 +498,7 @@ export default function Subscriptions() {
                       <FormItem>
                         <FormLabel>Website Domain</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g., netflix.com, spotify.com" {...field} data-testid="input-website-domain" />
+                          <Input placeholder="e.g., spotify.com" {...field} data-testid="input-website-domain" />
                         </FormControl>
                         <div className="text-xs text-muted-foreground">
                           Add the site domain here if you want browser extension visits to be auto-tracked.
@@ -591,7 +592,6 @@ export default function Subscriptions() {
                           key={sub.id}
                           subscription={sub}
                           onStatusChange={handleStatusChange}
-                          onDelete={handleDelete}
                           isPremium={tier === "premium"}
                         />
                       ))}
@@ -607,7 +607,6 @@ export default function Subscriptions() {
                           key={sub.id}
                           subscription={sub}
                           onStatusChange={handleStatusChange}
-                          onDelete={handleDelete}
                           isPremium={tier === "premium"}
                         />
                       ))}
@@ -623,7 +622,6 @@ export default function Subscriptions() {
                           key={sub.id}
                           subscription={sub}
                           onStatusChange={handleStatusChange}
-                          onDelete={handleDelete}
                           isPremium={tier === "premium"}
                         />
                       ))}
@@ -639,7 +637,6 @@ export default function Subscriptions() {
                           key={sub.id}
                           subscription={sub}
                           onStatusChange={handleStatusChange}
-                          onDelete={handleDelete}
                           isPremium={tier === "premium"}
                         />
                       ))}
@@ -674,7 +671,7 @@ export default function Subscriptions() {
                     key={sub.id}
                     subscription={sub}
                     onStatusChange={handleStatusChange}
-                    onDelete={handleDelete}
+
                     isPremium={tier === "premium"}
                   />
                 ))
@@ -693,7 +690,7 @@ export default function Subscriptions() {
                     key={sub.id}
                     subscription={sub}
                     onStatusChange={handleStatusChange}
-                    onDelete={handleDelete}
+
                     isPremium={tier === "premium"}
                   />
                 ))
@@ -713,7 +710,7 @@ export default function Subscriptions() {
                     key={sub.id}
                     subscription={sub}
                     onStatusChange={handleStatusChange}
-                    onDelete={handleDelete}
+
                     isPremium={tier === "premium"}
                   />
                 ))
@@ -736,7 +733,6 @@ export default function Subscriptions() {
                       key={sub.id}
                       subscription={sub}
                       onStatusChange={handleStatusChange}
-                      onDelete={handleDelete}
                       isPremium={tier === "premium"}
                     />
                   ))}

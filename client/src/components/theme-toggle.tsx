@@ -15,10 +15,7 @@ function getInitialTheme(userId?: string): "light" | "dark" {
     return stored;
   }
 
-  if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-    return "dark";
-  }
-
+  // Default new users to bright/light mode so they can opt in to dark mode.
   return "light";
 }
 

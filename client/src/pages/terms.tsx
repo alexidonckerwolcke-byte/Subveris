@@ -70,7 +70,7 @@ export default function Terms() {
 
             <div>
               <h2 className="text-lg font-semibold">Contact</h2>
-              <p className="mt-3 text-muted-foreground">
+                <p className="mt-3 text-muted-foreground">
                 Questions about these terms may be directed to <a href="mailto:help.subveris@gmail.com" className="font-medium text-primary underline">help.subveris@gmail.com</a>.
               </p>
             </div>

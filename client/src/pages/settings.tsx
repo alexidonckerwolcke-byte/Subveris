@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { CurrencySelector } from '@/components/currency-selector';
 import { useState, useRef, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 
@@ -75,7 +76,7 @@ export default function Settings() {
       const token = localStorage.getItem('supabase.auth.token');
       const accessToken = token ? JSON.parse(token).access_token : null;
 
-      const response = await fetch("/api/account/export", {
+      const response = await apiFetch("/api/account/export", {
         headers: accessToken ? { "Authorization": `Bearer ${accessToken}` } : {},
       });
       if (!response.ok) throw new Error("Failed to export");

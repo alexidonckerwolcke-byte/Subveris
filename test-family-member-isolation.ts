@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'crypto';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -16,10 +17,10 @@ async function generateToken(userId: string): Promise<string> {
 async function testFamilyMemberIsolation() {
   console.log('\n🧪 Testing Family Member Data Isolation...\n');
 
-  // Create test users
-  const ownerId = 'owner-' + Date.now();
-  const memberId = 'member-' + Date.now();
-  const otherMemberId = 'other-member-' + Date.now();
+  // Create test users with valid UUIDs
+  const ownerId = randomUUID();
+  const memberId = randomUUID();
+  const otherMemberId = randomUUID();
 
   console.log('📝 Creating test users:');
   console.log(`  Owner ID: ${ownerId}`);

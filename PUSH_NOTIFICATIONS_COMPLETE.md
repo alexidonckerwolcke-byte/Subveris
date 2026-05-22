@@ -148,7 +148,7 @@ const result = await sendBatchPushNotifications(
   },
   process.env.VAPID_PRIVATE_KEY!,
   process.env.VAPID_PUBLIC_KEY!,
-  'support@subveris.com'
+  'help.subveris@gmail.com'
 );
 
 console.log(`Sent to ${result.successful} users, ${result.failed} failed`);

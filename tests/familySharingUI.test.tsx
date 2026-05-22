@@ -4,7 +4,7 @@
  */
 
 import '@testing-library/jest-dom';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // create a map that our mocked useQuery will read from
@@ -145,6 +145,10 @@ describe('FamilySharing UI', () => {
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Shared' })
     );
+
+    // close the dialog so the main sharing UI is visible again
+    const cancelButton = screen.getByRole('button', { name: /Cancel/i });
+    fireEvent.click(cancelButton);
 
     // now pretend the server tells us sub2 is shared as well
     mockQueryData[JSON.stringify(['/api/family-groups', 'g1', 'family-data'])] = {

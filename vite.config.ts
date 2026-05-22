@@ -1,7 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "tailwindcss";
+import autoprefixer from "autoprefixer";
 import path, { dirname } from "path";
+import { copyFile } from "fs/promises";
 import { fileURLToPath } from "url";
+import type { Source, Input } from "postcss";
 // import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 // __dirname replacement for ESM
@@ -13,9 +17,18 @@ const clientRoot = path.resolve(workspaceRoot, "client");
 const srcRoot = path.resolve(clientRoot, "src");
 
 export default defineConfig({
-  logLevel: 'error',
+  logLevel: 'info',
   plugins: [
     react(),
+    {
+      name: "vite-github-pages-404",
+      closeBundle: async () => {
+        const outDir = path.resolve(workspaceRoot, "dist/public");
+        const indexPath = path.join(outDir, "index.html");
+        const fallbackPath = path.join(outDir, "404.html");
+        await copyFile(indexPath, fallbackPath);
+      },
+    },
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -28,6 +41,7 @@ export default defineConfig({
         ]
       : []),
   ],
+  envDir: workspaceRoot,
   resolve: {
     alias: {
       // pin React to workspace-installed versions (important when running from client subfolder)
@@ -41,34 +55,81 @@ export default defineConfig({
     },
   },
   root: clientRoot,
+  css: {
+    postcss: {
+      plugins: [
+        tailwindcss(),
+        autoprefixer(),
+        {
+          postcssPlugin: 'vite-fix-postcss-source',
+          Once(root) {
+            const fallbackFile = path.resolve(workspaceRoot, 'src/unknown.css');
+            if (!root.source?.input?.file) {
+              root.source = { input: { file: fallbackFile } } as Source;
+            }
+            root.walkDecls((decl) => {
+              if (!decl.source?.input?.file) {
+                decl.source = { input: { file: fallbackFile } } as Source;
+              }
+            });
+          },
+        },
+      ],
+    },
+  },
   build: {
     outDir: path.resolve(workspaceRoot, "dist/public"),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 2000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('@tanstack/react-query') || id.includes('recharts') || id.includes('date-fns') || id.includes('stripe') || id.includes('lucide-react')) {
+              return 'vendor-ui';
+            }
+            return 'vendor';
+          }
+        },
+      },
+      onwarn(warning, warn) {
+        if (typeof warning.message === 'string' && warning.message.includes('A PostCSS plugin did not pass the `from` option to `postcss.parse`.')) {
+          return;
+        }
+        warn(warning);
+      },
+    },
   },
   server: {
     host: true,
+    port: 5173,
     fs: {
       strict: true,
       deny: ["**/.*"],
     },
-    hmr: {
-      host: "localhost",
-      port: 5173,
-    },
     proxy: {
       "/api": {
-        target: "http://localhost:5000",
+        target: "http://127.0.0.1:5000",
         changeOrigin: true,
-      },
-      "/auth": {
-        target: "http://localhost:5000",
-        changeOrigin: true,
-        bypass: (req) => {
-          if (req.url?.startsWith('/auth/callback')) {
-            return req.url;
-          }
+        rewrite: (path) => path,
+        secure: false,
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // Forward all headers including Authorization
+            Object.keys(req.headers).forEach(key => {
+              if (key !== 'host' && key !== 'origin') {
+                const headerValue = req.headers[key];
+                proxyReq.setHeader(key, headerValue as string | number | readonly string[]);
+              }
+            });
+          });
         },
       },
+    },
+    hmr: {
+      protocol: "ws",
+      host: "localhost",
+      port: 5173,
     },
   }
 });

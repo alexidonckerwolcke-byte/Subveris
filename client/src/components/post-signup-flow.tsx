@@ -57,7 +57,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
     {
       name: 'Family',
       tier: 'family' as const,
-      price: "24,99 €",
+      price: "14,99 €",
       period: '/month',
       description: 'Share with your family and save together',
       features: [
@@ -73,6 +73,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
     if (tier === 'premium' || tier === 'family') {
       // Store selection and redirect after closing
       localStorage.setItem('postSignupPlan', tier);
+      localStorage.setItem('postSignupFlowCompleted', 'true');
       onClose();
       // Redirect after a brief delay to allow modal to close
       setTimeout(() => {
@@ -90,6 +91,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
   };
 
   const handle2FADecision = (setup: boolean) => {
+    localStorage.setItem('postSignupFlowCompleted', 'true');
     if (setup) {
       // Store that user wants to set up 2FA and redirect after closing
       localStorage.setItem('postSignupSetup2FA', 'true');

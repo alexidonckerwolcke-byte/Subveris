@@ -1,34 +1,6 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import * as legacy from '../server-legacy/supabase.ts';
 
-let supabaseClient: SupabaseClient | null = null;
+export const getSupabaseClient = legacy.getSupabaseClient;
+export const supabase = legacy.supabase;
 
-export function getSupabaseClient(): SupabaseClient {
-  if (supabaseClient) {
-    return supabaseClient;
-  }
-
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
-  }
-
-  supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  });
-
-  return supabaseClient;
-}
-
-export const supabase = {
-  get client() {
-    return getSupabaseClient();
-  },
-  from(table: string) {
-    return getSupabaseClient().from(table);
-  }
-};
+export default legacy;

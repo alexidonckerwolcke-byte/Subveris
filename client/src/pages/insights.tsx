@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,12 +23,17 @@ import type {
   CostPerUseAnalysis,
   Insight,
 } from "@shared/schema";
+import { useAuth } from "@/lib/auth-context";
 import { useCurrency } from "@/lib/currency-context";
-import { dedupeByKey, calculateMonthlyCost } from "@/lib/utils";
+import { dedupeByKey, calculateMonthlyCost, generateOpportunityCosts } from "@/lib/utils";
+import { generateRecommendationsFromSubscriptions } from "@/lib/recommendations";
+import { getVisibleFamilySubscriptions } from "@/lib/family-data";
+import { computeCostPerUseFromSubs } from "@/lib/cost-analysis";
 
 export default function Insights() {
-  const { formatAmount } = useCurrency();
+  const { formatAmount, convertAmount, currency: displayCurrency } = useCurrency();
   const { limits, tier } = useSubscription();
+  const { user } = useAuth();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
 
   const [refreshingRecommendations, setRefreshingRecommendations] = useState(false);
@@ -49,30 +54,30 @@ export default function Insights() {
     enabled: !!familyGroupId,
   });
 
+  const familySubscriptions = useMemo(() => getVisibleFamilySubscriptions(familyData, user?.id), [familyData, user?.id]);
+
   const recommendationsRaw = showFamilyData
     ? (familyData?.recommendations && familyData.recommendations.length
         ? familyData.recommendations
-        : computeRecommendationsFromSubs([...(familyData?.subscriptions || []), ...(familyData?.sharedSubscriptions?.map((s:any)=>(s.subscription || s)) || [])])
+        : generateRecommendationsFromSubscriptions(familySubscriptions)
       )
     : (personalRecommendations && personalRecommendations.length
         ? personalRecommendations
-        : computeRecommendationsFromSubs(personalSubscriptions || [])
+        : generateRecommendationsFromSubscriptions(personalSubscriptions || [])
       );
-
   const personalSubscriptionCount = (personalSubscriptions || []).filter((s) => s && s.status !== 'deleted').length;
   const recommendations: AIRecommendation[] = dedupeByKey(recommendationsRaw, "subscriptionId") as AIRecommendation[];
   const recsLoading = showFamilyData ? familyDataLoading : personalRecsLoading;
   const recsRefreshing = showFamilyData ? familyDataFetching : personalRecsFetching;
 
   const handleRefreshRecommendations = async () => {
-    console.log("[Insights] Refresh recommendations clicked", { showFamilyData, familyGroupId });
     setRefreshingRecommendations(true);
     try {
       if (showFamilyData && familyGroupId) {
         queryClient.removeQueries({ queryKey: ["/api/family-groups", familyGroupId, "family-data"], exact: true });
         queryClient.removeQueries({ queryKey: ["/api/subscriptions"], exact: true });
 
-        const familyDataResult = await queryClient.fetchQuery({
+        await queryClient.fetchQuery({
           queryKey: ["/api/family-groups", familyGroupId, "family-data"],
           queryFn: async () => {
             const res = await apiRequest("GET", `/api/family-groups/${familyGroupId}/family-data`);
@@ -80,9 +85,8 @@ export default function Insights() {
           },
           staleTime: 0,
         });
-        console.log("[Insights] family-data refreshed", familyDataResult);
 
-        const subscriptionsResult = await queryClient.fetchQuery({
+        await queryClient.fetchQuery({
           queryKey: ["/api/subscriptions"],
           queryFn: async () => {
             const res = await apiRequest("GET", "/api/subscriptions");
@@ -90,14 +94,13 @@ export default function Insights() {
           },
           staleTime: 0,
         });
-        console.log("[Insights] subscriptions refreshed", subscriptionsResult);
 
         await refetchFamilyData?.();
       } else {
         queryClient.removeQueries({ queryKey: ["/api/recommendations"], exact: true });
         queryClient.removeQueries({ queryKey: ["/api/subscriptions"], exact: true });
 
-        const recommendationsResult = await queryClient.fetchQuery({
+        await queryClient.fetchQuery({
           queryKey: ["/api/recommendations"],
           queryFn: async () => {
             const res = await apiRequest("GET", "/api/recommendations");
@@ -105,9 +108,8 @@ export default function Insights() {
           },
           staleTime: 0,
         });
-        console.log("[Insights] recommendations refreshed", recommendationsResult);
 
-        const subscriptionsResult = await queryClient.fetchQuery({
+        await queryClient.fetchQuery({
           queryKey: ["/api/subscriptions"],
           queryFn: async () => {
             const res = await apiRequest("GET", "/api/subscriptions");
@@ -115,7 +117,6 @@ export default function Insights() {
           },
           staleTime: 0,
         });
-        console.log("[Insights] subscriptions refreshed", subscriptionsResult);
 
         await refetchRecs?.();
       }
@@ -125,46 +126,6 @@ export default function Insights() {
       setRefreshingRecommendations(false);
     }
   };
-
-  function computeRecommendationsFromSubs(subs: any[] | undefined) {
-    if (!subs || subs.length === 0) return [];
-    const recommendations: any[] = [];
-    const actionableSubs = subs.filter(s => s && (s.status === 'unused' || s.status === 'to-cancel'));
-
-    const adobeSub = actionableSubs.find(s => s.name && s.name.toLowerCase().includes('adobe'));
-    if (adobeSub) {
-      recommendations.push({
-        id: (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : `rec-${Date.now()}`,
-        type: 'alternative',
-        title: 'Switch from Adobe to Affinity',
-        description: 'Affinity offers similar professional design tools with a one-time purchase instead of monthly fees.',
-        currentCost: adobeSub.amount,
-        suggestedCost: 0,
-        savings: adobeSub.amount || 0,
-        subscriptionId: adobeSub.id,
-        confidence: 0.85,
-        currency: adobeSub.currency || 'USD',
-      });
-    }
-
-    const unusedSubs = actionableSubs.filter(s => s.status === 'unused');
-    for (const sub of unusedSubs) {
-      recommendations.push({
-        id: (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : `rec-${Date.now()}-${Math.random()}`,
-        type: 'cancel',
-        title: `Cancel ${sub.name}`,
-        description: `You've barely used ${sub.name} this month. Consider cancelling to save money.`,
-        currentCost: sub.amount,
-        suggestedCost: 0,
-        savings: sub.amount || 0,
-        subscriptionId: sub.id,
-        confidence: 0.92,
-        currency: sub.currency || 'USD',
-      });
-    }
-
-    return recommendations;
-  }
 
   // Personal behavioral insights
   const { data: personalMetrics, isLoading: personalMetricsLoading } = useQuery<any>({
@@ -179,6 +140,18 @@ export default function Insights() {
     refetchOnWindowFocus: true,
   });
 
+  // Family behavioral insights
+  const { data: familyBehavioralInsights, isLoading: familyBehavioralLoading } = useQuery<OpportunityCost[]>({
+    queryKey: ["/api/insights/behavioral", "family", familyGroupId],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/insights/behavioral?family=true");
+      return res.json();
+    },
+    enabled: showFamilyData && !!familyGroupId,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+
   function computeBehavioralFromSubs(subs: any[] | undefined) {
     if (!subs || subs.length === 0) return [];
     // Strictly filter only unused and to-cancel, never active
@@ -188,55 +161,41 @@ export default function Insights() {
         (s.subStatus === 'unused' || s.subStatus === 'to-cancel')
       ))
       .map(sub => {
-        const monthlyAmount = sub.frequency === 'yearly' ? sub.amount / 12 : sub.frequency === 'quarterly' ? sub.amount / 3 : sub.frequency === 'weekly' ? sub.amount * 4 : sub.amount;
-        const items = [
-          { item: 'coffee drinks', unitCost: 5, icon: 'coffee' },
-          { item: 'movie tickets', unitCost: 15, icon: 'film' },
-          { item: 'lunch meals', unitCost: 12, icon: 'utensils' }
-        ];
-        const equivalents = items
-          .map(e => ({
-            item: e.item,
-            count: Math.floor(monthlyAmount / e.unitCost),
-            icon: e.icon,
-            totalCost: Math.floor(monthlyAmount / e.unitCost) * e.unitCost
-          }))
-          .filter(e => e.count >= 1)
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 1);
+        const rawMonthlyAmount = calculateMonthlyCost(sub.amount || 0, sub.frequency || 'monthly');
+        const monthlyAmount = Math.round(convertAmount(rawMonthlyAmount, (sub.currency || 'USD') as any, displayCurrency) * 100) / 100;
+        const equivalents = generateOpportunityCosts(monthlyAmount, displayCurrency);
 
         return {
           subscriptionId: sub.id,
           subscriptionName: sub.name,
-          monthlyAmount: Math.round(monthlyAmount * 100) / 100,
+          monthlyAmount,
+          currency: displayCurrency,
           equivalents,
         };
       });
   }
 
   const computedFamilyBehavioral = showFamilyData ? computeBehavioralFromSubs(familyData?.subscriptions || []) : [];
-  const filteredFamilyBehavioral = (familyData?.behavioralInsights || []).filter((i: any) => i.subscriptionId && i.monthlyAmount && i.equivalents && i.subStatus ? (i.subStatus === 'unused' || i.subStatus === 'to-cancel') : true);
-    const hasActionableFamilyBehavioral = filteredFamilyBehavioral.length > 0;
-    const behavioralInsights = showFamilyData
-      ? (hasActionableFamilyBehavioral
-          ? filteredFamilyBehavioral
-          : computedFamilyBehavioral)
-      : (
-          (personalBehavioralInsights || []).filter((i: any) =>
-            i && (
-              (i.subStatus === 'unused' || i.subStatus === 'to-cancel') ||
-              (i.status === 'unused' || i.status === 'to-cancel')
-            )
-          ).length > 0
-            ? (personalBehavioralInsights || []).filter((i: any) =>
-                i && (
-                  (i.subStatus === 'unused' || i.subStatus === 'to-cancel') ||
-                  (i.status === 'unused' || i.status === 'to-cancel')
-                )
+  const behavioralInsights = showFamilyData
+    ? ((familyBehavioralInsights && familyBehavioralInsights.length > (computedFamilyBehavioral.length || 0))
+        ? familyBehavioralInsights
+        : computedFamilyBehavioral)
+    : (
+        (personalBehavioralInsights || []).filter((i: any) =>
+          i && (
+            (i.subStatus === 'unused' || i.subStatus === 'to-cancel') ||
+            (i.status === 'unused' || i.status === 'to-cancel')
+          )
+        ).length > 0
+          ? (personalBehavioralInsights || []).filter((i: any) =>
+              i && (
+                (i.subStatus === 'unused' || i.subStatus === 'to-cancel') ||
+                (i.status === 'unused' || i.status === 'to-cancel')
               )
-            : computeBehavioralFromSubs(personalSubscriptions || [])
-        );
-  const behavioralLoading = showFamilyData ? familyDataLoading : personalBehavioralLoading;
+            )
+          : computeBehavioralFromSubs(personalSubscriptions || [])
+      );
+  const behavioralLoading = showFamilyData ? familyBehavioralLoading : personalBehavioralLoading;
 
   // Personal cost analysis
   const { data: personalCostAnalysis, isLoading: personalAnalysisLoading } = useQuery<CostPerUseAnalysis[]>({
@@ -258,48 +217,23 @@ export default function Insights() {
 
   const analysisLoading = showFamilyData ? familyAnalysisLoading : personalAnalysisLoading;
 
-  function computeCostPerUseFromSubs(subs: any[] | undefined) {
-    if (!subs || subs.length === 0) return [];
-    return subs
-      .filter(s => s && s.status !== 'deleted')
-      .map((sub) => {
-        const monthlyAmount = sub.frequency === 'yearly' ? sub.amount / 12 : sub.frequency === 'quarterly' ? sub.amount / 3 : sub.frequency === 'weekly' ? sub.amount * 4 : sub.amount;
-        // unify field names from different sources
-        const usageCount = (sub.usage_count ?? sub.usageCount ?? 0) as number;
-        const costPerUse = usageCount > 0 ? monthlyAmount / usageCount : monthlyAmount;
-        // Determine value rating based on both usage count and cost per use
-        let valueRating: 'excellent' | 'good' | 'fair' | 'poor';
-        if (usageCount <= 1) {
-          // No usage or single use means poor value
-          valueRating = 'poor';
-        } else if (usageCount <= 3) {
-          // With limited uses (2-3), be conservative - max out at fair
-          valueRating = costPerUse <= 10 ? 'fair' : 'poor';
-        } else {
-          // With good usage (4+), apply normal rating thresholds
-          valueRating = costPerUse > 20 ? 'poor' : costPerUse > 10 ? 'fair' : 'good';
-        }
-        return {
-          subscriptionId: sub.id,
-          name: sub.name,
-          monthlyAmount: Math.round(monthlyAmount * 100) / 100,
-          usageCount,
-          costPerUse: Math.round(costPerUse * 100) / 100,
-          valueRating,
-          currency: sub.currency || 'USD',
-        } as CostPerUseAnalysis;
-      });
-  }
-
-  const computedFamilyCostAnalysis = showFamilyData ? computeCostPerUseFromSubs(familyData?.subscriptions || []) : [];
+  const computedFamilyCostAnalysis = showFamilyData ? computeCostPerUseFromSubs(familySubscriptions) : [];
 
   function buildPerMemberAnalyses() {
     if (!showFamilyData || !familyData?.members || familyData.members.length === 0) return [];
-    const subs = familyData?.subscriptions || [];
+    const subs = familySubscriptions || [];
     const perMember: any[] = [];
     for (const m of familyData.members) {
-      const memberName = m.displayName || m.email || m.userId || 'Member';
-      const memberSubs = subs.filter((s: any) => s && (s.user_id === m.userId || s.userId === m.userId || s.owner_id === m.userId));
+      // If the member record lacks any identifying fields, skip creating
+      // a per-member analysis label (fall back to base analysis instead).
+      if (!m) continue;
+      const hasIdentity = Boolean(m.displayName || m.email || m.userId || m.user_id);
+      if (!hasIdentity) continue;
+
+      const memberName = m.displayName || m.email || m.userId || m.user_id || 'Member';
+      const memberId = m.userId ?? m.user_id;
+      const memberSubs = subs.filter((s: any) => s && (s.user_id === memberId || s.userId === memberId || s.owner_id === memberId));
+      if (!memberSubs || memberSubs.length === 0) continue;
       const analyses = computeCostPerUseFromSubs(memberSubs || []).map((a: any) => ({ ...a, name: `${memberName} — ${a.name}` }));
       perMember.push(...analyses);
     }
@@ -307,9 +241,17 @@ export default function Insights() {
   }
 
   const perMemberAnalyses = buildPerMemberAnalyses();
-  const baseAnalysis = showFamilyData ? (familyCostAnalysis && familyCostAnalysis.length ? familyCostAnalysis : computedFamilyCostAnalysis) : personalCostAnalysis;
+  const baseAnalysis = showFamilyData
+    ? ((familyData?.isOwner && familyCostAnalysis && familyCostAnalysis.length)
+        ? familyCostAnalysis
+        : computedFamilyCostAnalysis)
+    : personalCostAnalysis;
+  // Prefer server/base analysis entries (which contain canonical subscription names)
+  // and only use per-member prefixed analyses as a fallback so we don't label
+  // owner or shared subscriptions as "Member" unless the member-specific
+  // analysis is actually the authoritative one.
   const costAnalysis: CostPerUseAnalysis[] | undefined = showFamilyData
-    ? (dedupeByKey([...perMemberAnalyses, ...(baseAnalysis || [])], 'subscriptionId') as CostPerUseAnalysis[])
+    ? (dedupeByKey([...(baseAnalysis || []), ...perMemberAnalyses], 'subscriptionId') as CostPerUseAnalysis[])
     : baseAnalysis;
   const displayCostAnalysis = !showFamilyData && tier === "free"
     ? (costAnalysis?.slice(0, limits.maxCostPerUseSubscriptions) ?? [])
@@ -458,6 +400,7 @@ export default function Insights() {
           isLoading={recsLoading}
           onRefresh={handleRefreshRecommendations}
           isRefreshing={refreshingRecommendations || recsRefreshing}
+          expandable={true}
         />
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -473,7 +416,13 @@ export default function Insights() {
             <PremiumGate feature="Cost-per-use analytics" showBlurred={false} />
           )}
           {limits.hasBehavioralInsights ? (
-            <BehavioralInsights insights={behavioralInsights} isLoading={behavioralLoading} />
+            <BehavioralInsights 
+              insights={behavioralInsights} 
+              isLoading={behavioralLoading}
+              familyMembers={familyData?.members}
+              currentUserId={familyData?.currentUserId}
+              showMemberLabels={showFamilyData}
+            />
           ) : (
             <PremiumGate feature="Behavioral insights" showBlurred={false} />
           )}

@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react';
 import type { CalendarEvent, Subscription } from '@shared/schema';
 import { useCurrency, type Currency } from '@/lib/currency-context';
-import { dedupeById } from '@/lib/utils';
+import { advanceDateByFrequency, dedupeById, formatDate, parseDateOnlyLocal } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+
+function formatDateLocal(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
 interface SubscriptionCalendarProps {
   subscriptions?: Subscription[];
@@ -35,7 +39,7 @@ export function SubscriptionCalendar({
   onRenewalDateChange,
 }: SubscriptionCalendarProps) {
   const { formatAmount } = useCurrency();
-  const [currentDate, setCurrentDate] = useState(initialDate ? new Date(initialDate) : new Date());
+  const [currentDate, setCurrentDate] = useState(parseDateOnlyLocal(initialDate) ?? new Date());
   const [monthView, setMonthView] = useState<CalendarEvent[][]>([]);
   const [editingEvent, setEditingEvent] = useState<{ event: CalendarEvent; subscription: Subscription } | null>(null);
   const [newDate, setNewDate] = useState('');
@@ -77,7 +81,7 @@ export function SubscriptionCalendar({
     let currentGrid: CalendarEvent[] = [];
 
     for (let i = 0; i < 42; i++) {
-      const dateStr = startDate.toISOString().split('T')[0];
+      const dateStr = formatDateLocal(startDate);
       const dayEvents = eventMap.get(dateStr) || [];
       currentGrid.push(...dayEvents);
 
@@ -113,25 +117,15 @@ export function SubscriptionCalendar({
       const subscription = subscriptions.find(s => s.id === subscriptionId);
       if (subscription) {
         // Auto-advance renewal date if it's in the past
-        let renewalDate = new Date(event.eventDate);
-        const today = new Date();
+        let renewalDate = parseDateOnlyLocal(event.eventDate) ?? parseDateOnlyLocal(new Date()) ?? new Date(event.eventDate);
+        const today = parseDateOnlyLocal(new Date()) ?? new Date();
         if (event.eventType === 'renewal' && renewalDate < today) {
-          // Advance renewal date based on frequency
-          const freq = subscription.frequency;
           while (renewalDate < today) {
-            if (freq === 'monthly') {
-              renewalDate.setMonth(renewalDate.getMonth() + 1);
-            } else if (freq === 'yearly') {
-              renewalDate.setFullYear(renewalDate.getFullYear() + 1);
-            } else if (freq === 'weekly') {
-              renewalDate.setDate(renewalDate.getDate() + 7);
-            } else if (freq === 'quarterly') {
-              renewalDate.setMonth(renewalDate.getMonth() + 3);
-            }
+            renewalDate = advanceDateByFrequency(renewalDate, subscription.frequency || 'monthly');
           }
         }
         setEditingEvent({ event, subscription });
-        setNewDate(renewalDate.toISOString().split('T')[0]);
+        setNewDate(formatDateLocal(renewalDate));
       }
     }
   };
@@ -147,13 +141,13 @@ export function SubscriptionCalendar({
   const getEventColor = (eventType: string) => {
     switch (eventType) {
       case 'renewal':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-chart-2/10 text-chart-2';
       case 'trial_end':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-chart-4/10 text-chart-4';
       case 'custom':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted/20 text-foreground';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted/20 text-foreground';
     }
   };
 
@@ -232,11 +226,11 @@ export function SubscriptionCalendar({
       <CardContent>
         <div className="space-y-4">
           {/* Calendar Grid */}
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border rounded-lg overflow-hidden border-border">
             {/* Day headers */}
-            <div className="grid grid-cols-7 gap-0 bg-gray-50">
+            <div className="grid grid-cols-7 gap-0 bg-muted/30">
               {daysOfWeek.map((day) => (
-                <div key={day} className="p-2 text-center text-xs font-semibold text-gray-600 border-r border-b last:border-r-0">
+                <div key={day} className="p-2 text-center text-xs font-semibold text-muted-foreground border-r border-b border-border last:border-r-0">
                   {day}
                 </div>
               ))}
@@ -257,13 +251,13 @@ export function SubscriptionCalendar({
                   return (
                     <div
                       key={`${weekIdx}-${dayIdx}`}
-                      className={`min-h-24 p-2 border-r border-b last:border-r-0 ${
-                        isCurrentMonth ? 'bg-white' : 'bg-gray-50'
-                      } ${isToday ? 'bg-blue-50' : ''}`}
+                      className={`min-h-24 p-2 border-r border-b border-border last:border-r-0 ${
+                        isCurrentMonth ? 'bg-background' : 'bg-muted/5'
+                      } ${isToday ? 'bg-chart-2/5' : ''}`}
                     >
                       {isCurrentMonth && (
                         <div className="space-y-1">
-                          <div className={`text-xs font-semibold ${isToday ? 'text-blue-600' : 'text-gray-600'}`}> 
+                          <div className={`text-xs font-semibold ${isToday ? 'text-foreground' : 'text-muted-foreground'}`}> 
                             {dayOfMonth}
                           </div>
                           {dayEvents && dayEvents.length > 0 && (
@@ -278,7 +272,7 @@ export function SubscriptionCalendar({
                                     {event.title}
                                   </Badge>
                                   {event.amount && (
-                                    <div className="text-xs text-gray-600 mt-0.5">
+                                    <div className="text-xs text-muted-foreground mt-0.5">
                                       {formatAmount(event.amount, subscriptions?.find(s => s.id === event.subscriptionId)?.currency as Currency)}
                                     </div>
                                   )}
@@ -313,29 +307,33 @@ export function SubscriptionCalendar({
             <h3 className="text-sm font-semibold">Upcoming Events</h3>
             <div className="space-y-2 max-h-48 overflow-y-auto">
                 {dedupeById(calendarEvents).length === 0 ? (
-                <p className="text-sm text-gray-500">No events scheduled</p>
+                <p className="text-sm text-muted-foreground">No events scheduled</p>
               ) : (
                   dedupeById(calendarEvents)
-                  .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())
+                  .sort((a, b) => {
+                    const aDate = parseDateOnlyLocal(a.eventDate) ?? new Date(a.eventDate);
+                    const bDate = parseDateOnlyLocal(b.eventDate) ?? new Date(b.eventDate);
+                    return aDate.getTime() - bDate.getTime();
+                  })
                   .slice(0, 5)
                   .map((event) => {
                     const subscription = subscriptions.find((s) => s.id === event.subscriptionId);
                     return (
-                      <div key={event.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded border text-sm">
+                      <div key={event.id} className="flex items-center justify-between p-2 bg-muted/5 rounded border border-border text-sm">
                         <div>
-                          <div className="font-medium text-gray-900 dark:text-white">{event.title}</div>
-                          <div className="text-xs text-gray-600 dark:text-gray-300">
-                            {new Date(event.eventDate).toLocaleDateString()} • <span className="font-semibold text-gray-800 dark:text-blue-200">{subscription?.name}</span>
+                          <div className="font-medium text-foreground">{event.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(event.eventDate)} • <span className="font-semibold text-foreground">{subscription?.name}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {event.amount && <span className="font-medium text-gray-900 dark:text-blue-200">{formatAmount(event.amount, subscription?.currency as Currency)}</span>}
+                          {event.amount && <span className="font-medium text-foreground">{formatAmount(event.amount, subscription?.currency as Currency)}</span>}
                           {event.eventType === 'renewal' && (
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleEditRenewalDate(event)}
-                              className="h-6 w-6 p-0 text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/40"
+                              className="h-6 w-6 p-0 text-foreground hover:bg-muted"
                             >
                               <Edit2 className="h-4 w-4" />
                             </Button>
@@ -380,7 +378,7 @@ export function SubscriptionCalendar({
               />
             </div>
             {editingEvent && (
-              <div className="text-sm text-gray-600 dark:text-gray-200">
+              <div className="text-sm text-muted-foreground">
                 <p>Amount: {formatAmount(editingEvent.event.amount || editingEvent.subscription.amount, editingEvent.subscription.currency as Currency)}</p>
                 <p>Billing Frequency: {editingEvent.subscription.frequency}</p>
               </div>
