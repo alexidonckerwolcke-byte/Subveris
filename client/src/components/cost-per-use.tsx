@@ -3,8 +3,9 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, TrendingDown, Minus, Lock, Sparkles } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Lock, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "wouter";
+import { useState } from "react";
 import type { CostPerUseAnalysis } from "@shared/schema";
 import { getValueRatingColor, dedupeByKey } from "@/lib/utils";
 import { useCurrency, type Currency } from "@/lib/currency-context";
@@ -19,6 +20,8 @@ interface CostPerUseProps {
 
 export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, totalSubscriptions = 0, maxAllowed = 2 }: CostPerUseProps) {
   const { formatAmount } = useCurrency();
+  const [isExpanded, setIsExpanded] = useState(false);
+
   if (isLoading) {
     return (
       <Card>
@@ -45,7 +48,7 @@ export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, tot
       fair: { label: "Fair Value", className: "bg-chart-4/10 text-chart-4" },
       poor: { label: "Poor Value", className: "bg-chart-5/10 text-chart-5" },
     };
-    return config[rating];
+    return config[rating] || { label: "Unknown", className: "bg-muted/10 text-muted-foreground" };
   };
 
   // Strip any leading uuid-like token from a name string (e.g. "3c2085b7-... - Netflix")
@@ -76,21 +79,28 @@ export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, tot
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+        <CardTitle className="text-lg font-semibold">
           Cost Per Use Analysis
-          <Badge variant="secondary" className="text-xs font-normal">
+          <Badge variant="secondary" className="text-xs font-normal ml-3">
             Value Score
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-5">
-          {dedupeByKey(analyses, 'subscriptionId').map((analysis) => {
+          {dedupeByKey(analyses, 'subscriptionId')
+            .slice(0, isExpanded ? undefined : 3)
+            .map((analysis) => {
             const ratingConfig = getRatingBadge(analysis.valueRating);
             const usageCount = Number(analysis.usageCount || 0);
             const percent = getProgressPercentByUsage(usageCount);
             const progressColor = getProgressColorByUsage(usageCount);
-            const displayName = stripUuidPrefix(analysis.name || "");
+            let displayName = stripUuidPrefix(analysis.name || "");
+            // If the analysis name includes a member prefix like "Member — Service",
+            // prefer the last segment (the actual subscription name) so cards don't
+            // show a generic "Member" label for every entry when family data is enabled.
+            const nameParts = displayName.split(/\s*[—–-]\s*/);
+            if (nameParts.length > 1) displayName = nameParts[nameParts.length - 1].trim();
             return (
               <div
                 key={analysis.subscriptionId}
@@ -154,6 +164,23 @@ export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, tot
                 </Button>
               </Link>
             </div>
+          </div>
+        )}
+        {analyses && analyses.length > 3 && (
+          <div className="mt-4 border-t border-border pt-4">
+            <Button className="w-full" variant="outline" onClick={() => setIsExpanded(!isExpanded)}>
+              {isExpanded ? (
+                <>
+                  <ChevronUp className="h-4 w-4 mr-2" />
+                  Show Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4 mr-2" />
+                  Show All {analyses.length} Items
+                </>
+              )}
+            </Button>
           </div>
         )}
       </CardContent>

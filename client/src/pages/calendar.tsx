@@ -3,19 +3,22 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
 import type { Subscription, CalendarEvent } from "@shared/schema";
 import { useMemo, useEffect } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { apiFetch } from "@/lib/api";
 import { apiRequest } from "@/lib/queryClient";
-import { dedupeById } from "@/lib/utils";
+import { getVisibleFamilySubscriptions } from "@/lib/family-data";
+import { advanceDateByFrequency, dedupeById, formatDateLocal, parseDateOnlyLocal } from "@/lib/utils";
 
 export default function Calendar() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
 
   // Personal subscriptions (always load)
   const { data: personalSubscriptions = [] } = useQuery<Subscription[]>({
     queryKey: ["/api/subscriptions"],
     queryFn: async () => {
-      const token = JSON.parse(localStorage.getItem("supabase.auth.token") || "{}").access_token;
-      const res = await fetch("/api/subscriptions", { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+      const res = await apiFetch("/api/subscriptions");
       if (!res.ok) throw new Error("Failed to fetch subscriptions");
       return res.json();
     },
@@ -27,18 +30,11 @@ export default function Calendar() {
     enabled: !!familyGroupId,
   });
 
-  // Build the subscriptions list. For family mode include both `subscriptions` and
-  // any `sharedSubscriptions` mapped to their actual `subscription` objects
+  // Build the subscriptions list. For family mode include only visible family
+  // subscriptions for the current user.
   let subscriptions: Subscription[] = personalSubscriptions;
   if (showFamilyData && familyData) {
-    const familySubs: Subscription[] = familyData.subscriptions || [];
-    // Some family-data responses include `sharedSubscriptions` entries that contain
-    // a `subscription` field (added by the server). Map those into the list.
-    const sharedFromMembers: Subscription[] = (familyData.sharedSubscriptions || [])
-      .map((s: any) => s.subscription)
-      .filter(Boolean);
-
-    subscriptions = [...familySubs, ...sharedFromMembers];
+    subscriptions = getVisibleFamilySubscriptions(familyData, user?.id);
   }
 
   // Normalize subscription objects to ensure `nextBillingDate` is available
@@ -59,8 +55,7 @@ export default function Calendar() {
   const { data: personalCalendarEvents = [] } = useQuery<CalendarEvent[]>({
     queryKey: ["/api/calendar-events"],
     queryFn: async () => {
-      const token = JSON.parse(localStorage.getItem("supabase.auth.token") || "{}").access_token;
-      const res = await fetch("/api/calendar-events", { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+      const res = await apiFetch("/api/calendar-events");
       if (!res.ok) throw new Error("Failed to fetch calendar events");
       return res.json();
     },
@@ -70,8 +65,10 @@ export default function Calendar() {
 
   // Update renewal date for a subscription
   const updateRenewalDateMutation = useMutation({
-    mutationFn: async ({ subscriptionId, newDate }: { subscriptionId: string; newDate: string }) => {
-      const res = await apiRequest("PATCH", `/api/subscriptions/${subscriptionId}`, { nextBillingDate: newDate });
+    mutationFn: async ({ subscriptionId, newDate, autoAdvanced }: { subscriptionId: string; newDate: string; autoAdvanced?: boolean }) => {
+      const body: any = { nextBillingDate: newDate };
+      if (autoAdvanced) body.autoAdvanced = true;
+      const res = await apiRequest("PATCH", `/api/subscriptions/${subscriptionId}`, body);
       return res.json();
     },
     // Optimistic update so UI reflects change immediately
@@ -112,57 +109,50 @@ export default function Calendar() {
   useEffect(() => {
     if (!subscriptions || subscriptions.length === 0) return;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const advanceDate = (d: Date, freq: string) => {
-      const out = new Date(d);
-      if (freq === 'monthly') {
-        out.setMonth(out.getMonth() + 1);
-      } else if (freq === 'yearly') {
-        out.setFullYear(out.getFullYear() + 1);
-      } else if (freq === 'weekly') {
-        out.setDate(out.getDate() + 7);
-      } else if (freq === 'quarterly') {
-        out.setMonth(out.getMonth() + 3);
-      } else {
-        // default to monthly
-        out.setMonth(out.getMonth() + 1);
-      }
-      out.setHours(0,0,0,0);
-      return out;
-    };
+    const today = parseDateOnlyLocal(new Date());
+    if (!today) return;
 
     // Process PERSONAL subscriptions only for auto-advance (not family members')
     (async () => {
       const updates: Array<Promise<any>> = [];
       for (const sub of personalSubscriptions) {
         try {
-          console.debug('[calendar] checking subscription for auto-advance', { id: sub.id, name: sub.name, status: sub.status, nextBillingDate: sub.nextBillingDate, frequency: sub.frequency });
-          if (!sub.nextBillingDate) continue;
-          const raw = typeof sub.nextBillingDate === 'string' ? sub.nextBillingDate.split('T')[0] : new Date(sub.nextBillingDate).toISOString().split('T')[0];
-          let next = new Date(raw);
-          next.setHours(0,0,0,0);
+          // Normalize the billing date field (API returns next_billing_at or next_billing_date)
+          const billingDateField = sub.nextBillingDate;
+          console.debug('[calendar] checking subscription for auto-advance', { id: sub.id, name: sub.name, status: sub.status, nextBillingDate: billingDateField, frequency: sub.frequency });
+          if (!billingDateField) continue;
+          let next = parseDateOnlyLocal(billingDateField);
+          if (!next) continue;
+          const raw = typeof billingDateField === 'string' ? billingDateField.split('T')[0] : formatDateLocal(next);
 
           // Only consider active/unused subscriptions
           if (!(sub.status === 'active' || sub.status === 'unused')) continue;
 
           if (next < today) {
+            const renewalMonthStart = new Date(next.getFullYear(), next.getMonth(), 1);
+            const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+            // Preserve past dates inside the current month until month rollover.
+            // Only auto-advance once the renewal date belongs to a prior month.
+            if (renewalMonthStart.getTime() === currentMonthStart.getTime()) {
+              continue;
+            }
+
             // advance until next >= today
             let attempts = 0;
             while (next < today && attempts < 100) {
-              next = advanceDate(next, sub.frequency as string);
+              next = advanceDateByFrequency(next, sub.frequency as string);
               attempts++;
             }
 
             if (next >= today) {
-              const newDateStr = next.toISOString().split('T')[0];
+              const newDateStr = formatDateLocal(next);
               // only trigger if changed
               if (newDateStr !== raw) {
                 console.log('[calendar] auto-advancing', sub.id, raw, '->', newDateStr);
-                // Use mutateAsync so we can await and log result
+                // Use mutateAsync so we can await and log result. Mark as autoAdvanced
                 updates.push(
-                  updateRenewalDateMutation.mutateAsync({ subscriptionId: sub.id, newDate: newDateStr })
+                  updateRenewalDateMutation.mutateAsync({ subscriptionId: sub.id, newDate: newDateStr, autoAdvanced: true })
                     .then(res => {
                       console.log('[calendar] auto-advance success', sub.id, newDateStr, res);
                       return res;
@@ -230,7 +220,7 @@ export default function Calendar() {
           console.warn('[calendar] Invalid date for subscription', sub.id, sub.nextBillingDate);
           return acc;
         }
-        dateOnly = date.toISOString().split('T')[0];
+        dateOnly = formatDateLocal(date);
       }
 
       acc.push({
@@ -261,12 +251,12 @@ export default function Calendar() {
       mergedMap.set(key, arr);
     }
 
-    // Then add stored calendar events but avoid duplicating renewal events for same subscription
+    // Then add stored calendar events but avoid showing stale renewal events when
+    // we have a generated renewal event for the same subscription.
     for (const ev of calendarEvents) {
       if (ev.eventType === 'renewal' && ev.subscriptionId) {
-        // skip stored renewal events if we have a generated renewal for the same subscription
         const generated = renewalEvents.find(r => r.subscriptionId === ev.subscriptionId);
-        if (generated && generated.eventDate === ev.eventDate) continue;
+        if (generated) continue;
       }
       const key = ev.eventDate;
       const arr = mergedMap.get(key) || [];
@@ -286,11 +276,18 @@ export default function Calendar() {
 
   // Choose an initial calendar month that contains the next upcoming event
   const initialCalendarDate = useMemo(() => {
-    const today = new Date();
+    const today = parseDateOnlyLocal(new Date());
     const upcoming = [...calendarEventsWithRenewals]
       .map(e => ({ ...e, dateOnly: e.eventDate.includes('T') ? e.eventDate.split('T')[0] : e.eventDate }))
-      .filter(e => new Date(e.dateOnly) >= new Date(today.toISOString().split('T')[0]))
-      .sort((a, b) => new Date(a.dateOnly).getTime() - new Date(b.dateOnly).getTime())[0];
+      .filter(e => {
+        const date = parseDateOnlyLocal(e.dateOnly);
+        return date && today ? date >= today : false;
+      })
+      .sort((a, b) => {
+        const aDate = parseDateOnlyLocal(a.dateOnly);
+        const bDate = parseDateOnlyLocal(b.dateOnly);
+        return (aDate?.getTime() ?? 0) - (bDate?.getTime() ?? 0);
+      })[0];
 
     if (upcoming) return upcoming.dateOnly;
     return undefined;

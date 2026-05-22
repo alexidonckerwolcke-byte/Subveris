@@ -171,24 +171,32 @@
 
 @layer base {
   /* apply basic font and background styles globally */
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply font-sans antialiased text-foreground;
-    background: hsl(var(--background));
+    background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.12), transparent 28%),
+                hsl(var(--background));
     color: hsl(var(--foreground));
     min-height: 100vh;
+    background-attachment: fixed;
   }
   #root {
     min-height: 100vh;
     background: transparent;
   }
-  /* add subtle elevated card defaults */
+  /* premium glass-style container defaults */
   .card,
   .panel,
   .section {
-    border: 1px solid hsl(var(--border) / 0.25);
-    background: hsl(var(--card));
-    border-radius: 0.9rem;
-    box-shadow: 0 10px 30px hsl(217 20% 25% / 0.08);
+    border: 1px solid hsla(215, 18%, 75%, 0.18);
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(18px);
+    border-radius: 1.5rem;
+    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.09);
   }
   *,
   *::before,

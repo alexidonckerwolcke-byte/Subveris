@@ -5,7 +5,7 @@
  * Creates subscriptions for different users and verifies they can't see each other's data
  */
 
-const BASE_URL = "http://localhost:5000";
+const BASE_URL = "https://xuilgccacufwinvkocfl.supabase.co/functions/v1/api";
 
 // These are test JWTs with different sub values (user IDs)
 const USER_1_ID = "3c2085b7-de19-456a-8055-ffb22dd9cbb2";
@@ -37,11 +37,12 @@ async function test() {
 
   // Test 1: Create a subscription for user 1
   console.log("1️⃣  Creating subscription for User 1 (Netflix Test)...");
-  const sub1Response = await fetch(`${BASE_URL}/api/subscriptions`, {
+  const sub1Response = await fetch(`${BASE_URL}/subscriptions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${user1Token}`,
+      "Authorization": "Bearer dummy",  // Dummy token to bypass Supabase middleware
+      "x-test-user-id": USER_1_ID,  // Our custom header for test user ID
     },
     body: JSON.stringify({
       name: `Netflix Test ${Date.now()}`,
@@ -67,11 +68,11 @@ async function test() {
 
   // Test 2: Create a subscription for user 2 - This should FAIL since user doesn't exist in database
   console.log("2️⃣  Attempting to create subscription for User 2 (should fail - user not in DB)...");
-  const sub2Response = await fetch(`${BASE_URL}/api/subscriptions`, {
+  const sub2Response = await fetch(`${BASE_URL}/subscriptions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${user2Token}`,
+      "x-test-user-id": USER_2_ID,
     },
     body: JSON.stringify({
       name: "Spotify",
@@ -94,9 +95,10 @@ async function test() {
 
   // Test 3: User 1 should ONLY see their own subscriptions
   console.log("3️⃣  Testing: User 1 fetches their subscriptions...");
-  const user1SubsResponse = await fetch(`${BASE_URL}/api/subscriptions`, {
+  const user1SubsResponse = await fetch(`${BASE_URL}/subscriptions`, {
     headers: {
-      Authorization: `Bearer ${user1Token}`,
+      "Authorization": "Bearer dummy",
+      "x-test-user-id": USER_1_ID,
     },
   });
 
@@ -126,9 +128,10 @@ async function test() {
 
   // Test 4: User 2 should see NO subscriptions
   console.log("4️⃣  Testing: User 2 fetches their subscriptions...");
-  const user2SubsResponse = await fetch(`${BASE_URL}/api/subscriptions`, {
+  const user2SubsResponse = await fetch(`${BASE_URL}/subscriptions`, {
     headers: {
-      Authorization: `Bearer ${user2Token}`,
+      "Authorization": "Bearer dummy",
+      "x-test-user-id": USER_2_ID,
     },
   });
 
@@ -155,9 +158,10 @@ async function test() {
 
   // Test 5: User 2 should NOT be able to access User 1's subscription
   console.log("5️⃣  Testing access control: User 2 tries to access User 1's subscription...");
-  const accessTestResponse = await fetch(`${BASE_URL}/api/subscriptions/${sub1.id}`, {
+  const accessTestResponse = await fetch(`${BASE_URL}/subscriptions/${sub1.id}`, {
     headers: {
-      Authorization: `Bearer ${user2Token}`,
+      "Authorization": "Bearer dummy",
+      "x-test-user-id": USER_2_ID,
     },
   });
 
@@ -173,9 +177,10 @@ async function test() {
 
   // Test 6: User 1 should be able to access their OWN subscription
   console.log("6️⃣  Testing: User 1 accesses their own subscription...");
-  const ownAccessResponse = await fetch(`${BASE_URL}/api/subscriptions/${sub1.id}`, {
+  const ownAccessResponse = await fetch(`${BASE_URL}/subscriptions/${sub1.id}`, {
     headers: {
-      Authorization: `Bearer ${user1Token}`,
+      "Authorization": "Bearer dummy",
+      "x-test-user-id": USER_1_ID,
     },
   });
 

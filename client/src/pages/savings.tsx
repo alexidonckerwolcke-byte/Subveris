@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
+import { getVisibleFamilySubscriptions } from "@/lib/family-data";
 import {
   PiggyBank,
   TrendingUp,
@@ -26,8 +27,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { DashboardMetrics, MonthlySpending, Subscription } from "@shared/schema";
-import { useCurrency } from "@/lib/currency-context";
-import { calculateMonthlyCost } from "@/lib/utils";
+import { useCurrency, type Currency } from "@/lib/currency-context";
+import { calculateMonthlyCost, isSubscriptionBilledInMonth } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
  
 function isTimestampInCurrentMonth(timestamp?: string | null) {
@@ -50,8 +52,116 @@ function getSubscriptionDeletedTimestamp(sub: Subscription) {
   ) as string | null;
 }
 
+function isDeletedThisMonth(sub: Subscription) {
+  if (getSubscriptionStatus(sub) !== 'deleted') return false;
+  const ts = getSubscriptionDeletedTimestamp(sub);
+  if (ts) {
+    const date = new Date(ts);
+    const now = new Date();
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return date >= currentMonth && date < nextMonth;
+  }
+  return true;
+}
+
+function getSubscriptionStatus(sub: Subscription) {
+  return String((sub as any).status || '').trim().toLowerCase();
+}
+
+function getSubscriptionUserId(sub: Subscription) {
+  return (sub as any).userId || (sub as any).user_id || null;
+}
+
+function normalizeSubscriptionForSavings(sub: Subscription) {
+  const normalized = { ...(sub as any) } as any;
+  if (!normalized.userId && normalized.user_id) normalized.userId = normalized.user_id;
+  if (!normalized.deletedAt && normalized.deleted_at) normalized.deletedAt = normalized.deleted_at;
+  if (!normalized.createdAt && normalized.created_at) normalized.createdAt = normalized.created_at;
+  if (!normalized.nextBillingDate && normalized.next_billing_at) normalized.nextBillingDate = normalized.next_billing_at;
+  normalized.status = getSubscriptionStatus(sub);
+  return normalized as Subscription;
+}
+
+function computeMonthlySavingsFromSubscriptions(subscriptions: Subscription[]) {
+  const ownerSavings = subscriptions
+    .filter((sub) => isDeletedThisMonth(sub))
+    .reduce((total, sub) => {
+      const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
+      return total + monthlyAmount;
+    }, 0);
+
+  return Math.round(ownerSavings * 100) / 100;
+}
+
+function getCurrentMonthAmount(monthlyData: MonthlySpending[] | undefined) {
+  if (!monthlyData || monthlyData.length === 0) return 0;
+  const now = new Date();
+  const currentMonthLabel = now.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+  const exactMatch = monthlyData.find((entry) => entry.month === currentMonthLabel);
+  return exactMatch ? exactMatch.amount : 0;
+}
+
+function computeFamilySavingsBreakdown(
+  subscriptions: Subscription[],
+  currentUserId: string | undefined,
+  convertAmountFn: (amount: number, fromCurrency?: any, toCurrency?: any) => number,
+) {
+  const ownerSavings = subscriptions
+    .filter((sub) => {
+      return getSubscriptionUserId(sub) === currentUserId && isDeletedThisMonth(sub);
+    })
+    .reduce((total, sub) => {
+      const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
+      return total + convertAmountFn(monthlyAmount, (sub as any).currency || 'USD', 'USD');
+    }, 0);
+
+  const memberSavings = subscriptions
+    .filter((sub) => {
+      const subscriptionUserId = getSubscriptionUserId(sub);
+      return subscriptionUserId && subscriptionUserId !== currentUserId && isDeletedThisMonth(sub);
+    })
+    .reduce((total, sub) => {
+      const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
+      return total + convertAmountFn(monthlyAmount, (sub as any).currency || 'USD', 'USD');
+    }, 0);
+
+  return {
+    ownerSavings: Math.round(ownerSavings * 100) / 100,
+    memberSavings: Math.round(memberSavings * 100) / 100,
+    totalSavings: Math.round((ownerSavings + memberSavings) * 100) / 100,
+  };
+}
+
+function computeDeletedSubscriptionSavings(subscriptions: Subscription[]) {
+  return subscriptions
+    .filter((sub) => getSubscriptionStatus(sub) === 'deleted' && isDeletedThisMonth(sub))
+    .reduce((total, sub) => {
+      const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
+      return total + monthlyAmount;
+    }, 0);
+}
+
+function resolveFamilySavingsValue(serverValue: unknown, fallbackValue?: number) {
+  const numericServerValue = typeof serverValue === 'number' ? serverValue : Number(serverValue);
+  const fallbackNumber = typeof fallbackValue === 'number' ? fallbackValue : 0;
+  if (!Number.isFinite(numericServerValue)) {
+    return fallbackNumber;
+  }
+
+  if (numericServerValue === 0 && fallbackNumber !== 0) {
+    return fallbackNumber;
+  }
+
+  if (fallbackNumber !== 0 && Math.abs(numericServerValue - fallbackNumber) > 0.01) {
+    return fallbackNumber;
+  }
+
+  return numericServerValue;
+}
+
 export default function Savings() {
-  const { formatAmount, convertAmount } = useCurrency();
+  const { formatAmount, convertAmount, currency } = useCurrency();
   const { user } = useAuth();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
 
@@ -64,99 +174,252 @@ export default function Savings() {
   const { data: familyData, isLoading: familyDataLoading } = useQuery<any>({
     queryKey: ["/api/family-groups", familyGroupId, "family-data"],
     enabled: !!familyGroupId,
+    refetchInterval: 30000, // Refetch every 30 seconds to see member deletions
   });
+
+  const { data: familySavingsResponse, isLoading: familySavingsLoading } = useQuery<any>({
+    queryKey: ["/api/analytics/monthly-savings", "family"],
+    enabled: showFamilyData && !!user?.id,
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/analytics/monthly-savings?family=true");
+      return response.json();
+    },
+  });
+
+  const { data: personalSubscriptions } = useQuery<Subscription[]>({
+    queryKey: ["/api/subscriptions"],
+  });
+
+  const personalDeletedSavings = useMemo(() => {
+    if (!personalSubscriptions || personalSubscriptions.length === 0) return 0;
+    return Math.round(computeDeletedSubscriptionSavings(personalSubscriptions) * 100) / 100;
+  }, [personalSubscriptions]);
+
+  const familySubscriptions = useMemo<Subscription[]>(() => {
+    return getVisibleFamilySubscriptions(familyData, user?.id);
+  }, [familyData, user?.id]);
+
+  const familySavingsComputed = useMemo(() => {
+    if (!familySubscriptions || familySubscriptions.length === 0) {
+      return {
+        potentialSavings: 0,
+        thisMonthSavings: 0,
+        thisMonthSavingsOwner: 0,
+        thisMonthSavingsMembers: 0,
+        unusedSubscriptions: 0,
+      };
+    }
+
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const currentUserId = user?.id;
+
+    const isDeletedThisMonth = (sub: Subscription) => {
+      if (getSubscriptionStatus(sub) !== 'deleted') return false;
+      const ts = getSubscriptionDeletedTimestamp(sub);
+      if (!ts) return true;
+      const date = new Date(ts);
+      return date >= currentMonthStart && date < nextMonthStart;
+    };
+
+    const potentialSavings = familySubscriptions
+      .filter((sub) => sub && (sub.status === 'unused' || sub.status === 'to-cancel'))
+      .reduce((sum: number, sub) => {
+        const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
+        return sum + convertAmount(monthlyAmount, (sub as any).currency || 'USD', 'USD');
+      }, 0);
+
+    const thisMonthSavings = familySubscriptions
+      .filter(isDeletedThisMonth)
+      .reduce((sum: number, sub) => {
+        const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
+        return sum + convertAmount(monthlyAmount, (sub as any).currency || 'USD', 'USD');
+      }, 0);
+
+    const thisMonthSavingsOwner = familySubscriptions
+      .filter((sub) => isDeletedThisMonth(sub) && getSubscriptionUserId(sub) === currentUserId)
+      .reduce((sum: number, sub) => {
+        const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
+        return sum + convertAmount(monthlyAmount, (sub as any).currency || 'USD', 'USD');
+      }, 0);
+
+    const thisMonthSavingsMembers = familySubscriptions
+      .filter((sub) => {
+        const subscriptionUserId = getSubscriptionUserId(sub);
+        return isDeletedThisMonth(sub) && subscriptionUserId && subscriptionUserId !== currentUserId;
+      })
+      .reduce((sum: number, sub) => {
+        const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
+        return sum + convertAmount(monthlyAmount, (sub as any).currency || 'USD', 'USD');
+      }, 0);
+
+    const unusedSubscriptions = familySubscriptions.filter((sub) => getSubscriptionStatus(sub) === 'unused').length;
+
+    return {
+      potentialSavings: Math.round(potentialSavings * 100) / 100,
+      thisMonthSavings: Math.round(thisMonthSavings * 100) / 100,
+      thisMonthSavingsOwner: Math.round(thisMonthSavingsOwner * 100) / 100,
+      thisMonthSavingsMembers: Math.round(thisMonthSavingsMembers * 100) / 100,
+      unusedSubscriptions,
+    };
+  }, [familySubscriptions, user?.id, convertAmount]);
 
   // Personal behavioral insights (always load)
 
 
   // compute metrics depending on mode
-  let metrics: DashboardMetrics & { thisMonthSavingsOwner?: number; thisMonthSavingsMembers?: number } | undefined = personalMetrics;
+  let metrics: DashboardMetrics & { thisMonthSavingsOwner?: number; thisMonthSavingsMembers?: number } | undefined;
   let metricsLoading = showFamilyData ? familyDataLoading : personalMetricsLoading;
 
   if (showFamilyData) {
-    if (familyData?.subscriptions && familyData.subscriptions.length > 0) {
-      const subs = familyData.subscriptions as Subscription[];
-      const totalMonthlySpend = subs.reduce((sum: number, s: Subscription) => {
-        return sum + calculateMonthlyCost((s as any).amount, (s as any).frequency);
-      }, 0);
-      const activeSubscriptions = subs.filter((s) => s.status === "active").length;
-      const unusedSubscriptions = subs.filter((s) => s.status === "unused").length;
-      const potentialSavings = subs
-        .filter((s) => s.status === "unused" || s.status === "to-cancel")
-        .reduce((sum: number, s) => sum + calculateMonthlyCost((s as any).amount, (s as any).frequency), 0);
+    const hasServerFamilyMetrics = familyData?.isOwner === true && familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number';
+    // Prefer owner-only server spending series; members must use visible subscriptions.
+    const familyMonthlyData = familyData?.isOwner === true && familyData?.spending && familyData.spending.length > 0 ? familyData.spending : [];
+    const totalMonthlySpendFromSpendingData = getCurrentMonthAmount(familyMonthlyData);
 
-      // actual savings this month should be based on subscriptions the user has
-      // deleted (they represent money they've actually removed). "to-cancel"
-      // remains only for planning/potential calculation.
+    if (hasServerFamilyMetrics) {
+      metrics = {
+        totalMonthlySpend: totalMonthlySpendFromSpendingData,
+        activeSubscriptions: familyData.metrics.activeSubscriptions || 0,
+        potentialSavings: familySubscriptions.length > 0
+          ? familySavingsComputed.potentialSavings
+          : (familyData.metrics.potentialSavings || 0),
+        thisMonthSavings: familySubscriptions.length > 0
+          ? familySavingsComputed.thisMonthSavings
+          : (familyData.metrics.thisMonthSavings || 0),
+        unusedSubscriptions: familySubscriptions.length > 0
+          ? familySavingsComputed.unusedSubscriptions
+          : 0,
+        thisMonthSavingsOwner: familySubscriptions.length > 0
+          ? familySavingsComputed.thisMonthSavingsOwner
+          : 0,
+        thisMonthSavingsMembers: familySubscriptions.length > 0
+          ? familySavingsComputed.thisMonthSavingsMembers
+          : 0,
+        averageCostPerUse: 0,
+        monthlySpendChange: 0,
+        newServicesTracked: 0,
+      };
+      metricsLoading = familyDataLoading;
+    } else {
+      // In family mode, calculate from family data only when server metrics are absent.
+      const subs = familySubscriptions;
       const now = new Date();
-      const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-      const ownerId = user?.id;
-
-      const isDeletedThisMonth = (s: Subscription) => {
-        if (s.status !== "deleted") return false;
-        const ts = getSubscriptionDeletedTimestamp(s);
-        return isTimestampInCurrentMonth(ts);
+      let calculatedMetrics: DashboardMetrics & { thisMonthSavingsOwner?: number; thisMonthSavingsMembers?: number } = {
+        totalMonthlySpend: 0,
+        activeSubscriptions: 0,
+        potentialSavings: 0,
+        thisMonthSavings: 0,
+        thisMonthSavingsOwner: 0,
+        thisMonthSavingsMembers: 0,
+        unusedSubscriptions: 0,
+        averageCostPerUse: 0,
+        monthlySpendChange: 0,
+        newServicesTracked: 0,
       };
 
-      const ownerSavings = subs
-        .filter((s) => isDeletedThisMonth(s) && s.userId === ownerId)
-        .reduce((sum: number, s) => {
+      if (subs.length > 0) {
+        // Only include subscriptions renewing in the current month.
+        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        const totalMonthlySpend = subs.reduce((sum: number, s: Subscription) => {
+          if (s.status !== 'active' && s.status !== 'unused' && s.status !== 'to-cancel' && s.status !== 'canceled') return sum;
+          if (!isSubscriptionBilledInMonth(s, currentMonthStart, currentMonthEnd, now, true)) return sum;
           const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
-          // Convert to USD for consistent goal comparison
           return sum + convertAmount(monthlyCost, (s as any).currency || 'USD', 'USD');
         }, 0);
 
-      const memberSavings = subs
-        .filter((s) => isDeletedThisMonth(s) && s.userId !== ownerId)
-        .reduce((sum: number, s) => {
+        const activeSubscriptions = subs.filter((s) => s.status === 'active').length;
+        const unusedSubscriptions = subs.filter((s) => s.status === 'unused').length;
+        const potentialSavings = subs
+          .filter((s) => s.status === 'unused' || s.status === 'to-cancel')
+          .reduce((sum: number, s) => {
+            const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
+            return sum + convertAmount(monthlyCost, (s as any).currency || 'USD', 'USD');
+          }, 0);
+
+        const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const currentUserId = user?.id;
+
+        const isDeletedThisMonth = (s: Subscription) => {
+          if (getSubscriptionStatus(s) !== 'deleted') return false;
+          const ts = getSubscriptionDeletedTimestamp(s);
+          if (ts) {
+            const d = new Date(ts);
+            return d >= currentMonth && d < nextMonth;
+          }
+          return true;
+        };
+
+        const ownerSavings = subs
+          .filter((s) => isDeletedThisMonth(s) && getSubscriptionUserId(s) === currentUserId)
+          .reduce((sum: number, s) => {
+            const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
+            return sum + convertAmount(monthlyCost, (s as any).currency || 'USD', 'USD');
+          }, 0);
+
+        const memberSavings = subs
+          .filter((s) => {
+            const subscriptionUserId = getSubscriptionUserId(s);
+            return isDeletedThisMonth(s) && subscriptionUserId && subscriptionUserId !== currentUserId;
+          })
+          .reduce((sum: number, s) => {
+            const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
+            return sum + convertAmount(monthlyCost, (s as any).currency || 'USD', 'USD');
+          }, 0);
+
+        const thisMonthSavingsAmount = subs
+          .filter(isDeletedThisMonth)
+          .reduce((sum: number, s) => {
+            const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
+            return sum + convertAmount(monthlyCost, (s as any).currency || 'USD', 'USD');
+          }, 0);
+
+        const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const currentMonthSubs = subs.filter((s) => {
+          const ts = (s as any).created_at || (s as any).createdAt;
+          const d = ts ? new Date(ts) : new Date();
+          return d >= currentMonth && d < nextMonth;
+        });
+        const previousMonthSubs = subs.filter((s) => {
+          const ts = (s as any).created_at || (s as any).createdAt;
+          const d = ts ? new Date(ts) : new Date();
+          return d >= previousMonth && d < currentMonth;
+        });
+
+        const previousMonthSpend = previousMonthSubs.reduce((sum: number, s: Subscription) => {
           const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
-          // Convert to USD for consistent goal comparison
           return sum + convertAmount(monthlyCost, (s as any).currency || 'USD', 'USD');
         }, 0);
 
-      const thisMonthSavingsAmount = ownerSavings + memberSavings;
+        const monthlySpendChange = previousMonthSpend > 0
+          ? Math.round(((totalMonthlySpend - previousMonthSpend) / previousMonthSpend) * 100)
+          : 0;
+        const newServicesTracked = currentMonthSubs.length;
 
-      const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        calculatedMetrics = {
+          totalMonthlySpend,
+          activeSubscriptions,
+          potentialSavings,
+          thisMonthSavings: thisMonthSavingsAmount,
+          thisMonthSavingsOwner: ownerSavings,
+          thisMonthSavingsMembers: memberSavings,
+          unusedSubscriptions,
+          averageCostPerUse: 0,
+          monthlySpendChange,
+          newServicesTracked,
+        };
+      }
 
-      const currentMonthSubs = subs.filter((s) => {
-        // subscription records coming over the wire may have either
-        // `created_at` or `createdAt` depending on origin; neither property is
-        // typed on the shared Subscription interface, so just coerce to `any`.
-        const ts = (s as any).created_at || (s as any).createdAt;
-        const d = ts ? new Date(ts) : new Date();
-        return d >= currentMonth && d < nextMonth;
-      });
-      const previousMonthSubs = subs.filter((s) => {
-        const ts = (s as any).created_at || (s as any).createdAt;
-        const d = ts ? new Date(ts) : new Date();
-        return d >= previousMonth && d < currentMonth;
-      });
-
-      const previousMonthSpend = previousMonthSubs.reduce((sum: number, s: Subscription) => {
-        return sum + calculateMonthlyCost((s as any).amount, (s as any).frequency);
-      }, 0);
-
-      const monthlySpendChange = previousMonthSpend > 0
-        ? Math.round(((totalMonthlySpend - previousMonthSpend) / previousMonthSpend) * 100)
-        : 0;
-      const newServicesTracked = currentMonthSubs.length;
-
-      metrics = {
-        totalMonthlySpend,
-        activeSubscriptions,
-        potentialSavings,
-        thisMonthSavings: thisMonthSavingsAmount,
-        thisMonthSavingsOwner: ownerSavings,
-        thisMonthSavingsMembers: memberSavings,
-        unusedSubscriptions,
-        averageCostPerUse: 0,
-        monthlySpendChange,
-        newServicesTracked,
-      } as DashboardMetrics & { thisMonthSavingsOwner?: number; thisMonthSavingsMembers?: number };
+      metrics = calculatedMetrics;
+      metricsLoading = familyDataLoading;
     }
-    metricsLoading = familyDataLoading;
+  } else {
+    // Use personal metrics when not in family mode
+    metrics = personalMetrics;
+    metricsLoading = personalMetricsLoading;
   }
 
   // Personal spending (always load)
@@ -168,40 +431,45 @@ export default function Savings() {
 
   // Compute monthly spending from subscriptions for family mode
   function computeMonthlySpendingFromFamilySubscriptions() {
-    if (!familyData?.subscriptions || familyData.subscriptions.length === 0) return [];
+    if (!familySubscriptions || familySubscriptions.length === 0) return [];
     
     const now = new Date();
+    const currentDayOfMonth = now.getDate();
     const months: { [key: string]: number } = {};
     
-    // Create labels for last 12 months
-    for (let i = 11; i >= 0; i--) {
+    // Create labels for last 6 months + current month (7 total)
+    for (let i = 6; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const label = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
       months[label] = 0;
     }
     
-    // Add subscription costs to appropriate months
-    for (const sub of familyData.subscriptions) {
+    // Add subscription costs to months where they renew
+    for (const sub of familySubscriptions) {
       if (!sub || sub.status === 'deleted' || sub.status === 'canceled') continue;
-      const monthlyCost = calculateMonthlyCost(sub.amount || 0, sub.frequency || 'monthly');
+      if (sub.status !== 'active' && sub.status !== 'unused' && sub.status !== 'to-cancel') continue;
       
-      // Only add subscription cost from creation month forward
-      const createdDate = sub.createdAt ? new Date(sub.createdAt) : now;
-      const createdMonthLabel = createdDate.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+      const monthlyCost = convertAmount(
+        calculateMonthlyCost(sub.amount || 0, sub.frequency || 'monthly'),
+        (sub.currency as Currency) || 'USD',
+        'USD'
+      );
       
-      // Find if created month exists in our 12-month range
-      let foundStart = false;
-      for (const label of Object.keys(months)) {
-        if (label === createdMonthLabel) foundStart = true;
-        if (foundStart) {
-          months[label] += monthlyCost;
+      // Check each month to see if this subscription should be included
+      for (const [monthLabel, _] of Object.entries(months)) {
+        let includeInMonth = false;
+        const monthDate = new Date(monthLabel + " 1");
+        const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+        const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59);
+        const isCurrentMonth = monthDate.getFullYear() === now.getFullYear() && monthDate.getMonth() === now.getMonth();
+        
+        // Get the renewal date for this subscription
+        if (isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth)) {
+          includeInMonth = true;
         }
-      }
-      
-      // If subscription was created before our 12-month window, add to all months
-      if (!foundStart) {
-        for (const label of Object.keys(months)) {
-          months[label] += monthlyCost;
+        
+        if (includeInMonth) {
+          months[monthLabel] += monthlyCost;
         }
       }
     }
@@ -212,13 +480,15 @@ export default function Savings() {
     }));
   }
 
-  // Use server data if available, otherwise compute from subscriptions for family mode
+  // Use server data if available for owner views, otherwise compute from visible family subscriptions.
   const effectiveMonthlySpending = showFamilyData
-    ? (familyData?.spending && familyData.spending.length > 0 ? familyData.spending : computeMonthlySpendingFromFamilySubscriptions())
+    ? ((familyData?.spending && familyData.spending.length > 0 && familyData?.isOwner)
+        ? familyData.spending
+        : computeMonthlySpendingFromFamilySubscriptions())
     : (personalSpending || []);
 
   // Normalize monthly spending into a fixed-length recent months series (defaults to 6 months)
-  // Shows the last 6 COMPLETE months (not including current month) so historical data stays fixed
+  // Includes current month and the previous months
   function normalizeMonthlySeries(data: MonthlySpending[] | undefined, months = 6) {
     if (!data || data.length === 0) {
       return [];
@@ -231,81 +501,106 @@ export default function Savings() {
       return dateA.getTime() - dateB.getTime();
     });
 
-    // Get the most recent months, excluding current month
-    const now = new Date();
-    const currentMonthKey = now.toLocaleString("en-US", { month: "short", year: "numeric" });
-
-    // Filter out current month and get the last 'months' entries
-    const historicalData = sortedData.filter(item => item.month !== currentMonthKey);
-    return historicalData.slice(-months);
+    // Get the last 'months + 1' entries (includes current month)
+    return sortedData.slice(-(months + 1));
   }
 
   const chartMonthlyData = normalizeMonthlySeries(effectiveMonthlySpending, 6);
 
-  // Editable savings goal logic (store canonical value in USD)
+  // Editable savings goal logic (store in user's selected currency)
   // Default goal is a fixed baseline; we no longer auto‑populate using
   // potential savings because that causes the goal to track the savings
   // value and makes the progress bar appear full immediately when a
   // subscription is deleted.
-  const defaultGoalUSD = 500; // USD
-  const { currency } = useCurrency();
+  const defaultGoal = 500; // in USD, will be converted to user's currency
+  const [storedGoal, setStoredGoal] = useState<number>(defaultGoal);
+  const [hasLoadedGoal, setHasLoadedGoal] = useState(false);
 
-  const [storedGoalUSD, setStoredGoalUSD] = useState<number>(defaultGoalUSD);
-
-  // Load/migrate stored goal on mount and when family mode changes
+  // Load/migrate stored goal on mount and when user/family mode changes
+  // BUT NOT on currency change alone, to prevent losing user's custom goal
   useEffect(() => {
     // Use family-specific key in family mode, otherwise user-specific
     const keySuffix = showFamilyData && familyGroupId ? `-${familyGroupId}` : (user?.id ? `-${user.id}` : '');
-    const usdStored = localStorage.getItem(`subveris-savings-goal-usd${keySuffix}`);
-    const legacy = localStorage.getItem(`subveris-savings-goal${keySuffix}`);
     
+    // Try to load from all possible keys (current currency first, then legacy keys)
+    let found = false;
+    
+    // Try current currency key
+    const stored = localStorage.getItem(`subveris-savings-goal-${currency}${keySuffix}`);
+    if (stored) {
+      const goalValue = Number(stored);
+      if (!isNaN(goalValue) && goalValue >= 0) {
+        setStoredGoal(goalValue);
+        setDisplayInput(String(goalValue));
+        setHasLoadedGoal(true);
+        return;
+      }
+    }
+    
+    // Try USD legacy key
+    const usdStored = localStorage.getItem(`subveris-savings-goal-usd${keySuffix}`);
     if (usdStored) {
       const usdValue = Number(usdStored);
       if (!isNaN(usdValue) && usdValue >= 0) {
-        setStoredGoalUSD(usdValue);
-        // Update display input when goal changes
-        const displayBack = Math.round(convertAmount(usdValue, 'USD', currency) * 100) / 100;
-        setDisplayInput(String(displayBack));
+        const currencyValue = Math.round(convertAmount(usdValue, 'USD', currency) * 100) / 100;
+        setStoredGoal(currencyValue);
+        localStorage.setItem(`subveris-savings-goal-${currency}${keySuffix}`, String(currencyValue));
+        localStorage.removeItem(`subveris-savings-goal-usd${keySuffix}`);
+        setDisplayInput(String(currencyValue));
+        setHasLoadedGoal(true);
+        return;
       }
-      return;
     }
-    
+
+    // Try generic legacy key
+    const legacy = localStorage.getItem(`subveris-savings-goal${keySuffix}`);
     if (legacy) {
-      // Legacy value might have been stored in the user's selected currency — convert to USD
       const legacyNum = Number(legacy);
-      if (!isNaN(legacyNum) && legacyNum >= 0) {
-        try {
-          const migrated = Math.round(convertAmount(legacyNum, currency, 'USD') * 100) / 100;
-          setStoredGoalUSD(migrated);
-          localStorage.setItem(`subveris-savings-goal-usd${keySuffix}`, String(migrated));
-          localStorage.removeItem(`subveris-savings-goal${keySuffix}`);
-          // Update display input when goal changes
-          const displayBack = Math.round(convertAmount(migrated, 'USD', currency) * 100) / 100;
-          setDisplayInput(String(displayBack));
-        } catch (e) {
-          setStoredGoalUSD(defaultGoalUSD);
-          setDisplayInput(String(defaultGoalUSD));
-        }
-      } else {
-        setStoredGoalUSD(defaultGoalUSD);
-        setDisplayInput(String(defaultGoalUSD));
+      if (!isNaN(legacyNum) && legacyNum > 0) {
+        setStoredGoal(legacyNum);
+        localStorage.setItem(`subveris-savings-goal-${currency}${keySuffix}`, String(legacyNum));
+        localStorage.removeItem(`subveris-savings-goal${keySuffix}`);
+        setDisplayInput(String(legacyNum));
+        setHasLoadedGoal(true);
+        return;
       }
-      return;
     }
+
+    // No stored value found, use constant default converted to user's currency
+    const defaultInCurrency = Math.round(convertAmount(defaultGoal, 'USD', currency) * 100) / 100;
+    setStoredGoal(defaultInCurrency);
+    setDisplayInput(String(defaultInCurrency));
+    setHasLoadedGoal(true);
+  }, [showFamilyData, familyGroupId, user?.id]); // Only rerun on user/family mode change, NOT on currency alone
+
+  // When currency changes, update the displayed input to show the new currency value
+  // but don't change the actual stored goal
+  useEffect(() => {
+    if (!hasLoadedGoal) return; // Wait for goal to be loaded first
     
-    // No stored value, use constant default
-    setStoredGoalUSD(defaultGoalUSD);
-    setDisplayInput(String(defaultGoalUSD));
-  }, [showFamilyData, familyGroupId, user?.id, currency]); // Include all dependencies
+    const keySuffix = showFamilyData && familyGroupId ? `-${familyGroupId}` : (user?.id ? `-${user.id}` : '');
+    const stored = localStorage.getItem(`subveris-savings-goal-${currency}${keySuffix}`);
+    
+    if (stored) {
+      const goalValue = Number(stored);
+      if (!isNaN(goalValue) && goalValue >= 0) {
+        setStoredGoal(goalValue);
+        // Only update display if not focused (user not actively typing)
+        if (!isInputFocused) {
+          setDisplayInput(String(goalValue));
+        }
+      }
+    }
+  }, [currency, hasLoadedGoal]);
 
   // displayGoal is shown in the input (in the user's selected currency)
-  const computedDisplayGoal = Math.round(convertAmount(storedGoalUSD, 'USD', currency) * 100) / 100;
+  const computedDisplayGoal = storedGoal;
 
   // local input state to avoid immediate overwrite while typing
   const [displayInput, setDisplayInput] = useState<string>(String(computedDisplayGoal));
   const [isInputFocused, setIsInputFocused] = useState(false);
 
-  // keep displayInput in sync when currency or storedGoalUSD changes (unless user is actively typing)
+  // keep displayInput in sync when currency or storedGoal changes (unless user is actively typing)
   useEffect(() => {
     // Only update if the input is not focused (user is not actively typing)
     if (!isInputFocused) {
@@ -331,28 +626,55 @@ export default function Savings() {
     const displayVal = Math.max(0, Number(displayInput) || 0);
     // Round to 2 decimal places to avoid precision issues
     const roundedDisplayVal = Math.round(displayVal * 100) / 100;
-    const usd = convertAmount(roundedDisplayVal, currency, 'USD');
-    // Round USD value to avoid accumulating precision errors
-    const roundedUSD = Math.round(usd * 100) / 100;
-    setStoredGoalUSD(roundedUSD);
+    setStoredGoal(roundedDisplayVal);
     // Use family-specific key in family mode, otherwise user-specific
     const keySuffix = showFamilyData && familyGroupId ? `-${familyGroupId}` : (user?.id ? `-${user.id}` : '');
-    localStorage.setItem(`subveris-savings-goal-usd${keySuffix}`, String(roundedUSD));
+    localStorage.setItem(`subveris-savings-goal-${currency}${keySuffix}`, String(roundedDisplayVal));
     // Notify other components in this window that the savings goal was updated
     try {
-      window.dispatchEvent(new CustomEvent('savingsGoalUpdated', { detail: roundedUSD }));
+      window.dispatchEvent(new CustomEvent('savingsGoalUpdated', { detail: convertAmount(roundedDisplayVal, currency, 'USD') }));
     } catch (e) {
       // ignore in non-browser environments
     }
-    // Update display input with the properly converted value
-    const displayBack = Math.round(convertAmount(roundedUSD, 'USD', currency) * 100) / 100;
-    setDisplayInput(String(displayBack));
+    // Update display input with the rounded value
+    setDisplayInput(String(roundedDisplayVal));
   };
 
-  const currentSavings = metrics?.thisMonthSavings || 0; // USD
-  const familyOwnerSavings = showFamilyData ? metrics?.thisMonthSavingsOwner || 0 : 0;
-  const familyMemberSavings = showFamilyData ? metrics?.thisMonthSavingsMembers || 0 : 0;
-  const savingsProgress = storedGoalUSD > 0 ? Math.min((currentSavings / storedGoalUSD) * 100, 100) : 0;
+  const fallbackFamilySavings = computeFamilySavingsBreakdown(familySubscriptions, user?.id, convertAmount);
+  const familySavings = showFamilyData
+    ? {
+        totalSavings: resolveFamilySavingsValue(
+          familySavingsResponse?.monthlySavings,
+          metrics?.thisMonthSavings ?? fallbackFamilySavings.totalSavings,
+        ),
+        ownerSavings: resolveFamilySavingsValue(
+          familySavingsResponse?.ownerMonthlySavings,
+          metrics?.thisMonthSavingsOwner ?? fallbackFamilySavings.ownerSavings,
+        ),
+        memberSavings: resolveFamilySavingsValue(
+          familySavingsResponse?.memberMonthlySavings,
+          metrics?.thisMonthSavingsMembers ?? fallbackFamilySavings.memberSavings,
+        ),
+      }
+    : { ownerSavings: 0, memberSavings: 0, totalSavings: 0 };
+
+  const currentSavings = showFamilyData
+    ? familySavings.totalSavings
+    : Math.max(metrics?.thisMonthSavings ?? 0, personalDeletedSavings);
+  const familyOwnerSavings = showFamilyData
+    ? familySavings.ownerSavings
+    : 0;
+  const familyMemberSavings = showFamilyData
+    ? familySavings.memberSavings
+    : 0;
+
+  const currentSavingsInCurrency = convertAmount(currentSavings, 'USD', currency);
+  const familyOwnerSavingsInCurrency = convertAmount(familyOwnerSavings, 'USD', currency);
+  const familyMemberSavingsInCurrency = convertAmount(familyMemberSavings, 'USD', currency);
+
+  const savingsProgress = storedGoal > 0
+    ? Math.min((currentSavingsInCurrency / storedGoal) * 100, 100)
+    : 0;
   const projectedAnnualSavings = computedDisplayGoal * 12; // in user's currency
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -361,7 +683,7 @@ export default function Savings() {
         <div className="bg-popover border border-popover-border rounded-lg p-3 shadow-lg">
           <p className="text-sm font-medium">{label}</p>
           <p className="text-sm text-chart-1">
-            {formatAmount(payload[0].value)}
+            {formatAmount(payload[0].value, 'USD')}
           </p>
         </div>
       );
@@ -397,11 +719,11 @@ export default function Savings() {
               ) : (
                 <>
                   <span className="text-3xl font-bold text-chart-2 dark:text-foreground" data-testid="text-current-savings">
-                    {formatAmount(currentSavings)}
+                    {formatAmount(currentSavingsInCurrency, currency)}
                   </span>
                   {showFamilyData && (
                     <span className="text-xs text-muted-foreground mt-1 block" data-testid="text-current-savings-breakdown">
-                      You: {formatAmount(familyOwnerSavings)} · Members: {formatAmount(familyMemberSavings)}
+                      You: {formatAmount(familyOwnerSavingsInCurrency, currency)} · Members: {formatAmount(familyMemberSavingsInCurrency, currency)}
                     </span>
                   )}
                 </>
@@ -423,7 +745,7 @@ export default function Savings() {
                 <Skeleton className="h-9 w-24" />
               ) : (
                 <span className="text-3xl font-bold text-chart-2 dark:text-foreground" data-testid="text-potential-savings">
-                  {formatAmount(metrics?.potentialSavings || 0)}
+                    {formatAmount(metrics?.potentialSavings || 0, 'USD')}
                   <span className="text-sm font-normal text-muted-foreground">/mo</span>
                 </span>
               )}
@@ -502,7 +824,7 @@ export default function Savings() {
                     {showFamilyData ? "Family progress this month" : "Progress this month"}
                   </span>
                   <span className="font-medium">
-                    {formatAmount(currentSavings)} of {formatAmount(computedDisplayGoal, currency)}
+                    {formatAmount(currentSavingsInCurrency, currency)} of {formatAmount(computedDisplayGoal, currency)}
                   </span>
                 </div>
                 <div className="relative h-4 w-full overflow-hidden rounded-full bg-muted">
@@ -548,7 +870,7 @@ export default function Savings() {
                       interval="preserveStartEnd"
                     />
                     <YAxis
-                      tickFormatter={(value) => formatAmount(value)}
+                      tickFormatter={(value) => formatAmount(value, 'USD')}
                       tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
                       axisLine={{ stroke: "hsl(var(--border))" }}
                       tickLine={{ stroke: "hsl(var(--border))" }}

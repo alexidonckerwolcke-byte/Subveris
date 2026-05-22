@@ -4,7 +4,7 @@ import { config } from 'dotenv';
 config();
 
 import { createClient } from '@supabase/supabase-js';
-import { emailService } from '../server/email.js';
+import { emailService } from '../server-legacy/email';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -41,19 +41,68 @@ async function sendWeeklyDigests() {
       return;
     }
 
-    if (!preferences || preferences.length === 0) {
+    const enabledUserIds = new Set<string>(preferences?.map((pref) => pref.user_id) || []);
+
+    const { data: preferenceRows, error: preferenceRowsError } = await supabase
+      .from('notification_preferences')
+      .select('user_id');
+
+    if (preferenceRowsError) {
+      console.error('[Weekly Digest] Error fetching preference rows:', preferenceRowsError);
+      return;
+    }
+
+    const existingPrefUserIds = new Set<string>(preferenceRows?.map((pref) => pref.user_id) || []);
+
+    // Include users who have no notification preference row yet, because defaults are enabled
+    const { data: allUsers, error: userError } = await supabase
+      .from('users')
+      .select('id');
+
+    if (userError || !allUsers) {
+      console.error('[Weekly Digest] Error fetching users:', userError);
+      return;
+    }
+
+    const defaultEnabledUserIds = allUsers
+      .map((user) => user.id)
+      .filter((userId) => !existingPrefUserIds.has(userId));
+
+    if (defaultEnabledUserIds.length > 0) {
+      const { error: backfillError } = await supabase
+        .from('notification_preferences')
+        .insert(
+          defaultEnabledUserIds.map((userId) => ({
+            user_id: userId,
+            email_notifications: true,
+            push_notifications: true,
+            weekly_digest: true,
+          }))
+        );
+
+      if (backfillError) {
+        console.warn('[Weekly Digest] Failed to backfill default preference rows:', backfillError);
+      } else {
+        console.log(`[Weekly Digest] Backfilled ${defaultEnabledUserIds.length} default preference rows`);
+      }
+    }
+
+    const allEnabledUserIds = Array.from(enabledUserIds)
+      .concat(defaultEnabledUserIds)
+      .filter((userId, index, userIds) => userIds.indexOf(userId) === index);
+
+    if (allEnabledUserIds.length === 0) {
       console.log('[Weekly Digest] No users have weekly digest enabled');
       return;
     }
 
-    console.log(`[Weekly Digest] Found ${preferences.length} users with weekly digest enabled`);
+    console.log(`[Weekly Digest] Found ${allEnabledUserIds.length} users with weekly digest enabled or default enabled`);
 
     let successCount = 0;
     let errorCount = 0;
 
-    for (const pref of preferences) {
+    for (const userId of allEnabledUserIds) {
       try {
-        const userId = pref.user_id;
 
         // Get user email from auth
         const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
@@ -107,12 +156,10 @@ async function sendWeeklyDigests() {
                                 sub.frequency === 'weekly' ? sub.amount * 4.33 : sub.amount;
             return {
               name: sub.name,
-              monthlyAmount,
-              currency: sub.currency || 'USD',
-              category: sub.category
+              amount: monthlyAmount,
             };
           })
-          .sort((a, b) => b.monthlyAmount - a.monthlyAmount)
+          .sort((a, b) => b.amount - a.amount)
           .slice(0, 5);
 
         // Get user currency
@@ -120,9 +167,10 @@ async function sendWeeklyDigests() {
 
         // Prepare digest data
         const digestData = {
+          totalSubscriptions: subscriptions.length,
           monthlySpending: totalMonthlySpend,
+          weeklySavings: 0,
           currency: userCurrency,
-          activeSubscriptions,
           topSubscriptions
         };
 
@@ -138,7 +186,7 @@ async function sendWeeklyDigests() {
         }
 
       } catch (err) {
-        console.error(`[Weekly Digest] Error processing user ${pref.user_id}:`, err);
+        console.error(`[Weekly Digest] Error processing user ${userId}:`, err);
         errorCount++;
       }
     }

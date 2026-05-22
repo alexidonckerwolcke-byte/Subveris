@@ -23,10 +23,19 @@ export function computeCostPerUseFromSubs(subs: any[] | undefined): CostPerUseAn
       const currentMonth = new Date().toISOString().slice(0, 7);
       const usageMonth = (sub.usage_month ?? sub.usageMonth) as string | null;
       const monthlyUsageCount = (sub.monthly_usage_count ?? sub.monthlyUsageCount) as number | undefined;
-      const fallbackUsageCount = (sub.usage_count ?? sub.usageCount ?? 0) as number;
-      const usageCount = usageMonth === currentMonth && monthlyUsageCount !== undefined
-        ? monthlyUsageCount
-        : fallbackUsageCount;
+      // also accept legacy/common fields `usage_count` or `usageCount`
+      const directUsageCount = (sub.usage_count ?? sub.usageCount) as number | undefined;
+
+      let usageCount = 0;
+      if (monthlyUsageCount !== undefined) {
+        // Cost per use resets to zero on the first day of each month
+        // Only trust monthly count if it matches current month; otherwise reset to 0
+        usageCount = usageMonth === currentMonth ? monthlyUsageCount : 0;
+      } else if (directUsageCount !== undefined) {
+        usageCount = directUsageCount;
+      } else {
+        usageCount = 0;
+      }
       const costPerUse = usageCount > 0 ? monthlyAmount / usageCount : monthlyAmount;
       // Determine value rating based on both usage count and cost per use
       let valueRating: 'excellent' | 'good' | 'fair' | 'poor';

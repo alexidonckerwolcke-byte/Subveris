@@ -2,6 +2,8 @@ import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
+import { useAuth } from "@/lib/auth-context";
+import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/lib/currency-context";
 import {
   LayoutDashboard,
@@ -95,6 +97,7 @@ const settingsItems = [
 
 export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
   const [location] = useLocation();
+  const { user } = useAuth();
   const { showFamilyData } = useFamilyDataMode();
 
   const savingsQuery = useQuery<{
@@ -103,19 +106,13 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
     memberMonthlySavings?: number;
   }>({
     queryKey: ["/api/analytics/monthly-savings", showFamilyData],
+    enabled: !!user?.id,
     queryFn: async () => {
-      const token = JSON.parse(localStorage.getItem("supabase.auth.token") || "{}").access_token;
       let url = "/api/analytics/monthly-savings";
       if (showFamilyData) {
         url += "?family=true";
       }
-      const response = await fetch(url, {
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      });
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || `HTTP ${response.status}`);
-      }
+      const response = await apiRequest("GET", url);
       return await response.json();
     },
   });
@@ -135,7 +132,7 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b border-sidebar-border px-6 py-4 bg-gradient-to-r from-primary/90 to-indigo-500/80 text-primary-foreground">
+      <SidebarHeader className="border-b border-sidebar-border px-6 py-4 bg-gradient-to-r from-primary/60 to-indigo-300/70 text-primary-foreground">
         <Link href={disabled ? "#" : "/"} className={`flex items-center gap-3 ${disabled ? 'pointer-events-none opacity-70' : ''}`}>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden shadow-md">
             <img src="/assets/logo.png" alt="Subveris Logo" className="h-full w-full object-cover" />
@@ -221,7 +218,7 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
               )}
             </span>
             {showFamilyData && !loading && (
-              <span className="text-xs text-gray-100">
+              <span className="text-xs font-medium text-foreground">
                 You: {ownerMonthlySavings > 0 ? `+${formatCurrency(ownerMonthlySavings)}` : formatCurrency(ownerMonthlySavings)} · Members: {memberMonthlySavings > 0 ? `+${formatCurrency(memberMonthlySavings)}` : formatCurrency(memberMonthlySavings)}
               </span>
             )}

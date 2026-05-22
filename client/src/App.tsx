@@ -3,46 +3,46 @@ import { useState, useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { SubscriptionProvider } from "@/lib/subscription-context";
-import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { OnboardingTutorial } from "@/components/onboarding-tutorial";
-import { PostSignupFlow } from "@/components/post-signup-flow";
-import { MFAChallengeModal } from "@/components/mfa-challenge-modal";
-import { Button } from "@/components/ui/button";
-import NotFound from "@/pages/not-found";
-import Dashboard from "@/pages/dashboard";
-import Subscriptions from "@/pages/subscriptions";
-import Insights from "@/pages/insights";
-import Savings from "@/pages/savings";
-import Settings from "@/pages/settings";
-import Pricing from "@/pages/pricing";
-import Support from "@/pages/support";
-import Files from "@/pages/files";
-import HomePage from "@/pages/home";
-import Privacy from "@/pages/privacy";
-import Terms from "@/pages/terms";
-import Security from "@/pages/security";
-import AuthCallback from "@/pages/auth-callback";
-import FamilyCalendar from "@/pages/family-calendar";
-import Calendar from "@/pages/calendar";
-import FamilySharingPage from "@/pages/family-sharing";
-import DocsPage from "@/pages/docs";
-import { ContactPage } from "@/pages/contact";
+import { TooltipProvider } from "./components/ui/tooltip.js";
+import { SidebarProvider, SidebarTrigger } from "./components/ui/sidebar.js";
+import { AppSidebar } from "./components/app-sidebar.js";
+import { ThemeToggle } from "./components/theme-toggle.js";
+import { SubscriptionProvider } from "./lib/subscription-context.js";
+import { AuthProvider, useAuth } from "./lib/auth-context.js";
+import { OnboardingTutorial } from "./components/onboarding-tutorial.js";
+import { PostSignupFlow } from "./components/post-signup-flow.js";
+import { MFAChallengeModal } from "./components/mfa-challenge-modal.js";
+import { Button } from "./components/ui/button.js";
+import NotFound from "./pages/not-found.js";
+import Dashboard from "./pages/dashboard.js";
+import Subscriptions from "./pages/subscriptions.js";
+import Insights from "./pages/insights.js";
+import Savings from "./pages/savings.js";
+import Settings from "./pages/settings.js";
+import Pricing from "./pages/pricing.js";
+import Support from "./pages/support.js";
+import Files from "./pages/files.js";
+import HomePage from "./pages/home.js";
+import Privacy from "./pages/privacy.js";
+import Terms from "./pages/terms.js";
+import Security from "./pages/security.js";
+import AuthCallback from "./pages/auth-callback.js";
+import FamilyCalendar from "./pages/family-calendar.js";
+import Calendar from "./pages/calendar.js";
+import FamilySharingPage from "./pages/family-sharing.js";
+import DocsPage from "./pages/docs.js";
+import { ContactPage } from "./pages/contact.js";
 import { useLocation } from "wouter";
-import { CurrencyProvider } from "@/lib/currency-context";
-import { ErrorBoundary } from "@/components/error-boundary";
+import { CurrencyProvider } from "./lib/currency-context.js";
+import { ErrorBoundary } from "./components/error-boundary.js";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+} from "./components/ui/dropdown-menu.js";
+import { Avatar, AvatarFallback, AvatarImage } from "./components/ui/avatar.js";
 import React from "react";
 
 function Router({ user }: { user: any }) {
@@ -91,13 +91,19 @@ function AppContent() {
   const [location] = useLocation();
   const { user, loading, signOut, justSignedUp, clearSignUpFlag, pendingMfaSession } = useAuth();
   const [postSignupOpen, setPostSignupOpen] = useState(false);
+  const [postSignupCompleted, setPostSignupCompleted] = useState(false);
 
   useEffect(() => {
-    // Show flow only for users who have just signed up
-    if (user && justSignedUp) {
+    if (typeof window === 'undefined') return;
+    setPostSignupCompleted(localStorage.getItem('postSignupFlowCompleted') === 'true');
+  }, []);
+
+  useEffect(() => {
+    // Show flow only once for users who have just signed up and haven't completed it yet.
+    if (user && justSignedUp && !postSignupCompleted && location !== '/pricing') {
       setPostSignupOpen(true);
     }
-  }, [justSignedUp, user]);
+  }, [justSignedUp, user, postSignupCompleted, location]);
 
   // Standalone docs page: render only DocsPage, no app shell
   if (location === "/docs") {
@@ -190,6 +196,10 @@ function AppContent() {
                   <PostSignupFlow
                     open={postSignupOpen}
                     onClose={() => {
+                      if (typeof window !== 'undefined') {
+                        window.localStorage.setItem('postSignupFlowCompleted', 'true');
+                      }
+                      setPostSignupCompleted(true);
                       setPostSignupOpen(false);
                       clearSignUpFlag();
                     }}

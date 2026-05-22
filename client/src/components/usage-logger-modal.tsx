@@ -48,7 +48,7 @@ export function UsageLoggerModal({
     setIsLoading(true);
     try {
       await apiRequest("PATCH", `/api/subscriptions/${subscription.id}/usage`, {
-        usageCount: newCount,
+        monthlyUsageCount: newCount,
       });
 
       toast({

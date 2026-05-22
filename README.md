@@ -1,6 +1,6 @@
 # Subveris
 
-A SaaS web app for managing recurring payments and subscriptions with Supabase Auth, Supabase Database, and Stripe integration.
+Subscription management platform for tracking, analyzing, and optimizing recurring payments. Built with Supabase Auth, Supabase Database, and Stripe integration.
 
 ## Setup
 
@@ -53,6 +53,11 @@ npm run dev
   - `invoice.payment_failed`
   - `customer.subscription.updated`
   - `customer.subscription.deleted`
+
+### Supabase API migration
+- A new Supabase Edge Function is available at `supabase/functions/api`.
+- It currently handles Stripe checkout session creation and basic subscription status routes.
+- Stripe webhook handling is still on `supabase/functions/stripe-webhook`.
 
 ### Notes
 - `STRIPE_CHECKOUT_SUCCESS_URL` and `STRIPE_CHECKOUT_CANCEL_URL` are optional

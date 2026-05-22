@@ -26,7 +26,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-const PREMIUM_PRICE_ID = import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID || "price_1T3jhIJpTYwzr88x8pGboTSU"; // Premium Stripe price ID
+const PREMIUM_PRICE_ID = import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID || "price_1TM9r1JSf7SJ8WWRiocez8wo"; // Premium Stripe price ID
 
 export function SubscriptionManager() {
   const { toast } = useToast();

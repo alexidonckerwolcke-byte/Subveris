@@ -1,0 +1,1114 @@
+import { config } from 'dotenv';
+import { Resend } from 'resend';
+import { checkNotificationPreference } from './notification-preferences.js';
+import { sendBatchPushNotifications } from './push-notifications.js';
+import { createClient } from '@supabase/supabase-js';
+
+// Load environment variables
+config();
+
+// Email provider configuration
+interface EmailProvider {
+  name: string;
+  send: (options: EmailOptions) => Promise<EmailResult>;
+  isConfigured: () => boolean;
+  canSendTo: (email: string) => boolean;
+}
+
+interface EmailOptions {
+  to: string;
+  subject: string;
+  html: string;
+  from?: string;
+  replyTo?: string;
+}
+
+interface EmailResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
+
+// Resend provider
+class ResendProvider implements EmailProvider {
+  name = 'Resend';
+  private client: Resend | null = null;
+
+  constructor() {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (apiKey) {
+      this.client = new Resend(apiKey);
+    }
+  }
+
+  isConfigured(): boolean {
+    return !!this.client;
+  }
+
+  canSendTo(email: string): boolean {
+    // Always allow support inbox delivery for the contact form.
+    if (email.toLowerCase() === 'help.subveris@gmail.com') {
+      return true;
+    }
+
+    // In production, Resend allows sending to any verified domain.
+    if (process.env.NODE_ENV === 'production') {
+      return true;
+    }
+
+    // Testing restriction - only to the configured allowed email.
+    const allowedEmail = process.env.RESEND_TESTING_EMAIL || 'alexi.donckerwolcke@gmail.com';
+    return email.toLowerCase() === allowedEmail.toLowerCase();
+  }
+
+  async send(options: EmailOptions): Promise<EmailResult> {
+    if (!this.client) {
+      return { success: false, error: 'Resend not configured' };
+    }
+
+    if (!this.canSendTo(options.to)) {
+      return {
+        success: false,
+        error: `Cannot send to ${options.to} - ${this.name} restrictions`
+      };
+    }
+
+    try {
+      const from = options.from || 'Subveris <noreply@subveris.com>';
+      const result = await this.client.emails.send({
+        from,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        replyTo: options.replyTo,
+      });
+
+      return {
+        success: true,
+        messageId: result.data?.id,
+      };
+    } catch (error) {
+      console.error(`[${this.name}] Send error:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+}
+
+// SendGrid provider (fallback)
+class SendGridProvider implements EmailProvider {
+  name = 'SendGrid';
+  private apiKey: string | null = null;
+
+  constructor() {
+    this.apiKey = process.env.SENDGRID_API_KEY || null;
+  }
+
+  isConfigured(): boolean {
+    return !!this.apiKey;
+  }
+
+  canSendTo(email: string): boolean {
+    return true; // SendGrid allows sending to any email
+  }
+
+  async send(options: EmailOptions): Promise<EmailResult> {
+    if (!this.apiKey) {
+      return { success: false, error: 'SendGrid not configured' };
+    }
+
+    try {
+      const sgMailModule = (await import('@sendgrid/mail')) as any;
+      const sgMail = sgMailModule.default || sgMailModule;
+
+      const msg = {
+        to: options.to,
+        from: options.from || 'noreply@subveris.com',
+        subject: options.subject,
+        html: options.html,
+        replyTo: options.replyTo,
+      };
+
+      const result = await sgMail.send(msg);
+
+      return {
+        success: true,
+        messageId: result[0]?.headers?.['x-message-id'],
+      };
+    } catch (error) {
+      console.error(`[${this.name}] Send error:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+}
+
+// Email service with provider failover
+class EmailService {
+  private providers: EmailProvider[] = [];
+  private supabase: any;
+
+  constructor() {
+    // Initialize Supabase client
+    this.supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Initialize providers in order of preference
+    this.providers.push(new ResendProvider());
+    this.providers.push(new SendGridProvider());
+
+    console.log('[Email] Initialized providers:', this.providers.map(p => ({
+      name: p.name,
+      configured: p.isConfigured()
+    })));
+  }
+
+  public getSendGridProvider(): EmailProvider | undefined {
+    return this.providers.find(p => p.name === 'SendGrid' && p.isConfigured());
+  }
+
+  private async logEmailAttempt(options: EmailOptions, result: EmailResult, userId?: string) {
+    try {
+      await this.supabase.from('email_logs').insert({
+        user_id: userId,
+        to_email: options.to,
+        subject: options.subject,
+        provider: this.providers.find(p => p.isConfigured())?.name || 'none',
+        success: result.success,
+        error_message: result.error,
+        message_id: result.messageId,
+        created_at: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('[Email] Failed to log email attempt:', error);
+    }
+  }
+
+  getActiveProvider(): EmailProvider | null {
+    return this.providers.find(provider => provider.isConfigured()) || null;
+  }
+
+  async send(options: EmailOptions, userId?: string): Promise<EmailResult> {
+    // Try each configured provider in order
+    for (const provider of this.providers) {
+      if (!provider.isConfigured()) continue;
+      if (!provider.canSendTo(options.to)) continue;
+
+      console.log(`[Email] Attempting to send via ${provider.name} to ${options.to}`);
+
+      const result = await provider.send(options);
+      await this.logEmailAttempt(options, result, userId);
+
+      if (result.success) {
+        console.log(`[Email] Successfully sent via ${provider.name}:`, result.messageId);
+        return result;
+      } else {
+        console.warn(`[Email] Failed via ${provider.name}:`, result.error);
+      }
+    }
+
+    const error = 'All email providers failed or are not configured';
+    console.error('[Email]', error);
+    await this.logEmailAttempt(options, { success: false, error }, userId);
+
+    return { success: false, error };
+  }
+}
+
+// Global email service instance
+const emailServiceInstance = new EmailService();
+
+// Legacy functions for backward compatibility
+const resendApiKey = process.env.RESEND_API_KEY;
+console.log('[Email] RESEND_API_KEY check at load time:', !!resendApiKey, resendApiKey ? 'configured' : 'not configured');
+
+// Create resend client function that checks at runtime (deprecated - use emailService instead)
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  return apiKey
+    ? new Resend(apiKey)
+    : ({
+        emails: {
+          send: async () => {
+            console.warn('[Email] RESEND_API_KEY not configured. Skipping email send.');
+            return { data: null, error: null };
+          },
+        },
+      } as unknown as Resend);
+}
+
+// Check if email can be sent (deprecated - use provider.canSendTo instead)
+function canSendEmail(to: string): boolean {
+  const provider = emailServiceInstance.getActiveProvider();
+  return provider ? provider.canSendTo(to) : false;
+}
+
+// Exchange rates relative to USD (matching client/src/lib/currency-context.tsx)
+const EXCHANGE_RATES: Record<string, number> = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  CAD: 1.35,
+  AUD: 1.52,
+  JPY: 152.0,
+  CHF: 0.88,
+  SEK: 10.85,
+  NOK: 10.75,
+  DKK: 6.95,
+  PLN: 4.05,
+  CZK: 23.5,
+  HUF: 365.0,
+  BRL: 5.25,
+  MXN: 18.5,
+  ARS: 950.0,
+  TRY: 34.0,
+  ZAR: 18.5,
+  INR: 84.0,
+  CNY: 7.25,
+  KRW: 1350.0,
+  SGD: 1.35,
+  HKD: 7.8,
+  NZD: 1.65,
+};
+
+// Helper to get currency symbol
+function getCurrencySymbol(currency: string): string {
+  const currencySymbols: Record<string, string> = {
+    'USD': '$',
+    'EUR': '€',
+    'GBP': '£',
+    'JPY': '¥',
+    'CAD': 'C$',
+    'AUD': 'A$',
+    'CHF': 'CHF',
+    'CNY': '¥',
+    'INR': '₹',
+    'NZD': 'NZ$',
+    'SEK': 'kr',
+    'NOK': 'kr',
+    'DKK': 'kr',
+    'PLN': 'zł',
+    'CZK': 'Kč',
+    'HUF': 'Ft',
+    'BRL': 'R$',
+    'MXN': '$',
+    'ARS': '$',
+    'TRY': '₺',
+    'ZAR': 'R',
+    'KRW': '₩',
+    'SGD': 'S$',
+    'HKD': 'HK$',
+  };
+  return currencySymbols[currency.toUpperCase()] || currency;
+}
+
+// Helper to get user's preferred currency
+async function getUserCurrency(userId: string): Promise<string> {
+  try {
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data } = await supabase
+      .from('users')
+      .select('currency')
+      .eq('id', userId)
+      .single();
+    return data?.currency || 'USD';
+  } catch (err) {
+    return 'USD';
+  }
+}
+
+// Helper to format amount in user's currency
+function formatAmountForEmail(amount: number, fromCurrency: string, toCurrency: string): string {
+  const fromRate = EXCHANGE_RATES[fromCurrency.toUpperCase()] || 1;
+  const toRate = EXCHANGE_RATES[toCurrency.toUpperCase()] || 1;
+  const convertedAmount = (amount / fromRate) * toRate;
+  const symbol = getCurrencySymbol(toCurrency);
+  return `${symbol}${convertedAmount.toFixed(2)}`;
+}
+
+const emailTemplate = (title: string, content: string) => `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+    <div style="background-color: #f0f7ff; padding: 20px; border-radius: 8px 8px 0 0; border-left: 4px solid #007bff; display: flex; align-items: center; gap: 15px;">
+      <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663486926530/yZNjWlFaCygNTvdJ.png" alt="Subveris Logo" style="height: 40px; width: 40px; border-radius: 8px; object-fit: cover;" />
+      <h1 style="color: #007bff; margin: 0; font-size: 24px;">${title}</h1>
+    </div>
+    <div style="padding: 30px; background-color: #fff; border: 1px solid #e0e0e0; border-top: none;">
+      ${content}
+      <p style="margin-top: 30px; color: #666; font-size: 12px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+        Best regards,<br/>
+        The Subveris Team
+      </p>
+    </div>
+  </div>
+`;
+
+export const emailService = {
+  // Welcome email for new signups
+  async sendWelcomeEmail(userEmail: string, userName?: string) {
+    try {
+      const name = userName || 'there';
+      const content = `
+        <p>Hi ${name},</p>
+        <p>Welcome to Subveris! We're excited to have you on board.</p>
+        <p>Subveris helps you take complete control of your subscription spending by:</p>
+        <ul style="line-height: 1.8;">
+          <li>🎯 Tracking all your subscriptions in one place</li>
+          <li>💡 Getting AI-powered recommendations to save money</li>
+          <li>🏦 Connecting your bank accounts to auto-detect subscriptions</li>
+          <li>📊 Analyzing your spending patterns</li>
+          <li>⏰ Scheduling automatic cancellations</li>
+        </ul>
+        <p><strong>Get Started:</strong> Log in to your dashboard to add your first subscription or connect your bank account.</p>
+        <p>Questions? Check out our help center or reply to this email.</p>
+        <p>For support, contact us at: <strong>help.subveris@gmail.com</strong></p>
+      `;
+
+      const result = await emailServiceInstance.send({
+        to: userEmail,
+        subject: 'Welcome to Subveris! 🎉',
+        html: emailTemplate('Welcome to Subveris', content),
+        from: 'Subveris <onboarding@subveris.com>',
+      });
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending welcome email:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+
+  // Subscription added notification
+  async sendSubscriptionAddedEmail(userEmail: string, userId: string, data: {
+    subscriptionName: string;
+    amount: number;
+    currency: string;
+    frequency: string;
+  }) {
+    try {
+      // Check if user has email notifications enabled
+      const hasEmailPreference = await checkNotificationPreference(userId, 'email');
+      if (!hasEmailPreference) {
+        console.log('[Email] Email notifications disabled for user, skipping subscription added email');
+        return { success: true, skipped: true };
+      }
+
+      const userCurrency = await getUserCurrency(userId);
+      const formattedAmount = formatAmountForEmail(data.amount, data.currency, userCurrency);
+      const annualAmount = data.frequency === 'yearly' ? data.amount : 
+                         data.frequency === 'monthly' ? data.amount * 12 :
+                         data.frequency === 'quarterly' ? data.amount * 4 :
+                         data.frequency === 'weekly' ? data.amount * 52 : data.amount * 12;
+      const formattedAnnual = formatAmountForEmail(annualAmount, data.currency, userCurrency);
+
+      const content = `
+        <p>Hi there,</p>
+        <p>You've successfully added a new subscription to your Subveris dashboard!</p>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0;">
+            <strong>Subscription:</strong> ${data.subscriptionName}<br/>
+            <strong>Amount:</strong> ${formattedAmount}/${data.frequency}<br/>
+            <strong>Annual Cost:</strong> ${formattedAnnual}
+          </p>
+        </div>
+        <p>Your subscription is now being tracked. You can:</p>
+        <ul>
+          <li>View your cost-per-use analytics</li>
+          <li>Schedule automatic cancellation if needed</li>
+          <li>Track your usage</li>
+          <li>Get AI recommendations</li>
+        </ul>
+      `;
+
+      const result = await emailServiceInstance.send({
+        to: userEmail,
+        subject: `New subscription added: ${data.subscriptionName}`,
+        html: emailTemplate('Subscription Added', content),
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending subscription added email:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Subscription deleted notification
+  async sendSubscriptionDeletedEmail(userEmail: string, userId: string, data: {
+    subscriptionName: string;
+    amount: number;
+    currency: string;
+  }) {
+    try {
+      // Check if user has email notifications enabled
+      const hasEmailPreference = await checkNotificationPreference(userId, 'email');
+      if (!hasEmailPreference) {
+        console.log('[Email] Email notifications disabled for user, skipping subscription deleted email');
+        return { success: true, skipped: true };
+      }
+
+      const userCurrency = await getUserCurrency(userId);
+      const formattedAmount = formatAmountForEmail(data.amount, data.currency, userCurrency);
+      const formattedAnnual = formatAmountForEmail(data.amount * 12, data.currency, userCurrency);
+
+      const content = `
+        <p>Hi there,</p>
+        <p>You've successfully removed <strong>${data.subscriptionName}</strong> from your subscriptions.</p>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0;">
+            <strong>Subscription:</strong> ${data.subscriptionName}<br/>
+            <strong>Monthly Savings:</strong> ${formattedAmount}<br/>
+            <strong>Annual Savings:</strong> ${formattedAnnual}
+          </p>
+        </div>
+        <p>🎉 Great job optimizing your subscriptions! You're saving money every month.</p>
+      `;
+
+      const result = await emailServiceInstance.send({
+        to: userEmail,
+        subject: `Subscription cancelled: ${data.subscriptionName}`,
+        html: emailTemplate('Subscription Cancelled', content),
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending subscription deleted email:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Bank account connected notification
+  async sendBankConnectedEmail(userEmail: string, userId: string, data: {
+    bankName: string;
+    accountType?: string;
+  }) {
+    try {
+      // Check if user has email notifications enabled
+      const hasEmailPreference = await checkNotificationPreference(userId, 'email');
+      if (!hasEmailPreference) {
+        console.log('[Email] Email notifications disabled for user, skipping bank connected email');
+        return { success: true, skipped: true };
+      }
+
+      const content = `
+        <p>Hi there,</p>
+        <p>Your <strong>${data.bankName}</strong> account has been successfully connected to Subveris!</p>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0;">
+            <strong>Bank:</strong> ${data.bankName}<br/>
+            ${data.accountType ? `<strong>Account Type:</strong> ${data.accountType}<br/>` : ''}
+            <strong>Status:</strong> Connected ✅
+          </p>
+        </div>
+        <p>Subveris is now analyzing your transactions to automatically detect subscriptions.</p>
+        <p>This helps us:</p>
+        <ul>
+          <li>Find all your subscriptions automatically</li>
+          <li>Alert you about duplicate subscriptions</li>
+          <li>Provide better savings recommendations</li>
+        </ul>
+      `;
+
+      const result = await emailServiceInstance.send({
+        to: userEmail,
+        subject: `Bank account connected: ${data.bankName}`,
+        html: emailTemplate('Bank Account Connected', content),
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending bank connected email:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Subscription status changed notification
+  async sendStatusChangedEmail(userEmail: string, userId: string, data: {
+    subscriptionName: string;
+    oldStatus: string;
+    newStatus: string;
+  }) {
+    try {
+      // Check if user has email notifications enabled
+      const hasEmailPreference = await checkNotificationPreference(userId, 'email');
+      if (!hasEmailPreference) {
+        console.log('[Email] Email notifications disabled for user, skipping status changed email');
+        return { success: true, skipped: true };
+      }
+
+      const statusEmoji = {
+        'active': '✅',
+        'unused': '⏸️',
+        'to-cancel': '❌',
+        'deleted': '🗑️',
+      };
+      
+      const content = `
+        <p>Hi there,</p>
+        <p>The status of your <strong>${data.subscriptionName}</strong> subscription has changed.</p>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0;">
+            <strong>Subscription:</strong> ${data.subscriptionName}<br/>
+            <strong>Previous Status:</strong> ${statusEmoji[data.oldStatus as keyof typeof statusEmoji] || ''} ${data.oldStatus}<br/>
+            <strong>New Status:</strong> ${statusEmoji[data.newStatus as keyof typeof statusEmoji] || ''} ${data.newStatus}
+          </p>
+        </div>
+        <p>If you didn't make this change, please log in to your dashboard to review your subscriptions.</p>
+      `;
+
+      const result = await emailServiceInstance.send({
+        to: userEmail,
+        subject: `Subscription status changed: ${data.subscriptionName}`,
+        html: emailTemplate('Status Updated', content),
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending status changed email:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 2FA enabled notification
+  async send2FAEnabledEmail(userEmail: string, userId: string) {
+    try {
+      // Check if user has email notifications enabled
+      const hasEmailPreference = await checkNotificationPreference(userId, 'email');
+      if (!hasEmailPreference) {
+        console.log('[Email] Email notifications disabled for user, skipping 2FA enabled email');
+        return { success: true, skipped: true };
+      }
+
+      const content = `
+        <p>Hi there,</p>
+        <p>Two-factor authentication (2FA) has been successfully enabled on your Subveris account.</p>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0;">
+            <strong>Security Status:</strong> Enhanced ✅<br/>
+            <strong>2FA Method:</strong> Authenticator App<br/>
+            <strong>Protected:</strong> Account Login
+          </p>
+        </div>
+        <p>Your account is now more secure. When you log in, you'll be asked for a code from your authenticator app in addition to your password.</p>
+        <p><strong>Important:</strong> Keep your recovery codes in a safe place. You can find them in your account settings.</p>
+      `;
+
+      const result = await emailServiceInstance.send({
+        to: userEmail,
+        subject: 'Two-Factor Authentication Enabled',
+        html: emailTemplate('Security Enhanced', content),
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending 2FA enabled email:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Premium upgrade notification
+  async sendPremiumUpgradeEmail(userEmail: string, userId: string) {
+    try {
+      // Check if user has email notifications enabled
+      const hasEmailPreference = await checkNotificationPreference(userId, 'email');
+      if (!hasEmailPreference) {
+        console.log('[Email] Email notifications disabled for user, skipping premium upgrade email');
+        return { success: true, skipped: true };
+      }
+
+      const content = `
+        <p>Hi there,</p>
+        <p>🎉 Welcome to Subveris Premium! Your upgrade was successful.</p>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0;">
+            <strong>Plan:</strong> Premium<br/>
+            <strong>Status:</strong> Active ✅<br/>
+            <strong>Renewal:</strong> Auto-renewal enabled
+          </p>
+        </div>
+        <p>You now have access to premium features:</p>
+        <ul>
+          <li>⏰ Schedule automatic cancellations</li>
+          <li>🤖 Advanced AI recommendations</li>
+          <li>📧 Unlimited email notifications</li>
+          <li>📊 Detailed analytics reports</li>
+          <li>🔒 Priority support</li>
+        </ul>
+        <p>Start using your premium features in your dashboard!</p>
+      `;
+
+      const result = await emailServiceInstance.send({
+        to: userEmail,
+        subject: 'Welcome to Subveris Premium! 🎉',
+        html: emailTemplate('Premium Plan Activated', content),
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending premium upgrade email:', error);
+      return { success: false, error };
+    }
+  },
+
+  // AI Recommendation notification
+  async sendRecommendationEmail(userEmail: string, userId: string, data: {
+    recommendationType: string;
+    subscriptionName: string;
+    savings?: number;
+    currency?: string;
+  }) {
+    try {
+      // Check if user has email notifications enabled
+      const hasEmailPreference = await checkNotificationPreference(userId, 'email');
+      if (!hasEmailPreference) {
+        console.log('[Email] Email notifications disabled for user, skipping recommendation email');
+        return { success: true, skipped: true };
+      }
+
+      const content = `
+        <p>Hi there,</p>
+        <p>We have a recommendation that could help you save money! 💰</p>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0;">
+            <strong>Recommendation:</strong> ${data.recommendationType}<br/>
+            <strong>Subscription:</strong> ${data.subscriptionName}<br/>
+            ${data.savings ? `<strong>Potential Savings:</strong> ${data.currency} ${data.savings}/month<br/>` : ''}
+            <strong>Status:</strong> Review in dashboard
+          </p>
+        </div>
+        <p>Log in to your Subveris dashboard to review this recommendation and take action.</p>
+      `;
+
+      const result = await emailServiceInstance.send({
+        to: userEmail,
+        subject: `💡 Money-saving recommendation: ${data.subscriptionName}`,
+        html: emailTemplate('New Recommendation', content),
+        from: 'Subveris <recommendations@subveris.com>',
+      }, userId);
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending recommendation email:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Cancellation reminder (existing)
+  async sendCancellationScheduledReminder(userEmail: string, userId: string, data: {
+    subscriptionName: string;
+    cancellationDate: string;
+    amount: number;
+    currency: string;
+  }) {
+    try {
+      // Check if user has email notifications enabled
+      const hasEmailPreference = await checkNotificationPreference(userId, 'email');
+      if (!hasEmailPreference) {
+        console.log('[Email] Email notifications disabled for user, skipping cancellation scheduled reminder');
+        return { success: true, skipped: true };
+      }
+
+      const cancellationDate = new Date(data.cancellationDate).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      });
+
+      const content = `
+        <p>Hi there,</p>
+        <p>This is a friendly reminder that your <strong>${data.subscriptionName}</strong> subscription cancellation reminder is set for <strong>${cancellationDate}</strong>.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0;">
+            <strong>Subscription:</strong> ${data.subscriptionName}<br/>
+            <strong>Monthly Cost:</strong> ${data.currency} ${data.amount}<br/>
+            <strong>Reminder Date:</strong> ${cancellationDate}
+          </p>
+        </div>
+
+        <p>If you'd like to cancel this reminder or keep the subscription active, please log in to your Subveris dashboard.</p>
+      `;
+
+      const result = await emailServiceInstance.send({
+        to: userEmail,
+        subject: `Reminder scheduled for ${data.subscriptionName} on ${cancellationDate}`,
+        html: emailTemplate('Cancellation Reminder Scheduled', content),
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending cancellation scheduled reminder:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Cancellation confirmation (existing)
+  async sendCancellationConfirmation(userEmail: string, userId: string, data: {
+    subscriptionName: string;
+    amount: number;
+    currency: string;
+  }) {
+    try {
+      // Check if user has email notifications enabled
+      const hasEmailPreference = await checkNotificationPreference(userId, 'email');
+      if (!hasEmailPreference) {
+        console.log('[Email] Email notifications disabled for user, skipping cancellation confirmation');
+        return { success: true, skipped: true };
+      }
+
+      const userCurrency = await getUserCurrency(userId);
+      const formattedAmount = formatAmountForEmail(data.amount, data.currency, userCurrency);
+      const formattedAnnual = formatAmountForEmail(data.amount * 12, data.currency, userCurrency);
+
+      const content = `
+        <p>Hi there,</p>
+        <p>Your <strong>${data.subscriptionName}</strong> subscription has been successfully cancelled.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0;">
+            <strong>Subscription:</strong> ${data.subscriptionName}<br/>
+            <strong>Monthly Savings:</strong> ${formattedAmount}<br/>
+            <strong>Annual Savings:</strong> ${formattedAnnual}
+          </p>
+        </div>
+
+        <p>Great job optimizing your subscriptions! You're now saving <strong>${formattedAmount} per month</strong>.</p>
+      `;
+
+      const result = await emailServiceInstance.send({
+        to: userEmail,
+        subject: `${data.subscriptionName} has been cancelled`,
+        html: emailTemplate('Subscription Cancelled', content),
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending cancellation confirmation:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Smart cancellation reminder email
+  async sendCancellationReminder(userEmail: string, userId: string, data: {
+    subscriptionName: string;
+    amount: number;
+    currency: string;
+    cancellationUrl?: string;
+  }) {
+    try {
+      const userCurrency = await getUserCurrency(userId);
+      const formattedAmount = formatAmountForEmail(data.amount, data.currency, userCurrency);
+      const formattedAnnual = formatAmountForEmail(data.amount * 12, data.currency, userCurrency);
+      
+      let actionButton = '';
+      if (data.cancellationUrl) {
+        actionButton = `
+          <div style="margin: 30px 0; text-align: center;">
+            <a href="${data.cancellationUrl}" style="display: inline-block; background-color: #ef4444; color: white; padding: 12px 32px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">
+              Cancel ${data.subscriptionName}
+            </a>
+            <p style="margin-top: 12px; font-size: 12px; color: #666;">
+              Click the button above to go directly to the cancellation page
+            </p>
+          </div>
+        `;
+      }
+
+      const content = `
+        <p>Hi there,</p>
+        <p>Today is the day you scheduled to cancel <strong>${data.subscriptionName}</strong>!</p>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
+          <p style="margin: 0;">
+            <strong>Subscription:</strong> ${data.subscriptionName}<br/>
+            <strong>Monthly Cost:</strong> ${formattedAmount}<br/>
+            <strong>Annual Cost:</strong> ${formattedAnnual}<br/>
+            <strong>Potential Annual Savings:</strong> ${formattedAnnual}
+          </p>
+        </div>
+
+        <h3 style="color: #333; margin-top: 25px;">Next Steps:</h3>
+        <ol style="line-height: 1.8; color: #555;">
+          <li><strong>Review your decision</strong> - Make sure you still want to cancel</li>
+          <li><strong>Cancel the subscription</strong> - Use the button below or visit the provider's website</li>
+          <li><strong>Confirm cancellation</strong> - Save any data you might need before it's deleted</li>
+        </ol>
+
+        ${actionButton}
+
+        <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 14px;">
+          <strong>Didn't mean to cancel?</strong> You can always log back into ${data.subscriptionName} to reactivate your subscription.
+        </p>
+      `;
+
+      // Check email notification preference
+      const hasEmailPreference = await checkNotificationPreference(userId, 'email');
+      if (hasEmailPreference) {
+        const result = await emailServiceInstance.send({
+          to: userEmail,
+          subject: `Time to cancel ${data.subscriptionName}? Save ${formattedAnnual}/year`,
+          html: emailTemplate('Cancellation Reminder', content),
+          from: 'Subveris <onboarding@subveris.com>',
+        }, userId);
+
+        if (!result.success) {
+          console.error('[Email] Failed to send cancellation reminder:', result.error);
+        } else {
+          console.log('[Email] Cancellation reminder sent to', userEmail);
+        }
+      }
+
+      // Send push notification if enabled
+      const hasPushPreference = await checkNotificationPreference(userId, 'push');
+      if (hasPushPreference) {
+        await this.sendCancellationReminderPush(userId, {
+          subscriptionName: data.subscriptionName,
+          amount: data.amount,
+          currency: data.currency,
+          cancellationUrl: data.cancellationUrl,
+        });
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('[Email] Error sending cancellation reminder:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Helper: Send push notification for cancellation reminder
+  async sendCancellationReminderPush(userId: string, data: {
+    subscriptionName: string;
+    amount: number;
+    currency: string;
+    cancellationUrl?: string;
+  }) {
+    try {
+      const supabase = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+
+      // Get user's push subscriptions
+      const { data: subscriptions, error } = await supabase
+        .from('push_subscriptions')
+        .select('endpoint, auth_key, p256dh_key')
+        .eq('user_id', userId);
+
+      if (error || !subscriptions || subscriptions.length === 0) {
+        console.log('[Push] No push subscriptions found for user', userId);
+        return;
+      }
+
+      const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+      const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+      if (!vapidPrivateKey || !vapidPublicKey) {
+        console.warn('[Push] VAPID keys not configured');
+        return;
+      }
+
+      const payload = {
+        title: 'Cancellation Reminder',
+        body: `Time to cancel ${data.subscriptionName}! Save ${data.currency}${(data.amount * 12).toFixed(2)}/year`,
+        tag: `cancellation-${data.subscriptionName}`,
+        data: {
+          url: data.cancellationUrl || '/dashboard',
+          subscriptionName: data.subscriptionName,
+          amount: data.amount,
+          currency: data.currency,
+        },
+      };
+
+      const results = await sendBatchPushNotifications(
+        subscriptions.map(s => ({
+          endpoint: s.endpoint,
+          authKey: s.auth_key,
+          p256dhKey: s.p256dh_key,
+        })),
+        payload,
+        vapidPrivateKey,
+        vapidPublicKey,
+        'help.subveris@gmail.com'
+      );
+
+      console.log('[Push] Cancellation reminder sent:', results);
+    } catch (error) {
+      console.error('[Push] Error sending cancellation reminder:', error);
+    }
+  },
+
+  // Weekly digest email
+  async sendWeeklyDigest(userId: string, userEmail: string, data: {
+    totalSubscriptions: number;
+    monthlySpending: number;
+    weeklySavings: number;
+    currency: string;
+    topSubscriptions: Array<{ name: string; amount: number }>;
+  }) {
+    try {
+      // Check if user has weekly digest enabled
+      const hasDigestPreference = await checkNotificationPreference(userId, 'digest');
+      if (!hasDigestPreference) {
+        console.log('[Email] Weekly digest disabled for user, skipping');
+        return { success: true, skipped: true };
+      }
+
+      const userCurrency = await getUserCurrency(userId);
+      const formattedMonthly = formatAmountForEmail(data.monthlySpending, data.currency, userCurrency);
+      const formattedAnnual = formatAmountForEmail(data.monthlySpending * 12, data.currency, userCurrency);
+      
+      const topSubscriptionsHtml = data.topSubscriptions
+        .map(
+          (sub) =>
+            `<tr style="border-bottom: 1px solid #e0e0e0;">
+              <td style="padding: 12px; text-align: left;">${sub.name}</td>
+              <td style="padding: 12px; text-align: right;"><strong>${formatAmountForEmail(sub.amount, data.currency, userCurrency)}/month</strong></td>
+            </tr>`
+        )
+        .join('');
+
+      const content = `
+        <p>Hi there,</p>
+        <p>Here's your weekly subscription summary for the week of ${new Date().toLocaleDateString()}:</p>
+
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 12px;">
+                <p style="margin: 0; color: #666; font-size: 12px;">Total Subscriptions</p>
+                <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: bold; color: #007bff;">${data.totalSubscriptions}</p>
+              </td>
+              <td style="padding: 12px;">
+                <p style="margin: 0; color: #666; font-size: 12px;">Monthly Spending</p>
+                <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: bold; color: #007bff;">${formattedMonthly}</p>
+              </td>
+              <td style="padding: 12px;">
+                <p style="margin: 0; color: #666; font-size: 12px;">Annual Cost</p>
+                <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: bold; color: #28a745;">${formattedAnnual}</p>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <h3 style="color: #333; margin: 25px 0 15px 0;">Your Top Subscriptions</h3>
+        <table style="width: 100%; border-collapse: collapse; background-color: #f8f9fa;">
+          <thead>
+            <tr style="background-color: #e9ecef; border-bottom: 2px solid #dee2e6;">
+              <th style="padding: 12px; text-align: left; font-weight: bold;">Subscription</th>
+              <th style="padding: 12px; text-align: right; font-weight: bold;">Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${topSubscriptionsHtml}
+          </tbody>
+        </table>
+
+        <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 14px;">
+          <strong>💡 Tip:</strong> Review your subscriptions regularly to identify ones you're no longer using. 
+          Log in to Subveris to see AI-powered recommendations for potential savings!
+        </p>
+      `;
+
+      // Check if we can send to this email address (Resend testing restriction)
+      if (!canSendEmail(userEmail)) {
+        console.log('[Email] Skipping weekly digest due to Resend testing restriction');
+        return { success: true, skipped: true, reason: 'resend_restriction' };
+      }
+
+      const result = await emailServiceInstance.send({
+        to: userEmail,
+        subject: `Your Weekly Subscription Summary - ${formattedMonthly}/month`,
+        html: emailTemplate('Weekly Digest', content),
+        from: 'Subveris <onboarding@subveris.com>',
+      }, userId);
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending weekly digest:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Contact form submission email
+  async sendContactEmail(contactData: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }) {
+    try {
+      const content = `
+        <p><strong>New contact form submission from Subveris website</strong></p>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0;">
+            <strong>From:</strong> ${contactData.name} (${contactData.email})<br/>
+            <strong>Subject:</strong> ${contactData.subject}<br/>
+            <strong>Received:</strong> ${new Date().toLocaleString()}
+          </p>
+        </div>
+        <h3 style="color: #333; margin: 25px 0 15px 0;">Message:</h3>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #007bff;">
+          <p style="margin: 0; white-space: pre-wrap;">${contactData.message}</p>
+        </div>
+        <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 14px;">
+          <strong>Reply to:</strong> ${contactData.email}<br/>
+          <strong>Dashboard:</strong> <a href="https://app.subveris.com" style="color: #007bff;">https://app.subveris.com</a>
+        </p>
+      `;
+
+      // For contact emails, prefer SendGrid over Resend to avoid test mode issues
+      const sendGridProvider = emailServiceInstance.getSendGridProvider();
+      if (sendGridProvider && sendGridProvider.canSendTo('help.subveris@gmail.com')) {
+        console.log('[Email] Using SendGrid for contact email to avoid Resend test mode');
+        const result = await sendGridProvider.send({
+          to: 'help.subveris@gmail.com',
+          replyTo: contactData.email,
+          subject: `Contact Form: ${contactData.subject}`,
+          html: emailTemplate('New Contact Form Submission', content),
+          from: 'Subveris <onboarding@subveris.com>',
+        });
+        if (result.success) {
+          console.log('[Email] Contact email sent successfully via SendGrid');
+          return result;
+        } else {
+          console.warn('[Email] SendGrid failed for contact email:', result.error);
+        }
+      }
+
+      // Fallback to regular email service (which may use Resend)
+      const result = await emailServiceInstance.send({
+        to: 'help.subveris@gmail.com',
+        replyTo: contactData.email,
+        subject: `Contact Form: ${contactData.subject}`,
+        html: emailTemplate('New Contact Form Submission', content),
+        from: 'Subveris <onboarding@subveris.com>',
+      });
+
+      return result;
+    } catch (error) {
+      console.error('[Email] Error sending contact email:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Unified send method for direct email sending
+  async send(options: EmailOptions, userId?: string): Promise<EmailResult> {
+    return await emailServiceInstance.send(options, userId);
+  },
+};
+

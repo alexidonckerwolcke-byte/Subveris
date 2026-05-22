@@ -27,8 +27,8 @@ const stripe = new Stripe(stripeKey, {
 });
 
 const PRICE_ID_TO_PLAN_TYPE: Record<string, 'free' | 'premium' | 'family'> = {
-  [Deno.env.get('VITE_STRIPE_PREMIUM_PRICE_ID') || 'price_1T3jhIJpTYwzr88x8pGboTSU']: 'premium',
-  [Deno.env.get('VITE_STRIPE_FAMILY_PRICE_ID') || 'price_1T3jikJpTYwzr88xIxkKHkKu']: 'family',
+  [Deno.env.get('VITE_STRIPE_PREMIUM_PRICE_ID') || 'price_1TM9r1JSf7SJ8WWRiocez8wo']: 'premium',
+  [Deno.env.get('VITE_STRIPE_FAMILY_PRICE_ID') || 'price_1TM9sSJSf7SJ8WWR4H26rSZ9']: 'family',
 };
 
 function getPriceIdFromSubscription(subscription: Stripe.Subscription | any): string | undefined {

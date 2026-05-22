@@ -20,6 +20,7 @@ console.log("srcRoot", srcRoot);
 
 
 export default defineConfig({
+  envDir: workspaceRoot,
   logLevel: 'error',
   // minimal plugin set to reduce complexity
   plugins: [
@@ -54,16 +55,19 @@ export default defineConfig({
     },
     proxy: {
       "/api": {
-        target: "http://localhost:5000",
+        target: "http://127.0.0.1:5000",
         changeOrigin: true,
-      },
-      "/auth": {
-        target: "http://localhost:5000",
-        changeOrigin: true,
-        bypass: (req) => {
-          if (req.url?.startsWith('/auth/callback')) {
-            return req.url;
-          }
+        secure: false,
+        rewrite: (path) => path,
+        configure: (proxy, options) => {
+          proxy.on("proxyReq", (proxyReq, req, res) => {
+            Object.keys(req.headers).forEach((key) => {
+              if (key !== "host" && key !== "origin") {
+                const headerValue = req.headers[key];
+                proxyReq.setHeader(key, headerValue as string | number | readonly string[]);
+              }
+            });
+          });
         },
       },
     },

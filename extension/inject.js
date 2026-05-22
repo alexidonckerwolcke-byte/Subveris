@@ -1,7 +1,10 @@
 // inject.js - Injected into page to capture auth token from localStorage
 // This runs in the page context so it can access page localStorage
 
-function sendAuthToken() {
+let lastSentToken = null;
+let lastSentUserId = null;
+
+function sendAuthToken(force = false) {
   let token = null;
   let userId = null;
   
@@ -29,6 +32,11 @@ function sendAuthToken() {
   }
   
   if (token && userId) {
+    if (!force && token === lastSentToken && userId === lastSentUserId) {
+      return;
+    }
+    lastSentToken = token;
+    lastSentUserId = userId;
     console.log('[Inject] ✅ Found auth token + userId, sending to extension');
     window.postMessage({
       type: 'SUBVERIS_AUTH_TOKEN',
@@ -54,7 +62,7 @@ sendAuthToken();
 const originalSetItem = Storage.prototype.setItem;
 Storage.prototype.setItem = function(key, value) {
   originalSetItem.call(this, key, value);
-  if (key === 'supabase.auth.token' || key === 'supabase_auth_token') {
+  if (key === 'supabase.auth.token' || key === 'supabase_auth_token' || key === 'supabaseUserUUID') {
     console.log('[Inject] Auth token updated, resending');
     sendAuthToken();
   }

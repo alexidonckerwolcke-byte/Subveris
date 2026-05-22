@@ -1,8 +1,9 @@
 import { useState, useImperativeHandle, forwardRef } from "react";
-import { useAuth } from "@/lib/auth-context";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { apiFetch } from "../lib/api.js";
+import { useAuth } from "../lib/auth-context.js";
+import { Button } from "./ui/button.js";
+import { Input } from "./ui/input.js";
+import { Label } from "./ui/label.js";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "./ui/dialog.js";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,8 +21,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
+} from "./ui/alert-dialog.js";
+import { useToast } from "../hooks/use-toast.js";
 
 interface AccountSettingsModalsProps {
   currentEmail: string;
@@ -62,6 +63,22 @@ export const AccountSettingsModals = forwardRef<
   const [twoFASecret, setTwoFASecret] = useState<string>("");
   const [twoFAOtpauthUrl, setTwoFAOtpauthUrl] = useState<string>("");
   const [twoFAFactorId, setTwoFAFactorId] = useState<string>("");
+  const [twoFAQRCodeError, setTwoFAQRCodeError] = useState<string>("");
+  const [twoFAQRCodeSource, setTwoFAQRCodeSource] = useState<string>("");
+
+  function extractOtpSecretFromUri(uri: string | undefined, fallbackSecret = "") {
+    if (fallbackSecret) return fallbackSecret;
+    if (!uri) return "";
+
+    const match = uri.match(/[?&]secret=([^&]+)/i);
+    if (!match) return "";
+
+    try {
+      return decodeURIComponent(match[1]);
+    } catch {
+      return match[1];
+    }
+  }
 
   // Delete account state
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
@@ -84,7 +101,7 @@ export const AccountSettingsModals = forwardRef<
     setEmailLoading(true);
     try {
       const token = JSON.parse(localStorage.getItem('supabase.auth.token') || '{}').access_token;
-      const response = await fetch("/api/account/email", {
+      const response = await apiFetch("/api/account/email", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ email: newEmail }),
@@ -140,7 +157,7 @@ export const AccountSettingsModals = forwardRef<
     setPasswordLoading(true);
     try {
       const token = JSON.parse(localStorage.getItem('supabase.auth.token') || '{}').access_token;
-      const response = await fetch("/api/account/password", {
+      const response = await apiFetch("/api/account/password", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
@@ -177,7 +194,7 @@ export const AccountSettingsModals = forwardRef<
     try {
       setTwoFALoading(true);
       const token = JSON.parse(localStorage.getItem('supabase.auth.token') || '{}').access_token;
-      const response = await fetch("/api/account/2fa/init", {
+      const response = await apiFetch("/api/account/2fa/init", {
         method: "GET",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
@@ -186,20 +203,24 @@ export const AccountSettingsModals = forwardRef<
 
       const data = await response.json();
       const { id, secret, otpauthUrl } = data;
-      
+      const resolvedSecret = extractOtpSecretFromUri(otpauthUrl, secret);
+
       setTwoFAFactorId(id); // Store the factor ID for verification
-      setTwoFASecret(secret);
+      setTwoFASecret(resolvedSecret);
       setTwoFAOtpauthUrl(otpauthUrl);
       
       // If otpauthUrl is already a QR code data URL, use it directly
       // Otherwise, generate one using a QR code service
-      if (otpauthUrl.startsWith('data:')) {
-        setTwoFAQRCode(otpauthUrl);
-      } else {
+      let qrCodeUrl = "";
+      if (otpauthUrl && otpauthUrl.startsWith('data:')) {
+        qrCodeUrl = otpauthUrl;
+      } else if (otpauthUrl) {
         // Generate QR code from otpauth URL using a service
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauthUrl)}`;
-        setTwoFAQRCode(qrCodeUrl);
+        qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauthUrl)}`;
       }
+      setTwoFAQRCode(qrCodeUrl);
+      setTwoFAQRCodeSource(qrCodeUrl || otpauthUrl || "(empty)");
+      setTwoFAQRCodeError("");
       
       setTwoFAModalOpen(true);
     } catch (error) {
@@ -235,7 +256,7 @@ export const AccountSettingsModals = forwardRef<
     setTwoFALoading(true);
     try {
       const token = JSON.parse(localStorage.getItem('supabase.auth.token') || '{}').access_token;
-      const response = await fetch("/api/account/2fa", {
+      const response = await apiFetch("/api/account/2fa", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ code: twoFACode, factorId: twoFAFactorId }),
@@ -284,7 +305,7 @@ export const AccountSettingsModals = forwardRef<
   const handleExportData = async () => {
     try {
       const token = JSON.parse(localStorage.getItem('supabase.auth.token') || '{}').access_token;
-      const response = await fetch("/api/account/export", {
+      const response = await apiFetch("/api/account/export", {
         method: "GET",
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
@@ -317,7 +338,7 @@ export const AccountSettingsModals = forwardRef<
   const handleDeleteAccount = async () => {
     try {
       const token = JSON.parse(localStorage.getItem('supabase.auth.token') || '{}').access_token;
-      const response = await fetch("/api/account", {
+      const response = await apiFetch("/api/account", {
         method: "DELETE",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
@@ -328,8 +349,13 @@ export const AccountSettingsModals = forwardRef<
         title: "Account deleted",
         description: "Your account has been permanently deleted.",
       });
-      // Redirect to home after account deletion
-      window.location.href = "/";
+
+      try {
+        await auth.signOut();
+      } catch (signOutError) {
+        console.warn("Error signing out after account deletion:", signOutError);
+        window.location.href = "/";
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -362,7 +388,7 @@ export const AccountSettingsModals = forwardRef<
                 type="email"
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="new@example.com"
+                placeholder="name@company.com"
                 data-testid="input-new-email"
               />
             </div>
@@ -462,15 +488,22 @@ export const AccountSettingsModals = forwardRef<
             {twoFAQRCode ? (
               <>
                 <div className="flex items-center justify-center bg-white p-4 rounded-lg border border-gray-200">
-                  <img 
-                    src={twoFAQRCode} 
-                    alt="2FA QR Code" 
+                  <img
+                    src={twoFAQRCode}
+                    alt="2FA QR Code"
                     className="w-48 h-48"
+                    onError={() => setTwoFAQRCodeError('Failed to load QR image')}
                   />
                 </div>
                 <div className="text-xs text-muted-foreground bg-muted p-3 rounded text-center">
                   Can't scan? Enter this code manually: <br />
                   <code className="font-mono font-bold text-sm">{twoFASecret}</code>
+                </div>
+                {twoFAQRCodeError ? (
+                  <div className="text-xs text-destructive mt-2">{twoFAQRCodeError}</div>
+                ) : null}
+                <div className="text-xs text-muted-foreground mt-2 break-all">
+                  <strong>Debug QR source:</strong> {twoFAQRCodeSource}
                 </div>
               </>
             ) : (
@@ -570,22 +603,7 @@ export const AccountSettingsModals = forwardRef<
       />
     </>
   );
-  }
+}
 );
 
-// Export hook to use these modals from parent component
-export function useAccountSettingsModals() {
-  const emailTrigger = document.querySelector("[data-testid='open-email-modal']") as HTMLButtonElement;
-  const passwordTrigger = document.querySelector("[data-testid='open-password-modal']") as HTMLButtonElement;
-  const twoFATrigger = document.querySelector("[data-testid='open-2fa-modal']") as HTMLButtonElement;
-  const deleteAccountTrigger = document.querySelector("[data-testid='open-delete-alert']") as HTMLButtonElement;
-  const exportTrigger = document.querySelector("[data-testid='export-data-handler']") as HTMLButtonElement;
-
-  return {
-    openEmailModal: () => emailTrigger?.click(),
-    openPasswordModal: () => passwordTrigger?.click(),
-    openTwoFAModal: () => twoFATrigger?.click(),
-    openDeleteAccount: () => deleteAccountTrigger?.click(),
-    exportData: () => exportTrigger?.click(),
-  };
-}
+export { useAccountSettingsModals } from "../hooks/use-account-settings-modals";

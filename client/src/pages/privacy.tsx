@@ -75,7 +75,7 @@ export default function Privacy() {
 
             <div>
               <h2 className="text-lg font-semibold">Your Rights</h2>
-              <p className="mt-3 text-muted-foreground">
+                <p className="mt-3 text-muted-foreground">
                 You can request access, correction, or deletion of your personal data by contacting us at <a href="mailto:help.subveris@gmail.com" className="font-medium text-primary underline">help.subveris@gmail.com</a>.
               </p>
             </div>

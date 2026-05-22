@@ -237,6 +237,36 @@ export default function HomePage() {
               <span>4.9/5 User Rating</span>
             </div>
           </div>
+
+          <div className="mt-16 grid gap-5 sm:grid-cols-3 text-left">
+            <div className="rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg">
+              <div className="inline-flex items-center justify-center rounded-2xl bg-primary/10 p-3 mb-4">
+                <DollarSign className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Cost Per Use Intelligence</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Understand the true value of every service with usage-based cost analytics that show you what each subscription costs per session.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg">
+              <div className="inline-flex items-center justify-center rounded-2xl bg-blue-500/10 p-3 mb-4">
+                <BarChart3 className="h-6 w-6 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Premium Insights</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Drill into renewal risk, value trends, and savings opportunities with a polished dashboard built for professionals.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg">
+              <div className="inline-flex items-center justify-center rounded-2xl bg-green-500/10 p-3 mb-4">
+                <Sparkles className="h-6 w-6 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Executive-Level Control</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Get premium alerts, spend summaries, and actionable recommendations so every decision feels confident and high-value.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -268,12 +298,15 @@ export default function HomePage() {
       {/* 3️⃣ FEATURES SECTION */}
       <section id="features" className="container mx-auto px-4 py-28">
         <div className="max-w-4xl mx-auto">
-          <Badge variant="outline" className="mb-6 border-primary text-primary px-4 py-1">Features</Badge>
-          <h2 className="text-5xl font-bold mb-8 tracking-tight">Everything you need to stop overpaying.</h2>
+          <Badge variant="outline" className="mb-6 border-primary text-primary px-4 py-1">Premium Features</Badge>
+          <h2 className="text-5xl font-bold mb-8 tracking-tight">Features designed for high-value spenders.</h2>
+          <p className="text-xl text-muted-foreground max-w-3xl mb-12">
+            Subveris combines elegant design, trusted privacy, and powerful analytics so you can turn recurring spending into a competitive advantage.
+          </p>
           <div className="grid md:grid-cols-3 gap-10">
             {featureHighlights.map((feature, index) => (
-              <div key={index} className="flex flex-col gap-6">
-                <div className="h-14 w-14 bg-primary/10 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <div key={index} className="flex flex-col gap-6 rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg transition-transform hover:-translate-y-1">
+                <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <feature.icon className="h-7 w-7 text-primary" />
                 </div>
                 <div>
@@ -292,7 +325,7 @@ export default function HomePage() {
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">Why Subveris?</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Most "subscription managers" just read your bank transactions. We track actual usage.
+              Most "subscription managers" just read your bank transactions. We track actual usage, cost per use, and renewal impact so you can make smarter decisions.
             </p>
           </div>
 
@@ -408,10 +441,10 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">
-              Simple, Transparent Pricing
+              Pricing for professionals who want real savings.
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Start free. Upgrade anytime. Cancel anytime. No contracts, no surprises.
+              Start free. Upgrade anytime. Cancel anytime. No contracts, no surprises — just premium subscription intelligence.
             </p>
           </div>
 
@@ -632,8 +665,8 @@ export default function HomePage() {
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">Cost Per Use Analytics</td>
                     <td className="text-center py-4 px-6 text-muted-foreground">Up to 2 subscriptions</td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Yes, unlimited</td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Yes, unlimited</td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">Usage Tracking</td>

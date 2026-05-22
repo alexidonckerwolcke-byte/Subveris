@@ -283,7 +283,7 @@ export function FamilySharingManager({ subscriptions }: FamilySharingProps) {
                   {familyMembers.map((member) => (
                     <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
                       <div>
-                        <p className="text-sm font-medium">{member.userId}</p>
+                        <p className="text-sm font-medium">{member.email ?? member.user_email ?? member.userId}</p>
                         <Badge variant="secondary">{member.role}</Badge>
                       </div>
                       <Button

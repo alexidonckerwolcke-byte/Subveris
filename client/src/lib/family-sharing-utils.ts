@@ -13,7 +13,6 @@ export function filterAvailableToShare(
   const sharedIds = new Set(
     (sharedSubs || []).map((s: any) => s.subscription_id || s.subscription?.id)
   );
-  return allSubs.filter(
-    (s) => s.status !== 'deleted' && !sharedIds.has(s.id)
-  );
+  const list = Array.isArray(allSubs) ? allSubs : [];
+  return list.filter((s) => s && s.status !== 'deleted' && !sharedIds.has(s.id));
 }

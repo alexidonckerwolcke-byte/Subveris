@@ -3,6 +3,8 @@
  * Handles Web Push API integration with Subveris backend
  */
 
+import { apiFetch } from '@/lib/api';
+
 export interface PushNotificationAction {
   action: string;
   title: string;
@@ -110,7 +112,7 @@ export async function unsubscribeFromPush(subscription: PushSubscription): Promi
  * @returns Promise resolving to server response
  */
 export async function sendSubscriptionToServer(subscription: PushSubscription): Promise<Response> {
-  const response = await fetch('/api/notifications/subscribe', {
+  const response = await apiFetch('/api/notifications/subscribe', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -184,7 +186,7 @@ export async function initializePushNotifications(): Promise<void> {
     if (Notification.permission === 'granted') {
       // User has already granted permission, subscribe them
       try {
-        const response = await fetch('/api/notifications/vapid-public-key');
+const response = await apiFetch('/api/notifications/vapid-public-key');
         const { vapidPublicKey } = await response.json();
 
         const subscription = await subscribeToPush(registration, vapidPublicKey);

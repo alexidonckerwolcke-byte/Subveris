@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ export function NotificationPreferences() {
   const fetchPreferences = async () => {
     try {
       const token = await getToken();
-      const response = await fetch("/api/account/notification-preferences", {
+      const response = await apiFetch("/api/account/notification-preferences", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -55,7 +56,7 @@ export function NotificationPreferences() {
 
     try {
       const token = await getToken();
-      const response = await fetch("/api/account/notification-preferences", {
+      const response = await apiFetch("/api/account/notification-preferences", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
