@@ -13,7 +13,9 @@ function sendUsageTracking(domain, timeSpent) {
     }
 
     const payload = JSON.stringify({ domain, timeSpent });
-    const url = `${apiUrl}/api/track-usage-by-domain`;
+    
+    // Try the new endpoint that tracks for all members first
+    const url = `${apiUrl}/api/track-usage-for-all-members`;
 
     fetch(url, {
       method: 'POST',
@@ -24,15 +26,44 @@ function sendUsageTracking(domain, timeSpent) {
       body: payload,
       keepalive: true
     }).then(response => {
-      console.log('[Background] TRACK_USAGE response status:', response.status);
+      console.log('[Background] TRACK_USAGE_FOR_ALL_MEMBERS response status:', response.status);
       if (!response.ok) {
-        console.error('[Background] TRACK_USAGE request failed:', response.status, response.statusText);
+        console.error('[Background] TRACK_USAGE_FOR_ALL_MEMBERS request failed:', response.status, response.statusText);
+        // Fallback to single-user tracking
+        return this.sendUsageTrackingFallback(domain, timeSpent, token, apiUrl);
       } else {
-        console.log('[Background] ✅ TRACK_USAGE successful for:', domain);
+        console.log('[Background] ✅ TRACK_USAGE_FOR_ALL_MEMBERS successful for:', domain);
+        return response.json();
       }
     }).catch(error => {
-      console.error('[Background] Failed TRACK_USAGE fetch:', error);
+      console.error('[Background] Failed TRACK_USAGE_FOR_ALL_MEMBERS fetch:', error);
+      // Fallback to single-user tracking
+      return this.sendUsageTrackingFallback(domain, timeSpent, token, apiUrl);
     });
+  });
+}
+
+function sendUsageTrackingFallback(domain, timeSpent, token, apiUrl) {
+  const payload = JSON.stringify({ domain, timeSpent });
+  const url = `${apiUrl}/api/track-usage-by-domain`;
+
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: payload,
+    keepalive: true
+  }).then(response => {
+    console.log('[Background] TRACK_USAGE fallback response status:', response.status);
+    if (!response.ok) {
+      console.error('[Background] TRACK_USAGE fallback request failed:', response.status, response.statusText);
+    } else {
+      console.log('[Background] ✅ TRACK_USAGE fallback successful for:', domain);
+    }
+  }).catch(error => {
+    console.error('[Background] Failed TRACK_USAGE fallback fetch:', error);
   });
 }
 

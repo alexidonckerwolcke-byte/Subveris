@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { apiRequest } from "@/lib/queryClient";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
-import { advanceDateByFrequency, dedupeById, formatDateLocal, parseDateOnlyLocal } from "@/lib/utils";
+import { advanceDateByFrequency, dedupeById, formatDateLocal, getAdvancedRenewalDateIfNeeded, parseDateOnlyLocal } from "@/lib/utils";
 
 export default function Calendar() {
   const queryClient = useQueryClient();
@@ -117,8 +117,8 @@ export default function Calendar() {
       const updates: Array<Promise<any>> = [];
       for (const sub of personalSubscriptions) {
         try {
-          // Normalize the billing date field (API returns next_billing_at or next_billing_date)
-          const billingDateField = sub.nextBillingDate;
+          // Normalize the billing date field (API may return next_billing_at or next_billing_date)
+          const billingDateField = (sub as any).nextBillingDate || (sub as any).next_billing_date || (sub as any).next_billing_at || (sub as any).next_billing || (sub as any).next_billingDate;
           console.debug('[calendar] checking subscription for auto-advance', { id: sub.id, name: sub.name, status: sub.status, nextBillingDate: billingDateField, frequency: sub.frequency });
           if (!billingDateField) continue;
           let next = parseDateOnlyLocal(billingDateField);
@@ -128,42 +128,23 @@ export default function Calendar() {
           // Only consider active/unused subscriptions
           if (!(sub.status === 'active' || sub.status === 'unused')) continue;
 
-          if (next < today) {
-            const renewalMonthStart = new Date(next.getFullYear(), next.getMonth(), 1);
-            const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+          const nextAdvanceDate = getAdvancedRenewalDateIfNeeded(billingDateField, sub.frequency || 'monthly', today);
+          if (!nextAdvanceDate) continue;
 
-            // Preserve past dates inside the current month until month rollover.
-            // Only auto-advance once the renewal date belongs to a prior month.
-            if (renewalMonthStart.getTime() === currentMonthStart.getTime()) {
-              continue;
-            }
-
-            // advance until next >= today
-            let attempts = 0;
-            while (next < today && attempts < 100) {
-              next = advanceDateByFrequency(next, sub.frequency as string);
-              attempts++;
-            }
-
-            if (next >= today) {
-              const newDateStr = formatDateLocal(next);
-              // only trigger if changed
-              if (newDateStr !== raw) {
-                console.log('[calendar] auto-advancing', sub.id, raw, '->', newDateStr);
-                // Use mutateAsync so we can await and log result. Mark as autoAdvanced
-                updates.push(
-                  updateRenewalDateMutation.mutateAsync({ subscriptionId: sub.id, newDate: newDateStr, autoAdvanced: true })
-                    .then(res => {
-                      console.log('[calendar] auto-advance success', sub.id, newDateStr, res);
-                      return res;
-                    })
-                    .catch(err => {
-                      console.error('[calendar] auto-advance failed', sub.id, err);
-                      return Promise.reject(err);
-                    })
-                );
-              }
-            }
+          const newDateStr = formatDateLocal(nextAdvanceDate);
+          if (newDateStr !== raw) {
+            console.log('[calendar] auto-advancing', sub.id, raw, '->', newDateStr);
+            updates.push(
+              updateRenewalDateMutation.mutateAsync({ subscriptionId: sub.id, newDate: newDateStr, autoAdvanced: true })
+                .then(res => {
+                  console.log('[calendar] auto-advance success', sub.id, newDateStr, res);
+                  return res;
+                })
+                .catch(err => {
+                  console.error('[calendar] auto-advance failed', sub.id, err);
+                  return Promise.reject(err);
+                })
+            );
           }
         } catch (err) {
           console.warn('[calendar] failed to auto-advance for', sub.id, err);
@@ -293,6 +274,16 @@ export default function Calendar() {
     return undefined;
   }, [calendarEventsWithRenewals]);
 
+  const upcomingRenewalCount = useMemo(() => {
+    const today = parseDateOnlyLocal(new Date());
+    if (!today) return 0;
+    return calendarEventsWithRenewals.filter((ev) => {
+      const dateOnly = ev.eventDate.includes("T") ? ev.eventDate.split("T")[0] : ev.eventDate;
+      const date = parseDateOnlyLocal(dateOnly);
+      return date ? date >= today : false;
+    }).length;
+  }, [calendarEventsWithRenewals]);
+
   const handleRenewalDateChange = (subscriptionId: string, newDate: string) => {
     console.log('[calendar] handleRenewalDateChange', { subscriptionId, newDate });
     updateRenewalDateMutation.mutate({ subscriptionId, newDate });
@@ -304,6 +295,19 @@ export default function Calendar() {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Subscription Calendar</h2>
           <p className="text-muted-foreground">Track renewal dates and manage your subscription timeline</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Upcoming renewals</p>
+          <p className="mt-4 text-4xl font-bold">{upcomingRenewalCount}</p>
+          <p className="mt-2 text-sm text-muted-foreground">Renewals scheduled from today onward</p>
+        </div>
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Subscriptions tracked</p>
+          <p className="mt-4 text-4xl font-bold">{subscriptions.length}</p>
+          <p className="mt-2 text-sm text-muted-foreground">Total active and visible subscriptions</p>
         </div>
       </div>
 

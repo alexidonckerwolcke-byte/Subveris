@@ -194,6 +194,32 @@ export function advanceDateByFrequency(date: Date, frequency: string): Date {
   return result;
 }
 
+export function getAdvancedRenewalDateIfNeeded(date: string | Date | null | undefined, frequency: string, now = new Date()): Date | null {
+  const renewalDate = parseSubscriptionRenewalDate(date);
+  if (!renewalDate) return null;
+
+  const today = parseDateOnlyLocal(now);
+  if (!today) return null;
+  if (renewalDate >= today) return null;
+
+  const renewalMonthStart = new Date(renewalDate.getFullYear(), renewalDate.getMonth(), 1);
+  const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  // Preserve the current month's data until the calendar rolls over on the first of the next month.
+  if (renewalMonthStart.getTime() === currentMonthStart.getTime()) {
+    return null;
+  }
+
+  let nextDate = new Date(renewalDate);
+  let attempts = 0;
+  while (nextDate < today && attempts < 100) {
+    nextDate = advanceDateByFrequency(nextDate, frequency || 'monthly');
+    attempts++;
+  }
+
+  return nextDate >= today ? nextDate : null;
+}
+
 export function getSubscriptionBillingMonth(sub: any): string | null {
   const billingMonth = (sub?.billingMonth || sub?.billing_month || '').toString();
   const match = billingMonth.match(/^(\d{4})-(\d{2})$/);

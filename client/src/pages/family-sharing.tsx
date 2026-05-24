@@ -32,6 +32,9 @@ export default function FamilySharingPage() {
           <p className="text-muted-foreground">Share subscriptions with family members and manage costs</p>
         </div>
       </div>
+      <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
+        <p className="text-sm text-muted-foreground">Family sharing helps everyone stay aligned on renewal dates, spending status, and savings opportunities. Members only see subscriptions they are allowed to view.</p>
+      </div>
       {showDowngradeMsg && (
         <div className="mb-4 p-4 bg-red-100 border border-red-300 text-red-800 rounded">
           You need to delete your family group before you can downgrade your plan.

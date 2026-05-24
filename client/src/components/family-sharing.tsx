@@ -43,6 +43,7 @@ export function FamilySharing() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState<FamilyGroup | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [showCreateGroupLimitError, setShowCreateGroupLimitError] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [subscriptionToShare, setSubscriptionToShare] = useState<Subscription | null>(null);
@@ -144,11 +145,17 @@ export function FamilySharing() {
     subscription: allSubscriptions.find((sub) => sub.id === shared.subscription_id) || null,
   }));
 
-  // Combine all shared subscriptions from both API sources
+  // Combine all shared subscriptions from both API sources (deduplicate by id)
+  const seenIds = new Set<string>();
   const allSharedSubscriptions = [
     ...(sharedSubscriptionsWithDetails || []),
     ...(sharedFromFamilyData || []),
-  ];
+  ].filter((shared) => {
+    const key = shared.id || `${shared.subscription_id}`;
+    if (seenIds.has(key)) return false;
+    seenIds.add(key);
+    return true;
+  });
   // debug: log combined shared ids when running tests
   // eslint-disable-next-line no-console
   console.log('[FamilySharing] allSharedSubscriptions:', allSharedSubscriptions.map(s => ({ id: s.id, subscription_id: s.subscription_id, subName: s.subscription?.name })));
@@ -434,22 +441,40 @@ export function FamilySharing() {
             <Input
               placeholder="Family group name (e.g., 'My Family')"
               value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
+              onChange={(e) => {
+                setNewGroupName(e.target.value);
+                if (showCreateGroupLimitError) setShowCreateGroupLimitError(false);
+              }}
               onKeyPress={(e) => {
-                if (e.key === 'Enter' && newGroupName) {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (!newGroupName) return;
+                  if (!canCreateGroup) {
+                    setShowCreateGroupLimitError(true);
+                    return;
+                  }
+                  setShowCreateGroupLimitError(false);
                   createGroupMutation.mutate(newGroupName);
                 }
               }}
             />
             <Button
-              onClick={() => newGroupName && createGroupMutation.mutate(newGroupName)}
-              disabled={!newGroupName || createGroupMutation.isPending || !canCreateGroup}
+              onClick={() => {
+                if (!newGroupName) return;
+                if (!canCreateGroup) {
+                  setShowCreateGroupLimitError(true);
+                  return;
+                }
+                setShowCreateGroupLimitError(false);
+                createGroupMutation.mutate(newGroupName);
+              }}
+              disabled={!newGroupName || createGroupMutation.isPending}
             >
               <Plus className="h-4 w-4 mr-2" />
               Create
             </Button>
           </div>
-          {!canCreateGroup && (
+          {showCreateGroupLimitError && (
             <p className="text-sm text-red-600">
               You can only create 1 family group.
             </p>
@@ -687,31 +712,8 @@ export function FamilySharing() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              // Compute available member IDs to share with (exclude subscription owner and family owner)
-                              const memberIdsToShare = members
-                                .map((m: any) => m.userId ?? m.user_id)
-                                .filter(Boolean)
-                                .filter((id: string) => id !== ((sub as any).userId ?? (sub as any).user_id))
-                                .filter((id: string) => id !== selectedGroup?.ownerId);
-
-                              if (memberIdsToShare.length === 0) {
-                                // In tests we want to trigger the mutation so the mocked
-                                // `useMutation` calls `onSuccess` and fires a toast. In
-                                // real app (non-test) avoid calling the API with an
-                                // empty `memberIds` array which the server rejects.
-                                if (process.env.NODE_ENV === 'test') {
-                                  shareSubscriptionMutation.mutate({ subscriptionId: sub.id, memberIds: [user?.id || 'test'] });
-                                  setOptimisticSharedIds((prev) => new Set(prev).add(sub.id));
-                                } else {
-                                  setSubscriptionToShare(sub);
-                                  setShareDialogOpen(true);
-                                  return;
-                                }
-                              } else {
-                                shareSubscriptionMutation.mutate({ subscriptionId: sub.id, memberIds: memberIdsToShare });
-                                setOptimisticSharedIds((prev) => new Set(prev).add(sub.id));
-                              }
                               setSubscriptionToShare(sub);
+                              setSelectedMembersToShareWith([]);
                               setShareDialogOpen(true);
                             }}
                             disabled={shareSubscriptionMutation.isPending}
@@ -746,7 +748,7 @@ export function FamilySharing() {
                       {allSharedSubscriptions.map((shared) => (
                             <div key={shared.id ?? shared.subscription_id ?? shared.subscription?.id ?? shared.subscription?.name} className="flex items-center justify-between p-3 rounded border bg-muted/50">
                               <div>
-                                <div className="font-medium">Shared subscription</div>
+                                <div className="font-medium">{shared.subscription?.name || 'Shared subscription'}</div>
                             <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                               {shared.subscription?.status && (
                                 <Badge variant={shared.subscription.status === 'active' ? 'default' : 'secondary'}>

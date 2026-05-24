@@ -30,6 +30,14 @@ function makeFakeClient() {
       }
       return all;
     }
+    if (table === 'shared_subscriptions') {
+      const subscriptionIdOp = query.find(q => q.op === 'eq' && q.args[0] === 'subscription_id');
+      const familyGroupIdOp = query.find(q => q.op === 'eq' && q.args[0] === 'family_group_id');
+      if (subscriptionIdOp?.args[1] === 's1' && familyGroupIdOp?.args[1] === 'grp1') {
+        return { id: 'shared1', shared_with_user_id: null };
+      }
+      return null;
+    }
     return null;
   }
 

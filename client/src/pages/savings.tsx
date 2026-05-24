@@ -273,9 +273,9 @@ export default function Savings() {
   let metricsLoading = showFamilyData ? familyDataLoading : personalMetricsLoading;
 
   if (showFamilyData) {
-    const hasServerFamilyMetrics = familyData?.isOwner === true && familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number';
-    // Prefer owner-only server spending series; members must use visible subscriptions.
-    const familyMonthlyData = familyData?.isOwner === true && familyData?.spending && familyData.spending.length > 0 ? familyData.spending : [];
+    const hasServerFamilyMetrics = familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number';
+    // Use server spending series for both owners and members
+    const familyMonthlyData = familyData?.spending && familyData.spending.length > 0 ? familyData.spending : [];
     const totalMonthlySpendFromSpendingData = getCurrentMonthAmount(familyMonthlyData);
 
     if (hasServerFamilyMetrics) {
@@ -482,27 +482,38 @@ export default function Savings() {
 
   // Use server data if available for owner views, otherwise compute from visible family subscriptions.
   const effectiveMonthlySpending = showFamilyData
-    ? ((familyData?.spending && familyData.spending.length > 0 && familyData?.isOwner)
+    ? ((familyData?.spending && familyData.spending.length > 0)
         ? familyData.spending
         : computeMonthlySpendingFromFamilySubscriptions())
     : (personalSpending || []);
 
   // Normalize monthly spending into a fixed-length recent months series (defaults to 6 months)
-  // Includes current month and the previous months
+  // Includes the current month and the previous months, with zero-fill for missing months.
   function normalizeMonthlySeries(data: MonthlySpending[] | undefined, months = 6) {
-    if (!data || data.length === 0) {
-      return [];
+    const now = new Date();
+    const monthLabels: string[] = [];
+
+    for (let i = months; i >= 0; i--) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthLabels.push(monthDate.toLocaleString('en-US', { month: 'short', year: 'numeric' }));
     }
 
-    // Sort data by date (assuming month format is "MMM YYYY")
-    const sortedData = [...data].sort((a, b) => {
-      const dateA = new Date(a.month + " 1");
-      const dateB = new Date(b.month + " 1");
-      return dateA.getTime() - dateB.getTime();
-    });
+    const monthAmountMap = new Map<string, number>(monthLabels.map((label) => [label, 0]));
 
-    // Get the last 'months + 1' entries (includes current month)
-    return sortedData.slice(-(months + 1));
+    if (data && data.length > 0) {
+      for (const entry of data) {
+        if (!entry || typeof entry.month !== 'string') continue;
+        const normalizedMonth = entry.month.trim();
+        if (monthAmountMap.has(normalizedMonth)) {
+          monthAmountMap.set(normalizedMonth, Math.round((entry.amount || 0) * 100) / 100);
+        }
+      }
+    }
+
+    return monthLabels.map((month) => ({
+      month,
+      amount: monthAmountMap.get(month) ?? 0,
+    }));
   }
 
   const chartMonthlyData = normalizeMonthlySeries(effectiveMonthlySpending, 6);
@@ -697,11 +708,15 @@ export default function Savings() {
         <div className="mb-2">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Savings</h1>
           <p className="text-muted-foreground">
-            Track your progress and achieve your savings goals
+            Track your progress and achieve your savings goals.
           </p>
         </div>
 
-
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
+          <p className="text-sm text-muted-foreground">
+            Use this page to measure real savings, set a monthly target, and see what your family is saving together when shared mode is enabled.
+          </p>
+        </div>
 
         <div className="grid gap-4 md:grid-cols-4">
           <Card className="hover-elevate">
@@ -867,7 +882,8 @@ export default function Savings() {
                       tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
                       axisLine={{ stroke: "hsl(var(--border))" }}
                       tickLine={{ stroke: "hsl(var(--border))" }}
-                      interval="preserveStartEnd"
+                      interval={0}
+                      minTickGap={12}
                     />
                     <YAxis
                       tickFormatter={(value) => formatAmount(value, 'USD')}
@@ -881,6 +897,8 @@ export default function Savings() {
                       dataKey="amount"
                       stroke="hsl(var(--chart-1))"
                       strokeWidth={2}
+                      dot={{ r: 3, fill: "hsl(var(--chart-1))" }}
+                      activeDot={{ r: 4 }}
                       fillOpacity={1}
                       fill="url(#colorSpending)"
                     />

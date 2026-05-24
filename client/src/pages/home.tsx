@@ -41,6 +41,7 @@ import {
 
 export default function HomePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
   const [expandedFAQ, setExpandedFAQ] = useState<number | string | null>(null);
 
   useEffect(() => {
@@ -164,8 +165,11 @@ export default function HomePage() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-4">
-            <Button onClick={() => setAuthModalOpen(true)} size="lg" className="bg-primary hover:bg-primary/90">
+          <div className="flex items-center gap-3">
+            <Button onClick={() => { setAuthDefaultTab('signin'); setAuthModalOpen(true); }} variant="ghost" size="lg" className="text-sm font-medium">
+              Log In
+            </Button>
+            <Button onClick={() => { setAuthDefaultTab('signup'); setAuthModalOpen(true); }} size="lg" className="bg-primary hover:bg-primary/90">
               Get Started
             </Button>
           </div>
@@ -204,11 +208,6 @@ export default function HomePage() {
 
           {/* Social Proof Stats */}
           <div className="flex flex-col sm:flex-row justify-center items-center gap-12 text-sm mb-12">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">50K+</div>
-              <div className="text-muted-foreground">People Optimizing</div>
-            </div>
-            <div className="w-px h-8 bg-border hidden sm:block" />
             <div className="text-center">
               <div className="text-3xl font-bold text-primary">$120</div>
               <div className="text-muted-foreground">Avg. Monthly Savings</div>
@@ -355,7 +354,7 @@ export default function HomePage() {
       {/* 5️⃣ TESTIMONIALS SECTION */}
       <section className="container mx-auto px-4 py-28">
         <div className="text-center mb-20">
-          <h2 className="text-5xl font-bold mb-6 tracking-tight">Loved by 50,000+ users</h2>
+          <h2 className="text-5xl font-bold mb-6 tracking-tight">What Our Users Say</h2>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
           {[
@@ -826,7 +825,7 @@ export default function HomePage() {
               Start Optimizing Your Subscriptions Today
             </h2>
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-              Join 50,000+ users who are saving money and gaining control over their recurring spending.
+              Start saving money and gain complete control over your recurring spending.
             </p>
 
             <div className="bg-card/50 border border-border/50 rounded-lg p-6 mb-8 max-w-2xl mx-auto">
@@ -931,7 +930,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
+      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} defaultTab={authDefaultTab} />
     </div>
   );
 }

@@ -58,40 +58,78 @@ function formatForEmail(amount: number, from: string, to: string) {
   return `${symbol}${converted.toFixed(2)}`;
 }
 
-// Auto-advance renewal dates that have passed
-export async function autoAdvanceRenewalDates(userId: string) {
+// Helper function to advance subscriptions for a specific user
+async function advanceSubscriptionsForUser(userId: string, today: Date): Promise<number> {
   const supabase = getSupabaseClient();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  let advancedCount = 0;
 
-  // Get all active/unused subscriptions
-  const { data: subscriptions, error } = await supabase
+  // Try to fetch with next_billing_at first, fall back to next_billing_date
+  let subscriptions: any[] | null = null;
+  let error: any = null;
+
+  // Try primary column name
+  const { data: primaryData, error: primaryError } = await supabase
     .from("subscriptions")
-    .select("id, name, next_billing_at, frequency, user_id")
+    .select("id, name, next_billing_at, frequency, user_id, status")
     .eq("user_id", userId)
-    .in("status", ["active", "unused"]);
+    .in("status", ["active", "unused", "to-cancel"]);
+
+  if (primaryError && primaryError.message?.includes("column")) {
+    console.log(`[Renewal] next_billing_at column not found, trying next_billing_date`);
+    // Try alternate column name
+    const { data: altData, error: altError } = await supabase
+      .from("subscriptions")
+      .select("id, name, next_billing_date, frequency, user_id, status")
+      .eq("user_id", userId)
+      .in("status", ["active", "unused", "to-cancel"]);
+    
+    subscriptions = altData;
+    error = altError;
+  } else {
+    subscriptions = primaryData;
+    error = primaryError;
+  }
 
   if (error) {
-    console.error("[Renewal] Error fetching subscriptions:", error);
-    return;
+    console.error(`[Renewal] Error fetching subscriptions for user ${userId}:`, error);
+    return 0;
+  }
+
+  console.log(`[Renewal] Fetched ${subscriptions?.length || 0} subscriptions for user ${userId}`);
+  if (subscriptions) {
+    subscriptions.forEach((sub: any) => {
+      const billingAt = sub.next_billing_at || sub.next_billing_date;
+      console.log(`[Renewal]   - ${sub.name}: billingDate = ${billingAt}, frequency = ${sub.frequency}`);
+    });
   }
 
   // helper to advance a date by a subscription frequency
   function advanceByFrequency(d: Date, freq: string): Date {
     const result = new Date(d);
     if (freq === "monthly") {
-      const day = result.getDate();
+      const originalDay = result.getDate();
       result.setMonth(result.getMonth() + 1);
-      // if month overflow occurred (e.g. Jan 31 -> Mar 3), clamp to last day of
-      // the intended month by setting date 0 which yields the previous month's
-      // last day.
-      if (result.getDate() !== day) {
-        result.setDate(0); // last day of previous month, effectively month-end
+      // Get the last day of the target month
+      const lastDayOfMonth = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+      // If original day is greater than the last day of target month, use the last day
+      if (originalDay > lastDayOfMonth) {
+        result.setDate(lastDayOfMonth);
+      } else {
+        result.setDate(originalDay);
       }
     } else if (freq === "yearly") {
       result.setFullYear(result.getFullYear() + 1);
     } else if (freq === "quarterly") {
+      const originalDay = result.getDate();
       result.setMonth(result.getMonth() + 3);
+      // Get the last day of the target month
+      const lastDayOfMonth = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+      // If original day is greater than the last day of target month, use the last day
+      if (originalDay > lastDayOfMonth) {
+        result.setDate(lastDayOfMonth);
+      } else {
+        result.setDate(originalDay);
+      }
     } else if (freq === "weekly") {
       result.setDate(result.getDate() + 7);
     }
@@ -99,22 +137,26 @@ export async function autoAdvanceRenewalDates(userId: string) {
   }
 
   for (const sub of subscriptions || []) {
-    if (!sub.next_billing_at) continue;
+    // Get the billing date from whichever column exists
+    const billingDateStr = sub.next_billing_at || sub.next_billing_date;
+    if (!billingDateStr) {
+      console.log(`[Renewal] Skipping ${sub.name}: no billing date found`);
+      continue;
+    }
 
-    const nextBillingDate = parseDateLocal(sub.next_billing_at);
-    if (!nextBillingDate) continue;
+    const nextBillingDate = parseDateLocal(billingDateStr);
+    if (!nextBillingDate) {
+      console.log(`[Renewal] Skipping ${sub.name}: failed to parse date "${billingDateStr}"`);
+      continue;
+    }
 
-    // If renewal date is in the past and belongs to a prior month, advance
-    // it to the next valid cycle. If the date is in the current month, preserve
-    // it until the month rolls over, because the user may have intentionally
-    // adjusted it to an earlier day in the current billing period.
-    if (nextBillingDate < today) {
-      const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-      const renewalMonthStart = new Date(nextBillingDate.getFullYear(), nextBillingDate.getMonth(), 1);
-      if (renewalMonthStart.getTime() === currentMonthStart.getTime()) {
-        continue;
-      }
+    const isPast = nextBillingDate < today;
+    const daysDiff = Math.floor((today.getTime() - nextBillingDate.getTime()) / (1000 * 60 * 60 * 24));
+    console.log(`[Renewal] Checking ${sub.name}: date=${formatDateLocal(nextBillingDate)}, today=${formatDateLocal(today)}, ${isPast ? `PAST by ${daysDiff} days` : 'FUTURE'}`);
 
+    // If renewal date is at least 1 day in the past, advance it to the next valid cycle
+    if (isPast) {
+      console.log(`[Renewal] Advancing ${sub.name} (${daysDiff} days past)...`);
       let newDate = nextBillingDate;
       let lastRenewalDate = nextBillingDate;
       while (newDate < today) {
@@ -124,20 +166,119 @@ export async function autoAdvanceRenewalDates(userId: string) {
       const newDateStr = formatDateLocal(newDate);
       const billingMonthValue = formatBillingMonth(lastRenewalDate);
 
+      console.log(`[Renewal] Will update to: ${newDateStr}, billing_month: ${billingMonthValue}`);
+
+      // Determine which column to update
+      const updatePayload: any = { billing_month: billingMonthValue };
+      const columnToUpdate = sub.next_billing_at !== undefined ? "next_billing_at" : "next_billing_date";
+      updatePayload[columnToUpdate] = newDateStr;
+
       const { error: updateError } = await supabase
         .from("subscriptions")
-        .update({ next_billing_at: newDateStr, billing_month: billingMonthValue })
+        .update(updatePayload)
         .eq("id", sub.id);
 
       if (!updateError) {
+        advancedCount++;
         console.log(
-          `[Renewal] Advanced ${sub.name} from ${sub.next_billing_at} to ${newDateStr}`
+          `[Renewal] ✓ Advanced ${sub.name} from ${billingDateStr} to ${newDateStr}`
         );
       } else {
-        console.error(`[Renewal] Error updating ${sub.name}:`, updateError);
+        console.error(`[Renewal] ✗ Error updating ${sub.name}:`, updateError);
       }
     }
   }
+
+  return advancedCount;
+}
+
+// Auto-advance renewal dates that have passed for user and all family group members
+export async function autoAdvanceRenewalDates(userId: string) {
+  const supabase = getSupabaseClient();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let totalAdvancedCount = 0;
+
+  console.log(`[Renewal] autoAdvanceRenewalDates called for user ${userId}, today: ${formatDateLocal(today)}`);
+
+  // Get all user IDs to process: the current user + all members of their family groups
+  const userIdsToProcess = new Set<string>([userId]);
+
+  try {
+    // 1. Check if user is a MEMBER of any family group
+    const { data: familyMemberships, error: membershipError } = await supabase
+      .from("family_group_members")
+      .select("family_group_id")
+      .eq("user_id", userId);
+
+    if (membershipError) {
+      console.log(`[Renewal] Warning: Could not fetch family memberships for ${userId}:`, membershipError.message);
+    } else if (familyMemberships && familyMemberships.length > 0) {
+      for (const membership of familyMemberships) {
+        const familyGroupId = membership.family_group_id;
+        console.log(`[Renewal] User ${userId} is a MEMBER of family group ${familyGroupId}`);
+
+        // Get the group owner - they own the shared subscriptions
+        const { data: groupData, error: groupError } = await supabase
+          .from("family_groups")
+          .select("owner_id")
+          .eq("id", familyGroupId)
+          .single();
+
+        if (groupError) {
+          console.log(`[Renewal] Warning: Could not fetch group owner for ${familyGroupId}:`, groupError.message);
+        } else if (groupData) {
+          userIdsToProcess.add(groupData.owner_id);
+          console.log(`[Renewal]   Added owner: ${groupData.owner_id}`);
+        }
+      }
+    }
+
+    // 2. Check if user is an OWNER of any family group
+    const { data: ownedGroups, error: ownerError } = await supabase
+      .from("family_groups")
+      .select("id")
+      .eq("owner_id", userId);
+
+    if (ownerError) {
+      console.log(`[Renewal] Warning: Could not fetch owned groups for ${userId}:`, ownerError.message);
+    } else if (ownedGroups && ownedGroups.length > 0) {
+      for (const group of ownedGroups) {
+        const familyGroupId = group.id;
+        console.log(`[Renewal] User ${userId} is the OWNER of family group ${familyGroupId}`);
+
+        // Get all members of this group
+        const { data: groupMembers, error: membersError } = await supabase
+          .from("family_group_members")
+          .select("user_id")
+          .eq("family_group_id", familyGroupId);
+
+        if (membersError) {
+          console.log(`[Renewal] Warning: Could not fetch group members for ${familyGroupId}:`, membersError.message);
+        } else if (groupMembers) {
+          console.log(`[Renewal] Found ${groupMembers.length} members in group ${familyGroupId}`);
+          groupMembers.forEach((member: any) => {
+            userIdsToProcess.add(member.user_id);
+            console.log(`[Renewal]   Added member: ${member.user_id}`);
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[Renewal] Error fetching family group info for ${userId}:`, err);
+  }
+
+  console.log(`[Renewal] Will process renewals for ${userIdsToProcess.size} user(s): ${Array.from(userIdsToProcess).join(", ")}`);
+
+  // Process renewals for each user
+  for (const currentUserId of userIdsToProcess) {
+    const advancedCount = await advanceSubscriptionsForUser(currentUserId, today);
+    totalAdvancedCount += advancedCount;
+  }
+
+  console.log(`[Renewal] Completed: advanced ${totalAdvancedCount} total subscriptions`);
+  return { anyAdvanced: totalAdvancedCount > 0, count: totalAdvancedCount };
 }
 
 // Send renewal reminder emails (uses dynamic import to avoid module loading issues)

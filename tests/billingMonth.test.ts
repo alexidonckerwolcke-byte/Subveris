@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSubscriptionBillingMonth, isSubscriptionBilledInMonth, parseSubscriptionRenewalDate } from '../client/src/lib/utils';
+import { formatDateLocal, getSubscriptionBillingMonth, getAdvancedRenewalDateIfNeeded, isSubscriptionBilledInMonth, parseSubscriptionRenewalDate } from '../client/src/lib/utils';
 
 describe('billing month helpers', () => {
   it('parses billingMonth from subscription payload', () => {
@@ -71,5 +71,20 @@ describe('billing month helpers', () => {
     }
 
     process.env.TZ = originalTz;
+  });
+
+  it('auto-advances a past renewal date only after month rollover', () => {
+    const now = new Date('2026-06-01');
+    const next = getAdvancedRenewalDateIfNeeded('2026-05-15', 'monthly', now);
+    expect(next).not.toBeNull();
+    if (next) {
+      expect(formatDateLocal(next)).toBe('2026-06-15');
+    }
+  });
+
+  it('does not auto-advance a renewal date while still in the same month', () => {
+    const now = new Date('2026-05-20');
+    const next = getAdvancedRenewalDateIfNeeded('2026-05-05', 'monthly', now);
+    expect(next).toBeNull();
   });
 });
