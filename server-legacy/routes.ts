@@ -117,54 +117,34 @@ function isSubscriptionBilledInMonth(
   const targetMonth = formatBillingMonth(monthStart);
   const billingMonth = getSubscriptionBillingMonth(sub);
 
-  // If billing_month explicitly matches the target month, only include it
-  // for the current month when the renewal date has arrived or passed.
+  // If billing_month is explicitly set and matches the target month, count it (already advanced)
   if (billingMonth === targetMonth) {
-    if (isCurrentMonth) {
-      const renewalDate = normalizeRenewalDate(sub);
-      if (!renewalDate) {
-        return false;
-      }
-      // If renewalDate contains a time (ISO timestamp), adjust it into the
-      // client's local time using the provided offsetMinutes so same-day
-      // renewals are evaluated correctly.
-      let renewalAsDate = renewalDate instanceof Date ? new Date(renewalDate) : new Date(String(renewalDate));
-      if (!isNaN(renewalAsDate.getTime()) && offsetMinutes) {
-        renewalAsDate = new Date(renewalAsDate.getTime() - offsetMinutes * 60000);
-      }
-      const renewalDay = renewalAsDate ? new Date(renewalAsDate.getFullYear(), renewalAsDate.getMonth(), renewalAsDate.getDate()) : null;
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      // Include only if renewal already occurred today or earlier in this month.
-      if (renewalDay && renewalDay <= today) return true;
-      return false;
-    }
     return true;
   }
 
-  const renewalDate = normalizeRenewalDate(sub);
-  if (!renewalDate) {
-    return false;
-  }
-
-  // Adjust renewal date into client-local time if offset provided
-  let renewalAsDate = renewalDate instanceof Date ? new Date(renewalDate) : new Date(String(renewalDate));
-  if (!isNaN(renewalAsDate.getTime()) && offsetMinutes) {
-    renewalAsDate = new Date(renewalAsDate.getTime() - offsetMinutes * 60000);
-  }
-
-  if (formatBillingMonth(renewalAsDate) !== targetMonth) {
-    return false;
-  }
-
+  // For current month: also count subscriptions with renewal date = today (renewing now)
   if (isCurrentMonth) {
+    const renewalDate = normalizeRenewalDate(sub);
+    if (!renewalDate) {
+      return false;
+    }
+
+    let renewalAsDate = renewalDate instanceof Date ? new Date(renewalDate) : new Date(String(renewalDate));
+    if (!isNaN(renewalAsDate.getTime()) && offsetMinutes) {
+      renewalAsDate = new Date(renewalAsDate.getTime() - offsetMinutes * 60000);
+    }
+
     const renewalDay = new Date(renewalAsDate.getFullYear(), renewalAsDate.getMonth(), renewalAsDate.getDate());
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return renewalDay ? renewalDay <= today : false;
+    
+    // Count if renewal date is today (the day it renews) and in target month
+    if (formatBillingMonth(renewalAsDate) === targetMonth && renewalDay.getTime() === today.getTime()) {
+      return true;
+    }
   }
 
-  return true;
+  return false;
 }
-
 
 import express, { type Request, type Response, type Express } from 'express';
 import { type Server } from 'http';
@@ -175,51 +155,27 @@ import { z } from 'zod';
 import Stripe from 'stripe';
 import { STRIPE_API_VERSION, createStripeClient, stripe, getPriceIdFromSubscription, getPlanTypeFromSubscription, PRICE_ID_TO_PLAN_TYPE } from './stripe.js';
 import { emailService } from './email.js';
-import { runRenewalChecks } from './renewal-manager.js';
+import { runRenewalChecks, autoAdvanceRenewalDates } from './renewal-manager.js';
 
 // Helper for pagination params
 export function getPaginationParams(req: any) {
   let page = parseInt(req.query.page, 10);
   let perPage = parseInt(req.query.perPage, 10);
+  
+  // For page: default to 1 if NaN or invalid
   if (isNaN(page) || page < 1) page = 1;
+  
+  // For perPage: if NaN, default to 100; otherwise normalize to min 1
   if (isNaN(perPage)) {
     perPage = 100;
   } else if (perPage < 1) {
     perPage = 1;
   }
-  if (perPage > 1000) perPage = 1000;
-  return { page, perPage };
-}
-
-function getSupabaseAuthBaseUrl(): string {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  if (!supabaseUrl) {
-    throw new Error('Missing SUPABASE_URL environment variable');
-  }
-  return new URL('auth/v1/', supabaseUrl).href;
-}
-
-async function supabaseAuthFetch(
-  authToken: string,
-  relativePath: string,
-  body: Record<string, unknown>
-) {
-  const url = new URL(relativePath, getSupabaseAuthBaseUrl()).href;
-  const apikey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
   
-  const headersObj: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${authToken}`,
-    apikey,
-  };
-
-
-
-  return await fetch(url, {
-    method: 'POST',
-    headers: headersObj as any,
-    body: JSON.stringify(body),
-  });
+  // Cap perPage at 1000
+  if (perPage > 1000) perPage = 1000;
+  
+  return { page, perPage };
 }
 
 function extractTotpSecretFromUri(uri?: string): string {
@@ -269,13 +225,11 @@ function convertToUSD(amount: number, currency: string | undefined) {
 // Return monthlyized amount for a subscription (in its original currency)
 function monthlyAmountForSubscriptionRow(s: any): number {
   const amount = Number(s?.amount) || 0;
-  const freq = String(s?.frequency || 'monthly').toLowerCase();
-  // Match the logic used by /api/metrics: weekly approximated as 4x per month
-  if (freq === 'yearly') return amount / 12;
-  if (freq === 'quarterly') return amount / 3;
-  if (freq === 'weekly') return amount * 4;
+  // Return the full amount as-is - don't annualize it
+  // The subscription only appears in the month it renews, so show the full cost then
   return amount;
 }
+
 
 function getMetricsCacheKey(userId: string, date = new Date()) {
   const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -451,37 +405,63 @@ export async function handleCostPerUse(req: SessionRequest, res: Response) {
       } else {
         // Members should only see their own subscriptions and subscriptions
         // explicitly shared with them by the family owner.
-        const personalSubsResult = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', userId);
-        const personalSubs = Array.isArray(personalSubsResult)
-          ? personalSubsResult
-          : (personalSubsResult?.data ?? []);
-
-        const { data: sharedSubs } = await supabase
-          .from('shared_subscriptions')
-          .select('subscription_id')
-          .eq('shared_with_user_id', userId)
+        // To be robust across client shapes and RLS, fetch all group members'
+        // subscriptions and then include only the member's personal subs plus
+        // any subscriptions that have a shared_subscriptions row for this
+        // family group (either shared_with_user_id === userId or null).
+        const { data: members } = await supabase
+          .from('family_group_members')
+          .select('user_id')
           .eq('family_group_id', familyGroupId);
-        const sharedSubscriptionIds = (sharedSubs || []).map((s: any) => s.subscription_id).filter(Boolean);
+        const memberIds: string[] = Array.from(new Set([
+          userId,
+          ...(members || []).map((m: any) => m.user_id),
+        ])).filter(Boolean as any);
 
-        let sharedSubscriptions: any[] = [];
-        if (sharedSubscriptionIds.length > 0) {
-          const sharedSubsRowsResult: any = await supabase
-            .from('subscriptions')
-            .select('*')
-            .in('id', sharedSubscriptionIds)
-            .neq('status', 'deleted');
-          sharedSubscriptions = Array.isArray(sharedSubsRowsResult)
-            ? sharedSubsRowsResult
-            : (sharedSubsRowsResult?.data ?? []);
+        // Also ensure owner is included
+        const { data: groupRow } = await supabase
+          .from('family_groups')
+          .select('owner_id')
+          .eq('id', familyGroupId)
+          .single();
+        if (groupRow && groupRow.owner_id && !memberIds.includes(groupRow.owner_id)) {
+          memberIds.push(groupRow.owner_id);
         }
 
-        const combinedById = new Map<string, any>();
-        (personalSubs || []).forEach((sub: any) => combinedById.set(sub.id, sub));
-        sharedSubscriptions.forEach((sub: any) => combinedById.set(sub.id, sub));
-        subscriptions = Array.from(combinedById.values());
+        let allSubs: any[] = [];
+        if (memberIds.length > 0) {
+          const subsRes: any = await supabase
+            .from('subscriptions')
+            .select('*')
+            .in('user_id', memberIds)
+            .neq('status', 'deleted');
+          allSubs = Array.isArray(subsRes) ? subsRes : (subsRes?.data ?? []);
+        }
+
+        const visible: any[] = [];
+        for (const sub of (allSubs || [])) {
+          if (!sub) continue;
+          // always include the user's own subscriptions
+          if (sub.user_id === userId) {
+            visible.push(sub);
+            continue;
+          }
+          // otherwise check whether this subscription was shared with the group
+          const { data: match } = await supabase
+            .from('shared_subscriptions')
+            .select('id, shared_with_user_id')
+            .eq('family_group_id', familyGroupId)
+            .eq('subscription_id', sub.id)
+            .single();
+          if (match) {
+            // visible if shared to whole group (null) or explicitly to this user
+            if (!match.shared_with_user_id || match.shared_with_user_id === userId) {
+              visible.push(sub);
+            }
+          }
+        }
+
+        subscriptions = visible;
       }
     } else {
       // Only show personal data
@@ -591,7 +571,7 @@ export async function registerRoutes(
 
     // Auto-advance renewal dates before calculating metrics so no passed renewals remain.
     try {
-      await runRenewalChecks({ userId });
+      await autoAdvanceRenewalDates(userId);
     } catch (err) {
       console.error('[Routes] Error auto-advancing renewal dates:', err);
     }
@@ -730,17 +710,95 @@ export async function registerRoutes(
       if (authHeader) userId = extractUserIdFromToken(authHeader) || undefined;
     }
     if (!userId) throw new UnauthorizedError('Authentication required');
+
+    // Auto-advance renewal dates BEFORE checking cache, and invalidate cache if any were advanced
+    try {
+      const result = await autoAdvanceRenewalDates(userId);
+      if (result && result.anyAdvanced) {
+        console.log(`[Routes] Renewals were advanced, invalidating cache for user ${userId} and family members`);
+        
+        // Collect all user IDs to invalidate (must match renewal-manager logic)
+        const supabase = getSupabaseClient();
+        const userIdsToInvalidate = new Set<string>([userId]);
+
+        try {
+          // 1. Check if user is a MEMBER of any family group
+          const { data: familyMemberships, error: membershipError } = await supabase
+            .from("family_group_members")
+            .select("family_group_id")
+            .eq("user_id", userId);
+
+          if (membershipError) {
+            console.log(`[Routes] Warning: Could not fetch family memberships for cache invalidation:`, membershipError.message);
+          } else if (familyMemberships && familyMemberships.length > 0) {
+            for (const membership of familyMemberships) {
+              const familyGroupId = membership.family_group_id;
+              
+              // Get the group owner - they own the shared subscriptions
+              const { data: groupData, error: groupError } = await supabase
+                .from("family_groups")
+                .select("owner_id")
+                .eq("id", familyGroupId)
+                .single();
+
+              if (groupError) {
+                console.log(`[Routes] Warning: Could not fetch group owner for cache invalidation:`, groupError.message);
+              } else if (groupData) {
+                userIdsToInvalidate.add(groupData.owner_id);
+              }
+            }
+          }
+
+          // 2. Check if user is an OWNER of any family group
+          const { data: ownedGroups, error: ownerError } = await supabase
+            .from("family_groups")
+            .select("id")
+            .eq("owner_id", userId);
+
+          if (ownerError) {
+            console.log(`[Routes] Warning: Could not fetch owned groups for cache invalidation:`, ownerError.message);
+          } else if (ownedGroups && ownedGroups.length > 0) {
+            for (const group of ownedGroups) {
+              const familyGroupId = group.id;
+              
+              // Get all members of this group
+              const { data: groupMembers, error: membersError } = await supabase
+                .from("family_group_members")
+                .select("user_id")
+                .eq("family_group_id", familyGroupId);
+
+              if (membersError) {
+                console.log(`[Routes] Warning: Could not fetch group members for cache invalidation:`, membersError.message);
+              } else if (groupMembers) {
+                groupMembers.forEach((member: any) => {
+                  userIdsToInvalidate.add(member.user_id);
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.error("[Routes] Error fetching family info for cache invalidation:", err);
+        }
+
+        // Clear cache for all users
+        console.log(`[Routes] Clearing cache for ${userIdsToInvalidate.size} user(s)`);
+        for (const invalidateUserId of userIdsToInvalidate) {
+          for (let p = 1; p <= 10; p++) {
+            for (let n of [10, 25, 50, 100, 200, 500, 1000]) {
+              await cache.delete(`subscriptions:${invalidateUserId}:p${p}:n${n}`);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Routes] Error auto-advancing renewal dates:", err);
+    }
+
+    // Now check cache for fresh data
     const cacheKey = `subscriptions:${userId}:p${page}:n${perPage}`;
     const cached = await cache.get(cacheKey);
     if (cached) {
       return res.json(JSON.parse(cached));
-    }
-
-    // Auto-advance renewal dates for expired subscriptions (if supported by renewal manager)
-    try {
-      await runRenewalChecks({ userId });
-    } catch (err) {
-      console.error("[Routes] Error auto-advancing renewal dates:", err);
     }
 
     // Build paginated query using Supabase `range` helper.
@@ -798,6 +856,47 @@ export async function registerRoutes(
       }
 
       res.json(mapSubscriptionFromDb(data));
+  }));
+
+  // DEBUG: Show raw subscription data
+  app.get("/api/debug/subscriptions-raw", asyncHandler(async (req: SessionRequest, res: Response) => {
+    let userId = req.session?.user?.id;
+    if (!userId) {
+      const authHeader = req.headers.authorization?.replace('Bearer ', '');
+      if (authHeader) userId = extractUserIdFromToken(authHeader) || undefined;
+    }
+    if (!userId) throw new UnauthorizedError('Authentication required');
+
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (error) {
+      throw new AppError(500, `Error fetching subscriptions: ${error.message}`);
+    }
+
+    // Show raw data
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    res.json({
+      debug: true,
+      today: today.toISOString(),
+      todayLocal: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
+      subscriptionCount: data?.length || 0,
+      subscriptions: data?.map((sub: any) => ({
+        id: sub.id,
+        name: sub.name,
+        status: sub.status,
+        next_billing_at: sub.next_billing_at,
+        next_billing_date: sub.next_billing_date,
+        frequency: sub.frequency,
+        created_at: sub.created_at,
+        updated_at: sub.updated_at,
+      })),
+    });
   }));
 
   app.post("/api/subscriptions", asyncHandler(async (req: SessionRequest, res: Response) => {
@@ -1334,6 +1433,52 @@ export async function registerRoutes(
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       console.error("[Routes] POST /api/track-usage-by-domain error:", message);
+      res.status(500).json({ error: "Failed to track usage", message });
+    }
+  });
+
+  app.post("/api/track-usage-for-all-members", async (req: SessionRequest, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization?.replace('Bearer ', '');
+      if (!authHeader) {
+        return res.status(401).json({ error: "Missing authorization header" });
+      }
+
+      const userId = extractUserIdFromToken(authHeader);
+      if (!userId) {
+        return res.status(401).json({ error: "Invalid token" });
+      }
+
+      const { domain, timeSpent } = req.body;
+      if (!domain) {
+        return res.status(400).json({ error: "Missing domain in request body" });
+      }
+
+      const subscriptions = await storage.trackUsageByDomainForAllMembers(userId, domain, timeSpent || 0);
+      if (!subscriptions || subscriptions.length === 0) {
+        return res.status(404).json({
+          error: "No subscriptions found for this domain",
+          message: "Neither you nor your family members have a subscription for this domain"
+        });
+      }
+
+      res.json({
+        message: "Usage tracked for all subscriptions",
+        subscriptions: subscriptions.map(sub => {
+          const monthlyAmount = sub.frequency === 'yearly' ? sub.amount / 12 : sub.frequency === 'quarterly' ? sub.amount / 3 : sub.frequency === 'weekly' ? sub.amount * 4 : sub.amount;
+          const currentMonth = new Date().toISOString().slice(0, 7);
+          const usageForCost = sub.usageMonth === currentMonth ? sub.monthlyUsageCount : sub.usageCount;
+          const costPerUse = usageForCost > 0 ? monthlyAmount / usageForCost : monthlyAmount;
+          return {
+            subscription: sub,
+            costPerUse,
+          };
+        }),
+        count: subscriptions.length,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("[Routes] POST /api/track-usage-for-all-members error:", message);
       res.status(500).json({ error: "Failed to track usage", message });
     }
   });
@@ -1983,6 +2128,18 @@ export async function registerRoutes(
 
   app.patch("/api/account/password", handleAccountPasswordUpdate);
   app.patch("/account/password", handleAccountPasswordUpdate);
+
+  async function supabaseAuthFetch(authHeader: string, path: string, body?: any) {
+    const base = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+    const url = `${base}/auth/v1/${path}`;
+    const headers: any = { Authorization: `Bearer ${authHeader}` };
+    const opts: any = { method: body ? 'POST' : 'GET', headers };
+    if (body) {
+      headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return await fetch(url, opts);
+  }
 
   app.get("/api/account/2fa/init", async (req: SessionRequest, res: Response) => {
     try {
@@ -3477,7 +3634,7 @@ export async function registerRoutes(
   app.post('/api/family-groups/:id/share-subscription', async (req: SessionRequest, res: Response) => {
     try {
       const { id: groupId } = req.params;
-      const { subscriptionId } = req.body;
+      const { subscriptionId, memberIds } = req.body;
 
       // Resolve user id from session or authorization header
       let userId = req.session?.user?.id;
@@ -3514,24 +3671,48 @@ export async function registerRoutes(
         }
       }
 
-      // Create shared subscription record
-      const { data: newShare, error } = await supabase
-        .from('shared_subscriptions')
-        .insert({
+      // If memberIds provided, create separate records for each member
+      if (Array.isArray(memberIds) && memberIds.length > 0) {
+        const sharesToCreate = memberIds.map((memberId: string) => ({
           family_group_id: groupId,
           subscription_id: subscriptionId,
           shared_by_user_id: userId,
+          shared_with_user_id: memberId,
           shared_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+        }));
 
-      if (error) {
-        console.error('[Routes] Share subscription error:', error);
-        return res.status(500).json({ error: 'Failed to share subscription' });
+        const { data: newShares, error } = await supabase
+          .from('shared_subscriptions')
+          .insert(sharesToCreate)
+          .select();
+
+        if (error) {
+          console.error('[Routes] Share subscription error:', error);
+          return res.status(500).json({ error: 'Failed to share subscription' });
+        }
+
+        res.status(201).json(newShares || []);
+      } else {
+        // Legacy: if no memberIds, create a single record without shared_with_user_id
+        // (shared with entire group)
+        const { data: newShare, error } = await supabase
+          .from('shared_subscriptions')
+          .insert({
+            family_group_id: groupId,
+            subscription_id: subscriptionId,
+            shared_by_user_id: userId,
+            shared_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Routes] Share subscription error:', error);
+          return res.status(500).json({ error: 'Failed to share subscription' });
+        }
+
+        res.status(201).json(newShare);
       }
-
-      res.status(201).json(newShare);
     } catch (err) {
       console.error('[Routes] POST /api/family-groups/:id/share-subscription error:', err);
       res.status(500).json({ error: 'Failed to share subscription' });
@@ -3629,6 +3810,13 @@ export async function registerRoutes(
       }
       if (!requesterId) return res.status(401).json({ error: 'Unauthorized' });
 
+      // Auto-advance renewal dates for requester (owner or member)
+      try {
+        await autoAdvanceRenewalDates(requesterId);
+      } catch (err) {
+        console.error("[Routes] Error auto-advancing renewal dates for member dashboard:", err);
+      }
+
       // Verify the requested member exists in the group
       const { data: member, error: memberError } = await supabase
         .from('family_group_members')
@@ -3643,10 +3831,31 @@ export async function registerRoutes(
 
       // If requester is the member themselves, return their dashboard
       if (requesterId === memberId) {
+        // Get member's personal subscriptions
         const { data: subscriptions } = await supabase
           .from('subscriptions')
           .select('*')
           .eq('user_id', memberId);
+
+        // Get shared subscriptions (owner's subs that are shared with this member)
+        const { data: sharedRows } = await supabase
+          .from('shared_subscriptions')
+          .select('subscription_id')
+          .eq('family_group_id', groupId)
+          .eq('shared_with_user_id', memberId);
+
+        let sharedSubscriptions: any[] = [];
+        if (sharedRows && sharedRows.length > 0) {
+          const sharedIds = sharedRows.map((r: any) => r.subscription_id);
+          const { data: sharedSubs } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .in('id', sharedIds);
+          sharedSubscriptions = sharedSubs || [];
+        }
+
+        // Combine personal + shared subscriptions
+        const allSubscriptions = [...(subscriptions || []), ...sharedSubscriptions];
 
         const { data: userSub } = await supabase
           .from('user_subscriptions')
@@ -3654,7 +3863,7 @@ export async function registerRoutes(
           .eq('user_id', memberId)
           .single();
 
-        const memberSubscriptions = (subscriptions || []).filter((s: any) => isSubscriptionActiveLike(s));
+        const memberSubscriptions = allSubscriptions.filter((s: any) => isSubscriptionActiveLike(s));
         const currentDate = now;
         const currentMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
         const currentMonthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -3688,7 +3897,7 @@ export async function registerRoutes(
 
         return res.json({
           member,
-          subscriptions: subscriptions || [],
+          subscriptions: allSubscriptions || [],
           userSubscription: userSub || null,
           spending: spendingSeries,
           metrics: {
@@ -3802,6 +4011,13 @@ export async function registerRoutes(
         if (authHeader) userId = extractUserIdFromToken(authHeader) || undefined;
       }
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      // Auto-advance renewal dates for this user (will advance owner and family members)
+      try {
+        await autoAdvanceRenewalDates(userId);
+      } catch (err) {
+        console.error("[Routes] Error auto-advancing renewal dates for family-data:", err);
+      }
 
       // Ensure requester is either the group owner or a group member
       const { data: groupRow, error: groupRowError } = await supabase
@@ -3921,7 +4137,7 @@ export async function registerRoutes(
 
       const visibleSharedSubscriptions = isOwner
         ? (sharedSubs || [])
-        : (sharedSubs || []).filter((s: any) => s.shared_with_user_id === userId);
+        : (sharedSubs || []).filter((s: any) => !s.shared_with_user_id || s.shared_with_user_id === userId);
       const sharedSubscriptionIds = visibleSharedSubscriptions.map((s: any) => s.subscription_id).filter(Boolean);
       // Also fetch the actual subscription rows for any visible shared subscription ids
       let sharedSubscriptionsDetailed = visibleSharedSubscriptions;
@@ -4031,6 +4247,15 @@ export async function registerRoutes(
         if (personalSubsError) {
           console.error('[Routes] /api/family-groups/:id/family-data failed to load personal subscriptions', personalSubsError);
           return res.status(500).json({ error: 'Failed to load family subscriptions' });
+        }
+
+        // Debug: log member personal subscription count and details
+        // eslint-disable-next-line no-console
+        console.log('[Routes] /api/family-groups/:id/family-data MEMBER personalSubs count:', (personalSubs || []).length);
+        if (personalSubs && personalSubs.length > 0) {
+          personalSubs.forEach((s: any) => {
+            console.log(`[Routes]   - ${s.name}: billing_month=${s.billing_month}, status=${s.status}, next_billing_at/date=${s.next_billing_at || s.next_billing_date}`);
+          });
         }
 
         personalSubscriptions = personalSubs || [];
@@ -4250,6 +4475,8 @@ export async function registerRoutes(
           // Debug logging to help diagnose metric counts
           // eslint-disable-next-line no-console
           console.log('[Routes] family-data metrics counts: allSubs=', allSubs.length, 'subs=', subs.length, 'deleted=', deletedSubs.length, 'uniqueShared=', uniqueShared.length);
+          // eslint-disable-next-line no-console
+          console.log('[Routes] family-data monthly calculations: monthlyFromSubs=', monthlyFromSubs, 'monthlyFromShared=', monthlyFromShared, 'total=', monthlyFromSubs + monthlyFromShared);
 
           return {
             totalSubscriptions,
@@ -5067,6 +5294,7 @@ archive.on('error', (err: Error) => {
 
   return httpServer;
 }
+
 
 
 

@@ -330,9 +330,9 @@ export default function Insights() {
     <div className="flex-1 overflow-auto">
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
         <div className="mb-2">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Insights</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Insights & Opportunities</h1>
           <p className="text-muted-foreground">
-            AI-powered analysis and recommendations for your subscriptions
+            AI-powered analysis to highlight wasted spend, unused services, and smart cost-saving decisions.
           </p>
         </div>
 

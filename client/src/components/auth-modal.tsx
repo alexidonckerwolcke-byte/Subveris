@@ -12,18 +12,25 @@ import { PostSignupFlow } from '@/components/post-signup-flow';
 interface AuthModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultTab?: 'signin' | 'signup';
 }
 
-export function AuthModal({ open, onOpenChange }: AuthModalProps) {
+export function AuthModal({ open, onOpenChange, defaultTab = 'signin' }: AuthModalProps) {
   const { signIn, signUp, signInWithGoogle, pendingMfaSession, pendingMfaFactors, justSignedUp, clearSignUpFlag } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [mfaChallengeOpen, setMfaChallengeOpen] = useState(false);
   const [postSignupOpen, setPostSignupOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
+  const [activeTab, setActiveTab] = useState<'signin' | 'signup'>(defaultTab);
 
   const [signInData, setSignInData] = useState({ email: '', password: '' });
   const [signUpData, setSignUpData] = useState({ email: '', password: '', confirmPassword: '' });
+
+  useEffect(() => {
+    if (open) {
+      setActiveTab(defaultTab);
+    }
+  }, [open, defaultTab]);
 
   useEffect(() => {
     if (justSignedUp) {

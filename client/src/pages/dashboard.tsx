@@ -123,13 +123,19 @@ export default function Dashboard() {
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    // Prefer server-provided spending series for owners. For member views, use
-    // visible family subscriptions so analytics match the subscription list.
+    // Use server-provided spending series for both owners and members
     const familyMonthlyDataForDashboard = showFamilyData
-      ? (familyData?.spending && familyData.spending.length > 0 && familyData?.isOwner ? familyData.spending : [])
+      ? (familyData?.spending && familyData.spending.length > 0 ? familyData.spending : [])
       : [];
 
     const totalMonthlySpendFromSpendingData = getCurrentMonthAmount(familyMonthlyDataForDashboard);
+    
+    if (showFamilyData) {
+      console.log('[Dashboard] Family mode - familyData:', familyData);
+      console.log('[Dashboard] Family mode - familyMonthlyDataForDashboard:', familyMonthlyDataForDashboard);
+      console.log('[Dashboard] Family mode - totalMonthlySpendFromSpendingData:', totalMonthlySpendFromSpendingData);
+      console.log('[Dashboard] Family mode - familyData.metrics:', familyData?.metrics);
+    }
 
     const defaultMetrics = {
       totalMonthlySpend: 0,
@@ -142,7 +148,7 @@ export default function Dashboard() {
       newServicesTracked: 0,
     };
 
-    const serverMetrics = showFamilyData && familyData?.isOwner === true && familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number'
+    const serverMetrics = showFamilyData && familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number'
       ? {
           totalMonthlySpend: familyMonthlyDataForDashboard.length
             ? totalMonthlySpendFromSpendingData
@@ -157,42 +163,11 @@ export default function Dashboard() {
         }
       : personalMetrics || defaultMetrics;
 
-    if (showFamilyData && familyData && familyData?.isOwner !== true) {
-      const visibleSubs = familySubscriptions;
-      const subs = visibleSubs.filter((s: any) => s && s.status !== 'deleted' && s.status !== 'canceled');
-      const totalMonthlySpend = subs.reduce((acc, s) => {
-        if (!isSubscriptionBilledInMonth(s, currentMonthStart, currentMonthEnd, now, true)) return acc;
-        return acc + calculateMonthlyCost(Number(s.amount) || 0, s.frequency || 'monthly');
-      }, 0);
-      const activeSubscriptions = subs.filter((s: any) => s.status === 'active').length;
-      const unusedSubscriptions = subs.filter((s: any) => s.status === 'unused').length;
-      const potentialSavings = subs
-        .filter((s: any) => s.status === 'unused' || s.status === 'to-cancel')
-        .reduce((acc, s) => acc + calculateMonthlyCost(Number(s.amount) || 0, s.frequency || 'monthly'), 0);
-      const isDeletedThisMonth = (s: any) => {
-        if (!s || s.status !== 'deleted') return false;
-        const deletedAt = s.deletedAt || s.deleted_at || s.updatedAt || s.updated_at;
-        if (!deletedAt) return true;
-        const deletedDate = new Date(deletedAt);
-        return deletedDate >= currentMonthStart && deletedDate <= currentMonthEnd;
-      };
-      const thisMonthSavings = visibleSubs
-        .filter(isDeletedThisMonth)
-        .reduce((acc, s) => acc + calculateMonthlyCost(Number(s.amount) || 0, s.frequency || 'monthly'), 0);
-      const newServicesTracked = subs.filter((s: any) => {
-        const created = new Date(s.createdAt || s.created_at || 0);
-        return created >= currentMonthStart && created <= currentMonthEnd;
-      }).length;
-
-      return {
-        ...serverMetrics,
-        totalMonthlySpend,
-        activeSubscriptions,
-        unusedSubscriptions,
-        potentialSavings,
-        thisMonthSavings,
-        newServicesTracked,
-      };
+    // For members in family mode, trust the server metrics completely
+    // The server has already calculated all metrics including the member's own subscriptions
+    if (showFamilyData && familyData) {
+      console.log('[Dashboard] Returning serverMetrics for family mode:', serverMetrics);
+      return serverMetrics;
     }
 
     return serverMetrics;
@@ -231,7 +206,7 @@ export default function Dashboard() {
   });
 
   const monthlySpending = showFamilyData
-    ? ((familyData?.spending && familyData.spending.length > 0 && familyData?.isOwner)
+    ? ((familyData?.spending && familyData.spending.length > 0)
         ? familyData.spending
         : computeMonthlySpendingFromFamilySubscriptions())
     : personalMonthlySpending;
@@ -287,8 +262,8 @@ export default function Dashboard() {
   // Use server data if available, otherwise compute from subscriptions for family mode
   const effectiveMonthlySpending = showFamilyData
     ? (function () {
-        if (familyData?.spending && familyData.spending.length > 0 && familyData?.isOwner) return familyData.spending;
-        if (familyData?.isOwner && familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number') {
+        if (familyData?.spending && familyData.spending.length > 0) return familyData.spending;
+        if (familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number') {
           const now = new Date();
           const label = now.toLocaleString('en-US', { month: 'short', year: 'numeric' });
           return [{ month: label, amount: Math.round(Number(familyData.metrics.totalMonthlySpending) * 100) / 100 }];
@@ -420,7 +395,7 @@ export default function Dashboard() {
   }
 
   const categorySpendingComputed = showFamilyData
-    ? ((familyData?.byCategory && familyData.byCategory.length && familyData?.isOwner)
+    ? ((familyData?.byCategory && familyData.byCategory.length)
         ? familyData.byCategory
         : computeSpendingByCategoryFromSubs(familySubscriptions))
     : personalCategorySpending;
@@ -664,11 +639,29 @@ export default function Dashboard() {
         <div className="mb-4 animate-slide-in-right">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent mb-2">Dashboard</h1>
           <p className="text-lg text-muted-foreground">
-            Real-time insights into your subscription spending
+            Your subscription command center for spend, renewal timing, and savings action.
           </p>
         </div>
 
         <FamilyMembershipBanner />
+
+        <div className="grid gap-4 md:grid-cols-3 mb-6">
+          <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Spend snapshot</p>
+            <p className="mt-3 text-2xl font-semibold">{subscriptions?.length || 0} services</p>
+            <p className="mt-2 text-sm text-muted-foreground">Track what matters most in one place.</p>
+          </div>
+          <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Savings focus</p>
+            <p className="mt-3 text-2xl font-semibold">{unusedCount + toCancelCount}</p>
+            <p className="mt-2 text-sm text-muted-foreground">Unused or at-risk payments to review.</p>
+          </div>
+          <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Family mode</p>
+            <p className="mt-3 text-2xl font-semibold">{showFamilyData ? "Enabled" : "Personal"}</p>
+            <p className="mt-2 text-sm text-muted-foreground">View the right set of subscriptions for your account.</p>
+          </div>
+        </div>
 
         <MetricsCards metrics={finalMetrics} isLoading={metricsLoading} />
 

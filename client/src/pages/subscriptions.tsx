@@ -190,6 +190,13 @@ export default function Subscriptions() {
     
     return result;
   }, [rawSubscriptions, showFamilyData]);
+
+  const totalSubscriptionCount = subscriptions.length;
+  const activeSubscriptionCount = subscriptions.filter((s) => s.status === "active").length;
+  const unusedSubscriptionCount = subscriptions.filter((s) => s.status === "unused").length;
+  const toCancelSubscriptionCount = subscriptions.filter((s) => s.status === "to-cancel").length;
+  const listModeLabel = showFamilyData ? "Family view" : "Personal view";
+
   const isLoading = showFamilyData ? familyLoading : personalLoading;
 
   const addMutation = useMutation({
@@ -369,11 +376,12 @@ export default function Subscriptions() {
   return (
     <div className="flex-1 overflow-auto">
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Subscriptions</h1>
             <p className="text-muted-foreground">
-              Manage and track all your recurring payments
+              Manage and track all your recurring payments.
             </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -391,7 +399,7 @@ export default function Subscriptions() {
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
-                <form 
+                <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     console.log('[Subscriptions] Form submit event fired, dialogOpen=', dialogOpen);
@@ -400,7 +408,7 @@ export default function Subscriptions() {
                       return;
                     }
                     form.handleSubmit(onSubmit)(e);
-                  }} 
+                  }}
                   className="space-y-4"
                 >
                   <FormField
@@ -512,9 +520,9 @@ export default function Subscriptions() {
                     <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                       Cancel
                     </Button>
-                    <Button 
-                      type="submit" 
-                      disabled={addMutation.isPending || isSubmittingLocal || submissionInFlightRef.current} 
+                    <Button
+                      type="submit"
+                      disabled={addMutation.isPending || isSubmittingLocal || submissionInFlightRef.current}
                       data-testid="button-submit-subscription"
                     >
                       {addMutation.isPending || isSubmittingLocal ? "Adding..." : "Add Subscription"}
@@ -525,6 +533,21 @@ export default function Subscriptions() {
             </DialogContent>
           </Dialog>
         </div>
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-border bg-background p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Mode</p>
+            <p className="mt-2 font-semibold">{listModeLabel}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-background p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Total services</p>
+            <p className="mt-2 font-semibold">{totalSubscriptionCount}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-background p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Action items</p>
+            <p className="mt-2 font-semibold">{unusedSubscriptionCount + toCancelSubscriptionCount}</p>
+          </div>
+        </div>
+      </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">

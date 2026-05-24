@@ -413,11 +413,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn('Error clearing storage:', error);
     }
     
-    // Clear React state
-    setUser(null);
-    setSession(null);
-    setLoading(false);
-    
     // Attempt Supabase logout but don't wait for it
     if (supabase) {
       try {
@@ -430,10 +425,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    // Redirect to homepage immediately
-    setTimeout(() => {
+    // Redirect to homepage BEFORE clearing React state to avoid briefly showing 404 page
+    // This way the browser starts navigating before React re-renders with user=null
+    try {
+      window.location.replace('/');
+      return; // Don't execute state updates - page is navigating away
+    } catch (e) {
+      // Fallback
       window.location.href = '/';
-    }, 100);
+      return; // Don't execute state updates - page is navigating away
+    }
   };
 
   const getToken = async (): Promise<string> => {

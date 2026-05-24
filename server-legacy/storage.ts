@@ -56,6 +56,7 @@ export interface IStorage {
   updateSubscriptionUsage(id: string, usageCount: number): Promise<Subscription | undefined>;
   recordSubscriptionUsage(id: string): Promise<Subscription | undefined>;
   trackUsageByDomain(userId: string, domain: string, timeSpent: number): Promise<Subscription | undefined>;
+  trackUsageByDomainForAllMembers(ownerUserId: string, domain: string, timeSpent: number): Promise<Subscription[]>;
   deleteSubscription(id: string): Promise<boolean>;
   updateSubscriptionNextBilling(id: string, nextBillingDate: string): Promise<Subscription | undefined>;
   
@@ -519,6 +520,12 @@ export class MemStorage implements IStorage {
     subscription.status = 'active';
     this.subscriptions.set(subscription.id, subscription);
     return subscription;
+  }
+
+  async trackUsageByDomainForAllMembers(ownerUserId: string, domain: string, timeSpent: number): Promise<Subscription[]> {
+    // For in-memory storage, just track for the owner themselves
+    const result = await this.trackUsageByDomain(ownerUserId, domain, timeSpent);
+    return result ? [result] : [];
   }
 
   async updateSubscriptionNextBilling(id: string, nextBillingDate: string): Promise<Subscription | undefined> {

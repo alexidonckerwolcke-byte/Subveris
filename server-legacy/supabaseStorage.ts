@@ -421,6 +421,52 @@ export class SupabaseStorage implements IStorage {
     return this.mapSubscription(updatedData);
   }
 
+  async trackUsageByDomainForAllMembers(ownerUserId: string, domain: string, timeSpent: number): Promise<Subscription[]> {
+    // First track for the owner themselves
+    const results: Subscription[] = [];
+    const ownerResult = await this.trackUsageByDomain(ownerUserId, domain, timeSpent);
+    if (ownerResult) {
+      results.push(ownerResult);
+    }
+
+    // Get all family groups owned by this user
+    const { data: ownedGroups, error: groupsError } = await supabase
+      .from('family_groups')
+      .select('id')
+      .eq('owner_id', ownerUserId);
+
+    if (groupsError || !Array.isArray(ownedGroups)) {
+      return results;
+    }
+
+    const groupIds = ownedGroups.map((g: any) => g.id).filter(Boolean);
+    if (groupIds.length === 0) {
+      return results;
+    }
+
+    // Get all members in those groups
+    const { data: members, error: membersError } = await supabase
+      .from('family_group_members')
+      .select('user_id')
+      .in('family_group_id', groupIds);
+
+    if (membersError || !Array.isArray(members)) {
+      return results;
+    }
+
+    const memberUserIds = Array.from(new Set(members.map((m: any) => m.user_id).filter(Boolean)));
+
+    // Track usage for each member
+    for (const memberUserId of memberUserIds) {
+      const memberResult = await this.trackUsageByDomain(memberUserId, domain, timeSpent);
+      if (memberResult) {
+        results.push(memberResult);
+      }
+    }
+
+    return results;
+  }
+
   async deleteSubscription(id: string): Promise<boolean> {
     const { error } = await supabase
       .from('subscriptions')
