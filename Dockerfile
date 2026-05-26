@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Copy package metadata and install all dependencies for the build.
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci || npm install --no-audit --no-fund --legacy-peer-deps
 
 # Copy the full repo and build the client.
 COPY . ./
