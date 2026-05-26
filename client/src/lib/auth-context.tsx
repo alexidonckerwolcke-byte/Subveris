@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isLoggingOut: boolean;
   isNewUser: boolean;
   justSignedUp: boolean;
   tutorialCompleted: boolean;
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
   const [hasSubscriptions, setHasSubscriptions] = useState<boolean | null>(null);
   const [isPremium, setIsPremium] = useState<boolean>(false);
@@ -377,6 +379,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Set logging out flag immediately to prevent 404 page from showing
+    setIsLoggingOut(true);
+    
     try {
       // Clear React Query cache before signing out to prevent data leakage
       queryClient.clear();
@@ -448,6 +453,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     session,
     loading,
+    isLoggingOut,
     isNewUser,
     justSignedUp,
     tutorialCompleted,

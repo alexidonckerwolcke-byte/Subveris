@@ -41,6 +41,6 @@ build = ["npm", "run", "build"]
 [userenv]
 
 [userenv.shared]
-SUPABASE_URL = "https://nuhrithkvejwopiqnxii.supabase.co"
-VITE_SUPABASE_URL = "https://nuhrithkvejwopiqnxii.supabase.co"
-VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im51aHJpdGhrdmVqd29waXFueGlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MzE3ODAsImV4cCI6MjA4MDAwNzc4MH0.J4ytc5oGMxtelsQsdVbXi0PEUmnjybIc0qk_m3eYLrc"
+SUPABASE_URL = "https://xuilgccacufwinvkocfl.supabase.co"
+VITE_SUPABASE_URL = "https://xuilgccacufwinvkocfl.supabase.co"
+VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1aWxnY2NhY3Vmd2ludmtvY2ZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NzY4OTYsImV4cCI6MjA4MTU1Mjg5Nn0.f0xa0hY6VDht7Qeqfbc0UaKpZLzCB43CXwOlfxDJ93M"

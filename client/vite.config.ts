@@ -2,24 +2,14 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
-// import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-// __dirname equivalent for ES modules
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// directory of this config (the client project)
 const clientRoot = path.resolve(__dirname);
-// workspace root is parent of client
 const workspaceRoot = path.resolve(clientRoot, "..");
 const srcRoot = path.resolve(clientRoot, "src");
 
-// diagnostics for debugging alias resolution
-console.log("workspaceRoot", workspaceRoot);
-console.log("clientRoot", clientRoot);
-console.log("srcRoot", srcRoot);
-
-
 export default defineConfig({
+  base: '/Subveris-1/',
   envDir: workspaceRoot,
   logLevel: 'error',
   // minimal plugin set to reduce complexity

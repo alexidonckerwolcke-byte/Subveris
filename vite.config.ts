@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "tailwindcss";
 import autoprefixer from "autoprefixer";
@@ -13,6 +13,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // workspace root is the directory containing this config file
 const workspaceRoot = path.resolve(__dirname);
+const env = loadEnv('development', workspaceRoot);
 const clientRoot = path.resolve(workspaceRoot, "client");
 const srcRoot = path.resolve(clientRoot, "src");
 
@@ -109,9 +110,9 @@ export default defineConfig({
     },
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:5000",
+        target: env.VITE_API_URL || "http://127.0.0.1:5000",
         changeOrigin: true,
-        rewrite: (path) => path,
+        rewrite: (path) => path.replace(/^\/api/, ""),
         secure: false,
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {
@@ -129,7 +130,7 @@ export default defineConfig({
     hmr: {
       protocol: "ws",
       host: "localhost",
-      port: 5173,
+      port: 5175,
     },
   }
 });

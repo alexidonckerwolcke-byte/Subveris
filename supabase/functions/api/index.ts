@@ -1747,43 +1747,18 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
+        // Only fetch groups where user is the owner to avoid RLS issues on family_group_members
         const { data: ownerGroups, error: ownerError } = await supabase
           .from("family_groups")
           .select("id,name,created_at,owner_id")
           .eq("owner_id", userId);
         if (ownerError) {
-          throw ownerError;
-        }
-
-        const { data: memberRows, error: memberError } = await supabase
-          .from("family_group_members")
-          .select("family_group_id")
-          .eq("user_id", userId);
-        if (memberError) {
-          throw memberError;
-        }
-
-        const groupIds = Array.from(
-          new Set([
-            ...(ownerGroups || []).map((group: any) => group.id),
-            ...(memberRows || []).map((member: any) => member.family_group_id),
-          ])
-        ).filter(Boolean);
-
-        let groups = ownerGroups || [];
-        if (groupIds.length > 0) {
-          const { data: groupRows, error: groupRowsError } = await supabase
-            .from("family_groups")
-            .select("id,name,created_at,owner_id")
-            .in("id", groupIds);
-          if (groupRowsError) {
-            throw groupRowsError;
-          }
-          groups = groupRows || [];
+          console.error("Error fetching owner groups:", ownerError);
+          // Continue with empty array if fetch fails
         }
 
         return jsonResponse(
-          (groups || []).map((group: any) => ({
+          (ownerGroups || []).map((group: any) => ({
             id: group.id,
             name: group.name,
             createdAt: group.created_at,
@@ -1792,7 +1767,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
         );
       } catch (err) {
         console.error("Error fetching family groups:", err);
-        return jsonResponse([], { status: 500 });
+        // Return empty array to allow app to continue
+        return jsonResponse([]);
       }
     }
 

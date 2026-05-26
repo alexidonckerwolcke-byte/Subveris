@@ -1,26 +1,24 @@
-import { getSupabaseClient } from './server/supabase.js';
+import * as dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 
-async function listUsers() {
-  const supabase = getSupabaseClient();
+dotenv.config();
 
-  // Get auth users
-  const { data: { users }, error } = await supabase.auth.admin.listUsers();
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+async function main() {
+  const { data: users, error } = await supabase.auth.admin.listUsers();
   
   if (error) {
-    console.error('Error listing users:', error);
-    process.exit(1);
+    console.error('Error:', error);
+  } else {
+    console.log('Users:', users?.users.length);
+    users?.users.forEach(u => {
+      console.log(`- ${u.id}: ${u.email}`);
+    });
   }
-
-  console.log(`Found ${users?.length || 0} users:`);
-  users?.forEach((user: any) => {
-    console.log(`  ID: ${user.id}`);
-    console.log(`  Email: ${user.email}`);
-  });
-
-  process.exit(0);
 }
 
-listUsers().catch(err => {
-  console.error('Error:', err);
-  process.exit(1);
-});
+main();
