@@ -10,7 +10,7 @@ COPY package-lock.json* ./
 COPY client/ ./client/
 
 # Install dependencies (make lockfile optional)
-RUN npm ci 2>/dev/null || npm install
+RUN npm install
 
 # Build the client
 WORKDIR /app/client
