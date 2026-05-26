@@ -84,11 +84,10 @@ export default defineConfig({
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {
+        // Keep vendor chunking simple to avoid cross-chunk export/import mismatch
+        // that can surface as React internals being undefined at runtime.
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('@tanstack/react-query') || id.includes('recharts') || id.includes('date-fns') || id.includes('stripe') || id.includes('lucide-react')) {
-              return 'vendor-ui';
-            }
             return 'vendor';
           }
         },
