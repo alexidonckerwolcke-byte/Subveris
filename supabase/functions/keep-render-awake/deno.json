@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "@supabase/functions-js": "https://esm.sh/@supabase/functions-js@2.1.5"
+  },
+  "edge_runtime": {
+    "inspector": false
+  }
+}

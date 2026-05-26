@@ -102,6 +102,70 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
   }, [subscriptionData]);
 
+  // Prefetch all subscription data and related queries when the provider mounts
+  useEffect(() => {
+    console.log('[SubscriptionProvider] Prefetching subscription data...');
+    
+    // Prefetch subscriptions
+    queryClient.prefetchInfiniteQuery({
+      queryKey: ["/api/subscriptions", 50],
+      queryFn: async ({ pageParam = 1 }) => {
+        const res = await apiRequest("GET", `/api/subscriptions?page=${pageParam}&perPage=50`);
+        const items: any[] = await res.json();
+        const total = parseInt(res.headers.get('x-total-count') || '0');
+        return { items, total };
+      },
+      initialPageParam: 1,
+    });
+
+    // Prefetch metrics
+    queryClient.prefetchQuery({
+      queryKey: ["/api/metrics"],
+      queryFn: async () => {
+        const res = await apiRequest("GET", "/api/metrics");
+        return res.json();
+      },
+    });
+
+    // Prefetch family groups
+    queryClient.prefetchQuery({
+      queryKey: ["/api/family-groups"],
+      queryFn: async () => {
+        const res = await apiRequest("GET", "/api/family-groups");
+        return res.json();
+      },
+    });
+
+    // Prefetch monthly spending
+    queryClient.prefetchQuery({
+      queryKey: ["/api/spending/monthly"],
+      queryFn: async () => {
+        const res = await apiRequest("GET", "/api/spending/monthly");
+        return res.json();
+      },
+    });
+
+    // Prefetch category spending
+    queryClient.prefetchQuery({
+      queryKey: ["/api/spending/category"],
+      queryFn: async () => {
+        const res = await apiRequest("GET", "/api/spending/category");
+        return res.json();
+      },
+    });
+
+    // Prefetch recommendations
+    queryClient.prefetchQuery({
+      queryKey: ["/api/recommendations"],
+      queryFn: async () => {
+        const res = await apiRequest("GET", "/api/recommendations");
+        return res.json();
+      },
+    });
+
+    console.log('[SubscriptionProvider] Prefetch requests initiated');
+  }, []);
+
   const setTier = (newTier: SubscriptionTier) => {
     // Invalidate the subscription status query to refresh from Stripe
     queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription-status"] });

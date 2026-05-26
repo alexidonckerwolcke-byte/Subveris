@@ -89,7 +89,7 @@ function Router({ user }: { user: any }) {
 function AppContent() {
   // Call ALL hooks unconditionally at the top level
   const [location] = useLocation();
-  const { user, loading, signOut, justSignedUp, clearSignUpFlag, pendingMfaSession } = useAuth();
+  const { user, loading, signOut, justSignedUp, clearSignUpFlag, pendingMfaSession, isLoggingOut } = useAuth();
   const [postSignupOpen, setPostSignupOpen] = useState(false);
   const [postSignupCompleted, setPostSignupCompleted] = useState(false);
 
@@ -108,6 +108,11 @@ function AppContent() {
   // Standalone docs page: render only DocsPage, no app shell
   if (location === "/docs") {
     return <DocsPage />;
+  }
+
+  // Show blank page during logout to prevent 404 from appearing
+  if (isLoggingOut) {
+    return <div className="min-h-screen bg-background" />;
   }
 
   if (loading) {

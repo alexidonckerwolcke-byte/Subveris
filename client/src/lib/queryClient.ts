@@ -99,6 +99,9 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  // Always use the backend API instead of client-side Supabase bridge
+  // The bridge has issues with RLS policies and malformed queries
+  
   const headers: Record<string, string> = {};
   
   if (data) {
@@ -202,6 +205,10 @@ export const getQueryFn: <T>(options: {
     let token = await resolveAuthToken(true);
     const queryPath = buildQueryPath(queryKey as unknown[]);
     const queryPathWithLocal = appendLocalTimeQuery(queryPath);
+    
+    // Always use the backend API directly, don't use the client-side Supabase bridge
+    // The bridge has RLS and policy issues
+    
     const fetchUrl = resolveApiUrl(queryPathWithLocal);
 
     const makeRequest = async (authToken: string | null) => {
