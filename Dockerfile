@@ -1,36 +1,50 @@
-# Dockerfile for server application
-# multi-stage build: compile TypeScript then run
-
+# Build stage for React/Vite frontend
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# copy only package files to leverage cache
-COPY package.json package-lock.json tsconfig.json .
-COPY server/package.json server/package-lock.json ./server/
+# Copy root package files (make lockfile optional with *)
+COPY package.json ./
+COPY package-lock.json* ./
 
-# install dependencies (including dev for build)
+# Copy source files needed for the build
+COPY vite.config.ts ./
+COPY tsconfig.json ./
+COPY client/ ./client/
+COPY shared/ ./shared/
+COPY attached_assets/ ./attached_assets/
+COPY postcss.config.cjs ./postcss.config.cjs
+COPY postcss.config.js ./postcss.config.js
+
+# Install dependencies
 RUN npm ci
 
-# copy source
-COPY . .
-
-# build output (script/build.ts should compile to dist)
+# Build the static site
 RUN npm run build
 
-# -------------------------
-FROM node:20-alpine AS runner
+# Production runtime stage
+FROM node:20-alpine
 WORKDIR /app
 
-# only keep production deps
-COPY package.json package-lock.json .
-RUN npm ci --omit=dev
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
 
-# copy built files and needed assets
-COPY --from=builder /app/dist ./dist
+# Copy static site artifacts from builder
+COPY --from=builder /app/dist/public ./public
 
-# expose port
-ENV PORT=5000
-EXPOSE 5000
+# Copy static server
+COPY server.js ./
 
-# default command
-CMD ["node", "dist/index.cjs"]
+# Set environment
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" || exit 1
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "server.js"]
+
