@@ -1,50 +1,68 @@
-# Build stage for React/Vite frontend
-FROM node:20-alpine AS builder
+###
+# Multi-stage Dockerfile
+# - Frontend stage: build the Vite frontend located in `client/` (output normalized to `dist/public`).
+# - Backend stage: build the TypeScript backend located in `server/` (assumes `npm run build` outputs `dist`).
+# - Runtime stage: install production deps for the server and run the compiled server, serving static files from `public/`.
+###
+
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/client
+
+# Install frontend dependencies (make lockfile optional)
+COPY client/package.json ./
+COPY client/package-lock.json* ./
+
+# Copy frontend sources
+COPY client/ ./
+
+# Build frontend and normalize output to `dist/public` so runtime stage can always copy `public/`.
+RUN npm ci --silent && \
+    npm run build && \
+    if [ -d dist ] && [ ! -d dist/public ]; then mkdir -p dist/public && cp -R dist/* dist/public/ || true; fi
+
+
+FROM node:20-alpine AS backend-builder
+WORKDIR /app/server
+
+# Copy server package files (lockfile optional) and source
+COPY server/package.json ./
+COPY server/package-lock.json* ./
+COPY server/ ./
+
+# Install server deps and build TypeScript server (expects `npm run build` to produce `dist`)
+RUN npm ci --silent && npm run build
+
+
+FROM node:20-alpine AS runtime
 WORKDIR /app
 
-# Copy root package files (make lockfile optional with *)
-COPY package.json ./
-COPY package-lock.json* ./
+# Small tools for proper signal handling and healthchecks
+RUN apk add --no-cache dumb-init curl
 
-# Copy source files needed for the build
-COPY vite.config.ts ./
-COPY tsconfig.json ./
-COPY client/ ./client/
-COPY shared/ ./shared/
-COPY attached_assets/ ./attached_assets/
-COPY postcss.config.cjs ./postcss.config.cjs
-COPY postcss.config.js ./postcss.config.js
-
-# Install dependencies
-RUN npm ci
-
-# Build the static site
-RUN npm run build
-
-# Production runtime stage
-FROM node:20-alpine
-WORKDIR /app
-
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
-
-# Copy static site artifacts from builder
-COPY --from=builder /app/dist/public ./public
-
-# Copy static server
-COPY server.js ./
-
-# Set environment
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV SERVER_ENTRY=server/dist/index.js
+
+# Copy built frontend -> runtime `./public`
+COPY --from=frontend-builder /app/client/dist/public ./public
+
+# Copy built backend artifacts
+COPY --from=backend-builder /app/server/dist ./server/dist
+
+# Copy server package files so we can install production deps in runtime
+COPY server/package.json server/package-lock.json* ./server/  
+
+# Install only production dependencies for the server (immutable, repeatable)
+RUN cd server && npm ci --omit=dev --silent || true
 
 # Expose port
 EXPOSE 3000
 
-# Health check
+# Simple healthcheck
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" || exit 1
+  CMD curl -f http://localhost:3000/ || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "server.js"]
+# Default command runs the compiled server entry. Override with a different command if needed.
+CMD ["node", "server/dist/index.js"]
 
