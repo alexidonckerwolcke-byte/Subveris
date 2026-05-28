@@ -11,8 +11,15 @@ const DIST_PATH = path.join(__dirname, 'public');
 
 // Initialize Supabase
 const supabaseUrl = 'https://xuilgccacufwinvkocfl.supabase.co';
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+let supabase = null;
+if (supabaseServiceRoleKey) {
+  supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+  console.log('✓ Supabase initialized with service role key');
+} else {
+  console.warn('⚠ SUPABASE_SERVICE_ROLE_KEY not set - API endpoints will not work');
+}
 
 // Helper to parse JSON body
 const parseBody = (req) => {
@@ -31,6 +38,7 @@ const parseBody = (req) => {
 
 // Helper to extract and verify JWT token
 const getUser = async (authHeader) => {
+  if (!supabase) return null;
   if (!authHeader?.startsWith('Bearer ')) return null;
   
   const token = authHeader.slice(7);
@@ -59,6 +67,12 @@ const server = http.createServer(async (req, res) => {
 
   // API Routes
   if (urlPath === '/api/user/premium-status' && req.method === 'GET') {
+    if (!supabase) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Server not configured - SUPABASE_SERVICE_ROLE_KEY missing' }));
+      return;
+    }
+
     const user = await getUser(req.headers.authorization);
     if (!user) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -93,6 +107,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (urlPath === '/api/user/currency' && req.method === 'PATCH') {
+    if (!supabase) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Server not configured - SUPABASE_SERVICE_ROLE_KEY missing' }));
+      return;
+    }
+
     const user = await getUser(req.headers.authorization);
     if (!user) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
