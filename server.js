@@ -2,15 +2,132 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 const DIST_PATH = path.join(__dirname, 'public');
 
-const server = http.createServer((req, res) => {
+// Initialize Supabase
+const supabaseUrl = 'https://xuilgccacufwinvkocfl.supabase.co';
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+// Helper to parse JSON body
+const parseBody = (req) => {
+  return new Promise((resolve) => {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch {
+        resolve({});
+      }
+    });
+  });
+};
+
+// Helper to extract and verify JWT token
+const getUser = async (authHeader) => {
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  
+  const token = authHeader.slice(7);
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    return error ? null : user;
+  } catch {
+    return null;
+  }
+};
+
+const server = http.createServer(async (req, res) => {
   // Remove query strings and hash
   let urlPath = req.url.split('?')[0].split('#')[0];
+  
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+
+  // API Routes
+  if (urlPath === '/api/user/premium-status' && req.method === 'GET') {
+    const user = await getUser(req.headers.authorization);
+    if (!user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('subscription_tier, currency, cancel_at_period_end, current_period_end')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        isPremium: data?.subscription_tier !== 'free' && data?.subscription_tier !== null,
+        status: data?.subscription_tier || 'free',
+        planType: data?.subscription_tier || 'free',
+        currency: data?.currency || 'USD',
+        cancelAtPeriodEnd: data?.cancel_at_period_end || false,
+        currentPeriodEnd: data?.current_period_end || null,
+      }));
+    } catch (error) {
+      console.error('Error fetching premium status:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
+    return;
+  }
+
+  if (urlPath === '/api/user/currency' && req.method === 'PATCH') {
+    const user = await getUser(req.headers.authorization);
+    if (!user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
+    try {
+      const body = await parseBody(req);
+      const { currency } = body;
+
+      if (!currency) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Currency is required' }));
+        return;
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ currency })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, currency }));
+    } catch (error) {
+      console.error('Error updating currency:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
+    return;
+  }
+
+  // Static file serving
   if (urlPath === '/') urlPath = '/index.html';
 
   let filePath = path.join(DIST_PATH, urlPath);
