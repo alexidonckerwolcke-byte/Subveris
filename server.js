@@ -54,10 +54,8 @@ const server = http.createServer(async (req, res) => {
   // Remove query strings and hash
   let urlPath = req.url.split('?')[0].split('#')[0];
   
-  // Debug logging
-  if (urlPath.startsWith('/api')) {
-    console.log(`[${req.method}] ${urlPath}`);
-  }
+  // Debug logging for ALL requests
+  console.log(`[${req.method}] ${req.url} -> ${urlPath}`);
   
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
