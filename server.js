@@ -70,63 +70,20 @@ const server = http.createServer(async (req, res) => {
 
   // API Routes
   if (urlPath === '/api/user/premium-status' && req.method === 'GET') {
-    if (!supabase) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Server not configured - SUPABASE_SERVICE_ROLE_KEY missing' }));
-      return;
-    }
-
-    const user = await getUser(req.headers.authorization);
-    if (!user) {
-      res.writeHead(401, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Unauthorized' }));
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('subscription_tier, currency, cancel_at_period_end, current_period_end')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.warn('Profile query error (table may not exist):', error.message);
-        // Return defaults if profile doesn't exist yet
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          isPremium: false,
-          status: 'free',
-          planType: 'free',
-          currency: 'USD',
-          cancelAtPeriodEnd: false,
-          currentPeriodEnd: null,
-        }));
-        return;
-      }
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        isPremium: data?.subscription_tier !== 'free' && data?.subscription_tier !== null,
-        status: data?.subscription_tier || 'free',
-        planType: data?.subscription_tier || 'free',
-        currency: data?.currency || 'USD',
-        cancelAtPeriodEnd: data?.cancel_at_period_end || false,
-        currentPeriodEnd: data?.current_period_end || null,
-      }));
-    } catch (error) {
-      console.error('Error fetching premium status:', error);
-      // Return defaults on error instead of 500
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        isPremium: false,
-        status: 'free',
-        planType: 'free',
-        currency: 'USD',
-        cancelAtPeriodEnd: false,
-        currentPeriodEnd: null,
-      }));
-    }
+    console.log('[API] Premium status request - Auth header:', req.headers.authorization ? 'present' : 'missing');
+    
+    // For now, return defaults to all requests to test connectivity
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      test: true,
+      isPremium: false,
+      status: 'free',
+      planType: 'free',
+      currency: 'USD',
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: null,
+      authHeader: req.headers.authorization ? 'received' : 'missing',
+    }));
     return;
   }
 
