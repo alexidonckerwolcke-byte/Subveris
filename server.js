@@ -95,6 +95,67 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     
+    if (urlPath === '/api/user/currency' && req.method === 'PATCH') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+    
+    // Return default empty responses for unimplemented endpoints
+    if (urlPath === '/api/subscriptions' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([]));
+      return;
+    }
+    
+    if (urlPath === '/api/recommendations' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([]));
+      return;
+    }
+    
+    if (urlPath === '/api/analysis/cost-per-use' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([]));
+      return;
+    }
+    
+    if (urlPath.startsWith('/api/spending/category') && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([]));
+      return;
+    }
+    
+    if (urlPath === '/api/analytics/monthly-savings' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ total: 0, byMonth: [] }));
+      return;
+    }
+    
+    if (urlPath === '/api/insights/behavioral' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([]));
+      return;
+    }
+    
+    if (urlPath === '/api/family-groups' && (req.method === 'GET' || req.method === 'POST')) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([]));
+      return;
+    }
+    
+    if (urlPath.startsWith('/api/family-groups') && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([]));
+      return;
+    }
+    
+    if (urlPath.startsWith('/api/stripe') && req.method === 'POST') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ url: null }));
+      return;
+    }
+    
     // Unknown API endpoint
     console.log(`[${new Date().toISOString()}] ✗ Unknown API endpoint: ${urlPath}`);
     res.writeHead(404, { 'Content-Type': 'application/json' });
