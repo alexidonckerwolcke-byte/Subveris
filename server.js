@@ -126,6 +126,18 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     
+    if (urlPath.startsWith('/api/spending/monthly') && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([]));
+      return;
+    }
+    
+    if (urlPath.startsWith('/api/metrics') && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([]));
+      return;
+    }
+    
     if (urlPath === '/api/analytics/monthly-savings' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ total: 0, byMonth: [] }));
