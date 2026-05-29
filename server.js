@@ -55,7 +55,7 @@ const server = http.createServer(async (req, res) => {
   let urlPath = req.url.split('?')[0].split('#')[0];
   
   // Debug logging for ALL requests
-  console.log(`[${req.method}] ${req.url} -> ${urlPath}`);
+  console.log(`[${new Date().toISOString()}] [${req.method}] ${req.url} → urlPath="${urlPath}"`);
   
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -68,22 +68,30 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API Routes
-  if (urlPath === '/api/user/premium-status' && req.method === 'GET') {
-    console.log('[API] Premium status request - Auth header:', req.headers.authorization ? 'present' : 'missing');
+  // API Routes - MUST be checked before static file serving
+  if (urlPath.startsWith('/api/')) {
+    console.log(`[${new Date().toISOString()}] ✓ Routing to API handler for ${urlPath}`);
     
-    // For now, return defaults to all requests to test connectivity
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      test: true,
-      isPremium: false,
-      status: 'free',
-      planType: 'free',
-      currency: 'USD',
-      cancelAtPeriodEnd: false,
-      currentPeriodEnd: null,
-      authHeader: req.headers.authorization ? 'received' : 'missing',
-    }));
+    if (urlPath === '/api/user/premium-status' && req.method === 'GET') {
+      console.log(`[${new Date().toISOString()}] → Premium status endpoint`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        test: true,
+        isPremium: false,
+        status: 'free',
+        planType: 'free',
+        currency: 'USD',
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: null,
+        authHeader: req.headers.authorization ? 'received' : 'missing',
+      }));
+      return;
+    }
+    
+    // Unknown API endpoint
+    console.log(`[${new Date().toISOString()}] ✗ Unknown API endpoint: ${urlPath}`);
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'API endpoint not found' }));
     return;
   }
 
