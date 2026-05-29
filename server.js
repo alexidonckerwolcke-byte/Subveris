@@ -114,34 +114,18 @@ const server = http.createServer(async (req, res) => {
 
       try {
         const { data, error } = await supabase
-          .from('profiles')
-          .select('subscription_tier, currency, cancel_at_period_end, current_period_end')
-          .eq('id', user.id)
+          .from('user_subscriptions')
+          .select('plan_type, status, cancel_at_period_end, current_period_end')
+          .eq('user_id', user.id)
           .single();
 
         if (error) {
-          console.log('Profile not found or error:', error.message);
-          // Create a default profile if it doesn't exist
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              id: user.id,
-              subscription_tier: 'free',
-              currency: 'USD',
-              cancel_at_period_end: false,
-              current_period_end: null,
-            });
-          
-          if (insertError) {
-            console.log('Insert error:', insertError.message);
-          } else {
-            console.log('Created default profile for user');
-          }
-          
+          console.log('No subscription found for user:', error.message);
+          // Return default free tier response
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
             isPremium: false,
-            status: 'free',
+            status: 'inactive',
             planType: 'free',
             currency: 'USD',
             cancelAtPeriodEnd: false,
@@ -152,10 +136,10 @@ const server = http.createServer(async (req, res) => {
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-          isPremium: data?.subscription_tier !== 'free' && data?.subscription_tier !== null,
-          status: data?.subscription_tier || 'free',
-          planType: data?.subscription_tier || 'free',
-          currency: data?.currency || 'USD',
+          isPremium: data?.plan_type !== 'free' && data?.status === 'active',
+          status: data?.status || 'inactive',
+          planType: data?.plan_type || 'free',
+          currency: 'USD',
           cancelAtPeriodEnd: data?.cancel_at_period_end || false,
           currentPeriodEnd: data?.current_period_end || null,
         }));
@@ -213,56 +197,335 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath === '/api/recommendations' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify([]));
+      const user = await getUser(req.headers.authorization);
+      if (!user || !supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('insights')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.log('Insights error:', error.message);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify([]));
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data || []));
+      } catch (error) {
+        console.error('Error fetching recommendations:', error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
       return;
     }
     
     if (urlPath === '/api/analysis/cost-per-use' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify([]));
+      const user = await getUser(req.headers.authorization);
+      if (!user || !supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('subscriptions')
+          .select('id, name, amount, usage_count')
+          .eq('user_id', user.id)
+          .gt('usage_count', 0);
+
+        if (error) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify([]));
+          return;
+        }
+
+        const analysis = (data || []).map(sub => ({
+          id: sub.id,
+          name: sub.name,
+          totalCost: sub.amount,
+          usageCount: sub.usage_count || 1,
+          costPerUse: (sub.amount / (sub.usage_count || 1)).toFixed(2),
+        }));
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(analysis));
+      } catch (error) {
+        console.error('Error fetching cost-per-use:', error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
       return;
     }
     
     if (urlPath.startsWith('/api/spending/category') && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify([]));
+      const user = await getUser(req.headers.authorization);
+      if (!user || !supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('category, amount')
+          .eq('user_id', user.id);
+
+        if (error) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify([]));
+          return;
+        }
+
+        // Group by category
+        const grouped = {};
+        (data || []).forEach(tx => {
+          const cat = tx.category || 'Uncategorized';
+          grouped[cat] = (grouped[cat] || 0) + tx.amount;
+        });
+
+        const result = Object.entries(grouped).map(([category, amount]) => ({
+          category,
+          amount: parseFloat(amount.toFixed(2)),
+        }));
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        console.error('Error fetching spending by category:', error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
       return;
     }
     
     if (urlPath.startsWith('/api/spending/monthly') && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify([]));
+      const user = await getUser(req.headers.authorization);
+      if (!user || !supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('date, amount')
+          .eq('user_id', user.id);
+
+        if (error) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify([]));
+          return;
+        }
+
+        // Group by month
+        const grouped = {};
+        (data || []).forEach(tx => {
+          const month = tx.date ? tx.date.substring(0, 7) : 'unknown';
+          grouped[month] = (grouped[month] || 0) + tx.amount;
+        });
+
+        const result = Object.entries(grouped)
+          .sort()
+          .map(([month, amount]) => ({
+            month,
+            amount: parseFloat(amount.toFixed(2)),
+          }));
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        console.error('Error fetching monthly spending:', error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
       return;
     }
     
     if (urlPath.startsWith('/api/metrics') && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify([]));
+      const user = await getUser(req.headers.authorization);
+      if (!user || !supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      try {
+        // Fetch both subscriptions and transactions
+        const [subResult, txResult] = await Promise.all([
+          supabase.from('subscriptions').select('amount').eq('user_id', user.id),
+          supabase.from('transactions').select('amount').eq('user_id', user.id),
+        ]);
+
+        const subs = subResult.data || [];
+        const txs = txResult.data || [];
+
+        const totalSpending = (subs.reduce((sum, s) => sum + (s.amount || 0), 0) +
+                              txs.reduce((sum, t) => sum + (t.amount || 0), 0)).toFixed(2);
+
+        const metrics = {
+          totalSubscriptions: subs.length,
+          totalTransactions: txs.length,
+          totalSpending: parseFloat(totalSpending),
+          averagePerSub: subs.length > 0 ? (totalSpending / subs.length).toFixed(2) : 0,
+        };
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(metrics));
+      } catch (error) {
+        console.error('Error fetching metrics:', error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
       return;
     }
     
     if (urlPath === '/api/analytics/monthly-savings' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ total: 0, byMonth: [] }));
+      const user = await getUser(req.headers.authorization);
+      if (!user || !supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ total: 0, byMonth: [] }));
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('insights')
+          .select('potential_savings, created_at')
+          .eq('user_id', user.id);
+
+        if (error) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ total: 0, byMonth: [] }));
+          return;
+        }
+
+        let total = 0;
+        const byMonth = {};
+        (data || []).forEach(insight => {
+          const savings = insight.potential_savings || 0;
+          total += savings;
+          const month = insight.created_at ? insight.created_at.substring(0, 7) : 'unknown';
+          byMonth[month] = (byMonth[month] || 0) + savings;
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          total: parseFloat(total.toFixed(2)),
+          byMonth: Object.entries(byMonth).map(([month, amount]) => ({
+            month,
+            amount: parseFloat(amount.toFixed(2)),
+          })),
+        }));
+      } catch (error) {
+        console.error('Error fetching monthly savings:', error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ total: 0, byMonth: [] }));
+      }
       return;
     }
     
     if (urlPath === '/api/insights/behavioral' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify([]));
+      const user = await getUser(req.headers.authorization);
+      if (!user || !supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('insights')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('type', 'behavioral');
+
+        if (error) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify([]));
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data || []));
+      } catch (error) {
+        console.error('Error fetching behavioral insights:', error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
       return;
     }
     
     if (urlPath === '/api/family-groups' && (req.method === 'GET' || req.method === 'POST')) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify([]));
+      const user = await getUser(req.headers.authorization);
+      if (!user || !supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      if (req.method === 'GET') {
+        try {
+          const { data, error } = await supabase
+            .from('family_groups')
+            .select('*')
+            .eq('owner_id', user.id);
+
+          if (error) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify([]));
+            return;
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(data || []));
+        } catch (error) {
+          console.error('Error fetching family groups:', error);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify([]));
+        }
+      }
       return;
     }
     
     if (urlPath.startsWith('/api/family-groups') && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify([]));
+      const user = await getUser(req.headers.authorization);
+      if (!user || !supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('family_groups')
+          .select('*')
+          .or(`owner_id.eq.${user.id},members.cs.${JSON.stringify([{ user_id: user.id }])}`);
+
+        if (error) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify([]));
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data || []));
+      } catch (error) {
+        console.error('Error fetching family group:', error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
       return;
     }
     
@@ -303,24 +566,12 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ currency })
-        .eq('id', user.id);
-
-      if (error) {
-        console.warn('Currency update error (table may not exist):', error.message);
-        // Still return success - data will be stored in frontend localStorage
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, currency }));
-        return;
-      }
-
+      // Currency preference can be stored in frontend localStorage
+      // Return success for frontend to handle locally
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, currency }));
     } catch (error) {
       console.error('Error updating currency:', error);
-      // Return success anyway - frontend uses localStorage as fallback
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
     }
