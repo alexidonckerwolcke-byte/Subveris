@@ -81,17 +81,96 @@ const server = http.createServer(async (req, res) => {
     
     if (urlPath === '/api/user/premium-status' && req.method === 'GET') {
       console.log(`[${new Date().toISOString()}] → Premium status endpoint`);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        test: false,
-        isPremium: false,
-        status: 'free',
-        planType: 'free',
-        currency: 'USD',
-        cancelAtPeriodEnd: false,
-        currentPeriodEnd: null,
-        authHeader: req.headers.authorization ? 'received' : 'missing',
-      }));
+      
+      const user = await getUser(req.headers.authorization);
+      if (!user) {
+        console.log('No authenticated user');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          isPremium: false,
+          status: 'free',
+          planType: 'free',
+          currency: 'USD',
+          cancelAtPeriodEnd: false,
+          currentPeriodEnd: null,
+        }));
+        return;
+      }
+      
+      console.log(`User ID: ${user.id}`);
+      
+      if (!supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          isPremium: false,
+          status: 'free',
+          planType: 'free',
+          currency: 'USD',
+          cancelAtPeriodEnd: false,
+          currentPeriodEnd: null,
+        }));
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('subscription_tier, currency, cancel_at_period_end, current_period_end')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.log('Profile not found or error:', error.message);
+          // Create a default profile if it doesn't exist
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              subscription_tier: 'free',
+              currency: 'USD',
+              cancel_at_period_end: false,
+              current_period_end: null,
+            });
+          
+          if (insertError) {
+            console.log('Insert error:', insertError.message);
+          } else {
+            console.log('Created default profile for user');
+          }
+          
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            isPremium: false,
+            status: 'free',
+            planType: 'free',
+            currency: 'USD',
+            cancelAtPeriodEnd: false,
+            currentPeriodEnd: null,
+          }));
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          isPremium: data?.subscription_tier !== 'free' && data?.subscription_tier !== null,
+          status: data?.subscription_tier || 'free',
+          planType: data?.subscription_tier || 'free',
+          currency: data?.currency || 'USD',
+          cancelAtPeriodEnd: data?.cancel_at_period_end || false,
+          currentPeriodEnd: data?.current_period_end || null,
+        }));
+      } catch (error) {
+        console.error('Error fetching premium status:', error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          isPremium: false,
+          status: 'free',
+          planType: 'free',
+          currency: 'USD',
+          cancelAtPeriodEnd: false,
+          currentPeriodEnd: null,
+        }));
+      }
       return;
     }
     
@@ -103,8 +182,33 @@ const server = http.createServer(async (req, res) => {
     
     // Return default empty responses for unimplemented endpoints
     if (urlPath === '/api/subscriptions' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify([]));
+      const user = await getUser(req.headers.authorization);
+      if (!user || !supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (error) {
+          console.log('Subscriptions error:', error.message);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify([]));
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data || []));
+      } catch (error) {
+        console.error('Error fetching subscriptions:', error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
       return;
     }
     
