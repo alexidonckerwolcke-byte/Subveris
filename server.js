@@ -72,11 +72,18 @@ const server = http.createServer(async (req, res) => {
   if (urlPath.startsWith('/api/')) {
     console.log(`[${new Date().toISOString()}] ✓ Routing to API handler for ${urlPath}`);
     
+    // Health check endpoint
+    if (urlPath === '/api/health' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
+      return;
+    }
+    
     if (urlPath === '/api/user/premium-status' && req.method === 'GET') {
       console.log(`[${new Date().toISOString()}] → Premium status endpoint`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
-        test: true,
+        test: false,
         isPremium: false,
         status: 'free',
         planType: 'free',
