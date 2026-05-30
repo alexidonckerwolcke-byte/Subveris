@@ -2754,6 +2754,22 @@ runtimeDeno?.serve?.(async (req: Request) => {
       return jsonResponse({ success: true });
     }
 
+    if (pathname === "/stripe/config" && req.method === "GET") {
+      const premiumPriceId = Deno?.env?.get("STRIPE_PREMIUM_PRICE_ID")
+        || Deno?.env?.get("VITE_STRIPE_PREMIUM_PRICE_ID")
+        || "";
+      const familyPriceId = Deno?.env?.get("STRIPE_FAMILY_PRICE_ID")
+        || Deno?.env?.get("VITE_STRIPE_FAMILY_PRICE_ID")
+        || "";
+
+      if (!premiumPriceId || !familyPriceId) {
+        console.error("Stripe price IDs are not configured in runtime environment.");
+        return jsonResponse({ error: "Stripe price IDs are not configured." }, { status: 500 });
+      }
+
+      return jsonResponse({ priceIds: { premium: premiumPriceId, family: familyPriceId } });
+    }
+
     if (pathname === "/stripe/create-checkout-session" && req.method === "POST") {
       const userId = extractUserId(req);
       console.log("[Stripe] Create checkout session for user:", userId);
