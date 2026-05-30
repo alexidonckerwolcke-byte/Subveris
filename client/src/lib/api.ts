@@ -1,6 +1,7 @@
 import { supabase, supabaseAnonKeyOverride as supabaseAnonKey } from "./supabase";
 
-const remoteApiBase = import.meta.env.VITE_API_URL?.trim() || "";
+const DEFAULT_REMOTE_API_BASE = "https://xuilgccacufwinvkocfl.supabase.co/functions/v1/api";
+const remoteApiBase = import.meta.env.VITE_API_URL?.trim() || DEFAULT_REMOTE_API_BASE;
 // Disable local fallback to avoid 54321 errors when not running supabase functions serve
 const localDevApiBase = "";
 const apiBaseUrl = remoteApiBase || localDevApiBase;

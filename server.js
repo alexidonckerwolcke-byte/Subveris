@@ -654,11 +654,6 @@ const server = http.createServer(async (req, res) => {
     if (urlPath.startsWith('/api/stripe')) {
       console.log(`[${new Date().toISOString()}] → Stripe route handler: ${urlPath}`);
 
-      if (REMOTE_API_BASE) {
-        const forwarded = await proxyStripeRequest(req, res, urlPath.replace(/^\/api/, ''));
-        if (forwarded) return;
-      }
-
       if (urlPath === '/api/stripe/config' && req.method === 'GET') {
         const premium = STRIPE_PREMIUM_PRICE_ID;
         const family = STRIPE_FAMILY_PRICE_ID;
@@ -670,6 +665,11 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ priceIds: { premium, family } }));
         return;
+      }
+
+      if (REMOTE_API_BASE) {
+        const forwarded = await proxyStripeRequest(req, res, urlPath.replace(/^\/api/, ''));
+        if (forwarded) return;
       }
 
       // Fallback for local preview / stubbed Stripe route behavior
