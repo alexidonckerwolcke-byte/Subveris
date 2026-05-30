@@ -1,7 +1,6 @@
 import { supabase, supabaseAnonKeyOverride as supabaseAnonKey } from "./supabase";
 
-const DEFAULT_REMOTE_API_BASE = "https://xuilgccacufwinvkocfl.supabase.co/functions/v1/api";
-const remoteApiBase = import.meta.env.VITE_API_URL?.trim() || DEFAULT_REMOTE_API_BASE;
+const remoteApiBase = import.meta.env.VITE_API_URL?.trim() || "";
 // Disable local fallback to avoid 54321 errors when not running supabase functions serve
 const localDevApiBase = "";
 const apiBaseUrl = remoteApiBase || localDevApiBase;
@@ -49,8 +48,8 @@ export function resolveApiUrl(path: string) {
     return path;
   }
 
-  if (import.meta.env.DEV && path.startsWith("/api")) {
-    if (!hasWarnedNoApiUrl) {
+  if (path.startsWith("/api")) {
+    if (import.meta.env.DEV && !hasWarnedNoApiUrl) {
       console.info(
         "Development mode: forcing local /api proxy for all /api requests."
       );
