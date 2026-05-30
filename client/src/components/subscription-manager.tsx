@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,17 +26,48 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-const PREMIUM_PRICE_ID = import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID || "price_1TM9r1JSf7SJ8WWRiocez8wo"; // Premium Stripe price ID
-
 export function SubscriptionManager() {
   const { toast } = useToast();
   const { tier, subscriptionStatus, isLoading } = useSubscription();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [premiumPriceId, setPremiumPriceId] = useState(import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID ?? "");
+  const [priceConfigError, setPriceConfigError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (premiumPriceId) return;
+
+    const fetchStripeConfig = async () => {
+      try {
+        const res = await apiRequest("GET", "/api/stripe/config");
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to load Stripe configuration");
+        }
+
+        if (!data?.priceIds?.premium) {
+          throw new Error("Stripe premium price ID is not configured.");
+        }
+
+        setPremiumPriceId(data.priceIds.premium);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to load Stripe checkout configuration.";
+        console.warn("[SubscriptionManager] Stripe config load failed:", errorMessage);
+        setPriceConfigError(errorMessage);
+      }
+    };
+
+    fetchStripeConfig();
+  }, [premiumPriceId]);
 
   const createCheckoutMutation = useMutation({
     mutationFn: async () => {
+      if (!premiumPriceId) {
+        throw new Error("Stripe price ID is not configured.");
+      }
+
       const res = await apiRequest("POST", "/api/stripe/create-checkout-session", {
-        priceId: PREMIUM_PRICE_ID,
+        priceId: premiumPriceId,
       });
       return res.json();
     },
@@ -119,6 +150,11 @@ export function SubscriptionManager() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {priceConfigError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <strong>Stripe checkout is not configured.</strong> {priceConfigError}
+          </div>
+        ) : null}
         {/* Current Plan Status */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -189,10 +225,10 @@ export function SubscriptionManager() {
           {tier === 'free' ? (
             <Button
               onClick={handleUpgrade}
-              disabled={createCheckoutMutation.isPending}
+              disabled={createCheckoutMutation.isPending || !premiumPriceId}
               className="flex-1"
             >
-              {createCheckoutMutation.isPending ? 'Loading...' : 'Upgrade to Premium'}
+              {createCheckoutMutation.isPending ? 'Loading...' : premiumPriceId ? 'Upgrade to Premium' : 'Stripe config missing'}
             </Button>
           ) : (
             <>

@@ -26,9 +26,19 @@ const stripe = new Stripe(stripeKey, {
   apiVersion: STRIPE_API_VERSION,
 });
 
+const STRIPE_PREMIUM_PRICE_ID = Deno.env.get("STRIPE_PREMIUM_PRICE_ID")
+  || Deno.env.get("VITE_STRIPE_PREMIUM_PRICE_ID")
+  || "price_1TM9r1JSf7SJ8WWRiocez8wo";
+const STRIPE_FAMILY_PRICE_ID = Deno.env.get("STRIPE_FAMILY_PRICE_ID")
+  || Deno.env.get("VITE_STRIPE_FAMILY_PRICE_ID")
+  || "price_1TM9sSJSf7SJ8WWR4H26rSZ9";
+
+console.log(`[INIT] STRIPE_PREMIUM_PRICE_ID: ${STRIPE_PREMIUM_PRICE_ID ? STRIPE_PREMIUM_PRICE_ID.substring(0, 12) + '...' : 'MISSING'}`);
+console.log(`[INIT] STRIPE_FAMILY_PRICE_ID: ${STRIPE_FAMILY_PRICE_ID ? STRIPE_FAMILY_PRICE_ID.substring(0, 12) + '...' : 'MISSING'}`);
+
 const PRICE_ID_TO_PLAN_TYPE: Record<string, 'free' | 'premium' | 'family'> = {
-  [Deno.env.get('VITE_STRIPE_PREMIUM_PRICE_ID') || 'price_1TM9r1JSf7SJ8WWRiocez8wo']: 'premium',
-  [Deno.env.get('VITE_STRIPE_FAMILY_PRICE_ID') || 'price_1TM9sSJSf7SJ8WWR4H26rSZ9']: 'family',
+  [STRIPE_PREMIUM_PRICE_ID]: 'premium',
+  [STRIPE_FAMILY_PRICE_ID]: 'family',
 };
 
 function getPriceIdFromSubscription(subscription: Stripe.Subscription | any): string | undefined {

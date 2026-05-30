@@ -92,10 +92,43 @@ export default function PricingPage() {
     },
   ];
 
-  const priceIdMap = {
-    premium: import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID || "price_1TM9r1JSf7SJ8WWRiocez8wo",
-    family: import.meta.env.VITE_STRIPE_FAMILY_PRICE_ID || "price_1TM9sSJSf7SJ8WWR4H26rSZ9",
-  };
+  const [priceIdMap, setPriceIdMap] = useState({
+    premium: import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID ?? "",
+    family: import.meta.env.VITE_STRIPE_FAMILY_PRICE_ID ?? "",
+  });
+  const [priceConfigError, setPriceConfigError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (priceIdMap.premium && priceIdMap.family) {
+      return;
+    }
+
+    const fetchStripeConfig = async () => {
+      try {
+        const res = await apiRequest("GET", "/api/stripe/config");
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to load Stripe configuration");
+        }
+
+        if (!data?.priceIds?.premium || !data?.priceIds?.family) {
+          throw new Error("Stripe price IDs are not configured.");
+        }
+
+        setPriceIdMap({
+          premium: data.priceIds.premium,
+          family: data.priceIds.family,
+        });
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to load Stripe checkout configuration.";
+        console.warn("[Pricing] Stripe config load failed:", errorMessage);
+        setPriceConfigError(errorMessage);
+      }
+    };
+
+    fetchStripeConfig();
+  }, [priceIdMap.family, priceIdMap.premium]);
 
   const createCheckoutMutation = useMutation({
     mutationFn: async (tier: "premium" | "family") => {
@@ -339,6 +372,11 @@ export default function PricingPage() {
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed mb-8">
             Choose the perfect plan for your subscription management needs. Upgrade, downgrade, or cancel anytime with complete flexibility.
           </p>
+          {priceConfigError ? (
+            <div className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 mb-8">
+              <strong>Stripe pricing is not configured.</strong> {priceConfigError}
+            </div>
+          ) : null}
           {currentTier === "premium" && (
             <Badge className="inline-block px-6 py-2 text-base font-semibold bg-gradient-to-r from-primary to-blue-600">
               <Sparkles className="h-4 w-4 mr-2 fill-white" />
