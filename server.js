@@ -260,6 +260,38 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     
+    if (urlPath === '/api/calendar-events' && req.method === 'GET') {
+      const user = await getUser(req.headers.authorization);
+      if (!user || !supabase) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('subscription_calendar_events')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('event_date', { ascending: true });
+
+        if (error) {
+          console.log('Calendar events error:', error.message);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify([]));
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data || []));
+      } catch (error) {
+        console.error('Error fetching calendar events:', error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
+      return;
+    }
+    
     if (urlPath === '/api/analysis/cost-per-use' && req.method === 'GET') {
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
