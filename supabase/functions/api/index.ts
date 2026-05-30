@@ -1096,10 +1096,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       try {
         const authBase = new URL('auth/v1/', process.env.SUPABASE_URL || '').href;
+        const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+        
         const response = await fetch(new URL('factors', authBase).href, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'apikey': anonKey || '',
             Authorization: `Bearer ${authToken}`,
           },
           body: JSON.stringify({
