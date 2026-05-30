@@ -2788,7 +2788,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }
 
         const stripeSecretKey = Deno?.env?.get("STRIPE_SECRET_KEY") ?? "";
-        console.log("[Stripe] Secret key configured:", !!stripeSecretKey);
+        const keyMasked = stripeSecretKey ? `${stripeSecretKey.substring(0, 20)}...${stripeSecretKey.substring(stripeSecretKey.length - 10)}` : "NOT_SET";
+        console.log("[Stripe] Secret key configured:", !!stripeSecretKey, "key:", keyMasked);
         if (!stripeSecretKey) {
           console.error("STRIPE_SECRET_KEY not configured");
           return jsonResponse({ error: "Stripe not configured" }, { status: 500 });
@@ -2817,10 +2818,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           console.log("[Stripe] Creating Stripe customer for:", user.email);
           // Create Stripe customer
+          const auth = btoa(stripeSecretKey + ':');
           const customerRes = await fetch("https://api.stripe.com/v1/customers", {
             method: "POST",
             headers: {
-              "Authorization": `Bearer ${stripeSecretKey}`,
+              "Authorization": `Basic ${auth}`,
               "Content-Type": "application/x-www-form-urlencoded",
             },
             body: new URLSearchParams({
@@ -2856,10 +2858,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         console.log("[Stripe] Creating checkout session with:", { customerId, priceId, successUrl, cancelUrl });
 
+        const auth = btoa(stripeSecretKey + ':');
         const checkoutRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${stripeSecretKey}`,
+            "Authorization": `Basic ${auth}`,
             "Content-Type": "application/x-www-form-urlencoded",
           },
           body: new URLSearchParams({
