@@ -790,10 +790,10 @@ export function FamilySharing() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" aria-describedby="delete-group-desc">
           <DialogHeader>
             <DialogTitle className="text-red-600">Delete Family Group</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="delete-group-desc">
               This action cannot be undone. All members will be removed from this family group, but their personal subscription data will remain.
             </DialogDescription>
           </DialogHeader>
@@ -857,10 +857,10 @@ export function FamilySharing() {
 
       {/* Member Details Dialog */}
       <Dialog open={!!selectedMemberId} onOpenChange={(open) => !open && setSelectedMemberId(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto" aria-describedby="member-details-desc">
           <DialogHeader>
             <DialogTitle>Member Details</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="member-details-desc">
               View {members.find(m => m.userId === selectedMemberId)?.email}'s subscriptions and insights
             </DialogDescription>
           </DialogHeader>
@@ -1028,10 +1028,10 @@ export function FamilySharing() {
 
       {/* Share Subscription Dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" aria-describedby="share-sub-desc">
           <DialogHeader>
             <DialogTitle>Share Subscription</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="share-sub-desc">
               Select which family members you want to share this subscription with.
             </DialogDescription>
           </DialogHeader>

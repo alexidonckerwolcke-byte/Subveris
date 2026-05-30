@@ -369,10 +369,10 @@ export const AccountSettingsModals = forwardRef<
     <>
       {/* Change Email Modal */}
       <Dialog open={emailModalOpen} onOpenChange={setEmailModalOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby="change-email-desc">
           <DialogHeader>
             <DialogTitle>Change Email Address</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="change-email-desc">
               Enter your new email address. We'll send a confirmation link to verify the change.
             </DialogDescription>
           </DialogHeader>
@@ -414,10 +414,10 @@ export const AccountSettingsModals = forwardRef<
 
       {/* Change Password Modal */}
       <Dialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby="change-password-desc">
           <DialogHeader>
             <DialogTitle>Change Password</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="change-password-desc">
               Enter your current password and then your new password.
             </DialogDescription>
           </DialogHeader>
@@ -477,10 +477,10 @@ export const AccountSettingsModals = forwardRef<
 
       {/* Enable 2FA Modal */}
       <Dialog open={twoFAModalOpen} onOpenChange={closeTwoFAModal}>
-        <DialogContent>
+        <DialogContent aria-describedby="enable-2fa-desc">
           <DialogHeader>
             <DialogTitle>Enable Two-Factor Authentication</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="enable-2fa-desc">
               Scan the QR code with your authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.) and enter the 6-digit code.
             </DialogDescription>
           </DialogHeader>

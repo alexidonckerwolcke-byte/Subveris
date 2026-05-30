@@ -65,13 +65,13 @@ export function MFAChallengeModal({ open, onOpenChange, onVerifySuccess }: MFACh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px]" aria-describedby="mfa-challenge-desc">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
             <DialogTitle>Two-Factor Authentication</DialogTitle>
           </div>
-          <DialogDescription>
+          <DialogDescription id="mfa-challenge-desc">
             Enter the 6-digit code from your authenticator app to continue
           </DialogDescription>
         </DialogHeader>
