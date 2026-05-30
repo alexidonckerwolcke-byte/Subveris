@@ -701,6 +701,13 @@ const server = http.createServer(async (req, res) => {
       }
     }
     
+    // Generic proxy for any unhandled /api/* routes to Supabase
+    if (urlPath.startsWith('/api/') && REMOTE_API_BASE) {
+      console.log(`[${new Date().toISOString()}] → Generic proxy: ${urlPath}`);
+      const forwarded = await proxyStripeRequest(req, res, urlPath.replace(/^\/api/, ''));
+      if (forwarded) return;
+    }
+    
     // Unknown API endpoint
     console.log(`[${new Date().toISOString()}] ✗ Unknown API endpoint: ${urlPath}`);
     res.writeHead(404, { 'Content-Type': 'application/json' });
