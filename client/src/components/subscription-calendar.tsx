@@ -360,10 +360,10 @@ export function SubscriptionCalendar({
 
       {/* Edit Renewal Date Dialog */}
       <Dialog open={!!editingEvent} onOpenChange={(open) => !open && setEditingEvent(null)}>
-        <DialogContent>
+        <DialogContent aria-describedby="edit-renewal-desc">
           <DialogHeader>
             <DialogTitle>Edit Renewal Date</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="edit-renewal-desc">
               Update the renewal date for {editingEvent?.subscription.name}
             </DialogDescription>
           </DialogHeader>
