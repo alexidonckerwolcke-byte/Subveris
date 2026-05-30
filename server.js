@@ -4,7 +4,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import zlib from 'zlib';
 
 dotenv.config();
 
@@ -76,7 +75,9 @@ async function proxyStripeRequest(req, res, pathSuffix) {
   for (const [key, value] of Object.entries(req.headers)) {
     if (!value) continue;
     if (key === 'host') continue;
-    if (key.toLowerCase() === 'content-encoding') continue; // Skip content-encoding to prevent decoding issues
+    // Remove accept-encoding to avoid compression issues
+    if (key.toLowerCase() === 'accept-encoding') continue;
+    if (key.toLowerCase() === 'content-encoding') continue;
     headers[key] = value;
   }
 
@@ -100,19 +101,6 @@ async function proxyStripeRequest(req, res, pathSuffix) {
     });
 
     let responseBody = await remoteRes.arrayBuffer();
-    
-    // Handle gzip compression
-    const contentEncoding = remoteRes.headers.get('content-encoding');
-    if (contentEncoding === 'gzip') {
-      console.log(`[Proxy] Decompressing gzip response`);
-      responseBody = await new Promise((resolve, reject) => {
-        zlib.gunzip(Buffer.from(responseBody), (err, result) => {
-          if (err) reject(err);
-          else resolve(result.buffer);
-        });
-      });
-    }
-
     const bodyText = Buffer.from(responseBody).toString('utf-8');
     
     console.log(`[Proxy Response] Status: ${remoteRes.status}, Length: ${responseBody.byteLength}, Preview: ${bodyText.substring(0, 200)}`);
