@@ -36,6 +36,64 @@ const parseBody = (req) => {
   });
 };
 
+// Helper to read raw body bytes for proxying
+const parseRawBody = (req) => {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+};
+
+const REMOTE_API_BASE = process.env.VITE_API_URL || process.env.SUPABASE_API_URL || process.env.SUPABASE_FUNCTIONS_URL || '';
+const STRIPE_PREMIUM_PRICE_ID = process.env.STRIPE_PREMIUM_PRICE_ID || process.env.VITE_STRIPE_PREMIUM_PRICE_ID || '';
+const STRIPE_FAMILY_PRICE_ID = process.env.STRIPE_FAMILY_PRICE_ID || process.env.VITE_STRIPE_FAMILY_PRICE_ID || '';
+
+async function proxyStripeRequest(req, res, pathSuffix) {
+  if (!REMOTE_API_BASE) {
+    return false;
+  }
+
+  const remoteUrl = `${REMOTE_API_BASE.replace(/\/$/, '')}/${pathSuffix.replace(/^\//, '')}`;
+  const headers = {};
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (!value) continue;
+    if (key === 'host') continue;
+    headers[key] = value;
+  }
+
+  let body = null;
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+    const rawBody = await parseRawBody(req);
+    body = rawBody.length ? rawBody : null;
+  }
+
+  try {
+    const remoteRes = await fetch(remoteUrl, {
+      method: req.method,
+      headers,
+      body,
+    });
+
+    const responseBody = await remoteRes.arrayBuffer();
+    const responseHeaders = {};
+    remoteRes.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'transfer-encoding') return;
+      responseHeaders[key] = value;
+    });
+
+    res.writeHead(remoteRes.status, responseHeaders);
+    res.end(Buffer.from(responseBody));
+    return true;
+  } catch (error) {
+    console.error('Error proxying Stripe request to remote API:', error);
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to proxy Stripe request' }));
+    return true;
+  }
+}
+
 // Helper to extract and verify JWT token
 const getUser = async (authHeader) => {
   if (!supabase) return null;
@@ -593,10 +651,33 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     
-    if (urlPath.startsWith('/api/stripe') && req.method === 'POST') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ url: null }));
-      return;
+    if (urlPath.startsWith('/api/stripe')) {
+      console.log(`[${new Date().toISOString()}] → Stripe route handler: ${urlPath}`);
+
+      if (REMOTE_API_BASE) {
+        const forwarded = await proxyStripeRequest(req, res, urlPath.replace(/^\/api/, ''));
+        if (forwarded) return;
+      }
+
+      if (urlPath === '/api/stripe/config' && req.method === 'GET') {
+        const premium = STRIPE_PREMIUM_PRICE_ID;
+        const family = STRIPE_FAMILY_PRICE_ID;
+        if (!premium || !family) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Stripe price IDs are not configured on this server.' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ priceIds: { premium, family } }));
+        return;
+      }
+
+      // Fallback for local preview / stubbed Stripe route behavior
+      if (req.method === 'POST') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ url: null }));
+        return;
+      }
     }
     
     // Unknown API endpoint
