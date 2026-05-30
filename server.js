@@ -92,25 +92,30 @@ async function proxyStripeRequest(req, res, pathSuffix) {
     });
 
     const responseBody = await remoteRes.arrayBuffer();
+    const bodyText = Buffer.from(responseBody).toString('utf-8');
+    
+    console.log(`[Proxy Response] Status: ${remoteRes.status}, Length: ${responseBody.byteLength}, Preview: ${bodyText.substring(0, 200)}`);
+
     const responseHeaders = {};
     remoteRes.headers.forEach((value, key) => {
       if (key.toLowerCase() === 'transfer-encoding') return;
-      if (key.toLowerCase() === 'content-encoding') return; // Skip content-encoding
       responseHeaders[key] = value;
     });
 
     if (!remoteRes.ok) {
-      const bodyText = Buffer.from(responseBody).toString('utf-8');
       console.error(`[Proxy Error] ${remoteRes.status} from ${remoteUrl}:`, bodyText);
     }
 
+    // Ensure content-length is set correctly
+    responseHeaders['content-length'] = responseBody.byteLength;
+    
     res.writeHead(remoteRes.status, responseHeaders);
     res.end(Buffer.from(responseBody));
     return true;
   } catch (error) {
-    console.error('Error proxying Stripe request to remote API:', error.message);
+    console.error('Error proxying request to remote API:', error.message);
     res.writeHead(502, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Failed to proxy Stripe request' }));
+    res.end(JSON.stringify({ error: 'Failed to proxy request' }));
     return true;
   }
 }
