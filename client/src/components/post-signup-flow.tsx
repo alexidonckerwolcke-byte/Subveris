@@ -156,10 +156,10 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
   if (step === 'plan') {
     return (
       <Dialog open={open}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" aria-describedby="plan-selection-desc">
           <DialogHeader>
             <DialogTitle>Welcome to Subveris! 🎉</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="plan-selection-desc">
               Let's get you started. Choose a plan that works best for you.
             </DialogDescription>
           </DialogHeader>
@@ -226,7 +226,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
   if (step === 'mfa') {
     return (
       <Dialog open={open}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px]" aria-describedby="mfa-protect-desc">
           <DialogHeader>
             <div className="flex items-center gap-2">
               <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -234,7 +234,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
               </div>
               <DialogTitle>Protect Your Account</DialogTitle>
             </div>
-            <DialogDescription className="mt-2">
+            <DialogDescription id="mfa-protect-desc" className="mt-2">
               Enable two-factor authentication (2FA) to add an extra layer of security
             </DialogDescription>
           </DialogHeader>

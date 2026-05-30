@@ -247,10 +247,10 @@ export function SubscriptionManager() {
                       Cancel Subscription
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent aria-describedby="cancel-sub-desc">
                     <DialogHeader>
                       <DialogTitle>Cancel Subscription</DialogTitle>
-                      <DialogDescription>
+                      <DialogDescription id="cancel-sub-desc">
                         Are you sure you want to cancel your premium subscription?
                         You'll still have access to premium features until the end of your current billing period.
                       </DialogDescription>
