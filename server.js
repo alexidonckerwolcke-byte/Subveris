@@ -53,6 +53,13 @@ const REMOTE_API_BASE = process.env.VITE_API_URL || process.env.SUPABASE_API_URL
 const STRIPE_PREMIUM_PRICE_ID = process.env.STRIPE_PREMIUM_PRICE_ID || process.env.VITE_STRIPE_PREMIUM_PRICE_ID || '';
 const STRIPE_FAMILY_PRICE_ID = process.env.STRIPE_FAMILY_PRICE_ID || process.env.VITE_STRIPE_FAMILY_PRICE_ID || '';
 
+console.log('[Startup] Stripe Price IDs loaded:', {
+  premium: STRIPE_PREMIUM_PRICE_ID ? '✓ set' : '✗ NOT SET',
+  family: STRIPE_FAMILY_PRICE_ID ? '✓ set' : '✗ NOT SET',
+  premium_value: STRIPE_PREMIUM_PRICE_ID || 'undefined',
+  family_value: STRIPE_FAMILY_PRICE_ID || 'undefined'
+});
+
 async function proxyStripeRequest(req, res, pathSuffix) {
   if (!REMOTE_API_BASE) {
     return false;
@@ -63,6 +70,7 @@ async function proxyStripeRequest(req, res, pathSuffix) {
   for (const [key, value] of Object.entries(req.headers)) {
     if (!value) continue;
     if (key === 'host') continue;
+    if (key.toLowerCase() === 'content-encoding') continue; // Skip content-encoding to prevent decoding issues
     headers[key] = value;
   }
 
@@ -70,9 +78,13 @@ async function proxyStripeRequest(req, res, pathSuffix) {
   if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
     const rawBody = await parseRawBody(req);
     body = rawBody.length ? rawBody : null;
+    if (body) {
+      headers['content-length'] = body.length;
+    }
   }
 
   try {
+    console.log(`[Proxy] ${req.method} ${remoteUrl}`, { bodyLength: body?.length });
     const remoteRes = await fetch(remoteUrl, {
       method: req.method,
       headers,
@@ -83,14 +95,20 @@ async function proxyStripeRequest(req, res, pathSuffix) {
     const responseHeaders = {};
     remoteRes.headers.forEach((value, key) => {
       if (key.toLowerCase() === 'transfer-encoding') return;
+      if (key.toLowerCase() === 'content-encoding') return; // Skip content-encoding
       responseHeaders[key] = value;
     });
+
+    if (!remoteRes.ok) {
+      const bodyText = Buffer.from(responseBody).toString('utf-8');
+      console.error(`[Proxy Error] ${remoteRes.status} from ${remoteUrl}:`, bodyText);
+    }
 
     res.writeHead(remoteRes.status, responseHeaders);
     res.end(Buffer.from(responseBody));
     return true;
   } catch (error) {
-    console.error('Error proxying Stripe request to remote API:', error);
+    console.error('Error proxying Stripe request to remote API:', error.message);
     res.writeHead(502, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Failed to proxy Stripe request' }));
     return true;
