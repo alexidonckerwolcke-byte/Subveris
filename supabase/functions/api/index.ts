@@ -326,10 +326,29 @@ export function toLocalDateTimeInOffset(dateInput: string | Date, offsetMinutes 
   if (!dateInput) return null;
 
   if (!(dateInput instanceof Date)) {
-    const dateOnly = toDateOnlyLocal(dateInput);
-    if (dateOnly) {
-      return dateOnly;
+    // Try to parse as ISO datetime or date-only string and extract the date part
+    const dateStr = String(dateInput).trim();
+    
+    // Extract date components from ISO string (e.g., "2026-05-31T00:00:00+00:00" → "2026-05-31")
+    const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const y = Number(match[1]);
+      const mo = Number(match[2]) - 1;
+      const d = Number(match[3]);
+      const dt = new Date(y, mo, d);
+      dt.setHours(0, 0, 0, 0);
+      return dt;
     }
+    
+    // Fallback: try parsing as full date
+    const parsed = new Date(dateInput);
+    if (!isNaN(parsed.getTime())) {
+      const adjusted = new Date(parsed.getTime() - offsetMinutes * 60 * 1000);
+      adjusted.setHours(0, 0, 0, 0);
+      return adjusted;
+    }
+    
+    return null;
   }
 
   const parsed = dateInput instanceof Date ? new Date(dateInput) : new Date(dateInput);
