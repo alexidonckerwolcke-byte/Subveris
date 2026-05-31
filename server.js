@@ -140,19 +140,30 @@ async function proxyStripeRequest(req, res, pathSuffix) {
   }
 }
 
-// Helper to extract and verify JWT token
-const getUser = async (authHeader) => {
-  if (!supabase) return null;
-  if (!authHeader?.startsWith('Bearer ')) return null;
-  
-  const token = authHeader.slice(7);
-  try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    return error ? null : user;
-  } catch {
-    return null;
-  }
+// Currency conversion rates
+const EXCHANGE_RATES = {
+  USD: 1, EUR: 0.92, GBP: 0.79, CAD: 1.35, AUD: 1.52,
+  JPY: 152.0, CHF: 0.88, SEK: 10.85, NOK: 10.75, DKK: 6.95,
+  PLN: 4.05, CZK: 23.5, HUF: 365.0, BRL: 5.25, MXN: 18.5,
+  ARS: 950.0, TRY: 34.0, ZAR: 18.5, INR: 84.0, CNY: 7.25,
+  KRW: 1350.0, SGD: 1.35, HKD: 7.8, NZD: 1.65,
 };
+
+function getExchangeRate(currency) {
+  return EXCHANGE_RATES[(currency || 'USD').trim().toUpperCase()] ?? 1;
+}
+
+function convertToUSD(amount, currency) {
+  return amount / getExchangeRate(currency);
+}
+
+function calculateMonthlyCost(amount, frequency) {
+  const normalizedFrequency = (frequency || 'monthly').toLowerCase();
+  if (normalizedFrequency === 'yearly') return amount / 12;
+  if (normalizedFrequency === 'quarterly') return amount / 3;
+  if (normalizedFrequency === 'weekly') return amount * 4;
+  return amount;
+}
 
 const server = http.createServer(async (req, res) => {
   // Remove query strings and hash
@@ -446,13 +457,12 @@ const server = http.createServer(async (req, res) => {
       try {
         const now = new Date();
         const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         
         // Fetch subscriptions
         const { data, error } = await supabase
           .from('subscriptions')
-          .select('category, amount, renewal_date, status')
+          .select('*')
           .eq('user_id', user.id)
           .in('status', ['active', 'unused', 'to-cancel']);
 
@@ -463,19 +473,28 @@ const server = http.createServer(async (req, res) => {
         }
 
         // Filter to subscriptions with renewal_date <= today in current month
-        const thisMonthBilledSubs = (data || []).filter(sub => {
-          if (!sub.renewal_date) return false;
+        const grouped = {};
+        (data || []).forEach(sub => {
+          // Skip deleted/invalid
+          if (sub.status === 'deleted' || sub.deleted_at) return;
+          if (!sub.renewal_date) return;
+          
           const renewalDate = new Date(sub.renewal_date);
           renewalDate.setHours(0, 0, 0, 0);
-          // Include if renewal date is in current month AND has already occurred (renewal_date <= today)
-          return renewalDate >= currentMonthStart && renewalDate <= today;
-        });
-
-        // Group by category
-        const grouped = {};
-        thisMonthBilledSubs.forEach(sub => {
-          const cat = sub.category || 'Uncategorized';
-          grouped[cat] = (grouped[cat] || 0) + (sub.amount || 0);
+          
+          // For current month: only include if renewal_date <= today
+          if (renewalDate >= currentMonthStart && renewalDate <= today) {
+            // Calculate monthly cost (convert frequency to monthly amount)
+            const frequency = (sub.frequency || 'monthly').toLowerCase();
+            const amount = Number(sub.amount) || 0;
+            const monthlyCost = calculateMonthlyCost(amount, frequency);
+            
+            // Convert to USD
+            const convertedCost = convertToUSD(monthlyCost, sub.currency);
+            
+            const cat = sub.category || 'Uncategorized';
+            grouped[cat] = (grouped[cat] || 0) + convertedCost;
+          }
         });
 
         const result = Object.entries(grouped).map(([category, amount]) => ({
@@ -502,51 +521,72 @@ const server = http.createServer(async (req, res) => {
       }
 
       try {
-        const now = new Date();
-        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
-        // Fetch subscriptions
-        const { data, error } = await supabase
+        // Fetch all subscriptions
+        const { data: subscriptions, error } = await supabase
           .from('subscriptions')
-          .select('amount, renewal_date, status')
-          .eq('user_id', user.id)
-          .in('status', ['active', 'unused', 'to-cancel']);
+          .select('*')
+          .eq('user_id', user.id);
 
-        if (error) {
+        if (error || !subscriptions) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify([]));
           return;
         }
 
-        // Group by month, but for current month only include renewals that have occurred
-        const grouped = {};
-        (data || []).forEach(sub => {
-          if (!sub.renewal_date) return;
-          const renewalDate = new Date(sub.renewal_date);
-          renewalDate.setHours(0, 0, 0, 0);
-          const month = sub.renewal_date.substring(0, 7); // YYYY-MM
+        // Generate monthly spending for LAST 6 COMPLETE MONTHS + CURRENT MONTH (7 total)
+        const monthlyData = [];
+        const now = new Date();
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        
+        for (let i = 6; i >= 0; i--) {
+          const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+          const monthStr = `${monthNames[monthStart.getMonth()]} ${monthStart.getFullYear()}`;
+          const isCurrentMonth = i === 0;
           
-          // For current month: only include if renewal_date <= today
-          if (month === now.toISOString().substring(0, 7)) {
-            if (renewalDate <= today) {
-              grouped[month] = (grouped[month] || 0) + (sub.amount || 0);
+          let monthlyAmount = 0;
+          
+          for (const sub of subscriptions) {
+            // Skip deleted/invalid subscriptions
+            if (sub.status === 'deleted' || sub.deleted_at) continue;
+            if (!['active', 'unused', 'to-cancel'].includes(sub.status)) continue;
+            if (!sub.renewal_date) continue;
+            
+            const renewalDate = new Date(sub.renewal_date);
+            renewalDate.setHours(0, 0, 0, 0);
+            
+            // For current month: only include if renewal_date <= today
+            let includeInMonthlySpend = false;
+            if (isCurrentMonth) {
+              const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              if (renewalDate <= today) includeInMonthlySpend = true;
+            } else {
+              // For past months: include if renewal date is in that month
+              if (renewalDate >= monthStart && renewalDate <= monthEnd) {
+                includeInMonthlySpend = true;
+              }
             }
-          } else {
-            // For past/future months: include all
-            grouped[month] = (grouped[month] || 0) + (sub.amount || 0);
+            
+            if (includeInMonthlySpend) {
+              // Calculate monthly cost (convert frequency to monthly amount)
+              const frequency = (sub.frequency || 'monthly').toLowerCase();
+              const amount = Number(sub.amount) || 0;
+              const monthlyCost = calculateMonthlyCost(amount, frequency);
+              
+              // Convert to USD
+              const convertedCost = convertToUSD(monthlyCost, sub.currency);
+              monthlyAmount += convertedCost;
+            }
           }
-        });
-
-        const result = Object.entries(grouped)
-          .sort()
-          .map(([month, amount]) => ({
-            month,
-            amount: parseFloat(amount.toFixed(2)),
-          }));
+          
+          monthlyData.push({
+            month: monthStr,
+            amount: Math.round(monthlyAmount * 100) / 100,
+          });
+        }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
+        res.end(JSON.stringify(monthlyData));
       } catch (error) {
         console.error('Error fetching monthly spending:', error);
         res.writeHead(200, { 'Content-Type': 'application/json' });

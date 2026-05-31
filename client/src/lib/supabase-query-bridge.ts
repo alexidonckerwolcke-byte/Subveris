@@ -176,40 +176,30 @@ async function handleMonthlySpending(method: string, params: URLSearchParams) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401 });
     }
 
-    // Fetch subscriptions for spending data
-    const { data: subscriptions, error } = await supabase
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_detected', true);
+    // Call Supabase Edge Function with timezone offset
+    const offsetMinutes = new Date().getTimezoneOffset();
+    const localDateStr = new Date().toISOString().split('T')[0];
+    
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    const apiUrl = `${supabaseUrl}/functions/v1/api/spending/monthly?offsetMinutes=${offsetMinutes}&localDate=${localDateStr}`;
+    
+    const accessToken = (await supabase.auth.getSession())?.data?.session?.access_token;
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken || ''}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-    if (error) {
-      return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    if (!response.ok) {
+      console.error('Supabase function error:', response.status, await response.text());
+      return new Response(JSON.stringify({ error: 'Spending data unavailable' }), { status: response.status });
     }
 
-    // Group by month
-    const monthlyObj: Record<string, number> = {};
-    (subscriptions || []).forEach(sub => {
-      const date = new Date(sub.next_billing_at || new Date());
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      monthlyObj[monthKey] = (monthlyObj[monthKey] || 0) + (sub.amount || 0);
-    });
-
-    // Convert to array format: { month: "May 2026", amount: 119.96 }
-    const monthlySpending = Object.entries(monthlyObj).map(([monthKey, amount]) => {
-      const [year, month] = monthKey.split('-');
-      const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-      const label = date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-      return { month: label, amount: Math.round(amount * 100) / 100 };
-    }).sort((a, b) => {
-      const aDate = new Date(a.month);
-      const bDate = new Date(b.month);
-      return bDate.getTime() - aDate.getTime();
-    });
-
+    const monthlySpending = await response.json();
     return new Response(JSON.stringify(monthlySpending), { status: 200 });
   } catch (error) {
-    console.error('Error calculating monthly spending:', error);
+    console.error('Error fetching monthly spending:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
   }
 }
@@ -225,29 +215,33 @@ async function handleCategorySpending(method: string, params: URLSearchParams) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401 });
     }
 
-    // Fetch subscriptions grouped by category
-    const { data: subscriptions, error } = await supabase
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_detected', true);
-
-    if (error) {
-      return new Response(JSON.stringify({ error: error.message }), { status: 500 });
-    }
-
-    // Group by category
-    const categoryObj: Record<string, { amount: number; count: number }> = {};
-    (subscriptions || []).forEach(sub => {
-      const category = sub.category || 'Other';
-      if (!categoryObj[category]) {
-        categoryObj[category] = { amount: 0, count: 0 };
-      }
-      categoryObj[category].amount += sub.amount || 0;
-      categoryObj[category].count += 1;
+    // Call Supabase Edge Function with timezone offset
+    const offsetMinutes = new Date().getTimezoneOffset();
+    const localDateStr = new Date().toISOString().split('T')[0];
+    
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    const apiUrl = `${supabaseUrl}/functions/v1/api/spending/category?offsetMinutes=${offsetMinutes}&localDate=${localDateStr}`;
+    
+    const accessToken = (await supabase.auth.getSession())?.data?.session?.access_token;
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken || ''}`,
+        'Content-Type': 'application/json',
+      },
     });
 
-    // Calculate total spend for percentages
+    if (!response.ok) {
+      console.error('Supabase function error:', response.status, await response.text());
+      return new Response(JSON.stringify({ error: 'Spending data unavailable' }), { status: response.status });
+    }
+
+    const categorySpending = await response.json();
+    return new Response(JSON.stringify(categorySpending), { status: 200 });
+  } catch (error) {
+    console.error('Error fetching category spending:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
+  }
+}
     const totalAmount = Object.values(categoryObj).reduce((sum, cat) => sum + cat.amount, 0);
 
     // Convert to array format with percentages
