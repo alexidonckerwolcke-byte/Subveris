@@ -444,16 +444,16 @@ const server = http.createServer(async (req, res) => {
       }
 
       try {
-        // Get the current month in YYYY-MM format
+        // Get today's date (YYYY-MM-DD)
         const now = new Date();
-        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const today = now.toISOString().split('T')[0];
         
-        // Fetch subscriptions with renewal dates in the current month
+        // Fetch subscriptions renewing today
         const { data, error } = await supabase
           .from('subscriptions')
           .select('category, amount, renewal_date')
           .eq('user_id', user.id)
+          .eq('renewal_date', today)
           .in('status', ['active', 'unused', 'to-cancel']);
 
         if (error) {
@@ -462,16 +462,9 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        // Filter to only subscriptions renewing in current month
-        const thisMonthSubs = (data || []).filter(sub => {
-          if (!sub.renewal_date) return false;
-          const renewalDate = new Date(sub.renewal_date);
-          return renewalDate >= currentMonthStart && renewalDate < nextMonthStart;
-        });
-
         // Group by category
         const grouped = {};
-        thisMonthSubs.forEach(sub => {
+        (data || []).forEach(sub => {
           const cat = sub.category || 'Uncategorized';
           grouped[cat] = (grouped[cat] || 0) + (sub.amount || 0);
         });
@@ -500,11 +493,16 @@ const server = http.createServer(async (req, res) => {
       }
 
       try {
-        // Fetch subscriptions
+        // Fetch subscriptions renewing today
+        const now = new Date();
+        const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
+        
         const { data, error } = await supabase
           .from('subscriptions')
           .select('amount, renewal_date, status')
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .eq('renewal_date', today)
+          .in('status', ['active', 'unused', 'to-cancel']);
 
         if (error) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -512,26 +510,14 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        // Filter to only active/unused/to-cancel subscriptions
-        const activeOrUnused = (data || []).filter(sub => 
-          ['active', 'unused', 'to-cancel'].includes(sub.status)
-        );
+        // Sum spending for today
+        const todaySpending = (data || []).reduce((sum, sub) => sum + (sub.amount || 0), 0);
 
-        // Group by renewal month
-        const grouped = {};
-        activeOrUnused.forEach(sub => {
-          if (!sub.renewal_date) return;
-          // Extract YYYY-MM from renewal_date
-          const month = sub.renewal_date.substring(0, 7);
-          grouped[month] = (grouped[month] || 0) + (sub.amount || 0);
-        });
-
-        const result = Object.entries(grouped)
-          .sort()
-          .map(([month, amount]) => ({
-            month,
-            amount: parseFloat(amount.toFixed(2)),
-          }));
+        // Return spending for today's date in YYYY-MM format for the current month
+        const monthLabel = today.substring(0, 7); // YYYY-MM
+        const result = todaySpending > 0 
+          ? [{ month: monthLabel, amount: parseFloat(todaySpending.toFixed(2)) }]
+          : [];
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
