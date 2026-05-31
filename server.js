@@ -10,7 +10,16 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
-const DIST_PATH = path.join(__dirname, 'dist/public');
+const STATIC_DIR = process.env.STATIC_DIR || 'dist/public';
+let DIST_PATH = path.join(__dirname, STATIC_DIR);
+if (!fs.existsSync(DIST_PATH)) {
+  const fallbackPath = path.join(__dirname, 'public');
+  if (fs.existsSync(fallbackPath)) {
+    DIST_PATH = fallbackPath;
+  }
+}
+
+console.log('[Startup] Static assets path:', DIST_PATH);
 
 // Initialize Supabase
 const supabaseUrl = 'https://xuilgccacufwinvkocfl.supabase.co';
