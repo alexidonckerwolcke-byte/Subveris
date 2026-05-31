@@ -6,7 +6,6 @@ import path, { dirname } from "path";
 import { copyFile } from "fs/promises";
 import { fileURLToPath } from "url";
 import type { Source, Input } from "postcss";
-// import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 // __dirname replacement for ESM
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,17 +29,6 @@ export default defineConfig({
         await copyFile(indexPath, fallbackPath);
       },
     },
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
   ],
   envDir: workspaceRoot,
   resolve: {
