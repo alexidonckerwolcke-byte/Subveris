@@ -444,10 +444,17 @@ const server = http.createServer(async (req, res) => {
       }
 
       try {
+        // Get the current month in YYYY-MM format
+        const now = new Date();
+        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        
+        // Fetch subscriptions with renewal dates in the current month
         const { data, error } = await supabase
-          .from('transactions')
-          .select('category, amount')
-          .eq('user_id', user.id);
+          .from('subscriptions')
+          .select('category, amount, renewal_date')
+          .eq('user_id', user.id)
+          .in('status', ['active', 'unused', 'to-cancel']);
 
         if (error) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -455,11 +462,18 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
+        // Filter to only subscriptions renewing in current month
+        const thisMonthSubs = (data || []).filter(sub => {
+          if (!sub.renewal_date) return false;
+          const renewalDate = new Date(sub.renewal_date);
+          return renewalDate >= currentMonthStart && renewalDate < nextMonthStart;
+        });
+
         // Group by category
         const grouped = {};
-        (data || []).forEach(tx => {
-          const cat = tx.category || 'Uncategorized';
-          grouped[cat] = (grouped[cat] || 0) + tx.amount;
+        thisMonthSubs.forEach(sub => {
+          const cat = sub.category || 'Uncategorized';
+          grouped[cat] = (grouped[cat] || 0) + (sub.amount || 0);
         });
 
         const result = Object.entries(grouped).map(([category, amount]) => ({
@@ -486,9 +500,10 @@ const server = http.createServer(async (req, res) => {
       }
 
       try {
+        // Fetch subscriptions
         const { data, error } = await supabase
-          .from('transactions')
-          .select('date, amount')
+          .from('subscriptions')
+          .select('amount, renewal_date, status')
           .eq('user_id', user.id);
 
         if (error) {
@@ -497,11 +512,18 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        // Group by month
+        // Filter to only active/unused/to-cancel subscriptions
+        const activeOrUnused = (data || []).filter(sub => 
+          ['active', 'unused', 'to-cancel'].includes(sub.status)
+        );
+
+        // Group by renewal month
         const grouped = {};
-        (data || []).forEach(tx => {
-          const month = tx.date ? tx.date.substring(0, 7) : 'unknown';
-          grouped[month] = (grouped[month] || 0) + tx.amount;
+        activeOrUnused.forEach(sub => {
+          if (!sub.renewal_date) return;
+          // Extract YYYY-MM from renewal_date
+          const month = sub.renewal_date.substring(0, 7);
+          grouped[month] = (grouped[month] || 0) + (sub.amount || 0);
         });
 
         const result = Object.entries(grouped)
