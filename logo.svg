@@ -1,16 +1,3 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- White background -->
-  <rect width="512" height="512" fill="white"/>
-  
-  <!-- Top right blue rounded rectangle -->
-  <rect x="270" y="110" width="210" height="95" rx="47" fill="#4B9FFF"/>
-  
-  <!-- Top left blue curved segment -->
-  <ellipse cx="200" cy="240" rx="85" ry="100" fill="#4B9FFF"/>
-  
-  <!-- Bottom left blue rounded rectangle -->
-  <rect x="140" y="315" width="220" height="100" rx="50" fill="#3B82F6"/>
-  
-  <!-- Right side black curved segment -->
-  <ellipse cx="400" cy="310" rx="110" ry="130" fill="#1F1F1F" transform="rotate(-15 400 310)"/>
+  <image width="512" height="512" href="$(cat /tmp/subveris-logo.uri)"/>
 </svg>
