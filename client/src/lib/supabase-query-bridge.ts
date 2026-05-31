@@ -178,7 +178,9 @@ async function handleMonthlySpending(method: string, params: URLSearchParams) {
 
     // Call Supabase Edge Function with timezone offset
     const offsetMinutes = new Date().getTimezoneOffset();
-    const localDateStr = new Date().toISOString().split('T')[0];
+    // Build a local YYYY-MM-DD date string (local timezone)
+    const now = new Date();
+    const localDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
     const apiUrl = `${supabaseUrl}/functions/v1/api/spending/monthly?offsetMinutes=${offsetMinutes}&localDate=${localDateStr}`;
@@ -217,7 +219,9 @@ async function handleCategorySpending(method: string, params: URLSearchParams) {
 
     // Call Supabase Edge Function with timezone offset
     const offsetMinutes = new Date().getTimezoneOffset();
-    const localDateStr = new Date().toISOString().split('T')[0];
+    // Build a local YYYY-MM-DD date string (local timezone)
+    const now = new Date();
+    const localDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
     const apiUrl = `${supabaseUrl}/functions/v1/api/spending/category?offsetMinutes=${offsetMinutes}&localDate=${localDateStr}`;
