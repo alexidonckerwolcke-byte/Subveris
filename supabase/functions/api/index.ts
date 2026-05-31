@@ -3057,6 +3057,126 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
     }
 
+    // Complete checkout session - retrieve session details and create subscription
+    if (pathname === "/stripe/complete-checkout-session" && req.method === "POST") {
+      const userId = extractUserId(req);
+      if (!userId) {
+        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      try {
+        const body = await req.json();
+        const sessionId = body.sessionId;
+
+        if (!sessionId) {
+          return jsonResponse({ error: "Missing sessionId" }, { status: 400 });
+        }
+
+        const stripeSecretKey = Deno?.env?.get("STRIPE_SECRET_KEY") ?? "";
+        if (!stripeSecretKey) {
+          return jsonResponse({ error: "Stripe not configured" }, { status: 500 });
+        }
+
+        // Retrieve session details from Stripe
+        const auth = btoa(stripeSecretKey + ':');
+        const sessionRes = await fetch(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Basic ${auth}`,
+          },
+        });
+
+        if (!sessionRes.ok) {
+          const sessionError = await sessionRes.text();
+          console.error("[Stripe] Failed to retrieve session:", sessionRes.status, sessionError);
+          return jsonResponse({ error: "Failed to retrieve checkout session" }, { status: 500 });
+        }
+
+        const sessionData = await sessionRes.json();
+        console.log("[Stripe] Session retrieved:", { id: sessionData.id, payment_status: sessionData.payment_status, status: sessionData.status });
+
+        // Verify payment was successful
+        if (sessionData.payment_status !== "paid") {
+          return jsonResponse({ error: "Payment not completed" }, { status: 400 });
+        }
+
+        // Get subscription ID from session
+        const subscriptionId = sessionData.subscription;
+        if (!subscriptionId) {
+          return jsonResponse({ error: "No subscription found in session" }, { status: 400 });
+        }
+
+        // Retrieve subscription details to get price and customer
+        const subRes = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Basic ${auth}`,
+          },
+        });
+
+        if (!subRes.ok) {
+          const subError = await subRes.text();
+          console.error("[Stripe] Failed to retrieve subscription:", subRes.status, subError);
+          return jsonResponse({ error: "Failed to retrieve subscription" }, { status: 500 });
+        }
+
+        const subData = await subRes.json();
+        console.log("[Stripe] Subscription retrieved:", { id: subData.id, status: subData.status, items: subData.items?.data?.length });
+
+        // Determine subscription type based on price ID
+        const priceId = subData.items?.data?.[0]?.price?.id;
+        const premiumPriceId = Deno?.env?.get("STRIPE_PREMIUM_PRICE_ID") || "";
+        const familyPriceId = Deno?.env?.get("STRIPE_FAMILY_PRICE_ID") || "";
+
+        let tier = "premium";
+        if (priceId === familyPriceId) {
+          tier = "family";
+        } else if (priceId === premiumPriceId) {
+          tier = "premium";
+        }
+
+        // Store subscription in database
+        try {
+          const { error } = await supabase.from("subscriptions").insert({
+            user_id: userId,
+            id: subData.id,
+            name: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Plan (Stripe)`,
+            description: `Stripe ${tier} subscription`,
+            amount: (subData.items?.data?.[0]?.price?.unit_amount ?? 0) / 100, // Convert from cents
+            currency: (subData.items?.data?.[0]?.price?.currency ?? "USD").toUpperCase(),
+            frequency: subData.items?.data?.[0]?.price?.recurring?.interval || "monthly",
+            category: "software",
+            renewal_date: new Date(subData.current_period_end * 1000).toISOString(),
+            status: "active",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+
+          if (error) {
+            console.error("[Stripe] Failed to store subscription:", error);
+            return jsonResponse({ error: "Failed to store subscription" }, { status: 500 });
+          }
+
+          console.log("[Stripe] Subscription stored for user:", userId);
+        } catch (dbError) {
+          console.error("[Stripe] Database error:", dbError);
+          return jsonResponse({ error: "Failed to store subscription" }, { status: 500 });
+        }
+
+        return jsonResponse({
+          success: true,
+          subscription: {
+            id: subData.id,
+            tier,
+            status: subData.status,
+          },
+        });
+      } catch (err) {
+        console.error("Exception completing checkout session:", err);
+        return jsonResponse({ error: `Internal error: ${err}` }, { status: 500 });
+      }
+    }
+
     if (pathname === "/stripe/subscription-status" && req.method === "GET") {
       return jsonResponse({ status: "free", tier: "free" });
     }
