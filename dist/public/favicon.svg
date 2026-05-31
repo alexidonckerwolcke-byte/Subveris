@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Simple "S" icon in Subveris orange -->
+  <rect width="32" height="32" fill="#ffffff"/>
+  <g transform="translate(16, 16)">
+    <!-- Top curve -->
+    <rect x="-10" y="-12" width="20" height="5" rx="2.5" fill="#FF6B35"/>
+    <!-- Middle -->
+    <rect x="-5" y="-7" width="10" height="14" fill="#FF6B35"/>
+    <!-- Bottom curve -->
+    <rect x="-10" y="7" width="20" height="5" rx="2.5" fill="#FF6B35"/>
+  </g>
+</svg>

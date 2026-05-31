@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#ffffff"/>
+  
+  <!-- Main circular badge -->
+  <circle cx="256" cy="256" r="240" fill="#FF6B35" opacity="0.1" stroke="#FF6B35" stroke-width="2"/>
+  
+  <!-- Stylized "S" shape made of overlapping rectangles -->
+  <g transform="translate(256, 256)">
+    <!-- Top curve of S -->
+    <rect x="-80" y="-120" width="160" height="50" rx="25" fill="#FF6B35"/>
+    
+    <!-- Middle section -->
+    <rect x="-40" y="-60" width="80" height="120" fill="#FF6B35"/>
+    
+    <!-- Bottom curve of S -->
+    <rect x="-80" y="70" width="160" height="50" rx="25" fill="#FF6B35"/>
+  </g>
+  
+  <!-- Brand name -->
+  <text x="256" y="450" font-family="Arial, sans-serif" font-size="48" font-weight="bold" text-anchor="middle" fill="#FF6B35">Subveris</text>
+</svg>
