@@ -343,7 +343,9 @@ function getRequestLocalNow(url: URL): Date {
   }
 
   const offsetMinutes = getRequestOffsetMinutes(url);
-  return new Date(Date.now() + offsetMinutes * 60 * 1000);
+  // `offsetMinutes` follows the browser API: UTC - local (minutes).
+  // Convert to local time by subtracting the offset (i.e. UTC - offset = local).
+  return new Date(Date.now() - offsetMinutes * 60 * 1000);
 }
 
 function isRenewalDateInCurrentMonth(date: Date, now = new Date()): boolean {
