@@ -58,6 +58,20 @@ const parseRawBody = (req) => {
   });
 };
 
+// Helper to extract and verify JWT token
+const getUser = async (authHeader) => {
+  if (!supabase) return null;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7);
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error) return null;
+    return data?.user || null;
+  } catch (err) {
+    return null;
+  }
+};
+
 const REMOTE_API_BASE = process.env.VITE_API_URL || process.env.SUPABASE_API_URL || process.env.SUPABASE_FUNCTIONS_URL || 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1/api';
 const STRIPE_PREMIUM_PRICE_ID = process.env.STRIPE_PREMIUM_PRICE_ID || process.env.VITE_STRIPE_PREMIUM_PRICE_ID || '';
 const STRIPE_FAMILY_PRICE_ID = process.env.STRIPE_FAMILY_PRICE_ID || process.env.VITE_STRIPE_FAMILY_PRICE_ID || '';
