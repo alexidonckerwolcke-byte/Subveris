@@ -300,6 +300,18 @@ export function toDateOnlyLocal(dateInput: string | Date): Date | null {
 
   // Parse only date-only strings (YYYY-MM-DD) as local dates to avoid UTC shifts
   const dateStr = String(dateInput).trim();
+  
+  // First try to extract YYYY-MM-DD from ISO datetime strings (e.g. 2026-05-31T00:00:00+00:00)
+  const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const y = Number(isoMatch[1]);
+    const mo = Number(isoMatch[2]) - 1;
+    const d = Number(isoMatch[3]);
+    const dt = new Date(y, mo, d);
+    dt.setHours(0, 0, 0, 0);
+    return dt;
+  }
+  
   const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
   const y = Number(match[1]);
