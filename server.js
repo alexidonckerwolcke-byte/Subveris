@@ -717,6 +717,48 @@ const server = http.createServer(async (req, res) => {
       }
     }
     
+    // Extension download
+    if (urlPath === '/api/extension/download' && req.method === 'GET') {
+      const fs = require('fs');
+      const path = require('path');
+      const archiver = require('archiver');
+      
+      try {
+        const extensionDir = path.join(process.cwd(), 'extension');
+        
+        // Check if extension directory exists
+        if (!fs.existsSync(extensionDir)) {
+          console.log(`[${new Date().toISOString()}] ✗ Extension directory not found: ${extensionDir}`);
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Extension not found' }));
+          return;
+        }
+
+        // Create ZIP archive
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', 'attachment; filename="subveris-extension.zip"');
+        
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        
+        archive.on('error', (err) => {
+          console.error(`[${new Date().toISOString()}] ✗ Archive error:`, err);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Failed to create archive' }));
+        });
+        
+        archive.pipe(res);
+        archive.directory(extensionDir, 'subveris-extension');
+        archive.finalize();
+        
+        console.log(`[${new Date().toISOString()}] ✓ Extension downloaded`);
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] ✗ Extension download error:`, error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to download extension' }));
+      }
+      return;
+    }
+    
     // Generic proxy for any unhandled /api/* routes to Supabase
     if (urlPath.startsWith('/api/') && REMOTE_API_BASE) {
       console.log(`[${new Date().toISOString()}] → Generic proxy: ${urlPath}`);
