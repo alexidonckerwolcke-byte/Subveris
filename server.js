@@ -444,16 +444,16 @@ const server = http.createServer(async (req, res) => {
       }
 
       try {
-        // Get today's date (YYYY-MM-DD)
         const now = new Date();
-        const today = now.toISOString().split('T')[0];
+        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         
-        // Fetch subscriptions renewing today
+        // Fetch subscriptions
         const { data, error } = await supabase
           .from('subscriptions')
-          .select('category, amount, renewal_date')
+          .select('category, amount, renewal_date, status')
           .eq('user_id', user.id)
-          .eq('renewal_date', today)
           .in('status', ['active', 'unused', 'to-cancel']);
 
         if (error) {
@@ -462,9 +462,18 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
+        // Filter to subscriptions with renewal_date <= today in current month
+        const thisMonthBilledSubs = (data || []).filter(sub => {
+          if (!sub.renewal_date) return false;
+          const renewalDate = new Date(sub.renewal_date);
+          renewalDate.setHours(0, 0, 0, 0);
+          // Include if renewal date is in current month AND has already occurred (renewal_date <= today)
+          return renewalDate >= currentMonthStart && renewalDate <= today;
+        });
+
         // Group by category
         const grouped = {};
-        (data || []).forEach(sub => {
+        thisMonthBilledSubs.forEach(sub => {
           const cat = sub.category || 'Uncategorized';
           grouped[cat] = (grouped[cat] || 0) + (sub.amount || 0);
         });
@@ -493,15 +502,15 @@ const server = http.createServer(async (req, res) => {
       }
 
       try {
-        // Fetch subscriptions renewing today
         const now = new Date();
-        const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
+        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         
+        // Fetch subscriptions
         const { data, error } = await supabase
           .from('subscriptions')
           .select('amount, renewal_date, status')
           .eq('user_id', user.id)
-          .eq('renewal_date', today)
           .in('status', ['active', 'unused', 'to-cancel']);
 
         if (error) {
@@ -510,14 +519,31 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        // Sum spending for today
-        const todaySpending = (data || []).reduce((sum, sub) => sum + (sub.amount || 0), 0);
+        // Group by month, but for current month only include renewals that have occurred
+        const grouped = {};
+        (data || []).forEach(sub => {
+          if (!sub.renewal_date) return;
+          const renewalDate = new Date(sub.renewal_date);
+          renewalDate.setHours(0, 0, 0, 0);
+          const month = sub.renewal_date.substring(0, 7); // YYYY-MM
+          
+          // For current month: only include if renewal_date <= today
+          if (month === now.toISOString().substring(0, 7)) {
+            if (renewalDate <= today) {
+              grouped[month] = (grouped[month] || 0) + (sub.amount || 0);
+            }
+          } else {
+            // For past/future months: include all
+            grouped[month] = (grouped[month] || 0) + (sub.amount || 0);
+          }
+        });
 
-        // Return spending for today's date in YYYY-MM format for the current month
-        const monthLabel = today.substring(0, 7); // YYYY-MM
-        const result = todaySpending > 0 
-          ? [{ month: monthLabel, amount: parseFloat(todaySpending.toFixed(2)) }]
-          : [];
+        const result = Object.entries(grouped)
+          .sort()
+          .map(([month, amount]) => ({
+            month,
+            amount: parseFloat(amount.toFixed(2)),
+          }));
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
