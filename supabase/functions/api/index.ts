@@ -1234,6 +1234,156 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
     }
 
+    // Change email
+    if (pathname === "/account/email" && req.method === "PATCH") {
+      const userId = extractUserId(req);
+      if (!userId) {
+        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const authToken = req.headers.get('authorization')?.replace('Bearer ', '');
+      if (!authToken) {
+        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      try {
+        const body = await req.json();
+        const { newEmail, password } = body;
+
+        if (!newEmail || !password) {
+          return jsonResponse({ error: "Missing email or password" }, { status: 400 });
+        }
+
+        // Use service role to update email via Auth API
+        const authBase = new URL('auth/v1/', process.env.SUPABASE_URL || '').href;
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+        const response = await fetch(new URL('admin/users/' + userId, authBase).href, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': serviceKey || '',
+            'Authorization': `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            email: newEmail,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('[Email] Update failed:', response.status, errorData);
+          return jsonResponse({ error: errorData.message || "Failed to update email" }, { status: response.status });
+        }
+
+        console.log('[Email] Updated for user:', userId);
+        return jsonResponse({ success: true, email: newEmail });
+      } catch (error) {
+        console.error("[Email] Exception updating email:", error);
+        return jsonResponse({ error: "Failed to update email" }, { status: 500 });
+      }
+    }
+
+    // Change password
+    if (pathname === "/account/password" && req.method === "PATCH") {
+      const userId = extractUserId(req);
+      if (!userId) {
+        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const authToken = req.headers.get('authorization')?.replace('Bearer ', '');
+      if (!authToken) {
+        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      try {
+        const body = await req.json();
+        const { newPassword } = body;
+
+        if (!newPassword || newPassword.length < 6) {
+          return jsonResponse({ error: "Password must be at least 6 characters" }, { status: 400 });
+        }
+
+        // Use service role to update password via Auth API
+        const authBase = new URL('auth/v1/', process.env.SUPABASE_URL || '').href;
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+        const response = await fetch(new URL('admin/users/' + userId, authBase).href, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': serviceKey || '',
+            'Authorization': `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            password: newPassword,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('[Password] Update failed:', response.status, errorData);
+          return jsonResponse({ error: errorData.message || "Failed to update password" }, { status: response.status });
+        }
+
+        console.log('[Password] Updated for user:', userId);
+        return jsonResponse({ success: true });
+      } catch (error) {
+        console.error("[Password] Exception updating password:", error);
+        return jsonResponse({ error: "Failed to update password" }, { status: 500 });
+      }
+    }
+
+    // Delete account
+    if (pathname === "/account" && req.method === "DELETE") {
+      const userId = extractUserId(req);
+      if (!userId) {
+        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const authToken = req.headers.get('authorization')?.replace('Bearer ', '');
+      if (!authToken) {
+        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      try {
+        // Delete all user data from database tables
+        await Promise.all([
+          supabase.from('subscriptions').delete().eq('user_id', userId),
+          supabase.from('notification_preferences').delete().eq('user_id', userId),
+          supabase.from('users').delete().eq('id', userId),
+          supabase.from('family_groups').delete().eq('created_by', userId),
+          supabase.from('family_group_members').delete().eq('user_id', userId),
+        ]);
+
+        console.log('[Account] Deleted user data for:', userId);
+
+        // Delete user from Auth using service role
+        const authBase = new URL('auth/v1/', process.env.SUPABASE_URL || '').href;
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+        const response = await fetch(new URL('admin/users/' + userId, authBase).href, {
+          method: 'DELETE',
+          headers: {
+            'apikey': serviceKey || '',
+            'Authorization': `Bearer ${serviceKey}`,
+          },
+        });
+
+        if (!response.ok && response.status !== 404) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('[Account] Delete auth failed:', response.status, errorData);
+          return jsonResponse({ error: errorData.message || "Failed to delete account" }, { status: response.status });
+        }
+
+        console.log('[Account] Deleted auth user:', userId);
+        return jsonResponse({ success: true });
+      } catch (error) {
+        console.error("[Account] Exception deleting account:", error);
+        return jsonResponse({ error: "Failed to delete account" }, { status: 500 });
+      }
+    }
+
     // Update user currency preference
     if (pathname === "/user/currency" && req.method === "PATCH") {
       const userId = extractUserId(req);
