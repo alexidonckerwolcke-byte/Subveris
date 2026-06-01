@@ -182,8 +182,10 @@ async function handleMonthlySpending(method: string, params: URLSearchParams) {
     const now = new Date();
     const localDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const apiUrl = `${supabaseUrl}/functions/v1/api/spending/monthly?offsetMinutes=${offsetMinutes}&localDate=${localDateStr}`;
+    const supabaseFunctionsBase = import.meta.env.VITE_SUPABASE_URL?.trim()
+      ? `${import.meta.env.VITE_SUPABASE_URL.trim().replace(/\/$/, "")}/functions/v1/api`
+      : 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1/api';
+    const apiUrl = `${supabaseFunctionsBase}/spending/monthly?offsetMinutes=${offsetMinutes}&localDate=${localDateStr}`;
     
     const accessToken = (await supabase.auth.getSession())?.data?.session?.access_token;
     const response = await fetch(apiUrl, {
@@ -223,8 +225,10 @@ async function handleCategorySpending(method: string, params: URLSearchParams) {
     const now = new Date();
     const localDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const apiUrl = `${supabaseUrl}/functions/v1/api/spending/category?offsetMinutes=${offsetMinutes}&localDate=${localDateStr}`;
+    const supabaseFunctionsBase = import.meta.env.VITE_SUPABASE_URL?.trim()
+      ? `${import.meta.env.VITE_SUPABASE_URL.trim().replace(/\/$/, "")}/functions/v1/api`
+      : 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1/api';
+    const apiUrl = `${supabaseFunctionsBase}/spending/category?offsetMinutes=${offsetMinutes}&localDate=${localDateStr}`;
     
     const accessToken = (await supabase.auth.getSession())?.data?.session?.access_token;
     const response = await fetch(apiUrl, {

@@ -1,10 +1,12 @@
 import { supabase, supabaseAnonKeyOverride as supabaseAnonKey } from "./supabase";
 
+const DEFAULT_REMOTE_API_BASE =
+  'https://xuilgccacufwinvkocfl.supabase.co/functions/v1/api';
 const remoteApiBase =
   import.meta.env.VITE_API_URL?.trim() ||
   (import.meta.env.VITE_SUPABASE_URL?.trim()
     ? `${import.meta.env.VITE_SUPABASE_URL.trim().replace(/\/$/, "")}/functions/v1/api`
-    : "");
+    : DEFAULT_REMOTE_API_BASE);
 // Disable local fallback to avoid 54321 errors when not running supabase functions serve
 const localDevApiBase = "";
 const apiBaseUrl = remoteApiBase || localDevApiBase;
@@ -53,13 +55,16 @@ export function resolveApiUrl(path: string) {
   }
 
   if (path.startsWith("/api")) {
-    if (import.meta.env.DEV && !hasWarnedNoApiUrl) {
-      console.info(
-        "Development mode: forcing local /api proxy for all /api requests."
-      );
-      hasWarnedNoApiUrl = true;
+    if (import.meta.env.DEV) {
+      if (!hasWarnedNoApiUrl) {
+        console.info(
+          "Development mode: forcing local /api proxy for all /api requests."
+        );
+        hasWarnedNoApiUrl = true;
+      }
+      return path;
     }
-    return path;
+    return resolveRemoteApiUrl(path);
   }
 
   if (!apiBaseUrl) {
@@ -110,7 +115,7 @@ export async function fetchWithRemoteFallback(url: string, init: RequestInit) {
   };
 
   const res = await attemptFetch(primaryUrl);
-  const shouldRetry = secondaryUrl && [404, 502, 503, 504].includes(res.status);
+  const shouldRetry = secondaryUrl && [401, 403, 404, 500, 502, 503, 504].includes(res.status);
   if (shouldRetry) {
     console.warn("[apiFetch] primary /api request returned retryable status, retrying against remote API", {
       primaryUrl,
