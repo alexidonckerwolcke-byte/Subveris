@@ -179,6 +179,23 @@ function calculateMonthlyCost(amount, frequency) {
   return amount;
 }
 
+function parseDateString(dateInput) {
+  if (!dateInput) return null;
+  const parsed = new Date(dateInput);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function getSubscriptionRenewalDateString(sub) {
+  return (
+    sub.next_billing_at ||
+    sub.next_billing_date ||
+    sub.nextBillingDate ||
+    sub.renewal_date ||
+    sub.renewalDate ||
+    null
+  );
+}
+
 const server = http.createServer(async (req, res) => {
   // Remove query strings and hash
   let urlPath = req.url.split('?')[0].split('#')[0];
@@ -486,14 +503,16 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        // Filter to subscriptions with renewal_date <= today in current month
+        // Filter to subscriptions with renewal date <= today in current month
         const grouped = {};
         (data || []).forEach(sub => {
           // Skip deleted/invalid
           if (sub.status === 'deleted' || sub.deleted_at) return;
-          if (!sub.renewal_date) return;
+          const renewalDateStr = getSubscriptionRenewalDateString(sub);
+          if (!renewalDateStr) return;
           
-          const renewalDate = new Date(sub.renewal_date);
+          const renewalDate = parseDateString(renewalDateStr);
+          if (!renewalDate) return;
           renewalDate.setHours(0, 0, 0, 0);
           
           // For current month: only include if renewal_date <= today
@@ -564,9 +583,11 @@ const server = http.createServer(async (req, res) => {
             // Skip deleted/invalid subscriptions
             if (sub.status === 'deleted' || sub.deleted_at) continue;
             if (!['active', 'unused', 'to-cancel'].includes(sub.status)) continue;
-            if (!sub.renewal_date) continue;
+            const renewalDateStr = getSubscriptionRenewalDateString(sub);
+            if (!renewalDateStr) continue;
             
-            const renewalDate = new Date(sub.renewal_date);
+            const renewalDate = parseDateString(renewalDateStr);
+            if (!renewalDate) continue;
             renewalDate.setHours(0, 0, 0, 0);
             
             // For current month: only include if renewal_date <= today
