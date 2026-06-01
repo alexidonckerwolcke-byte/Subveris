@@ -1,6 +1,10 @@
 import { supabase, supabaseAnonKeyOverride as supabaseAnonKey } from "./supabase";
 
-const remoteApiBase = import.meta.env.VITE_API_URL?.trim() || "";
+const remoteApiBase =
+  import.meta.env.VITE_API_URL?.trim() ||
+  (import.meta.env.VITE_SUPABASE_URL?.trim()
+    ? `${import.meta.env.VITE_SUPABASE_URL.trim().replace(/\/$/, "")}/functions/v1/api`
+    : "");
 // Disable local fallback to avoid 54321 errors when not running supabase functions serve
 const localDevApiBase = "";
 const apiBaseUrl = remoteApiBase || localDevApiBase;
@@ -106,8 +110,9 @@ export async function fetchWithRemoteFallback(url: string, init: RequestInit) {
   };
 
   const res = await attemptFetch(primaryUrl);
-  if (secondaryUrl && [502, 503, 504].includes(res.status)) {
-    console.warn("[apiFetch] primary /api request returned gateway error, retrying against remote API", {
+  const shouldRetry = secondaryUrl && [404, 502, 503, 504].includes(res.status);
+  if (shouldRetry) {
+    console.warn("[apiFetch] primary /api request returned retryable status, retrying against remote API", {
       primaryUrl,
       secondaryUrl,
       status: res.status,
