@@ -86,7 +86,7 @@ export function resolveRemoteApiUrl(path: string) {
 }
 
 function shouldUseRemoteFallback(url: string) {
-  return import.meta.env.DEV && remoteApiBase && url.startsWith("/api");
+  return Boolean(remoteApiBase && url.startsWith("/api"));
 }
 
 export async function fetchWithRemoteFallback(url: string, init: RequestInit) {

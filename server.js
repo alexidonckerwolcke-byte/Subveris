@@ -155,6 +155,13 @@ async function proxyStripeRequest(req, res, pathSuffix) {
   }
 }
 
+async function proxyApiRequest(req, res) {
+  if (!REMOTE_API_BASE) {
+    return false;
+  }
+  return proxyStripeRequest(req, res, req.url.replace(/^\/api/, ''));
+}
+
 // Currency conversion rates
 const EXCHANGE_RATES = {
   USD: 1, EUR: 0.92, GBP: 0.79, CAD: 1.35, AUD: 1.52,
@@ -229,6 +236,11 @@ const server = http.createServer(async (req, res) => {
     if (urlPath === '/api/user/premium-status' && req.method === 'GET') {
       console.log(`[${new Date().toISOString()}] → Premium status endpoint`);
       
+      if (!supabase && REMOTE_API_BASE) {
+        const forwarded = await proxyApiRequest(req, res);
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user) {
         console.log('No authenticated user');
@@ -313,6 +325,11 @@ const server = http.createServer(async (req, res) => {
     
     // Return default empty responses for unimplemented endpoints
     if (urlPath === '/api/subscriptions' && req.method === 'GET') {
+      if (!supabase && REMOTE_API_BASE) {
+        const forwarded = await proxyApiRequest(req, res);
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -344,6 +361,11 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath === '/api/recommendations' && req.method === 'GET') {
+      if (!supabase && REMOTE_API_BASE) {
+        const forwarded = await proxyApiRequest(req, res);
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -376,6 +398,11 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath === '/api/insights' && req.method === 'GET') {
+      if (!supabase && REMOTE_API_BASE) {
+        const forwarded = await proxyApiRequest(req, res);
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -408,6 +435,11 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath === '/api/calendar-events' && req.method === 'GET') {
+      if (!supabase && REMOTE_API_BASE) {
+        const forwarded = await proxyApiRequest(req, res);
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -440,6 +472,11 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath === '/api/analysis/cost-per-use' && req.method === 'GET') {
+      if (!supabase && REMOTE_API_BASE) {
+        const forwarded = await proxyApiRequest(req, res);
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -644,6 +681,11 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath.startsWith('/api/metrics') && req.method === 'GET') {
+      if (!supabase && REMOTE_API_BASE) {
+        const forwarded = await proxyApiRequest(req, res);
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -682,6 +724,11 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath === '/api/analytics/monthly-savings' && req.method === 'GET') {
+      if (!supabase && REMOTE_API_BASE) {
+        const forwarded = await proxyApiRequest(req, res);
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -727,6 +774,11 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath === '/api/insights/behavioral' && req.method === 'GET') {
+      if (!supabase && REMOTE_API_BASE) {
+        const forwarded = await proxyApiRequest(req, res);
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -758,6 +810,11 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath === '/api/family-groups' && (req.method === 'GET' || req.method === 'POST')) {
+      if (!supabase && REMOTE_API_BASE) {
+        const forwarded = await proxyApiRequest(req, res);
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -790,6 +847,11 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath.startsWith('/api/family-groups') && req.method === 'GET') {
+      if (!supabase && REMOTE_API_BASE) {
+        const forwarded = await proxyApiRequest(req, res);
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
