@@ -22,15 +22,15 @@ if (!fs.existsSync(DIST_PATH)) {
 console.log('[Startup] Static assets path:', DIST_PATH);
 
 // Initialize Supabase
-const supabaseUrl = 'https://xuilgccacufwinvkocfl.supabase.co';
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || 'https://xuilgccacufwinvkocfl.supabase.co';
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
 
 let supabase = null;
 if (supabaseServiceRoleKey) {
   supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
   console.log('✓ Supabase initialized with service role key');
 } else {
-  console.warn('⚠ SUPABASE_SERVICE_ROLE_KEY not set - API endpoints will not work');
+  console.warn('⚠ SUPABASE_SERVICE_ROLE_KEY or SERVICE_ROLE_KEY not set - API endpoints will not work');
 }
 
 // Helper to parse JSON body
@@ -93,7 +93,8 @@ async function proxyStripeRequest(req, res, pathSuffix) {
     return false;
   }
 
-  const remoteUrl = `${REMOTE_API_BASE.replace(/\/$/, '')}/${pathSuffix.replace(/^\//, '')}`;
+  const cleanedSuffix = pathSuffix.replace(/^\//, '');
+  const remoteUrl = `${REMOTE_API_BASE.replace(/\/$/, '')}/${cleanedSuffix}`;
   const headers = {};
   for (const [key, value] of Object.entries(req.headers)) {
     if (!value) continue;
@@ -478,6 +479,12 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath.startsWith('/api/spending/category') && req.method === 'GET') {
+      if (REMOTE_API_BASE) {
+        console.log(`[${new Date().toISOString()}] → Proxying spending category request to remote functions: ${req.url}`);
+        const forwarded = await proxyStripeRequest(req, res, req.url.replace(/^\/api/, ''));
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -546,6 +553,12 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath.startsWith('/api/spending/monthly') && req.method === 'GET') {
+      if (REMOTE_API_BASE) {
+        console.log(`[${new Date().toISOString()}] → Proxying spending monthly request to remote functions: ${req.url}`);
+        const forwarded = await proxyStripeRequest(req, res, req.url.replace(/^\/api/, ''));
+        if (forwarded) return;
+      }
+
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -823,7 +836,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (REMOTE_API_BASE) {
-        const forwarded = await proxyStripeRequest(req, res, urlPath.replace(/^\/api/, ''));
+        const forwarded = await proxyStripeRequest(req, res, req.url.replace(/^\/api/, ''));
         if (forwarded) return;
       }
 
@@ -879,8 +892,8 @@ const server = http.createServer(async (req, res) => {
     
     // Generic proxy for any unhandled /api/* routes to Supabase
     if (urlPath.startsWith('/api/') && REMOTE_API_BASE) {
-      console.log(`[${new Date().toISOString()}] → Generic proxy: ${urlPath}`);
-      const forwarded = await proxyStripeRequest(req, res, urlPath.replace(/^\/api/, ''));
+      console.log(`[${new Date().toISOString()}] → Generic proxy: ${req.url}`);
+      const forwarded = await proxyStripeRequest(req, res, req.url.replace(/^\/api/, ''));
       if (forwarded) return;
     }
     
