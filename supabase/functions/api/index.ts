@@ -106,6 +106,22 @@ function generateId() {
   return crypto.randomUUID();
 }
 
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "Unknown error";
+  }
+}
+
 function extractUserId(req: Request): string | null {
   // Allow x-test-user-id header for testing
   const testUserId = req.headers.get("x-test-user-id");
@@ -850,7 +866,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
         return jsonResponse(updated || { success: true });
       } catch (err) {
         console.error("Error updating subscription:", err);
-        return jsonResponse({ error: "Failed to update subscription" }, { status: 500 });
+        return jsonResponse(
+          { error: toErrorMessage(err) || "Failed to update subscription" },
+          { status: 500 }
+        );
       }
     }
 
@@ -872,7 +891,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
         return jsonResponse(updated || { success: true });
       } catch (err) {
         console.error("Error updating subscription status:", err);
-        return jsonResponse({ error: "Failed to update subscription status" }, { status: 500 });
+        return jsonResponse(
+          { error: toErrorMessage(err) || "Failed to update subscription status" },
+          { status: 500 }
+        );
       }
     }
 
@@ -900,7 +922,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
         return jsonResponse(updated || { success: true });
       } catch (err) {
         console.error("Error updating subscription usage:", err);
-        return jsonResponse({ error: "Failed to update subscription usage" }, { status: 500 });
+        return jsonResponse(
+          { error: toErrorMessage(err) || "Failed to update subscription usage" },
+          { status: 500 }
+        );
       }
     }
 
