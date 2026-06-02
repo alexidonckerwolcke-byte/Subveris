@@ -11,8 +11,6 @@ const remoteApiBase =
 const localDevApiBase = "";
 const apiBaseUrl = remoteApiBase || localDevApiBase;
 const localFallbackBase = "";
-const isSubverisProductionHost =
-  typeof window !== "undefined" && /(^|\.)subveris\.com$/i.test(window.location.hostname);
 let hasWarnedNoApiUrl = false;
 
 async function resolveAuthToken(forceRefresh = false) {
@@ -51,22 +49,16 @@ function normalizeBase(base: string) {
   return base.replace(/\/$/, "");
 }
 
-function shouldUseSameOriginApi(path: string) {
-  return Boolean(path.startsWith("/api") && !import.meta.env.DEV && isSubverisProductionHost);
-}
-
 export function resolveApiUrl(path: string) {
   if (/^https?:\/\//.test(path)) {
     return path;
   }
 
   if (path.startsWith("/api")) {
-    if (import.meta.env.DEV || shouldUseSameOriginApi(path)) {
+    if (import.meta.env.DEV) {
       if (!hasWarnedNoApiUrl) {
         console.info(
-          import.meta.env.DEV
-            ? "Development mode: forcing local /api proxy for all /api requests."
-            : "Production mode: using same-origin /api requests on subveris.com to avoid cross-origin CORS failures."
+          "Development mode: forcing local /api proxy for all /api requests."
         );
         hasWarnedNoApiUrl = true;
       }
