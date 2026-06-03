@@ -1035,6 +1035,7 @@ const server = http.createServer(async (req, res) => {
       '.json': 'application/json',
       '.svg': 'image/svg+xml',
       '.png': 'image/png',
+      '.ico': 'image/x-icon',
       '.jpg': 'image/jpeg',
       '.gif': 'image/gif',
       '.webp': 'image/webp',
