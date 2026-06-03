@@ -25,15 +25,26 @@ if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
   });
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization,Content-Type,x-test-user-id",
-  "Access-Control-Expose-Headers": "x-total-count",
-  "Access-Control-Max-Age": "86400",
-  "Cache-Control": "no-store",
-  "Vary": "Origin",
-};
+const ALLOWED_ORIGINS = [
+  "https://www.subveris.com",
+  "https://subveris.com",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization,Content-Type,x-test-user-id",
+    "Access-Control-Expose-Headers": "x-total-count",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Max-Age": "86400",
+    "Cache-Control": "no-store",
+    "Vary": "Origin",
+  };
+}
 
 const EXCHANGE_RATES: Record<string, number> = {
   USD: 1,
@@ -78,9 +89,9 @@ function calculateMonthlyCost(amount: number, frequency: string | undefined) {
   return amount;
 }
 
-function addCorsHeaders(response: Response): Response {
+function addCorsHeaders(response: Response, origin?: string | null): Response {
   const newHeaders = new Headers(response.headers);
-  Object.entries(corsHeaders).forEach(([key, value]) => {
+  Object.entries(getCorsHeaders(origin ?? null)).forEach(([key, value]) => {
     newHeaders.set(key, value);
   });
   return new Response(response.body, {
@@ -90,15 +101,27 @@ function addCorsHeaders(response: Response): Response {
   });
 }
 
-function jsonResponse(body: unknown, init: ResponseInit = {}) {
+function jsonResponse(body: unknown, initOrOrigin?: ResponseInit | string | null, maybeInit?: ResponseInit): Response {
+  // Handle overloaded signature for backwards compatibility
+  let actualOrigin: string | null = null;
+  let actualInit: ResponseInit = {};
+  
+  if (typeof initOrOrigin === 'string' || initOrOrigin === null) {
+    actualOrigin = initOrOrigin;
+    actualInit = maybeInit || {};
+  } else if (initOrOrigin && typeof initOrOrigin === 'object') {
+    actualOrigin = null;
+    actualInit = initOrOrigin;
+  }
+  
   const headers = {
     "Content-Type": "application/json",
-    ...corsHeaders,
-    ...init.headers,
+    ...getCorsHeaders(actualOrigin),
+    ...actualInit.headers,
   };
   return new Response(JSON.stringify(body), {
     headers,
-    ...init,
+    ...actualInit,
   });
 }
 
@@ -736,10 +759,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
   try {
     console.log(`[API] ${req.method} ${req.url}`);
     
+    // Extract origin from request
+    const origin = req.headers.get("origin");
+    
     // Handle CORS preflight - MUST be first to never fail
     if (req.method === "OPTIONS") {
       console.log("[API] Returning 204 for OPTIONS");
-      return addCorsHeaders(new Response(null, { status: 204 }));
+      return addCorsHeaders(new Response(null, { status: 204 }), origin);
     }
 
     const url = new URL(req.url);
@@ -762,7 +788,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/subscriptions" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([]);
+        return jsonResponse([], origin);
       }
 
       const page = Number(url.searchParams.get("page") || "1");
@@ -770,14 +796,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       try {
         const { subscriptions, count } = await loadSubscriptions(userId, page, perPage);
-        return jsonResponse(subscriptions, {
+        return jsonResponse(subscriptions, origin, {
           headers: {
             "x-total-count": String(count),
           },
         });
       } catch (err) {
         console.error("Error fetching subscriptions:", err);
-        return jsonResponse([], { status: 500 });
+        return jsonResponse([], origin, { status: 500 });
       }
     }
 
@@ -1611,7 +1637,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const userId = extractUserId(req);
       // If no user, return empty for dev purposes
       if (!userId) {
-        return jsonResponse([]);
+        return jsonResponse([], origin);
       }
 
       const { data, error } = await supabase
@@ -1624,18 +1650,19 @@ runtimeDeno?.serve?.(async (req: Request) => {
         console.error("Error fetching insights:", error);
         return jsonResponse(
           { error: "Failed to fetch insights" },
+          origin,
           { status: 500 }
         );
       }
 
-      return jsonResponse(data || []);
+      return jsonResponse(data || [], origin);
     }
 
     // Get recommendations (same as insights for now)
     if (pathname === "/recommendations" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([]);
+        return jsonResponse([], origin);
       }
 
       const normalizeText = (value: any) => String(value || "").trim().toLowerCase();
@@ -1954,7 +1981,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/family-groups" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([]);
+        return jsonResponse([], origin);
       }
 
       try {
@@ -1974,19 +2001,20 @@ runtimeDeno?.serve?.(async (req: Request) => {
             name: group.name,
             createdAt: group.created_at,
             ownerId: group.owner_id,
-          }))
+          })),
+          origin
         );
       } catch (err) {
         console.error("Error fetching family groups:", err);
         // Return empty array to allow app to continue
-        return jsonResponse([]);
+        return jsonResponse([], origin);
       }
     }
 
     if (pathname === "/family-groups/me/membership" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] });
+        return jsonResponse({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] }, origin);
       }
 
       try {
@@ -1998,7 +2026,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (ownerError) {
           console.error("Error fetching owned groups:", ownerError);
-          return jsonResponse({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] });
+          return jsonResponse({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] }, origin);
         }
 
         // Get groups where user is a member
@@ -2009,7 +2037,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (memberError) {
           console.error("Error fetching member groups:", memberError);
-          return jsonResponse({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] });
+          return jsonResponse({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] }, origin);
         }
 
         const getNestedFamilyGroup = (m: any) => {
@@ -3370,7 +3398,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/insights/behavioral" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([]);
+        return jsonResponse([], origin);
       }
 
       const query = new URL(req.url).searchParams;
@@ -3557,17 +3585,17 @@ runtimeDeno?.serve?.(async (req: Request) => {
             };
           });
 
-        return jsonResponse(behavioralInsights);
+        return jsonResponse(behavioralInsights, origin);
       } catch (err) {
         console.error("Exception generating behavioral insights:", err);
-        return jsonResponse([]);
+        return jsonResponse([], origin);
       }
     }
 
     if (pathname === "/analysis/cost-per-use" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([]);
+        return jsonResponse([], origin);
       }
 
       const query = new URL(req.url).searchParams;
@@ -3710,7 +3738,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       if (!userId) {
         return jsonResponse({
           monthlySavings: 0,
-        });
+        }, origin);
       }
 
       const query = new URL(req.url).searchParams;
@@ -3742,7 +3770,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (ownedGroupsError || memberGroupsError) {
           console.error("Error fetching family groups for monthly savings:", ownedGroupsError || memberGroupsError);
-          return jsonResponse({ monthlySavings: 0 });
+          return jsonResponse({ monthlySavings: 0 }, origin);
         }
 
         const groupIds = Array.from(new Set([
@@ -3763,7 +3791,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (membersError || groupsWithOwnersError) {
             console.error("Error fetching family members for monthly savings:", membersError || groupsWithOwnersError);
-            return jsonResponse({ monthlySavings: 0 });
+            return jsonResponse({ monthlySavings: 0 }, origin);
           }
 
           const memberIds = Array.from(new Set([
@@ -3779,7 +3807,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (error) {
             console.error("Error fetching family monthly savings subscriptions:", error);
-            return jsonResponse({ monthlySavings: 0 });
+            return jsonResponse({ monthlySavings: 0 }, origin);
           }
 
           subscriptions = subs || [];
@@ -3791,7 +3819,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (error) {
             console.error("Error fetching monthly savings subscriptions:", error);
-            return jsonResponse({ monthlySavings: 0 });
+            return jsonResponse({ monthlySavings: 0 }, origin);
           }
 
           subscriptions = subs || [];
@@ -3804,7 +3832,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (error) {
           console.error("Error fetching monthly savings subscriptions:", error);
-          return jsonResponse({ monthlySavings: 0 });
+          return jsonResponse({ monthlySavings: 0 }, origin);
         }
 
         subscriptions = subs || [];
@@ -3834,42 +3862,42 @@ runtimeDeno?.serve?.(async (req: Request) => {
         monthlySavings,
         ownerMonthlySavings,
         memberMonthlySavings,
-      });
+      }, origin);
     }
 
     if (pathname === "/calendar-events" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([]);
+        return jsonResponse([], origin);
       }
 
       const { subscriptions } = await loadSubscriptions(userId);
-      return jsonResponse(buildCalendarEvents(subscriptions));
+      return jsonResponse(buildCalendarEvents(subscriptions), origin);
     }
 
     if (pathname === "/health-score" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse(buildHealthScore([]));
+        return jsonResponse(buildHealthScore([]), origin);
       }
 
       const { subscriptions } = await loadSubscriptions(userId);
-      return jsonResponse(buildHealthScore(subscriptions));
+      return jsonResponse(buildHealthScore(subscriptions), origin);
     }
 
     if (pathname === "/user/currency" && req.method === "GET") {
-      return jsonResponse({ currency: "USD", symbol: "$" });
+      return jsonResponse({ currency: "USD", symbol: "$" }, origin);
     }
 
     if (pathname.match(/^\/family-groups\/[^/]+\/family-data$/) && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Login required" }, { status: 401 });
+        return jsonResponse({ error: "Login required" }, origin, { status: 401 });
       }
 
       const groupId = pathname.split('/')[2];
       if (!groupId) {
-        return jsonResponse({ error: "Invalid group ID" }, { status: 400 });
+        return jsonResponse({ error: "Invalid group ID" }, origin, { status: 400 });
       }
 
       const { data: groupRow, error: groupRowError } = await supabase
@@ -4562,11 +4590,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
     }
 
     // Return 404 for unknown routes
-    return jsonResponse({ error: "Not found" }, { status: 404 });
+    return jsonResponse({ error: "Not found" }, origin, { status: 404 });
   } catch (err) {
     console.error("API error:", err);
+    const origin = req.headers.get("origin");
     return jsonResponse(
       { error: "Internal server error" },
+      origin,
       { status: 500 }
     );
   }
