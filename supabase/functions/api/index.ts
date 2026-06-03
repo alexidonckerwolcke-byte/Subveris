@@ -762,10 +762,27 @@ runtimeDeno?.serve?.(async (req: Request) => {
     // Extract origin from request
     const origin = req.headers.get("origin");
     
+    // Create context-aware response helpers that automatically include origin
+    const sendJson = (body: unknown, init?: ResponseInit) => {
+      const headers = {
+        "Content-Type": "application/json",
+        ...getCorsHeaders(origin),
+        ...init?.headers,
+      };
+      return new Response(JSON.stringify(body), {
+        ...init,
+        headers,
+      });
+    };
+    
+    const sendCorsHeaders = (response: Response) => {
+      return addCorsHeaders(response, origin);
+    };
+    
     // Handle CORS preflight - MUST be first to never fail
     if (req.method === "OPTIONS") {
       console.log("[API] Returning 204 for OPTIONS");
-      return addCorsHeaders(new Response(null, { status: 204 }), origin);
+      return sendCorsHeaders(new Response(null, { status: 204 }));
     }
 
     const url = new URL(req.url);
@@ -776,19 +793,19 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
     // Test route
     if (pathname === "/test" && req.method === "GET") {
-      return jsonResponse({ message: "API is working!" });
+      return sendJson({ message: "API is working!" });
     }
 
     // Test route
     if (pathname === "/test" && req.method === "GET") {
-      return jsonResponse({ message: "API is working!" });
+      return sendJson({ message: "API is working!" });
     }
 
     // Get subscriptions
     if (pathname === "/subscriptions" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([], origin);
+        return sendJson([]);
       }
 
       const page = Number(url.searchParams.get("page") || "1");
@@ -796,14 +813,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       try {
         const { subscriptions, count } = await loadSubscriptions(userId, page, perPage);
-        return jsonResponse(subscriptions, origin, {
+        return sendJson(subscriptions, {
           headers: {
             "x-total-count": String(count),
           },
         });
       } catch (err) {
         console.error("Error fetching subscriptions:", err);
-        return jsonResponse([], origin, { status: 500 });
+        return sendJson([], { status: 500 });
       }
     }
 
@@ -811,13 +828,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname.match(/^\/subscriptions\/[^/]+$/) && req.method === "PATCH") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Login required" }, { status: 401 });
+        return sendJson({ error: "Login required" }, { status: 401 });
       }
 
       const subscriptionId = pathname.split('/')[2];
       const body = await req.json();
       if (!subscriptionId) {
-        return jsonResponse({ error: "Missing subscription ID" }, { status: 400 });
+        return sendJson({ error: "Missing subscription ID" }, { status: 400 });
       }
 
       const updates: any = {};
@@ -882,17 +899,17 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       if (Object.keys(updates).length === 0) {
-        return jsonResponse({ error: "No updatable fields provided" }, { status: 400 });
+        return sendJson({ error: "No updatable fields provided" }, { status: 400 });
       }
 
       try {
         console.log(`[API] PATCH /subscriptions/${subscriptionId} update payload:`, updates);
         const updated = await updateSubscription(userId, subscriptionId, updates);
         console.log(`[API] PATCH /subscriptions/${subscriptionId} update result:`, updated);
-        return jsonResponse(updated || { success: true });
+        return sendJson(updated || { success: true });
       } catch (err) {
         console.error("Error updating subscription:", err);
-        return jsonResponse(
+        return sendJson(
           { error: toErrorMessage(err) || "Failed to update subscription" },
           { status: 500 }
         );
@@ -903,21 +920,21 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname.match(/^\/subscriptions\/[^/]+\/status$/) && req.method === "PATCH") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Login required" }, { status: 401 });
+        return sendJson({ error: "Login required" }, { status: 401 });
       }
 
       const subscriptionId = pathname.split('/')[2];
       const body = await req.json();
       if (!subscriptionId || !body.status) {
-        return jsonResponse({ error: "Missing subscription ID or status" }, { status: 400 });
+        return sendJson({ error: "Missing subscription ID or status" }, { status: 400 });
       }
 
       try {
         const updated = await updateSubscription(userId, subscriptionId, { status: body.status });
-        return jsonResponse(updated || { success: true });
+        return sendJson(updated || { success: true });
       } catch (err) {
         console.error("Error updating subscription status:", err);
-        return jsonResponse(
+        return sendJson(
           { error: toErrorMessage(err) || "Failed to update subscription status" },
           { status: 500 }
         );
@@ -928,13 +945,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname.match(/^\/subscriptions\/[^/]+\/usage$/) && req.method === "PATCH") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Login required" }, { status: 401 });
+        return sendJson({ error: "Login required" }, { status: 401 });
       }
 
       const subscriptionId = pathname.split('/')[2];
       const body = await req.json();
       if (!subscriptionId || body.monthlyUsageCount === undefined) {
-        return jsonResponse({ error: "Missing subscription ID or monthlyUsageCount" }, { status: 400 });
+        return sendJson({ error: "Missing subscription ID or monthlyUsageCount" }, { status: 400 });
       }
 
       try {
@@ -945,10 +962,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
           usage_month: currentMonth,
           last_used_at: new Date().toISOString().split("T")[0],
         });
-        return jsonResponse(updated || { success: true });
+        return sendJson(updated || { success: true });
       } catch (err) {
         console.error("Error updating subscription usage:", err);
-        return jsonResponse(
+        return sendJson(
           { error: toErrorMessage(err) || "Failed to update subscription usage" },
           { status: 500 }
         );
@@ -959,20 +976,20 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname.match(/^\/subscriptions\/[^/]+\/log-usage$/) && req.method === "POST") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Login required" }, { status: 401 });
+        return sendJson({ error: "Login required" }, { status: 401 });
       }
 
       const subscriptionId = pathname.split('/')[2];
       if (!subscriptionId) {
-        return jsonResponse({ error: "Missing subscription ID" }, { status: 400 });
+        return sendJson({ error: "Missing subscription ID" }, { status: 400 });
       }
 
       try {
         const updated = await incrementSubscriptionUsageCount(userId, subscriptionId);
-        return jsonResponse(updated || { success: true });
+        return sendJson(updated || { success: true });
       } catch (err) {
         console.error("Exception logging subscription usage:", err);
-        return jsonResponse({ error: "Failed to log usage" }, { status: 500 });
+        return sendJson({ error: "Failed to log usage" }, { status: 500 });
       }
     }
 
@@ -980,46 +997,46 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname.match(/^\/subscriptions\/[^/]+\/schedule-cancellation$/) && req.method === "POST") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Login required" }, { status: 401 });
+        return sendJson({ error: "Login required" }, { status: 401 });
       }
 
       const subscriptionId = pathname.split('/')[2];
       if (!subscriptionId) {
-        return jsonResponse({ error: "Missing subscription ID" }, { status: 400 });
+        return sendJson({ error: "Missing subscription ID" }, { status: 400 });
       }
 
       try {
         const updated = await updateSubscription(userId, subscriptionId, { status: "to-cancel" });
-        return jsonResponse(updated || { success: true });
+        return sendJson(updated || { success: true });
       } catch (err) {
         console.error("Error scheduling cancellation:", err);
-        return jsonResponse({ error: "Failed to schedule cancellation" }, { status: 500 });
+        return sendJson({ error: "Failed to schedule cancellation" }, { status: 500 });
       }
     }
 
     // Send cancellation reminder
     if (pathname.match(/^\/subscriptions\/[^/]+\/send-cancellation-reminder$/) && req.method === "POST") {
-      return jsonResponse({ success: true });
+      return sendJson({ success: true });
     }
 
     // Delete subscription
     if (pathname.match(/^\/subscriptions\/[^/]+$/) && req.method === "DELETE") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Login required" }, { status: 401 });
+        return sendJson({ error: "Login required" }, { status: 401 });
       }
 
       const subscriptionId = pathname.split('/')[2];
       if (!subscriptionId) {
-        return jsonResponse({ error: "Missing subscription ID" }, { status: 400 });
+        return sendJson({ error: "Missing subscription ID" }, { status: 400 });
       }
 
       try {
         await deleteSubscription(userId, subscriptionId);
-        return jsonResponse({ success: true });
+        return sendJson({ success: true });
       } catch (err) {
         console.error("Error deleting subscription:", err);
-        return jsonResponse({ error: "Failed to delete subscription" }, { status: 500 });
+        return sendJson({ error: "Failed to delete subscription" }, { status: 500 });
       }
     }
 
@@ -1028,7 +1045,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const userId = extractUserId(req);
       
       if (!userId) {
-        return jsonResponse({
+        return sendJson({
           isPremium: false,
           planType: "free",
           status: "free",
@@ -1047,7 +1064,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (userError || !userData) {
           console.log("No subscription found for user:", userId);
-          return jsonResponse({
+          return sendJson({
             isPremium: false,
             planType: "free",
             status: "active",
@@ -1060,7 +1077,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         const planType: "free" | "premium" | "family" = (userData.plan_type || "free") as "free" | "premium" | "family";
         const isPremium = (planType === "premium" || planType === "family") && userData.status === "active";
 
-        return jsonResponse({
+        return sendJson({
           isPremium,
           planType,
           status: userData.status || "active",
@@ -1069,7 +1086,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         });
       } catch (err) {
         console.error("Exception fetching premium status:", err);
-        return jsonResponse({
+        return sendJson({
           isPremium: false,
           planType: "free",
           status: "active",
@@ -1083,7 +1100,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/account/notification-preferences" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -1095,21 +1112,21 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (error || !data) {
           // Return defaults for new users
-          return jsonResponse({
+          return sendJson({
             emailNotifications: true,
             pushNotifications: true,
             weeklyDigest: true,
           });
         }
 
-        return jsonResponse({
+        return sendJson({
           emailNotifications: data.email_notifications ?? true,
           pushNotifications: data.push_notifications ?? true,
           weeklyDigest: data.weekly_digest ?? true,
         });
       } catch (error) {
         console.error("[Preferences] Error fetching:", error);
-        return jsonResponse({ error: "Failed to fetch preferences" }, { status: 500 });
+        return sendJson({ error: "Failed to fetch preferences" }, { status: 500 });
       }
     }
 
@@ -1117,7 +1134,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/account/notification-preferences" && req.method === "PATCH") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -1148,21 +1165,21 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (insertError) {
             console.error("[Preferences] Error inserting:", insertError);
-            return jsonResponse({ error: "Failed to save preferences" }, { status: 500 });
+            return sendJson({ error: "Failed to save preferences" }, { status: 500 });
           }
         } else if (updateError) {
           console.error("[Preferences] Error updating:", updateError);
-          return jsonResponse({ error: "Failed to save preferences" }, { status: 500 });
+          return sendJson({ error: "Failed to save preferences" }, { status: 500 });
         }
 
-        return jsonResponse({
+        return sendJson({
           emailNotifications,
           pushNotifications,
           weeklyDigest,
         });
       } catch (error) {
         console.error("[Preferences] Error saving:", error);
-        return jsonResponse({ error: "Failed to save preferences" }, { status: 500 });
+        return sendJson({ error: "Failed to save preferences" }, { status: 500 });
       }
     }
 
@@ -1170,12 +1187,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/account/2fa/init" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       const authToken = req.headers.get('authorization')?.replace('Bearer ', '');
       if (!authToken) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -1199,7 +1216,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         const data = await response.json().catch(() => null);
         if (!response.ok || !data || !data.id || !data.totp) {
           console.error('[2FA] init error', response.status, data);
-          return jsonResponse({ error: "Failed to initialize 2FA" }, { status: 500 });
+          return sendJson({ error: "Failed to initialize 2FA" }, { status: 500 });
         }
 
         const otpauthUrl = data.totp.uri ?? data.totp.qr_code ?? '';
@@ -1216,14 +1233,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
           secretPresent: !!secret,
         });
 
-        return jsonResponse({
+        return sendJson({
           id: data.id,
           secret,
           otpauthUrl,
         });
       } catch (error) {
         console.error("[2FA] Exception initializing 2FA:", error);
-        return jsonResponse({ error: "Failed to initialize 2FA" }, { status: 500 });
+        return sendJson({ error: "Failed to initialize 2FA" }, { status: 500 });
       }
     }
 
@@ -1231,12 +1248,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/account/2fa" && req.method === "POST") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       const authToken = req.headers.get('authorization')?.replace('Bearer ', '');
       if (!authToken) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -1244,7 +1261,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         const { code, factorId } = body;
 
         if (!code || !factorId) {
-          return jsonResponse({ error: "Code and factor ID are required" }, { status: 400 });
+          return sendJson({ error: "Code and factor ID are required" }, { status: 400 });
         }
 
         const authBase = new URL('auth/v1/', process.env.SUPABASE_URL || '').href;
@@ -1260,7 +1277,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         const verifyData = await response.json().catch(() => null);
         if (!response.ok || !verifyData) {
           console.error('[2FA] verify error', response.status, verifyData);
-          return jsonResponse({ error: "Invalid authentication code" }, { status: 400 });
+          return sendJson({ error: "Invalid authentication code" }, { status: 400 });
         }
 
         // Send 2FA enabled email notification
@@ -1273,13 +1290,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
           console.error("[2FA] Error sending notification email:", emailError);
         }
 
-        return jsonResponse({
+        return sendJson({
           success: true,
           message: "Two-factor authentication enabled",
         });
       } catch (error) {
         console.error("[2FA] Exception enabling 2FA:", error);
-        return jsonResponse({ error: "Failed to enable 2FA" }, { status: 500 });
+        return sendJson({ error: "Failed to enable 2FA" }, { status: 500 });
       }
     }
 
@@ -1287,7 +1304,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/account/export" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -1307,14 +1324,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
           insights,
         };
 
-        return jsonResponse(exportData, {
+        return sendJson(exportData, {
           headers: {
             "Content-Disposition": "attachment; filename=subveris-data.json",
           },
         });
       } catch (error) {
         console.error("[Export] Error exporting data:", error);
-        return jsonResponse({ error: "Failed to export data" }, { status: 500 });
+        return sendJson({ error: "Failed to export data" }, { status: 500 });
       }
     }
 
@@ -1322,12 +1339,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/account/email" && req.method === "PATCH") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       const authToken = req.headers.get('authorization')?.replace('Bearer ', '');
       if (!authToken) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -1335,7 +1352,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         const { newEmail, password } = body;
 
         if (!newEmail || !password) {
-          return jsonResponse({ error: "Missing email or password" }, { status: 400 });
+          return sendJson({ error: "Missing email or password" }, { status: 400 });
         }
 
         // Use service role to update email via Auth API
@@ -1357,14 +1374,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           console.error('[Email] Update failed:', response.status, errorData);
-          return jsonResponse({ error: errorData.message || "Failed to update email" }, { status: response.status });
+          return sendJson({ error: errorData.message || "Failed to update email" }, { status: response.status });
         }
 
         console.log('[Email] Updated for user:', userId);
-        return jsonResponse({ success: true, email: newEmail });
+        return sendJson({ success: true, email: newEmail });
       } catch (error) {
         console.error("[Email] Exception updating email:", error);
-        return jsonResponse({ error: "Failed to update email" }, { status: 500 });
+        return sendJson({ error: "Failed to update email" }, { status: 500 });
       }
     }
 
@@ -1372,12 +1389,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/account/password" && req.method === "PATCH") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       const authToken = req.headers.get('authorization')?.replace('Bearer ', '');
       if (!authToken) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -1385,7 +1402,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         const { newPassword } = body;
 
         if (!newPassword || newPassword.length < 6) {
-          return jsonResponse({ error: "Password must be at least 6 characters" }, { status: 400 });
+          return sendJson({ error: "Password must be at least 6 characters" }, { status: 400 });
         }
 
         // Use service role to update password via Auth API
@@ -1407,14 +1424,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           console.error('[Password] Update failed:', response.status, errorData);
-          return jsonResponse({ error: errorData.message || "Failed to update password" }, { status: response.status });
+          return sendJson({ error: errorData.message || "Failed to update password" }, { status: response.status });
         }
 
         console.log('[Password] Updated for user:', userId);
-        return jsonResponse({ success: true });
+        return sendJson({ success: true });
       } catch (error) {
         console.error("[Password] Exception updating password:", error);
-        return jsonResponse({ error: "Failed to update password" }, { status: 500 });
+        return sendJson({ error: "Failed to update password" }, { status: 500 });
       }
     }
 
@@ -1422,12 +1439,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/account" && req.method === "DELETE") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       const authToken = req.headers.get('authorization')?.replace('Bearer ', '');
       if (!authToken) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -1457,14 +1474,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
         if (!response.ok && response.status !== 404) {
           const errorData = await response.json().catch(() => ({}));
           console.error('[Account] Delete auth failed:', response.status, errorData);
-          return jsonResponse({ error: errorData.message || "Failed to delete account" }, { status: response.status });
+          return sendJson({ error: errorData.message || "Failed to delete account" }, { status: response.status });
         }
 
         console.log('[Account] Deleted auth user:', userId);
-        return jsonResponse({ success: true });
+        return sendJson({ success: true });
       } catch (error) {
         console.error("[Account] Exception deleting account:", error);
-        return jsonResponse({ error: "Failed to delete account" }, { status: 500 });
+        return sendJson({ error: "Failed to delete account" }, { status: 500 });
       }
     }
 
@@ -1472,7 +1489,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/user/currency" && req.method === "PATCH") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -1481,7 +1498,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         // Validate currency code (3-letter uppercase)
         if (!currency || !/^[A-Z]{3}$/.test(currency)) {
-          return jsonResponse({ error: "Invalid currency code" }, { status: 400 });
+          return sendJson({ error: "Invalid currency code" }, { status: 400 });
         }
 
         // Update user metadata in auth
@@ -1500,10 +1517,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
           console.warn("[Currency] Failed to upsert currency into users table:", dbError);
         }
 
-        return jsonResponse({ currency });
+        return sendJson({ currency });
       } catch (error) {
         console.error("[Currency] Error updating currency:", error);
-        return jsonResponse({ error: "Failed to update currency" }, { status: 500 });
+        return sendJson({ error: "Failed to update currency" }, { status: 500 });
       }
     }
 
@@ -1511,7 +1528,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/subscriptions" && req.method === "POST") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse(
+        return sendJson(
           { error: "Login required to create subscriptions" },
           { status: 401 }
         );
@@ -1528,7 +1545,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       } = body;
 
       if (!name || amount === undefined) {
-        return jsonResponse(
+        return sendJson(
           { error: "Missing required fields: name, amount" },
           { status: 400 }
         );
@@ -1539,7 +1556,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       if (nextBillingDate) {
         const parsedDate = toDateOnlyLocal(nextBillingDate);
         if (!parsedDate) {
-          return jsonResponse(
+          return sendJson(
             { error: "Invalid nextBillingDate" },
             { status: 400 }
           );
@@ -1615,17 +1632,17 @@ runtimeDeno?.serve?.(async (req: Request) => {
         if (!postgresResponse.ok) {
           const errorText = await postgresResponse.text();
           console.error("PostgREST error:", postgresResponse.status, errorText);
-          return jsonResponse(
+          return sendJson(
             { error: "Failed to create subscription", details: errorText },
             { status: 500 }
           );
         }
 
         const createdSubscription = await postgresResponse.json();
-        return jsonResponse(createdSubscription[0] || { id: subscriptionId }, { status: 201 });
+        return sendJson(createdSubscription[0] || { id: subscriptionId }, { status: 201 });
       } catch (err) {
         console.error("Exception during subscription creation:", err);
-        return jsonResponse(
+        return sendJson(
           { error: "Failed to create subscription", details: String(err) },
           { status: 500 }
         );
@@ -1637,7 +1654,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const userId = extractUserId(req);
       // If no user, return empty for dev purposes
       if (!userId) {
-        return jsonResponse([], origin);
+        return sendJson([]);
       }
 
       const { data, error } = await supabase
@@ -1648,21 +1665,21 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       if (error) {
         console.error("Error fetching insights:", error);
-        return jsonResponse(
+        return sendJson(
           { error: "Failed to fetch insights" },
           origin,
           { status: 500 }
         );
       }
 
-      return jsonResponse(data || [], origin);
+      return sendJson(data || []);
     }
 
     // Get recommendations (same as insights for now)
     if (pathname === "/recommendations" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([], origin);
+        return sendJson([]);
       }
 
       const normalizeText = (value: any) => String(value || "").trim().toLowerCase();
@@ -1708,7 +1725,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (subsError) {
           console.error("Error fetching subscriptions for recommendations:", subsError);
-          return jsonResponse(
+          return sendJson(
             { error: "Failed to fetch subscriptions" },
             { status: 500 }
           );
@@ -1885,10 +1902,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
           }
         }
 
-        return jsonResponse(recommendations);
+        return sendJson(recommendations);
       } catch (error) {
         console.error("Error generating recommendations:", error);
-        return jsonResponse(
+        return sendJson(
           { error: "Failed to generate recommendations" },
           { status: 500 }
         );
@@ -1900,7 +1917,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const userId = extractUserId(req);
       // If no user, return empty for dev purposes
       if (!userId) {
-        return jsonResponse({
+        return sendJson({
           totalMonthlySpend: 0,
           totalItems: 0,
           activeSubscriptions: 0,
@@ -1919,7 +1936,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       if (error) {
         console.error("Error fetching metrics:", error);
-        return jsonResponse(
+        return sendJson(
           { error: "Failed to fetch metrics" },
           { status: 500 }
         );
@@ -1966,7 +1983,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           return sum + convertToUSD(monthlyAmount, s.currency);
         }, 0);
 
-      return jsonResponse({
+      return sendJson({
         totalMonthlySpend: totalCost,
         totalItems: allSubs.length,
         activeSubscriptions: allSubs.filter((s: any) => s.status === 'active').length,
@@ -1981,7 +1998,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/family-groups" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([], origin);
+        return sendJson([]);
       }
 
       try {
@@ -1995,7 +2012,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           // Continue with empty array if fetch fails
         }
 
-        return jsonResponse(
+        return sendJson(
           (ownerGroups || []).map((group: any) => ({
             id: group.id,
             name: group.name,
@@ -2007,14 +2024,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
       } catch (err) {
         console.error("Error fetching family groups:", err);
         // Return empty array to allow app to continue
-        return jsonResponse([], origin);
+        return sendJson([]);
       }
     }
 
     if (pathname === "/family-groups/me/membership" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] }, origin);
+        return sendJson({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] });
       }
 
       try {
@@ -2026,7 +2043,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (ownerError) {
           console.error("Error fetching owned groups:", ownerError);
-          return jsonResponse({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] }, origin);
+          return sendJson({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] });
         }
 
         // Get groups where user is a member
@@ -2037,7 +2054,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (memberError) {
           console.error("Error fetching member groups:", memberError);
-          return jsonResponse({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] }, origin);
+          return sendJson({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] });
         }
 
         const getNestedFamilyGroup = (m: any) => {
@@ -2072,7 +2089,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           };
         });
 
-        return jsonResponse({
+        return sendJson({
           groups: allGroups,
           isMemberOfFamily: allGroups.length > 0,
           membershipCount: allGroups.length,
@@ -2080,14 +2097,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
         });
       } catch (err) {
         console.error("Error fetching membership:", err);
-        return jsonResponse({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] });
+        return sendJson({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] });
       }
     }
 
     if (pathname === "/family-groups/me/family-data" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ familyData: null, isMemberOfFamily: false });
+        return sendJson({ familyData: null, isMemberOfFamily: false });
       }
 
       try {
@@ -2100,7 +2117,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (memberError && memberError.code !== 'PGRST116') { // PGRST116 is "not found"
           console.error("Error fetching membership:", memberError);
-          return jsonResponse({ familyData: null, isMemberOfFamily: false });
+          return sendJson({ familyData: null, isMemberOfFamily: false });
         }
 
         // Check if user is owner of a group
@@ -2112,7 +2129,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (ownerError && ownerError.code !== 'PGRST116') {
           console.error("Error fetching owned group:", ownerError);
-          return jsonResponse({ familyData: null, isMemberOfFamily: false });
+          return sendJson({ familyData: null, isMemberOfFamily: false });
         }
 
         const familyGroup = ownedGroup || getNestedFamilyGroup(membership);
@@ -2122,7 +2139,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         const isMemberOfFamily = isOwner || isMember;
 
         if (!isMemberOfFamily || !normalizedFamilyGroup?.id) {
-          return jsonResponse({ familyData: null, isMemberOfFamily: false });
+          return sendJson({ familyData: null, isMemberOfFamily: false });
         }
 
         // Get all members of the family group
@@ -2143,7 +2160,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (membersError) {
           console.error("Error fetching members:", membersError);
-          return jsonResponse({ familyData: null, isMemberOfFamily: false });
+          return sendJson({ familyData: null, isMemberOfFamily: false });
         }
 
         // Get owner profile
@@ -2155,7 +2172,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (ownerProfileError) {
           console.error("Error fetching owner profile:", ownerProfileError);
-          return jsonResponse({ familyData: null, isMemberOfFamily: false });
+          return sendJson({ familyData: null, isMemberOfFamily: false });
         }
 
         const familyData = {
@@ -2172,17 +2189,17 @@ runtimeDeno?.serve?.(async (req: Request) => {
           isMember
         };
 
-        return jsonResponse({ familyData, isMemberOfFamily: true });
+        return sendJson({ familyData, isMemberOfFamily: true });
       } catch (err) {
         console.error("Error fetching family data:", err);
-        return jsonResponse({ familyData: null, isMemberOfFamily: false });
+        return sendJson({ familyData: null, isMemberOfFamily: false });
       }
     }
 
     if (pathname === "/family-groups/me/family-metrics" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ familyMetrics: null, isMemberOfFamily: false });
+        return sendJson({ familyMetrics: null, isMemberOfFamily: false });
       }
 
       try {
@@ -2195,7 +2212,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (memberError && memberError.code !== 'PGRST116') {
           console.error("Error fetching membership:", memberError);
-          return jsonResponse({ familyMetrics: null, isMemberOfFamily: false });
+          return sendJson({ familyMetrics: null, isMemberOfFamily: false });
         }
 
         // Check if user owns a group
@@ -2207,13 +2224,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (ownerError && ownerError.code !== 'PGRST116') {
           console.error("Error fetching owned group:", ownerError);
-          return jsonResponse({ familyMetrics: null, isMemberOfFamily: false });
+          return sendJson({ familyMetrics: null, isMemberOfFamily: false });
         }
 
         const familyGroup = ownedGroup || getNestedFamilyGroup(membership);
         const normalizedFamilyGroup = Array.isArray(familyGroup) ? familyGroup[0] : familyGroup;
         if (!normalizedFamilyGroup?.id) {
-          return jsonResponse({ familyMetrics: null, isMemberOfFamily: false });
+          return sendJson({ familyMetrics: null, isMemberOfFamily: false });
         }
 
         // Get all members of the family group
@@ -2224,7 +2241,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (membersError) {
           console.error("Error fetching members:", membersError);
-          return jsonResponse({ familyMetrics: null, isMemberOfFamily: false });
+          return sendJson({ familyMetrics: null, isMemberOfFamily: false });
         }
 
         const memberIds = members?.map(m => m.user_id) || [];
@@ -2240,7 +2257,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (metricsError) {
           console.error("Error fetching family metrics:", metricsError);
-          return jsonResponse({ familyMetrics: null, isMemberOfFamily: false });
+          return sendJson({ familyMetrics: null, isMemberOfFamily: false });
         }
 
         // Aggregate metrics
@@ -2258,17 +2275,17 @@ runtimeDeno?.serve?.(async (req: Request) => {
           individualMetrics: metrics || []
         };
 
-        return jsonResponse({ familyMetrics, isMemberOfFamily: true });
+        return sendJson({ familyMetrics, isMemberOfFamily: true });
       } catch (err) {
         console.error("Error fetching family metrics:", err);
-        return jsonResponse({ familyMetrics: null, isMemberOfFamily: false });
+        return sendJson({ familyMetrics: null, isMemberOfFamily: false });
       }
     }
 
     if (pathname === "/family-groups" && req.method === "POST") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -2282,11 +2299,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .eq("owner_id", userId);
 
         if (checkError) {
-          return jsonResponse({ error: "Failed to check existing groups" }, { status: 500 });
+          return sendJson({ error: "Failed to check existing groups" }, { status: 500 });
         }
 
         if ((existingGroups?.length ?? 0) >= 1) {
-          return jsonResponse({ error: "You can only create 1 family group." }, { status: 400 });
+          return sendJson({ error: "You can only create 1 family group." }, { status: 400 });
         }
 
         // Create the family group
@@ -2301,7 +2318,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (createError || !createdGroup) {
           console.error("Failed to create family group:", createError);
-          return jsonResponse({ error: "Failed to create family group" }, { status: 500 });
+          return sendJson({ error: "Failed to create family group" }, { status: 500 });
         }
 
         // Get owner's email for member record
@@ -2344,7 +2361,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           // Don't fail the whole request, the group was created
         }
 
-        return jsonResponse({
+        return sendJson({
           id: createdGroup.id,
           name: createdGroup.name,
           ownerId: createdGroup.owner_id,
@@ -2352,24 +2369,24 @@ runtimeDeno?.serve?.(async (req: Request) => {
         });
       } catch (error) {
         console.error("Error creating family group:", error);
-        return jsonResponse({ error: "Failed to create family group" }, { status: 500 });
+        return sendJson({ error: "Failed to create family group" }, { status: 500 });
       }
     }
 
     if (pathname.match(/^\/family-groups\/[^/]+$/) && req.method === "DELETE") {
-      return jsonResponse({ success: true });
+      return sendJson({ success: true });
     }
 
     if (pathname.match(/^\/family-groups\/[^/]+\/members$/) && req.method === "GET") {
       const match = pathname.match(/^\/family-groups\/([^/]+)\/members$/);
       const groupId = match?.[1];
       if (!groupId) {
-        return jsonResponse({ error: 'Invalid family group ID' }, { status: 400 });
+        return sendJson({ error: 'Invalid family group ID' }, { status: 400 });
       }
 
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
+        return sendJson({ error: 'Unauthorized' }, { status: 401 });
       }
 
       try {
@@ -2380,7 +2397,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .single();
 
         if (groupRowError || !groupRow) {
-          return jsonResponse({ error: 'Family group not found' }, { status: 404 });
+          return sendJson({ error: 'Family group not found' }, { status: 404 });
         }
 
         if (groupRow.owner_id !== userId) {
@@ -2392,7 +2409,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             .single();
 
           if (membershipError || !membership) {
-            return jsonResponse({ error: 'Not authorized to view family members' }, { status: 403 });
+            return sendJson({ error: 'Not authorized to view family members' }, { status: 403 });
           }
         }
 
@@ -2403,7 +2420,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (membersError) {
           console.error('Error fetching family members:', membersError);
-          return jsonResponse({ error: 'Failed to fetch family members' }, { status: 500 });
+          return sendJson({ error: 'Failed to fetch family members' }, { status: 500 });
         }
 
         // Fetch emails from auth service for members without email data
@@ -2430,10 +2447,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
           };
         }));
 
-        return jsonResponse(membersWithEmails);
+        return sendJson(membersWithEmails);
       } catch (error) {
         console.error('Error in GET /family-groups/:id/members:', error);
-        return jsonResponse({ error: 'Failed to fetch family members' }, { status: 500 });
+        return sendJson({ error: 'Failed to fetch family members' }, { status: 500 });
       }
     }
 
@@ -2441,28 +2458,28 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const match = pathname.match(/^\/family-groups\/([^/]+)\/members$/);
       const groupId = match?.[1];
       if (!groupId) {
-        return jsonResponse({ error: 'Invalid family group ID' }, { status: 400 });
+        return sendJson({ error: 'Invalid family group ID' }, { status: 400 });
       }
 
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
+        return sendJson({ error: 'Unauthorized' }, { status: 401 });
       }
 
       let body: any;
       try {
         body = await req.json();
       } catch (error) {
-        return jsonResponse({ error: 'Invalid request body' }, { status: 400 });
+        return sendJson({ error: 'Invalid request body' }, { status: 400 });
       }
 
       const rawIdentifier = (body.memberIdentifier || body.memberEmail || body.memberId || '').trim();
       if (!rawIdentifier || typeof rawIdentifier !== 'string') {
-        return jsonResponse({ error: 'Missing member email or user ID' }, { status: 400 });
+        return sendJson({ error: 'Missing member email or user ID' }, { status: 400 });
       }
 
       if (rawIdentifier === groupId) {
-        return jsonResponse({ error: 'Member identifier cannot be the family group ID; provide an exact email or user ID' }, { status: 400 });
+        return sendJson({ error: 'Member identifier cannot be the family group ID; provide an exact email or user ID' }, { status: 400 });
       }
 
       try {
@@ -2473,11 +2490,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .single();
 
         if (groupRowError || !groupRow) {
-          return jsonResponse({ error: 'Family group not found' }, { status: 404 });
+          return sendJson({ error: 'Family group not found' }, { status: 404 });
         }
 
         if (groupRow.owner_id !== userId) {
-          return jsonResponse({ error: 'Only group owner can add members' }, { status: 403 });
+          return sendJson({ error: 'Only group owner can add members' }, { status: 403 });
         }
 
         let memberUserId: string | null = null;
@@ -2530,7 +2547,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }
 
         if (!memberUserId) {
-          return jsonResponse({ error: 'User not found; please use an exact registered email or user ID' }, { status: 404 });
+          return sendJson({ error: 'User not found; please use an exact registered email or user ID' }, { status: 404 });
         }
 
         // Fetch the member's email
@@ -2557,10 +2574,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (insertError) {
           console.error('Error inserting family member:', insertError);
-          return jsonResponse({ error: 'Failed to add family member' }, { status: 500 });
+          return sendJson({ error: 'Failed to add family member' }, { status: 500 });
         }
 
-        return jsonResponse({
+        return sendJson({
           id: insertData.id,
           familyGroupId: insertData.family_group_id,
           userId: insertData.user_id,
@@ -2570,7 +2587,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }, { status: 201 });
       } catch (error) {
         console.error('Error in POST /family-groups/:id/members:', error);
-        return jsonResponse({ error: 'Failed to add family member' }, { status: 500 });
+        return sendJson({ error: 'Failed to add family member' }, { status: 500 });
       }
     }
 
@@ -2579,12 +2596,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const groupId = match?.[1];
       const memberId = match?.[2];
       if (!groupId || !memberId) {
-        return jsonResponse({ error: 'Invalid request' }, { status: 400 });
+        return sendJson({ error: 'Invalid request' }, { status: 400 });
       }
 
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
+        return sendJson({ error: 'Unauthorized' }, { status: 401 });
       }
 
       try {
@@ -2597,7 +2614,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .single();
 
         if (memberError || !member) {
-          return jsonResponse({ error: 'Member not found in group' }, { status: 404 });
+          return sendJson({ error: 'Member not found in group' }, { status: 404 });
         }
 
         // If requester is the member themselves, return their dashboard
@@ -2613,7 +2630,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             .eq('user_id', memberId)
             .single();
 
-          return jsonResponse({
+          return sendJson({
             member,
             subscriptions: subscriptions || [],
             userSubscription: userSub || null,
@@ -2628,12 +2645,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .single();
 
         if (groupInfoError || !groupInfo) {
-          return jsonResponse({ error: 'Failed to fetch group info' }, { status: 500 });
+          return sendJson({ error: 'Failed to fetch group info' }, { status: 500 });
         }
 
         // Only owner can view other members' dashboards
         if (groupInfo.owner_id !== userId) {
-          return jsonResponse({ error: 'Members can only view their own dashboard' }, { status: 403 });
+          return sendJson({ error: 'Members can only view their own dashboard' }, { status: 403 });
         }
 
         // Owner can view specific member's subscriptions and details
@@ -2648,14 +2665,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .eq('user_id', memberId)
           .single();
 
-        return jsonResponse({
+        return sendJson({
           member,
           subscriptions: subscriptions || [],
           userSubscription: userSub || null,
         });
       } catch (error) {
         console.error('Error in GET /family-groups/:id/members/:memberId/dashboard:', error);
-        return jsonResponse({ error: 'Failed to fetch member dashboard data' }, { status: 500 });
+        return sendJson({ error: 'Failed to fetch member dashboard data' }, { status: 500 });
       }
     }
 
@@ -2664,12 +2681,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const groupId = match?.[1];
       const memberId = match?.[2];
       if (!groupId || !memberId) {
-        return jsonResponse({ error: 'Invalid request' }, { status: 400 });
+        return sendJson({ error: 'Invalid request' }, { status: 400 });
       }
 
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
+        return sendJson({ error: 'Unauthorized' }, { status: 401 });
       }
 
       try {
@@ -2680,11 +2697,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .single();
 
         if (groupRowError || !groupRow) {
-          return jsonResponse({ error: 'Family group not found' }, { status: 404 });
+          return sendJson({ error: 'Family group not found' }, { status: 404 });
         }
 
         if (groupRow.owner_id !== userId) {
-          return jsonResponse({ error: 'Only group owner can remove members' }, { status: 403 });
+          return sendJson({ error: 'Only group owner can remove members' }, { status: 403 });
         }
 
         const { error: deleteError } = await supabase
@@ -2695,13 +2712,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (deleteError) {
           console.error('Error deleting family member:', deleteError);
-          return jsonResponse({ error: 'Failed to remove family member' }, { status: 500 });
+          return sendJson({ error: 'Failed to remove family member' }, { status: 500 });
         }
 
-        return jsonResponse({ success: true });
+        return sendJson({ success: true });
       } catch (error) {
         console.error('Error in DELETE /family-groups/:id/members/:memberId:', error);
-        return jsonResponse({ error: 'Failed to remove family member' }, { status: 500 });
+        return sendJson({ error: 'Failed to remove family member' }, { status: 500 });
       }
     }
 
@@ -2709,12 +2726,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const match = pathname.match(/^\/family-groups\/([^/]+)\/shared-subscriptions$/);
       const groupId = match?.[1];
       if (!groupId) {
-        return jsonResponse({ error: "Invalid group ID" }, { status: 400 });
+        return sendJson({ error: "Invalid group ID" }, { status: 400 });
       }
 
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       const { data: groupRow, error: groupRowError } = await supabase
@@ -2724,7 +2741,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         .single();
 
       if (groupRowError || !groupRow) {
-        return jsonResponse({ error: 'Family group not found' }, { status: 404 });
+        return sendJson({ error: 'Family group not found' }, { status: 404 });
       }
 
       if (groupRow.owner_id !== userId) {
@@ -2736,7 +2753,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .single();
 
         if (membershipError || !membership) {
-          return jsonResponse({ error: 'Not authorized to view shared subscriptions' }, { status: 403 });
+          return sendJson({ error: 'Not authorized to view shared subscriptions' }, { status: 403 });
         }
       }
 
@@ -2747,7 +2764,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       if (sharedError) {
         console.error('Error fetching shared subscriptions:', sharedError);
-        return jsonResponse({ error: 'Failed to fetch shared subscriptions' }, { status: 500 });
+        return sendJson({ error: 'Failed to fetch shared subscriptions' }, { status: 500 });
       }
 
       // Filter results based on user permissions
@@ -2758,35 +2775,35 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
       // Owners see all shared subscriptions in their group
 
-      return jsonResponse(filteredSharedSubs);
+      return sendJson(filteredSharedSubs);
     }
 
     if (pathname.match(/^\/family-groups\/[^/]+\/share-subscription$/) && req.method === "POST") {
       const match = pathname.match(/^\/family-groups\/([^/]+)\/share-subscription$/);
       const groupId = match?.[1];
       if (!groupId) {
-        return jsonResponse({ error: 'Invalid group ID' }, { status: 400 });
+        return sendJson({ error: 'Invalid group ID' }, { status: 400 });
       }
 
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
+        return sendJson({ error: 'Unauthorized' }, { status: 401 });
       }
 
       let body: any;
       try {
         body = await req.json();
       } catch (error) {
-        return jsonResponse({ error: 'Invalid request body' }, { status: 400 });
+        return sendJson({ error: 'Invalid request body' }, { status: 400 });
       }
 
       const subscriptionId = body.subscriptionId;
       const memberIds = body.memberIds;
       if (!subscriptionId) {
-        return jsonResponse({ error: 'Missing subscriptionId' }, { status: 400 });
+        return sendJson({ error: 'Missing subscriptionId' }, { status: 400 });
       }
       if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
-        return jsonResponse({ error: 'Missing or invalid memberIds' }, { status: 400 });
+        return sendJson({ error: 'Missing or invalid memberIds' }, { status: 400 });
       }
 
       const { data: groupRow, error: groupRowError } = await supabase
@@ -2796,11 +2813,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
         .single();
 
       if (groupRowError || !groupRow) {
-        return jsonResponse({ error: 'Family group not found' }, { status: 404 });
+        return sendJson({ error: 'Family group not found' }, { status: 404 });
       }
 
       if (groupRow.owner_id !== userId) {
-        return jsonResponse({ error: 'Only the group owner can share subscriptions' }, { status: 403 });
+        return sendJson({ error: 'Only the group owner can share subscriptions' }, { status: 403 });
       }
 
       // Verify all specified members are part of the family group
@@ -2813,12 +2830,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .single();
 
         if (membershipError || !membership) {
-          return jsonResponse({ error: `Member ${memberId} is not part of this family group` }, { status: 403 });
+          return sendJson({ error: `Member ${memberId} is not part of this family group` }, { status: 403 });
         }
       }
 
       if (memberIds.includes(groupRow.owner_id)) {
-        return jsonResponse({ error: 'Cannot share subscriptions to the family group owner' }, { status: 400 });
+        return sendJson({ error: 'Cannot share subscriptions to the family group owner' }, { status: 400 });
       }
 
       const { data: subRow, error: subError } = await supabase
@@ -2828,12 +2845,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
         .single();
 
       if (subError || !subRow) {
-        return jsonResponse({ error: 'Subscription not found' }, { status: 404 });
+        return sendJson({ error: 'Subscription not found' }, { status: 404 });
       }
 
       // Check that none of the selected members own the subscription
       if (memberIds.includes(subRow.user_id)) {
-        return jsonResponse({ error: 'Cannot share subscription with its owner' }, { status: 400 });
+        return sendJson({ error: 'Cannot share subscription with its owner' }, { status: 400 });
       }
 
       // Create shared subscription records for each selected member
@@ -2853,13 +2870,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (insertError) {
           console.error('Error sharing subscription:', insertError);
-          return jsonResponse({ error: `Failed to share subscription with member ${memberId}` }, { status: 500 });
+          return sendJson({ error: `Failed to share subscription with member ${memberId}` }, { status: 500 });
         }
 
         sharedRecords.push(newShare);
       }
 
-      return jsonResponse(sharedRecords, { status: 201 });
+      return sendJson(sharedRecords, { status: 201 });
     }
 
     if (pathname.match(/^\/family-groups\/[^/]+\/shared-subscriptions\/[^/]+$/) && req.method === "DELETE") {
@@ -2867,12 +2884,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const groupId = match?.[1];
       const sharedId = match?.[2];
       if (!groupId || !sharedId) {
-        return jsonResponse({ error: 'Invalid request' }, { status: 400 });
+        return sendJson({ error: 'Invalid request' }, { status: 400 });
       }
 
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
+        return sendJson({ error: 'Unauthorized' }, { status: 401 });
       }
 
       const { data: groupRow, error: groupRowError } = await supabase
@@ -2882,7 +2899,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         .single();
 
       if (groupRowError || !groupRow) {
-        return jsonResponse({ error: 'Family group not found' }, { status: 404 });
+        return sendJson({ error: 'Family group not found' }, { status: 404 });
       }
 
       // Check if user is owner or the member the subscription was shared with
@@ -2902,7 +2919,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       if (!canUnshare) {
-        return jsonResponse({ error: 'Not authorized to unshare this subscription' }, { status: 403 });
+        return sendJson({ error: 'Not authorized to unshare this subscription' }, { status: 403 });
       }
 
       const { error: deleteError } = await supabase
@@ -2913,14 +2930,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       if (deleteError) {
         console.error('Error unsharing subscription:', deleteError);
-        return jsonResponse({ error: 'Failed to unshare subscription' }, { status: 500 });
+        return sendJson({ error: 'Failed to unshare subscription' }, { status: 500 });
       }
 
-      return jsonResponse({ success: true });
+      return sendJson({ success: true });
     }
 
     if (pathname.match(/^\/family-groups\/[^/]+\/shared-subscriptions\/[^/]+\/cost-splits$/) && req.method === "POST") {
-      return jsonResponse({ success: true });
+      return sendJson({ success: true });
     }
 
     if (pathname.match(/^\/family-groups\/[^/]+\/settings$/) && req.method === "PUT") {
@@ -2928,13 +2945,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const groupId = match?.[1];
 
       if (!groupId) {
-        return jsonResponse({ error: "Invalid group ID" }, { status: 400 });
+        return sendJson({ error: "Invalid group ID" }, { status: 400 });
       }
 
       try {
         const userId = extractUserId(req);
         if (!userId) {
-          return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+          return sendJson({ error: "Unauthorized" }, { status: 401 });
         }
 
         // Verify user is owner of the group
@@ -2945,11 +2962,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .single();
 
         if (groupError || !groupRow) {
-          return jsonResponse({ error: "Family group not found" }, { status: 404 });
+          return sendJson({ error: "Family group not found" }, { status: 404 });
         }
 
         if (groupRow.owner_id !== userId) {
-          return jsonResponse({ error: "Only group owner can update settings" }, { status: 403 });
+          return sendJson({ error: "Only group owner can update settings" }, { status: 403 });
         }
 
         // Get the request body
@@ -2971,26 +2988,26 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (settingsError) {
           console.error("Failed to update family group settings:", settingsError);
-          return jsonResponse({ error: "Failed to update settings" }, { status: 500 });
+          return sendJson({ error: "Failed to update settings" }, { status: 500 });
         }
 
-        return jsonResponse(settings);
+        return sendJson(settings);
       } catch (error) {
         console.error("Error updating family group settings:", error);
-        return jsonResponse({ error: "Failed to update settings" }, { status: 500 });
+        return sendJson({ error: "Failed to update settings" }, { status: 500 });
       }
     }
 
     if (pathname === "/notifications/vapid-public-key" && req.method === "GET") {
-      return jsonResponse({ publicKey: Deno?.env?.get("VAPID_PUBLIC_KEY") || "" });
+      return sendJson({ publicKey: Deno?.env?.get("VAPID_PUBLIC_KEY") || "" });
     }
 
     if (pathname === "/notifications/subscribe" && req.method === "POST") {
-      return jsonResponse({ success: true });
+      return sendJson({ success: true });
     }
 
     if (pathname === "/notifications/unsubscribe" && req.method === "POST") {
-      return jsonResponse({ success: true });
+      return sendJson({ success: true });
     }
 
     if (pathname === "/stripe/config" && req.method === "GET") {
@@ -3003,10 +3020,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       if (!premiumPriceId || !familyPriceId) {
         console.error("Stripe price IDs are not configured in runtime environment.");
-        return jsonResponse({ error: "Stripe price IDs are not configured." }, { status: 500 });
+        return sendJson({ error: "Stripe price IDs are not configured." }, { status: 500 });
       }
 
-      return jsonResponse({ priceIds: { premium: premiumPriceId, family: familyPriceId } });
+      return sendJson({ priceIds: { premium: premiumPriceId, family: familyPriceId } });
     }
 
     if (pathname === "/stripe/create-checkout-session" && req.method === "POST") {
@@ -3014,7 +3031,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       console.log("[Stripe] Create checkout session for user:", userId);
       
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -3023,7 +3040,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         console.log("[Stripe] priceId:", priceId);
         
         if (!priceId) {
-          return jsonResponse({ error: "Missing priceId" }, { status: 400 });
+          return sendJson({ error: "Missing priceId" }, { status: 400 });
         }
 
         const stripeSecretKey = Deno?.env?.get("STRIPE_SECRET_KEY") ?? "";
@@ -3031,7 +3048,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         console.log("[Stripe] Secret key configured:", !!stripeSecretKey, "key:", keyMasked);
         if (!stripeSecretKey) {
           console.error("STRIPE_SECRET_KEY not configured");
-          return jsonResponse({ error: "Stripe not configured" }, { status: 500 });
+          return sendJson({ error: "Stripe not configured" }, { status: 500 });
         }
 
         // Get user's Stripe customer ID from user_subscriptions table
@@ -3052,7 +3069,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           
           if (authError || !user?.email) {
             console.error("[Stripe] Auth error or no email:", { authError, email: user?.email });
-            return jsonResponse({ error: "Could not retrieve user email" }, { status: 400 });
+            return sendJson({ error: "Could not retrieve user email" }, { status: 400 });
           }
 
           console.log("[Stripe] Creating Stripe customer for:", user.email);
@@ -3072,7 +3089,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           if (!customerRes.ok) {
             const customerError = await customerRes.text();
             console.error("Failed to create Stripe customer:", customerRes.status, customerError);
-            return jsonResponse({ error: `Failed to create Stripe customer: ${customerError}` }, { status: 500 });
+            return sendJson({ error: `Failed to create Stripe customer: ${customerError}` }, { status: 500 });
           }
 
           const customerData = await customerRes.json();
@@ -3127,19 +3144,19 @@ runtimeDeno?.serve?.(async (req: Request) => {
             stripleErrorMsg = errorJson.error?.message || checkoutError;
           } catch {/* ignore */}
           
-          return jsonResponse({ error: `Stripe error: ${stripleErrorMsg}` }, { status: 500 });
+          return sendJson({ error: `Stripe error: ${stripleErrorMsg}` }, { status: 500 });
         }
 
         const checkoutData = await checkoutRes.json();
         console.log("[Stripe] Session created:", checkoutData.id);
         
-        return jsonResponse({
+        return sendJson({
           url: checkoutData.url,
           sessionId: checkoutData.id,
         });
       } catch (err) {
         console.error("Exception creating checkout session:", err);
-        return jsonResponse({ error: `Internal error: ${err}` }, { status: 500 });
+        return sendJson({ error: `Internal error: ${err}` }, { status: 500 });
       }
     }
 
@@ -3147,7 +3164,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/stripe/complete-checkout-session" && req.method === "POST") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
 
       try {
@@ -3155,12 +3172,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
         const sessionId = body.sessionId;
 
         if (!sessionId) {
-          return jsonResponse({ error: "Missing sessionId" }, { status: 400 });
+          return sendJson({ error: "Missing sessionId" }, { status: 400 });
         }
 
         const stripeSecretKey = Deno?.env?.get("STRIPE_SECRET_KEY") ?? "";
         if (!stripeSecretKey) {
-          return jsonResponse({ error: "Stripe not configured" }, { status: 500 });
+          return sendJson({ error: "Stripe not configured" }, { status: 500 });
         }
 
         // Retrieve session details from Stripe
@@ -3175,7 +3192,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         if (!sessionRes.ok) {
           const sessionError = await sessionRes.text();
           console.error("[Stripe] Failed to retrieve session:", sessionRes.status, sessionError);
-          return jsonResponse({ error: "Failed to retrieve checkout session" }, { status: 500 });
+          return sendJson({ error: "Failed to retrieve checkout session" }, { status: 500 });
         }
 
         const sessionData = await sessionRes.json();
@@ -3183,13 +3200,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         // Verify payment was successful
         if (sessionData.payment_status !== "paid") {
-          return jsonResponse({ error: "Payment not completed" }, { status: 400 });
+          return sendJson({ error: "Payment not completed" }, { status: 400 });
         }
 
         // Get subscription ID from session
         const subscriptionId = sessionData.subscription;
         if (!subscriptionId) {
-          return jsonResponse({ error: "No subscription found in session" }, { status: 400 });
+          return sendJson({ error: "No subscription found in session" }, { status: 400 });
         }
 
         // Retrieve subscription details to get price and customer
@@ -3203,7 +3220,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         if (!subRes.ok) {
           const subError = await subRes.text();
           console.error("[Stripe] Failed to retrieve subscription:", subRes.status, subError);
-          return jsonResponse({ error: "Failed to retrieve subscription" }, { status: 500 });
+          return sendJson({ error: "Failed to retrieve subscription" }, { status: 500 });
         }
 
         const subData = await subRes.json();
@@ -3240,16 +3257,16 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (error) {
             console.error("[Stripe] Failed to store subscription:", error);
-            return jsonResponse({ error: "Failed to store subscription" }, { status: 500 });
+            return sendJson({ error: "Failed to store subscription" }, { status: 500 });
           }
 
           console.log("[Stripe] Subscription stored for user:", userId);
         } catch (dbError) {
           console.error("[Stripe] Database error:", dbError);
-          return jsonResponse({ error: "Failed to store subscription" }, { status: 500 });
+          return sendJson({ error: "Failed to store subscription" }, { status: 500 });
         }
 
-        return jsonResponse({
+        return sendJson({
           success: true,
           subscription: {
             id: subData.id,
@@ -3259,31 +3276,31 @@ runtimeDeno?.serve?.(async (req: Request) => {
         });
       } catch (err) {
         console.error("Exception completing checkout session:", err);
-        return jsonResponse({ error: `Internal error: ${err}` }, { status: 500 });
+        return sendJson({ error: `Internal error: ${err}` }, { status: 500 });
       }
     }
 
     if (pathname === "/stripe/subscription-status" && req.method === "GET") {
-      return jsonResponse({ status: "free", tier: "free" });
+      return sendJson({ status: "free", tier: "free" });
     }
 
     if (pathname === "/stripe/cancel-subscription" && req.method === "POST") {
-      return jsonResponse({ success: true, status: "canceled" });
+      return sendJson({ success: true, status: "canceled" });
     }
 
     if (pathname === "/stripe/reactivate-subscription" && req.method === "POST") {
-      return jsonResponse({ success: true, status: "active" });
+      return sendJson({ success: true, status: "active" });
     }
 
     if (pathname === "/healthz" && req.method === "GET") {
-      return jsonResponse({ status: "ok" });
+      return sendJson({ status: "ok" });
     }
 
     if (pathname === "/spending/monthly" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
         console.warn("[spending/monthly] No userId found");
-        return jsonResponse([]);
+        return sendJson([]);
       }
 
       console.log('[spending/monthly] Request URL:', req.url);
@@ -3299,7 +3316,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (error || !subscriptions) {
           console.error("Error fetching subscriptions for spending monthly:", error);
-          return jsonResponse([]);
+          return sendJson([]);
         }
 
         console.log(`[spending/monthly] Found ${subscriptions.length} subscriptions for user`);
@@ -3387,10 +3404,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }
 
         console.log(`[spending/monthly] Returning ${monthlyData.length} months of data`);
-        return jsonResponse(monthlyData);
+        return sendJson(monthlyData);
       } catch (err) {
         console.error("Exception generating spending monthly data:", err);
-        return jsonResponse([]);
+        return sendJson([]);
 
       }
     }
@@ -3398,7 +3415,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/insights/behavioral" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([], origin);
+        return sendJson([]);
       }
 
       const query = new URL(req.url).searchParams;
@@ -3585,17 +3602,17 @@ runtimeDeno?.serve?.(async (req: Request) => {
             };
           });
 
-        return jsonResponse(behavioralInsights, origin);
+        return sendJson(behavioralInsights);
       } catch (err) {
         console.error("Exception generating behavioral insights:", err);
-        return jsonResponse([], origin);
+        return sendJson([]);
       }
     }
 
     if (pathname === "/analysis/cost-per-use" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([], origin);
+        return sendJson([]);
       }
 
       const query = new URL(req.url).searchParams;
@@ -3612,7 +3629,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .single();
 
         if (groupError || !groupRow) {
-          return jsonResponse({ error: "Family group not found" }, { status: 404 });
+          return sendJson({ error: "Family group not found" }, { status: 404 });
         }
 
         // Check if user is owner or member
@@ -3627,13 +3644,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
             .single();
           if (membershipError && membershipError.code !== 'PGRST116') {
             console.error("Error checking membership:", membershipError);
-            return jsonResponse({ error: "Failed to verify membership" }, { status: 500 });
+            return sendJson({ error: "Failed to verify membership" }, { status: 500 });
           }
           isMember = !!membership;
         }
 
         if (!isOwner && !isMember) {
-          return jsonResponse({ error: "Not authorized to view family cost analysis" }, { status: 403 });
+          return sendJson({ error: "Not authorized to view family cost analysis" }, { status: 403 });
         }
 
         const { data: settingsData, error: settingsError } = await supabase
@@ -3644,12 +3661,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (settingsError && settingsError.code !== 'PGRST116') {
           console.error("Error fetching family group settings:", settingsError);
-          return jsonResponse({ error: "Failed to load family settings" }, { status: 500 });
+          return sendJson({ error: "Failed to load family settings" }, { status: 500 });
         }
 
         const showFamilyData = settingsData?.show_family_data !== undefined ? settingsData.show_family_data : true;
         if (!showFamilyData) {
-          return jsonResponse({ error: 'Family sharing not enabled for this group' }, { status: 403 });
+          return sendJson({ error: 'Family sharing not enabled for this group' }, { status: 403 });
         }
 
         if (isOwner) {
@@ -3660,7 +3677,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (membersError) {
             console.error("Error fetching family members:", membersError);
-            return jsonResponse({ error: "Failed to verify family members" }, { status: 500 });
+            return sendJson({ error: "Failed to verify family members" }, { status: 500 });
           }
 
           const memberIds = Array.from(new Set([groupRow.owner_id, ...(members || []).map((m: any) => m.user_id)]));
@@ -3672,7 +3689,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (subsError) {
             console.error("Error fetching family subscriptions:", subsError);
-            return jsonResponse([]);
+            return sendJson([]);
           }
 
           subscriptions = familySubs || [];
@@ -3685,7 +3702,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (personalError) {
             console.error("Error fetching personal subscriptions:", personalError);
-            return jsonResponse([]);
+            return sendJson([]);
           }
 
           const { data: sharedRecords, error: sharedError } = await supabase
@@ -3696,7 +3713,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (sharedError) {
             console.error("Error fetching shared subscriptions:", sharedError);
-            return jsonResponse([]);
+            return sendJson([]);
           }
 
           const sharedSubscriptionIds = (sharedRecords || []).map((record: any) => record.subscription_id).filter(Boolean);
@@ -3709,7 +3726,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
               .neq("status", "deleted");
             if (sharedSubsError) {
               console.error("Error fetching shared subscription details:", sharedSubsError);
-              return jsonResponse([]);
+              return sendJson([]);
             }
             sharedSubscriptions = sharedSubs || [];
           }
@@ -3729,14 +3746,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
         .sort((a, b) => (b.costPerUse || 0) - (a.costPerUse || 0))
         .slice(0, 12);
 
-      return jsonResponse(analysis);
+      return sendJson(analysis);
     }
 
     // Monthly savings from deleted subscriptions
     if (pathname === "/analytics/monthly-savings" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({
+        return sendJson({
           monthlySavings: 0,
         }, origin);
       }
@@ -3770,7 +3787,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (ownedGroupsError || memberGroupsError) {
           console.error("Error fetching family groups for monthly savings:", ownedGroupsError || memberGroupsError);
-          return jsonResponse({ monthlySavings: 0 }, origin);
+          return sendJson({ monthlySavings: 0 });
         }
 
         const groupIds = Array.from(new Set([
@@ -3791,7 +3808,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (membersError || groupsWithOwnersError) {
             console.error("Error fetching family members for monthly savings:", membersError || groupsWithOwnersError);
-            return jsonResponse({ monthlySavings: 0 }, origin);
+            return sendJson({ monthlySavings: 0 });
           }
 
           const memberIds = Array.from(new Set([
@@ -3807,7 +3824,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (error) {
             console.error("Error fetching family monthly savings subscriptions:", error);
-            return jsonResponse({ monthlySavings: 0 }, origin);
+            return sendJson({ monthlySavings: 0 });
           }
 
           subscriptions = subs || [];
@@ -3819,7 +3836,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           if (error) {
             console.error("Error fetching monthly savings subscriptions:", error);
-            return jsonResponse({ monthlySavings: 0 }, origin);
+            return sendJson({ monthlySavings: 0 });
           }
 
           subscriptions = subs || [];
@@ -3832,7 +3849,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (error) {
           console.error("Error fetching monthly savings subscriptions:", error);
-          return jsonResponse({ monthlySavings: 0 }, origin);
+          return sendJson({ monthlySavings: 0 });
         }
 
         subscriptions = subs || [];
@@ -3858,7 +3875,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const memberMonthlySavings = Math.round((totalMonthlySavings - (savingsByUser[userId] || 0)) * 100) / 100;
       const monthlySavings = Math.round(totalMonthlySavings * 100) / 100;
 
-      return jsonResponse({
+      return sendJson({
         monthlySavings,
         ownerMonthlySavings,
         memberMonthlySavings,
@@ -3868,36 +3885,36 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (pathname === "/calendar-events" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([], origin);
+        return sendJson([]);
       }
 
       const { subscriptions } = await loadSubscriptions(userId);
-      return jsonResponse(buildCalendarEvents(subscriptions), origin);
+      return sendJson(buildCalendarEvents(subscriptions));
     }
 
     if (pathname === "/health-score" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse(buildHealthScore([]), origin);
+        return sendJson(buildHealthScore([]));
       }
 
       const { subscriptions } = await loadSubscriptions(userId);
-      return jsonResponse(buildHealthScore(subscriptions), origin);
+      return sendJson(buildHealthScore(subscriptions));
     }
 
     if (pathname === "/user/currency" && req.method === "GET") {
-      return jsonResponse({ currency: "USD", symbol: "$" }, origin);
+      return sendJson({ currency: "USD", symbol: "$" });
     }
 
     if (pathname.match(/^\/family-groups\/[^/]+\/family-data$/) && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse({ error: "Login required" }, origin, { status: 401 });
+        return sendJson({ error: "Login required" }, { status: 401 });
       }
 
       const groupId = pathname.split('/')[2];
       if (!groupId) {
-        return jsonResponse({ error: "Invalid group ID" }, origin, { status: 400 });
+        return sendJson({ error: "Invalid group ID" }, { status: 400 });
       }
 
       const { data: groupRow, error: groupRowError } = await supabase
@@ -3907,7 +3924,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         .single();
 
       if (groupRowError || !groupRow) {
-        return jsonResponse({ error: "Family group not found" }, { status: 404 });
+        return sendJson({ error: "Family group not found" }, { status: 404 });
       }
 
       const { data: membership, error: membershipError } = await supabase
@@ -3919,12 +3936,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       if (membershipError && membershipError.code !== 'PGRST116') {
         console.error("Error checking membership:", membershipError);
-        return jsonResponse({ error: "Failed to verify membership" }, { status: 500 });
+        return sendJson({ error: "Failed to verify membership" }, { status: 500 });
       }
 
       const isOwner = groupRow.owner_id === userId;
       if (!isOwner && !membership) {
-        return jsonResponse({ error: "Not authorized to view family data" }, { status: 403 });
+        return sendJson({ error: "Not authorized to view family data" }, { status: 403 });
       }
 
       const { data: members, error: membersError } = await supabase
@@ -3934,7 +3951,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       if (membersError) {
         console.error("Error fetching family members:", membersError);
-        return jsonResponse({ error: "Failed to load family data" }, { status: 500 });
+        return sendJson({ error: "Failed to load family data" }, { status: 500 });
       }
 
       const { data: settingsData, error: settingsError } = await supabase
@@ -3945,7 +3962,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       if (settingsError && settingsError.code !== 'PGRST116') {
         console.error("Error fetching family group settings:", settingsError);
-        return jsonResponse({ error: "Failed to load family settings" }, { status: 500 });
+        return sendJson({ error: "Failed to load family settings" }, { status: 500 });
       }
 
       const showFamilyData = settingsData?.show_family_data !== undefined ? settingsData.show_family_data : true;
@@ -3962,7 +3979,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (personalSubsError) {
           console.error("Error fetching personal subscriptions:", personalSubsError);
-          return jsonResponse({ error: "Failed to load personal subscriptions" }, { status: 500 });
+          return sendJson({ error: "Failed to load personal subscriptions" }, { status: 500 });
         }
 
         const allSubs = personalSubscriptions || [];
@@ -4092,7 +4109,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           percentage: totalAmount > 0 ? Math.round((entry.amount / totalAmount) * 100) : 0,
         }));
 
-        return jsonResponse({
+        return sendJson({
           subscriptions: visibleSubscriptions,
           sharedSubscriptions: [],
           members: members || [],
@@ -4121,7 +4138,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       if (subsError) {
         console.error("Error fetching family subscriptions:", subsError);
-        return jsonResponse({ error: "Failed to load family subscriptions" }, { status: 500 });
+        return sendJson({ error: "Failed to load family subscriptions" }, { status: 500 });
       }
 
       const { data: sharedRecords, error: sharedError } = await supabase
@@ -4131,7 +4148,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       if (sharedError) {
         console.error('Error fetching shared subscription records:', sharedError);
-        return jsonResponse({ error: 'Failed to load shared subscriptions' }, { status: 500 });
+        return sendJson({ error: 'Failed to load shared subscriptions' }, { status: 500 });
       }
 
       // Filter shared records based on user permissions
@@ -4280,7 +4297,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         percentage: totalAmount > 0 ? Math.round((entry.amount / totalAmount) * 100) : 0,
       }));
 
-      return jsonResponse({
+      return sendJson({
         subscriptions: visibleSubscriptions,
         sharedSubscriptions: filteredSharedRecords,
         members: members || [],
@@ -4306,13 +4323,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const groupId = match?.[1];
 
       if (!groupId) {
-        return jsonResponse({ error: "Invalid group ID" }, { status: 400 });
+        return sendJson({ error: "Invalid group ID" }, { status: 400 });
       }
 
       try {
         const userId = extractUserId(req);
         if (!userId) {
-          return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+          return sendJson({ error: "Unauthorized" }, { status: 401 });
         }
 
         // Verify user is owner or member of the group
@@ -4323,7 +4340,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .single();
 
         if (groupError || !groupRow) {
-          return jsonResponse({ error: "Family group not found" }, { status: 404 });
+          return sendJson({ error: "Family group not found" }, { status: 404 });
         }
 
         if (groupRow.owner_id !== userId) {
@@ -4335,7 +4352,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             .single();
 
           if (memberError || !membership) {
-            return jsonResponse({ error: "Not authorized to view family group settings" }, { status: 403 });
+            return sendJson({ error: "Not authorized to view family group settings" }, { status: 403 });
           }
         }
 
@@ -4349,24 +4366,24 @@ runtimeDeno?.serve?.(async (req: Request) => {
         if (settingsError) {
           console.warn("Failed to fetch family group settings:", settingsError);
           // Return default if settings don't exist
-          return jsonResponse({ show_family_data: false, family_group_id: groupId });
+          return sendJson({ show_family_data: false, family_group_id: groupId });
         }
 
-        return jsonResponse(settings);
+        return sendJson(settings);
       } catch (error) {
         console.error("Error fetching family group settings:", error);
-        return jsonResponse({ error: "Failed to fetch settings" }, { status: 500 });
+        return sendJson({ error: "Failed to fetch settings" }, { status: 500 });
       }
     }
 
     if (pathname === "/family-groups" && req.method === "GET") {
-      return jsonResponse([]);
+      return sendJson([]);
     }
 
     if (pathname === "/spending/category" && req.method === "GET") {
       const userId = extractUserId(req);
       if (!userId) {
-        return jsonResponse([]);
+        return sendJson([]);
       }
 
       try {
@@ -4378,7 +4395,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         if (error || !subscriptions) {
           console.error("Error fetching subscriptions for spending category:", error);
-          return jsonResponse([]);
+          return sendJson([]);
         }
 
         // Get current month boundaries using the user's local offset
@@ -4430,15 +4447,15 @@ runtimeDeno?.serve?.(async (req: Request) => {
           count: data.count
         }));
 
-        return jsonResponse(categories);
+        return sendJson(categories);
       } catch (err) {
         console.error("Exception generating spending category data:", err);
-        return jsonResponse([]);
+        return sendJson([]);
       }
     }
 
     if (pathname === "/family-groups/me/membership" && req.method === "GET") {
-      return jsonResponse(null);
+      return sendJson(null);
     }
 
     // Contact form endpoint
@@ -4449,7 +4466,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         // Basic validation
         if (!name || !email || !message) {
-          return jsonResponse(
+          return sendJson(
             {
               error: "Missing required fields",
               message: "Name, email, and message are required."
@@ -4461,7 +4478,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         // Email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-          return jsonResponse(
+          return sendJson(
             {
               error: "Invalid email",
               message: "Please provide a valid email address."
@@ -4563,7 +4580,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             lastError: emailErrorMessage,
           };
           console.error("[Contact] Contact form failed to send email", providerInfo);
-          return jsonResponse(
+          return sendJson(
             {
               error: "Failed to send contact message",
               message: "Unable to deliver your message right now. Please try again later.",
@@ -4572,14 +4589,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
           );
         }
 
-        return jsonResponse({
+        return sendJson({
           message: "Thank you for your message! We'll get back to you soon.",
           success: true,
         });
       } catch (err) {
         console.error("[Contact] Error processing contact form:", err);
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
-        return jsonResponse(
+        return sendJson(
           {
             error: "Failed to process contact form",
             message: errorMessage
@@ -4590,13 +4607,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
     }
 
     // Return 404 for unknown routes
-    return jsonResponse({ error: "Not found" }, origin, { status: 404 });
+    return sendJson({ error: "Not found" }, { status: 404 });
   } catch (err) {
     console.error("API error:", err);
-    const origin = req.headers.get("origin");
-    return jsonResponse(
+    return sendJson(
       { error: "Internal server error" },
-      origin,
       { status: 500 }
     );
   }
