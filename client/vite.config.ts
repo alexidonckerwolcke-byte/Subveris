@@ -9,7 +9,7 @@ const workspaceRoot = path.resolve(clientRoot, "..");
 const srcRoot = path.resolve(clientRoot, "src");
 
 export default defineConfig({
-  base: '/Subveris-1/',
+  base: '/',
   envDir: workspaceRoot,
   logLevel: 'error',
   // minimal plugin set to reduce complexity
