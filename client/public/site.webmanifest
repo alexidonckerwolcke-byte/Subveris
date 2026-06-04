@@ -7,11 +7,6 @@
   "theme_color": "#111827",
   "icons": [
     {
-      "src": "/favicon.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml"
-    },
-    {
       "src": "/assets/logo.png",
       "sizes": "1024x1024",
       "type": "image/png"
