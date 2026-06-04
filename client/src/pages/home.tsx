@@ -145,7 +145,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden shadow-sm">
-              <img src="/logo.svg" alt="Subveris Logo" className="h-full w-full object-cover" />
+              <img src="/assets/logo.png" alt="Subveris Logo" className="h-full w-full object-cover" />
             </div>
             <span className="text-xl font-bold tracking-tight">Subveris</span>
           </div>
@@ -911,7 +911,7 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden shadow-sm">
-                <img src="/logo.svg" alt="Subveris Logo" className="h-full w-full object-cover" />
+                <img src="/assets/logo.png" alt="Subveris Logo" className="h-full w-full object-cover" />
               </div>
               <span className="text-lg font-bold tracking-tight">Subveris</span>
             </div>
