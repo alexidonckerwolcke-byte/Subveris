@@ -5,6 +5,7 @@ import autoprefixer from "autoprefixer";
 import path, { dirname } from "path";
 import { copyFile } from "fs/promises";
 import { fileURLToPath } from "url";
+import { existsSync } from "fs";
 import type { Source, Input } from "postcss";
 
 // __dirname replacement for ESM
@@ -28,9 +29,13 @@ export default defineConfig({
         const fallbackPath = path.join(outDir, "404.html");
         await copyFile(indexPath, fallbackPath);
 
+        // Only copy robots.txt and sitemap.xml if they exist in public folder
         const publicRoot = path.resolve(workspaceRoot, "public");
         for (const file of ["robots.txt", "sitemap.xml"]) {
-          await copyFile(path.join(publicRoot, file), path.join(outDir, file));
+          const srcPath = path.join(publicRoot, file);
+          if (existsSync(srcPath)) {
+            await copyFile(srcPath, path.join(outDir, file));
+          }
         }
       },
     },
