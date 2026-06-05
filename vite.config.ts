@@ -54,6 +54,7 @@ export default defineConfig({
     },
   },
   root: clientRoot,
+  publicDir: path.resolve(clientRoot, 'public'),
   css: {
     postcss: {
       plugins: [
