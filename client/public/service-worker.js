@@ -5,8 +5,8 @@ self.addEventListener('push', (event) => {
   
   const options = {
     body: data.body || 'You have a new notification',
-    icon: '/logo.svg',
-    badge: '/logo.svg',
+    icon: '/assets/logo.png',
+    badge: '/assets/logo.png',
     tag: data.tag || 'notification',
     requireInteraction: data.requireInteraction || false,
     data: data.data || {},
