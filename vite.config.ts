@@ -27,6 +27,11 @@ export default defineConfig({
         const indexPath = path.join(outDir, "index.html");
         const fallbackPath = path.join(outDir, "404.html");
         await copyFile(indexPath, fallbackPath);
+
+        const publicRoot = path.resolve(workspaceRoot, "public");
+        for (const file of ["robots.txt", "sitemap.xml"]) {
+          await copyFile(path.join(publicRoot, file), path.join(outDir, file));
+        }
       },
     },
   ],
