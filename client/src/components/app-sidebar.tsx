@@ -135,7 +135,7 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
       <SidebarHeader className="border-b border-sidebar-border px-6 py-4 bg-gradient-to-r from-primary/60 to-indigo-300/70 dark:from-blue-400/70 dark:to-blue-300/60 text-primary-foreground">
         <Link href={disabled ? "#" : "/"} className={`flex items-center gap-3 ${disabled ? 'pointer-events-none opacity-70' : ''}`}>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden shadow-md bg-blue-50">
-            <img src="/logo.svg" alt="Subveris Logo" className="h-full w-full object-cover" />
+            <img src="/assets/logo.png" alt="Subveris Logo" className="h-full w-full object-cover" />
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-bold tracking-tight text-white">Subveris</span>
