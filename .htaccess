@@ -1,0 +1,25 @@
+# Force fresh favicon downloads (anti-caching)
+<FilesMatch "favicon\.ico">
+    Header Set Cache-Control "public, max-age=3600, must-revalidate"
+    Header Set ETag W/"subveris-v2"
+</FilesMatch>
+
+<FilesMatch "favicon.*\.png">
+    Header Set Cache-Control "public, max-age=3600, must-revalidate"
+    Header Set ETag W/"subveris-v2"
+</FilesMatch>
+
+<FilesMatch "apple-touch-icon">
+    Header Set Cache-Control "public, max-age=3600, must-revalidate"
+    Header Set ETag W/"subveris-v2"
+</FilesMatch>
+
+<FilesMatch "site\.webmanifest">
+    Header Set Cache-Control "public, max-age=3600, must-revalidate"
+    Header Set ETag W/"subveris-v2"
+</FilesMatch>
+
+# Prevent old cache
+<FilesMatch "\.(ico|png|jpg|jpeg|gif|svg)$">
+    Header Set Cache-Control "public, max-age=3600, must-revalidate"
+</FilesMatch>
