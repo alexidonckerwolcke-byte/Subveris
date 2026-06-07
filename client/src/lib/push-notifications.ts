@@ -52,8 +52,9 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   }
 
   try {
-    const registration = await navigator.serviceWorker.register('/service-worker.js', {
+    const registration = await navigator.serviceWorker.register('/service-worker.js?v=3', {
       scope: '/',
+      updateViaCache: 'none',
     });
     console.log('Service Worker registered:', registration);
     return registration;
