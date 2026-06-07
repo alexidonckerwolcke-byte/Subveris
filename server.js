@@ -1050,7 +1050,8 @@ const server = http.createServer(async (req, res) => {
       urlPath.includes('favicon') ||
       urlPath.includes('apple-touch-icon') ||
       urlPath.includes('site.webmanifest') ||
-      urlPath.includes('/assets/logo.png');
+      urlPath.includes('/assets/logo.png') ||
+      urlPath.includes('/service-worker.js');
 
     const cacheControl = isHtmlResponse || isVersionedAsset
       ? 'no-cache, must-revalidate'
