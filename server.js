@@ -1045,10 +1045,16 @@ const server = http.createServer(async (req, res) => {
     };
 
     const contentType = contentTypes[ext] || 'application/octet-stream';
-    const cacheControl =
-      urlPath.includes('favicon') || urlPath.includes('apple-touch-icon') || urlPath.includes('site.webmanifest') || urlPath.includes('/assets/logo.png')
-        ? 'no-cache, must-revalidate'
-        : 'public, max-age=31536000, immutable';
+    const isHtmlResponse = ext === '.html' || urlPath === '/' || urlPath.endsWith('/index.html');
+    const isVersionedAsset =
+      urlPath.includes('favicon') ||
+      urlPath.includes('apple-touch-icon') ||
+      urlPath.includes('site.webmanifest') ||
+      urlPath.includes('/assets/logo.png');
+
+    const cacheControl = isHtmlResponse || isVersionedAsset
+      ? 'no-cache, must-revalidate'
+      : 'public, max-age=31536000, immutable';
 
     res.writeHead(200, {
       'Content-Type': contentType,
