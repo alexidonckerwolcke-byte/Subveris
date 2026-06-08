@@ -3109,8 +3109,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         console.log("[Stripe] Using customer ID:", customerId);
         // Create checkout session
-        const successUrl = Deno?.env?.get("STRIPE_CHECKOUT_SUCCESS_URL") || "https://localhost:5000/pricing?checkout=success";
-        const cancelUrl = Deno?.env?.get("STRIPE_CHECKOUT_CANCEL_URL") || "https://localhost:5000/pricing?checkout=cancel";
+        const successUrl = Deno?.env?.get("STRIPE_CHECKOUT_SUCCESS_URL") || "https://subveris.com/pricing?checkout=success";
+        const cancelUrl = Deno?.env?.get("STRIPE_CHECKOUT_CANCEL_URL") || "https://subveris.com/pricing?checkout=cancel";
 
         console.log("[Stripe] Creating checkout session with:", { customerId, priceId, successUrl, cancelUrl });
 
