@@ -354,7 +354,7 @@ export default function HomePage() {
       {/* 5️⃣ TESTIMONIALS SECTION */}
       <section className="container mx-auto px-4 py-28">
         <div className="text-center mb-20">
-          <h2 className="text-5xl font-bold mb-6 tracking-tight">What Our Users Say</h2>
+          <h2 className="text-5xl font-bold mb-6 tracking-tight">Loved by 50,000 users</h2>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
           {[
