@@ -12,6 +12,7 @@ function isRecentlyCreatedAccount(user: any) {
 export default function AuthCallback() {
   const [, setLocation] = useLocation();
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState('Verifying authentication...');
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -20,59 +21,71 @@ export default function AuthCallback() {
         return;
       }
 
-      const { data, error } = await supabase.auth.detectSessionInUrl();
+      const hash = window.location.hash.substring(1);
+      const search = window.location.search;
+      const hasOAuthResponse = hash.includes('access_token') || hash.includes('id_token') || hash.includes('refresh_token') || hash.includes('error') || search.includes('code');
 
-      if (error) {
-        // If there is no session URL payload, fall back to current stored session.
-        const existingSession = await supabase.auth.getSession();
+      let session = null;
+      let callbackError = null;
 
-        if (existingSession.data?.session) {
-          window.location.replace('/dashboard');
-          return;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const result = await supabase.auth.getSession();
+        session = result.data?.session;
+        callbackError = result.error;
+
+        if (session || callbackError || !hasOAuthResponse) {
+          break;
         }
 
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const errorParam = hashParams.get('error');
-        const errorDescription = hashParams.get('error_description');
-
-        if (errorParam) {
-          setError(errorDescription || 'Authentication failed');
-          setTimeout(() => {
-            window.location.replace('/login');
-          }, 3000);
-          return;
-        }
-
-        setLocation('/login');
-        return;
+        await new Promise((resolve) => setTimeout(resolve, 200));
       }
 
-      if (data?.session?.user && isRecentlyCreatedAccount(data.session.user)) {
+      if (session?.user && isRecentlyCreatedAccount(session.user)) {
         localStorage.setItem('justSignedUp', 'true');
       }
 
-      if (data?.session) {
+      if (session) {
+        setStatus('Authentication successful. Redirecting...');
         window.location.replace('/dashboard');
         return;
       }
 
-      setLocation('/login');
+      const hashParams = new URLSearchParams(hash);
+      const errorParam = hashParams.get('error');
+      const errorDescription = hashParams.get('error_description');
+
+      if (errorParam) {
+        setError(errorDescription || 'Authentication failed');
+        setStatus('Redirecting to login...');
+        setTimeout(() => {
+          window.location.replace('/login');
+        }, 3000);
+        return;
+      }
+
+      if (callbackError) {
+        console.warn('Auth callback session check failed:', callbackError);
+        setError('Authentication failed. Redirecting to login...');
+        setTimeout(() => {
+          window.location.replace('/login');
+        }, 3000);
+        return;
+      }
+
+      setStatus('No active session found. Redirecting to login...');
+      setTimeout(() => setLocation('/login'), 500);
     };
 
     handleAuthCallback();
   }, [setLocation]);
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen space-y-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Authentication Failed</h1>
-          <p className="text-muted-foreground mb-4">{error}</p>
-          <p className="text-sm text-muted-foreground">Redirecting you to login...</p>
-        </div>
+  return (
+    <div className="flex flex-col items-center justify-center h-screen space-y-4 text-center px-4">
+      <div>
+        <h1 className="text-2xl font-bold mb-2">{error ? 'Authentication Failed' : 'Signing You In'}</h1>
+        <p className="text-muted-foreground mb-4">{error || status}</p>
+        {!error && <p className="text-sm text-muted-foreground">Please wait while we finish authenticating your account.</p>}
       </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 }

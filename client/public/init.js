@@ -89,9 +89,16 @@
     }
   });
 
-  if ((hash.includes('access_token') || hash.includes('error') || search.includes('code')) && window.location.pathname !== '/auth/callback') {
+  const isAuthCallbackPath = window.location.pathname === '/auth/callback' || window.location.pathname === '/auth/callback/';
+  const hasOAuthResponse = hash.includes('access_token') || hash.includes('error') || search.includes('code');
+
+  if (hasOAuthResponse && !isAuthCallbackPath) {
     window.location.replace('/auth/callback' + hash + search);
     return;
+  }
+
+  if (window.location.pathname === '/auth/callback/' && hasOAuthResponse) {
+    window.history.replaceState(null, '', '/auth/callback' + hash + search);
   }
 
   const fallback = document.getElementById('fallback-root');
