@@ -20,7 +20,7 @@ export default function AuthCallback() {
         return;
       }
 
-      const { data, error } = await supabase.auth.getSessionFromUrl();
+      const { data, error } = await supabase.auth.detectSessionInUrl();
 
       if (error) {
         // If there is no session URL payload, fall back to current stored session.
