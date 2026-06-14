@@ -7,5 +7,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Missing Supabase credentials. Some features may not work.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    detectSessionInUrl: true,
+  },
+});
 export const supabaseAnonKeyOverride = supabaseAnonKey;
