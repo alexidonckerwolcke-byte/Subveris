@@ -65,6 +65,7 @@ function Router({ user }: { user: any }) {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/subscriptions" component={Subscriptions} />
       <Route path="/insights" component={Insights} />
       <Route path="/savings" component={Savings} />

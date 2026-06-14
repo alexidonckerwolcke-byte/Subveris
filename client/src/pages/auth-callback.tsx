@@ -46,7 +46,7 @@ export default function AuthCallback() {
 
       if (session) {
         setStatus('Authentication successful. Redirecting...');
-        window.location.replace('/dashboard');
+        window.location.replace('/');
         return;
       }
 
