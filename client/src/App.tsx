@@ -56,6 +56,7 @@ function Router({ user }: { user: any }) {
         <Route path="/contact" component={ContactPage} />
         <Route path="/docs" component={DocsPage} />
         <Route path="/auth/callback" component={AuthCallback} />
+        <Route path="/auth/callback/" component={AuthCallback} />
         <Route component={NotFound} />
       </Switch>
     );
@@ -80,6 +81,7 @@ function Router({ user }: { user: any }) {
       <Route path="/support" component={Support} />
       <Route path="/files" component={Files} />
       <Route path="/auth/callback" component={AuthCallback} />
+      <Route path="/auth/callback/" component={AuthCallback} />
       <Route component={NotFound} />
     </Switch>
   );
