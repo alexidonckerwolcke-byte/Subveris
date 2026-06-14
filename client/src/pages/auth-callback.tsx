@@ -20,13 +20,30 @@ export default function AuthCallback() {
         return;
       }
 
-      const { data, error } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getSessionFromUrl();
 
       if (error) {
-        setError(error.message || 'Authentication failed');
-        setTimeout(() => {
-          window.location.replace('/login');
-        }, 3000);
+        // If there is no session URL payload, fall back to current stored session.
+        const existingSession = await supabase.auth.getSession();
+
+        if (existingSession.data?.session) {
+          window.location.replace('/dashboard');
+          return;
+        }
+
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const errorParam = hashParams.get('error');
+        const errorDescription = hashParams.get('error_description');
+
+        if (errorParam) {
+          setError(errorDescription || 'Authentication failed');
+          setTimeout(() => {
+            window.location.replace('/login');
+          }, 3000);
+          return;
+        }
+
+        setLocation('/login');
         return;
       }
 
@@ -36,18 +53,6 @@ export default function AuthCallback() {
 
       if (data?.session) {
         window.location.replace('/dashboard');
-        return;
-      }
-
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const errorParam = hashParams.get('error');
-      const errorDescription = hashParams.get('error_description');
-
-      if (errorParam) {
-        setError(errorDescription || 'Authentication failed');
-        setTimeout(() => {
-          setLocation('/login');
-        }, 3000);
         return;
       }
 
