@@ -453,7 +453,7 @@ export default function HomePage() {
               <CardHeader className="text-center pb-6 pt-8">
                 <CardTitle className="text-3xl font-bold">Free</CardTitle>
                 <div className="mt-6">
-                  <span className="text-5xl font-bold text-foreground">$0</span>
+                  <span className="text-5xl font-bold text-foreground">€0</span>
                   <span className="text-muted-foreground ml-2">/month</span>
                 </div>
                 <CardDescription className="mt-4 text-base">
