@@ -639,7 +639,7 @@ export default function Dashboard() {
         <div className="mb-4 animate-slide-in-right">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent mb-2">Dashboard</h1>
           <p className="text-lg text-muted-foreground">
-            Discover subscriptions you're paying for but barely use.
+            Your subscription command center for spend, renewal timing, and savings action.
           </p>
         </div>
 

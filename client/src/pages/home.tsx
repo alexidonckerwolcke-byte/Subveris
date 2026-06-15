@@ -188,9 +188,9 @@ export default function HomePage() {
           </Badge>
           
           <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-8 leading-tight">
-            Take Control of Your
+            Discover subscriptions you're paying for
             <br />
-            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">Subscriptions</span>
+            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">but barely use.</span>
           </h1>
           
           <p className="text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed font-light">
