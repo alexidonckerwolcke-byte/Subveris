@@ -107,10 +107,9 @@ function jsonResponse(body: unknown, initOrOrigin?: ResponseInit | string | null
   let actualInit: ResponseInit = {};
   
   if (typeof initOrOrigin === 'string' || initOrOrigin === null) {
-    actualOrigin = initOrOrigin;
+    actualOrigin = initOrOrigin as string | null;
     actualInit = maybeInit || {};
-  } else if (initOrOrigin && typeof initOrOrigin === 'object') {
-    actualOrigin = null;
+  } else if (typeof initOrOrigin === 'object' && initOrOrigin !== null) {
     actualInit = initOrOrigin;
   }
   
@@ -329,6 +328,94 @@ function parseSubscriptionDate(dateInput: string | Date): Date | null {
   return parsed;
 }
 
+function formatDateForReminder(date: Date): string {
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatSubscriptionReminderLine(sub: any): string {
+  const amount = Number(sub.amount) || 0;
+  const frequency = String(sub.frequency || "monthly").toLowerCase();
+  const currency = String(sub.currency || "USD").toUpperCase();
+  const amountText = `${amount.toFixed(2)} ${currency}`;
+  const frequencyText = frequency === "yearly" ? "yearly" : frequency === "quarterly" ? "quarterly" : frequency === "weekly" ? "weekly" : "monthly";
+  const renewalDate = normalizeSubscriptionDate(sub);
+  const parsedDate = renewalDate ? toDateOnlyLocal(renewalDate) : null;
+  const humanDate = parsedDate ? formatDateForReminder(parsedDate) : renewalDate || "unknown date";
+  return `<li><strong>${String(sub.name || "Subscription").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</strong>: ${amountText} (${frequencyText}) - Renews on ${humanDate}</li>`;
+}
+
+function shouldSendRenewalReminder(sub: any, daysAhead = 5, now = new Date()): boolean {
+  const status = normalizeSubscriptionStatus(sub.status);
+  if (status === "deleted" || status === "canceled") return false;
+  if (!(status === "active" || status === "unused" || status === "to-cancel")) return false;
+
+  const renewalDateStr = normalizeSubscriptionDate(sub);
+  const renewalDate = renewalDateStr ? toDateOnlyLocal(renewalDateStr) : null;
+  if (!renewalDate) return false;
+
+  return isDateInDaysFromNow(renewalDate, daysAhead, now);
+}
+
+async function loadAllSubscriptionsForRenewal(): Promise<any[]> {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("*");
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}
+
+async function buildRenewalReminderBatches(daysAhead = 5, now = new Date()) {
+  const subscriptions = await loadAllSubscriptionsForRenewal();
+  const batches: Record<string, any[]> = {};
+
+  (subscriptions || []).forEach((sub: any) => {
+    if (!shouldSendRenewalReminder(sub, daysAhead, now)) return;
+    const userId = sub.user_id;
+    if (!userId) return;
+    batches[userId] = batches[userId] || [];
+    batches[userId].push(sub);
+  });
+
+  return batches;
+}
+
+async function sendRenewalReminders(daysAhead = 5): Promise<{ success: boolean; sent: number; skipped: number; failures: { userId: string; email: string | null; error: string }[] }> {
+  const batches = await buildRenewalReminderBatches(daysAhead);
+  const failures: { userId: string; email: string | null; error: string }[] = [];
+  let sent = 0;
+  let skipped = 0;
+
+  for (const [userId, subs] of Object.entries(batches)) {
+    const email = await getUserEmail(userId);
+    if (!email) {
+      failures.push({ userId, email: null, error: "Missing user email" });
+      continue;
+    }
+
+    const result = await sendRenewalReminderEmail(email, subs);
+    if (result.success) {
+      sent += 1;
+    } else {
+      failures.push({ userId, email, error: result.error || "Unknown email send failure" });
+    }
+  }
+
+  return {
+    success: failures.length === 0,
+    sent,
+    skipped: Object.keys(batches).length - sent,
+    failures,
+  };
+}
+
 export function toDateOnlyLocal(dateInput: string | Date): Date | null {
   if (!dateInput) return null;
   if (dateInput instanceof Date) {
@@ -427,6 +514,126 @@ function isRenewalDateInCurrentMonth(date: Date, now = new Date()): boolean {
 function isRenewalDateToday(date: Date, now = new Date()): boolean {
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   return date.getTime() === today.getTime();
+}
+
+function getAdminApiKey(): string | null {
+  return Deno?.env?.get("ADMIN_API_KEY")?.trim() ?? null;
+}
+
+function isAdminRequest(req: Request): boolean {
+  const expected = getAdminApiKey();
+  if (!expected) return false;
+
+  const apiKey = req.headers.get("x-api-key")?.trim();
+  if (apiKey === expected) return true;
+
+  const authHeader = req.headers.get("authorization")?.trim();
+  if (authHeader === `Bearer ${expected}`) return true;
+
+  return false;
+}
+
+function isDateInDaysFromNow(date: Date, days: number, now = new Date()): boolean {
+  const today = toDateOnlyLocal(now);
+  if (!today) return false;
+
+  const target = new Date(today);
+  target.setDate(target.getDate() + days);
+  return date.getTime() === target.getTime();
+}
+
+async function getUserEmail(userId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.auth.admin.getUserById(userId);
+    if (!error && data?.user?.email) {
+      return data.user.email;
+    }
+  } catch (err) {
+    console.warn("[Renewal] Failed to fetch user email from auth:", err);
+  }
+
+  try {
+    const { data, error } = await supabase.from("users").select("email").eq("id", userId).single();
+    if (!error && data?.email) {
+      return data.email;
+    }
+  } catch (err) {
+    console.warn("[Renewal] Failed to fetch user email from users table:", err);
+  }
+
+  return null;
+}
+
+async function sendRenewalReminderEmail(to: string, subscriptions: any[]): Promise<{ success: boolean; error?: string }> {
+  const RESEND_API_KEY = Deno?.env?.get("RESEND_API_KEY")?.trim();
+  const SENDGRID_API_KEY = Deno?.env?.get("SENDGRID_API_KEY")?.trim();
+  const from = Deno?.env?.get("EMAIL_FROM")?.trim() || "noreply@subveris.com";
+  const emailPayload = {
+    subject: "Upcoming subscription renewal reminder",
+    html: `
+      <h2>Upcoming Subscription Renewals</h2>
+      <p>Your subscription${subscriptions.length === 1 ? "" : "s"} will renew in 5 days. Please review the upcoming charge${subscriptions.length === 1 ? "" : "s"} below:</p>
+      <ul>
+        ${subscriptions.map(formatSubscriptionReminderLine).join("\n")}
+      </ul>
+      <p>If you want to make changes, open Subveris and update or cancel the subscription before the renewal date.</p>
+    `,
+  };
+
+  if (RESEND_API_KEY) {
+    try {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from,
+          to,
+          ...emailPayload,
+        }),
+      });
+
+      if (response.ok) {
+        return { success: true };
+      }
+
+      return { success: false, error: `Resend error ${response.status}: ${await response.text()}` };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  if (SENDGRID_API_KEY) {
+    try {
+      const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${SENDGRID_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{
+            to: [{ email: to }],
+            subject: emailPayload.subject,
+          }],
+          from: { email: from },
+          content: [{ type: "text/html", value: emailPayload.html }],
+        }),
+      });
+
+      if (response.ok) {
+        return { success: true };
+      }
+
+      return { success: false, error: `SendGrid error ${response.status}: ${await response.text()}` };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  return { success: false, error: "No email provider configured (RESEND_API_KEY or SENDGRID_API_KEY required)." };
 }
 
 function isRenewalDateTodayOrEarlierInCurrentMonth(date: Date, now = new Date()): boolean {
@@ -756,28 +963,35 @@ function buildCalendarEvents(subscriptions: any[]) {
 }
 
 runtimeDeno?.serve?.(async (req: Request) => {
-  try {
-    console.log(`[API] ${req.method} ${req.url}`);
-    
-    // Extract origin from request
     const origin = req.headers.get("origin");
-    
-    // Create context-aware response helpers that automatically include origin
-    const sendJson = (body: unknown, init?: ResponseInit) => {
+    const sendJson = (body: unknown, initOrOrigin?: ResponseInit | string | null, maybeInit?: ResponseInit) => {
+      let actualOrigin: string | null = origin;
+      let actualInit: ResponseInit = {};
+
+      if (typeof initOrOrigin === 'string' || initOrOrigin === null) {
+        actualOrigin = initOrOrigin as string | null;
+        actualInit = maybeInit || {};
+      } else if (typeof initOrOrigin === 'object' && initOrOrigin !== null) {
+        actualInit = initOrOrigin;
+      }
+
       const headers = {
         "Content-Type": "application/json",
-        ...getCorsHeaders(origin),
-        ...init?.headers,
+        ...getCorsHeaders(actualOrigin),
+        ...actualInit.headers,
       };
       return new Response(JSON.stringify(body), {
-        ...init,
+        ...actualInit,
         headers,
       });
     };
-    
+
     const sendCorsHeaders = (response: Response) => {
       return addCorsHeaders(response, origin);
     };
+
+  try {
+    console.log(`[API] ${req.method} ${req.url}`);
     
     // Handle CORS preflight - MUST be first to never fail
     if (req.method === "OPTIONS") {
@@ -4600,6 +4814,32 @@ runtimeDeno?.serve?.(async (req: Request) => {
           {
             error: "Failed to process contact form",
             message: errorMessage
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    if (pathname === "/admin/renewal-checks" && req.method === "POST") {
+      if (!isAdminRequest(req)) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      try {
+        const result = await sendRenewalReminders(5);
+        return sendJson({
+          success: result.success,
+          sent: result.sent,
+          skipped: result.skipped,
+          failures: result.failures,
+          message: result.success ? "Renewal reminders processed" : "Renewal reminders completed with failures",
+        });
+      } catch (err) {
+        console.error("[Renewal] Manual renewal check failed:", err);
+        return sendJson(
+          {
+            error: "Failed to run renewal checks",
+            message: toErrorMessage(err),
           },
           { status: 500 }
         );
