@@ -67,6 +67,7 @@ function Router({ user }: { user: any }) {
         <Route path="/cancel-adobe" component={CancelAdobePage} />
         <Route path="/cancel-hellofresh" component={CancelHelloFreshPage} />
         <Route path="/cancel-disney-plus" component={CancelDisneyPlusPage} />
+        <Route path="/cancel-youtube-premium" component={CancelYouTubePremiumPage} />
         <Route path="/auth/callback" component={AuthCallback} />
         <Route path="/auth/callback/" component={AuthCallback} />
         <Route component={NotFound} />
@@ -97,6 +98,7 @@ function Router({ user }: { user: any }) {
       <Route path="/cancel-adobe" component={CancelAdobePage} />
       <Route path="/cancel-hellofresh" component={CancelHelloFreshPage} />
       <Route path="/cancel-disney-plus" component={CancelDisneyPlusPage} />
+      <Route path="/cancel-youtube-premium" component={CancelYouTubePremiumPage} />
       <Route path="/support" component={Support} />
       <Route path="/files" component={Files} />
       <Route path="/auth/callback" component={AuthCallback} />
