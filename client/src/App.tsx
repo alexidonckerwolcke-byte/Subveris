@@ -30,6 +30,7 @@ import CancelSpotifyPage from "./pages/cancel-spotify.js";
 import CancelAdobePage from "./pages/cancel-adobe.js";
 import CancelHelloFreshPage from "./pages/cancel-hellofresh.js";
 import CancelDisneyPlusPage from "./pages/cancel-disney-plus.js";
+import CancelYouTubePremiumPage from "./pages/cancel-youtube-premium.js";
 import Terms from "./pages/terms.js";
 import Security from "./pages/security.js";
 import AuthCallback from "./pages/auth-callback.js";
