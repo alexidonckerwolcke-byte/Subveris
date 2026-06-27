@@ -28,6 +28,7 @@ import CancelNetflixPage from "./pages/cancel-netflix.js";
 import CancelAmazonPrimePage from "./pages/cancel-amazon-prime.js";
 import CancelSpotifyPage from "./pages/cancel-spotify.js";
 import CancelAdobePage from "./pages/cancel-adobe.js";
+import CancelHelloFreshPage from "./pages/cancel-hellofresh.js";
 import Terms from "./pages/terms.js";
 import Security from "./pages/security.js";
 import AuthCallback from "./pages/auth-callback.js";
@@ -63,6 +64,7 @@ function Router({ user }: { user: any }) {
         <Route path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />
         <Route path="/cancel-spotify" component={CancelSpotifyPage} />
         <Route path="/cancel-adobe" component={CancelAdobePage} />
+        <Route path="/cancel-hellofresh" component={CancelHelloFreshPage} />
         <Route path="/auth/callback" component={AuthCallback} />
         <Route path="/auth/callback/" component={AuthCallback} />
         <Route component={NotFound} />
@@ -91,6 +93,7 @@ function Router({ user }: { user: any }) {
       <Route path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />
       <Route path="/cancel-spotify" component={CancelSpotifyPage} />
       <Route path="/cancel-adobe" component={CancelAdobePage} />
+      <Route path="/cancel-hellofresh" component={CancelHelloFreshPage} />
       <Route path="/support" component={Support} />
       <Route path="/files" component={Files} />
       <Route path="/auth/callback" component={AuthCallback} />
