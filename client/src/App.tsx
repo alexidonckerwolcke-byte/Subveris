@@ -26,6 +26,7 @@ import HomePage from "./pages/home.js";
 import Privacy from "./pages/privacy.js";
 import CancelNetflixPage from "./pages/cancel-netflix.js";
 import CancelAmazonPrimePage from "./pages/cancel-amazon-prime.js";
+import CancelSpotifyPage from "./pages/cancel-spotify.js";
 import Terms from "./pages/terms.js";
 import Security from "./pages/security.js";
 import AuthCallback from "./pages/auth-callback.js";
@@ -59,6 +60,7 @@ function Router({ user }: { user: any }) {
         <Route path="/docs" component={DocsPage} />
         <Route path="/cancel-netflix" component={CancelNetflixPage} />
         <Route path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />
+        <Route path="/cancel-spotify" component={CancelSpotifyPage} />
         <Route path="/auth/callback" component={AuthCallback} />
         <Route path="/auth/callback/" component={AuthCallback} />
         <Route component={NotFound} />
@@ -85,6 +87,7 @@ function Router({ user }: { user: any }) {
       <Route path="/docs" component={DocsPage} />
       <Route path="/cancel-netflix" component={CancelNetflixPage} />
       <Route path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />
+      <Route path="/cancel-spotify" component={CancelSpotifyPage} />
       <Route path="/support" component={Support} />
       <Route path="/files" component={Files} />
       <Route path="/auth/callback" component={AuthCallback} />
