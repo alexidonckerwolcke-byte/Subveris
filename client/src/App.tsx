@@ -33,6 +33,7 @@ import CancelDisneyPlusPage from "./pages/cancel-disney-plus.js";
 import CancelYouTubePremiumPage from "./pages/cancel-youtube-premium.js";
 import CancelICloudPage from "./pages/cancel-icloud.js";
 import CancelXboxGamePassPage from "./pages/cancel-xbox-game-pass.js";
+import CancelPlayStationPlusPage from "./pages/cancel-playstation-plus.js";
 import Terms from "./pages/terms.js";
 import Security from "./pages/security.js";
 import AuthCallback from "./pages/auth-callback.js";
@@ -73,6 +74,7 @@ function Router({ user }: { user: any }) {
         <Route path="/cancel-youtube-premium" component={CancelYouTubePremiumPage} />
         <Route path="/cancel-icloud" component={CancelICloudPage} />
         <Route path="/cancel-xbox-game-pass" component={CancelXboxGamePassPage} />
+        <Route path="/cancel-playstation-plus" component={CancelPlayStationPlusPage} />
         <Route path="/auth/callback" component={AuthCallback} />
         <Route path="/auth/callback/" component={AuthCallback} />
         <Route component={NotFound} />
@@ -106,6 +108,7 @@ function Router({ user }: { user: any }) {
       <Route path="/cancel-youtube-premium" component={CancelYouTubePremiumPage} />
       <Route path="/cancel-icloud" component={CancelICloudPage} />
       <Route path="/cancel-xbox-game-pass" component={CancelXboxGamePassPage} />
+      <Route path="/cancel-playstation-plus" component={CancelPlayStationPlusPage} />
       <Route path="/support" component={Support} />
       <Route path="/files" component={Files} />
       <Route path="/auth/callback" component={AuthCallback} />
