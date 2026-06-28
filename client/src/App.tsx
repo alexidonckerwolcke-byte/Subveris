@@ -34,6 +34,10 @@ import CancelYouTubePremiumPage from "./pages/cancel-youtube-premium.js";
 import CancelICloudPage from "./pages/cancel-icloud.js";
 import CancelXboxGamePassPage from "./pages/cancel-xbox-game-pass.js";
 import CancelPlayStationPlusPage from "./pages/cancel-playstation-plus.js";
+import CancelHBOMaxPage from "./pages/cancel-hbo-max.js";
+import CancelViaplayPage from "./pages/cancel-viaplay.js";
+import CancelTinderGoldPage from "./pages/cancel-tinder-gold.js";
+import CancelDuolingoPage from "./pages/cancel-duolingo.js";
 import Terms from "./pages/terms.js";
 import Security from "./pages/security.js";
 import AuthCallback from "./pages/auth-callback.js";
@@ -75,6 +79,10 @@ function Router({ user }: { user: any }) {
         <Route path="/cancel-icloud" component={CancelICloudPage} />
         <Route path="/cancel-xbox-game-pass" component={CancelXboxGamePassPage} />
         <Route path="/cancel-playstation-plus" component={CancelPlayStationPlusPage} />
+        <Route path="/cancel-hbo-max" component={CancelHBOMaxPage} />
+        <Route path="/cancel-viaplay" component={CancelViaplayPage} />
+        <Route path="/cancel-tinder-gold" component={CancelTinderGoldPage} />
+        <Route path="/cancel-duolingo" component={CancelDuolingoPage} />
         <Route path="/auth/callback" component={AuthCallback} />
         <Route path="/auth/callback/" component={AuthCallback} />
         <Route component={NotFound} />
@@ -109,6 +117,10 @@ function Router({ user }: { user: any }) {
       <Route path="/cancel-icloud" component={CancelICloudPage} />
       <Route path="/cancel-xbox-game-pass" component={CancelXboxGamePassPage} />
       <Route path="/cancel-playstation-plus" component={CancelPlayStationPlusPage} />
+      <Route path="/cancel-hbo-max" component={CancelHBOMaxPage} />
+      <Route path="/cancel-viaplay" component={CancelViaplayPage} />
+      <Route path="/cancel-tinder-gold" component={CancelTinderGoldPage} />
+      <Route path="/cancel-duolingo" component={CancelDuolingoPage} />
       <Route path="/support" component={Support} />
       <Route path="/files" component={Files} />
       <Route path="/auth/callback" component={AuthCallback} />
