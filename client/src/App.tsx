@@ -38,6 +38,12 @@ import CancelHBOMaxPage from "./pages/cancel-hbo-max.js";
 import CancelViaplayPage from "./pages/cancel-viaplay.js";
 import CancelTinderGoldPage from "./pages/cancel-tinder-gold.js";
 import CancelDuolingoPage from "./pages/cancel-duolingo.js";
+import CancelMicrosoft365Page from "./pages/cancel-microsoft-365.js";
+import CancelCanvaProPage from "./pages/cancel-canva-pro.js";
+import CancelLinkedInPremiumPage from "./pages/cancel-linkedin-premium.js";
+import CancelNordVPNPage from "./pages/cancel-nordvpn.js";
+import CancelAudiblePage from "./pages/cancel-audible.js";
+import CancelReadlyPage from "./pages/cancel-readly.js";
 import Terms from "./pages/terms.js";
 import Security from "./pages/security.js";
 import AuthCallback from "./pages/auth-callback.js";
@@ -83,6 +89,12 @@ function Router({ user }: { user: any }) {
         <Route path="/cancel-viaplay" component={CancelViaplayPage} />
         <Route path="/cancel-tinder-gold" component={CancelTinderGoldPage} />
         <Route path="/cancel-duolingo" component={CancelDuolingoPage} />
+        <Route path="/cancel-microsoft-365" component={CancelMicrosoft365Page} />
+        <Route path="/cancel-canva-pro" component={CancelCanvaProPage} />
+        <Route path="/cancel-linkedin-premium" component={CancelLinkedInPremiumPage} />
+        <Route path="/cancel-nordvpn" component={CancelNordVPNPage} />
+        <Route path="/cancel-audible" component={CancelAudiblePage} />
+        <Route path="/cancel-readly" component={CancelReadlyPage} />
         <Route path="/auth/callback" component={AuthCallback} />
         <Route path="/auth/callback/" component={AuthCallback} />
         <Route component={NotFound} />
@@ -121,6 +133,12 @@ function Router({ user }: { user: any }) {
       <Route path="/cancel-viaplay" component={CancelViaplayPage} />
       <Route path="/cancel-tinder-gold" component={CancelTinderGoldPage} />
       <Route path="/cancel-duolingo" component={CancelDuolingoPage} />
+      <Route path="/cancel-microsoft-365" component={CancelMicrosoft365Page} />
+      <Route path="/cancel-canva-pro" component={CancelCanvaProPage} />
+      <Route path="/cancel-linkedin-premium" component={CancelLinkedInPremiumPage} />
+      <Route path="/cancel-nordvpn" component={CancelNordVPNPage} />
+      <Route path="/cancel-audible" component={CancelAudiblePage} />
+      <Route path="/cancel-readly" component={CancelReadlyPage} />
       <Route path="/support" component={Support} />
       <Route path="/files" component={Files} />
       <Route path="/auth/callback" component={AuthCallback} />
