@@ -34,7 +34,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { limits, tier } = useSubscription();
   const { user } = useAuth();
-  const { familyGroupId, showFamilyData } = useFamilyDataMode();
+  const { familyGroupId, showFamilyData, isFamilyDataModeReady } = useFamilyDataMode();
   const { convertAmount, currency: displayCurrency } = useCurrency();
 
   // Personal metrics (always load)
@@ -62,7 +62,7 @@ export default function Dashboard() {
 
   const { data: familySavingsResponse, isLoading: familySavingsLoading } = useQuery<any>({
     queryKey: ["/api/analytics/monthly-savings", "family", familyGroupId],
-    enabled: showFamilyData && !!user?.id,
+    enabled: showFamilyData === true && !!user?.id,
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/analytics/monthly-savings?family=true");
       return response.json();
@@ -133,13 +133,13 @@ export default function Dashboard() {
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
     // Use server-provided spending series for both owners and members
-    const familyMonthlyDataForDashboard = showFamilyData
+    const familyMonthlyDataForDashboard = showFamilyData === true
       ? (familyData?.spending && familyData.spending.length > 0 ? familyData.spending : [])
       : [];
 
     const totalMonthlySpendFromSpendingData = getCurrentMonthAmount(familyMonthlyDataForDashboard);
     
-    if (showFamilyData) {
+    if (showFamilyData === true) {
       console.log('[Dashboard] Family mode - familyData:', familyData);
       console.log('[Dashboard] Family mode - familyMonthlyDataForDashboard:', familyMonthlyDataForDashboard);
       console.log('[Dashboard] Family mode - totalMonthlySpendFromSpendingData:', totalMonthlySpendFromSpendingData);
@@ -157,13 +157,24 @@ export default function Dashboard() {
       newServicesTracked: 0,
     };
 
-    const familyCurrentSavings = showFamilyData
+    const familyCurrentSavings = showFamilyData === true
       ? (typeof familySavingsResponse?.monthlySavings === 'number'
           ? familySavingsResponse.monthlySavings
-          : familySavingsComputed.thisMonthSavings || familyData.metrics.thisMonthSavings || 0)
+          : familySavingsComputed.thisMonthSavings || familyData?.metrics?.thisMonthSavings || 0)
       : 0;
 
-    const serverMetrics = showFamilyData && familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number'
+    const familyMetricsFallback = {
+      totalMonthlySpend: familyMonthlyDataForDashboard.length ? totalMonthlySpendFromSpendingData : 0,
+      activeSubscriptions: familySubscriptions.filter((sub) => sub?.status === 'active').length,
+      potentialSavings: familySavingsComputed.potentialSavings,
+      thisMonthSavings: familyCurrentSavings,
+      unusedSubscriptions: familySavingsComputed.unusedSubscriptions,
+      averageCostPerUse: 0,
+      monthlySpendChange: 0,
+      newServicesTracked: 0,
+    };
+
+    const serverMetrics = showFamilyData === true && familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number'
       ? {
           totalMonthlySpend: familyMonthlyDataForDashboard.length
             ? totalMonthlySpendFromSpendingData
@@ -172,15 +183,15 @@ export default function Dashboard() {
           potentialSavings: familySavingsComputed.potentialSavings || familyData.metrics.potentialSavings || 0,
           thisMonthSavings: familyCurrentSavings,
           unusedSubscriptions: familySavingsComputed.unusedSubscriptions || familyData.metrics.unusedSubscriptions || 0,
-          averageCostPerUse: familyData.metrics.averageCostPerUse || 0,
-          monthlySpendChange: familyData.metrics.monthlySpendChange || 0,
-          newServicesTracked: familyData.metrics.newServicesTracked || 0,
+          averageCostPerUse: familyData.metrics?.averageCostPerUse || 0,
+          monthlySpendChange: familyData.metrics?.monthlySpendChange || 0,
+          newServicesTracked: familyData.metrics?.newServicesTracked || 0,
         }
-      : personalMetrics || defaultMetrics;
+      : (showFamilyData === true ? familyMetricsFallback : personalMetrics || defaultMetrics);
 
     // For members in family mode, trust the server metrics completely
     // The server has already calculated all metrics including the member's own subscriptions
-    if (showFamilyData && familyData) {
+    if (showFamilyData === true && familyData) {
       console.log('[Dashboard] Returning serverMetrics for family mode:', serverMetrics);
       return serverMetrics;
     }
@@ -194,15 +205,20 @@ export default function Dashboard() {
   ]);
 
   // Metrics loading flag (value computed below after subscriptions are known)
-  const metricsLoading = showFamilyData ? familyDataLoading : personalMetricsLoading;
+  const metricsLoading = !isFamilyDataModeReady
+    ? true
+    : showFamilyData === true
+      ? familyDataLoading
+      : personalMetricsLoading;
 
   // Personal subscriptions (always load)
   const { data: personalSubscriptions, isLoading: personalSubsLoading } = useQuery<Subscription[]>({
     queryKey: ["/api/subscriptions"],
+    enabled: showFamilyData !== undefined,
     refetchInterval: 30000, // Refetch every 30 seconds to stay fresh
   });
 
-  const rawSubscriptions = showFamilyData ? familySubscriptions : personalSubscriptions || [];
+  const rawSubscriptions = showFamilyData === true ? familySubscriptions : showFamilyData === false ? personalSubscriptions || [] : [];
   // dedupe by id to avoid duplicate keys when family aggregation returns duplicates
   const subscriptions = (function () {
     const map = new Map<string, Subscription>();
@@ -212,7 +228,7 @@ export default function Dashboard() {
     }
     return Array.from(map.values());
   })();
-  const subsLoading = showFamilyData ? familyDataLoading : personalSubsLoading;
+  const subsLoading = !isFamilyDataModeReady ? true : showFamilyData === true ? familyDataLoading : personalSubsLoading;
 
   // Personal spending (always load)
   const { data: personalMonthlySpending, isLoading: personalMonthlyLoading } = useQuery<MonthlySpending[]>({
@@ -220,12 +236,18 @@ export default function Dashboard() {
     refetchInterval: 30000, // Refetch every 30 seconds to stay fresh
   });
 
-  const monthlySpending = showFamilyData
+  const monthlySpending = showFamilyData === true
     ? ((familyData?.spending && familyData.spending.length > 0)
         ? familyData.spending
         : computeMonthlySpendingFromFamilySubscriptions())
-    : personalMonthlySpending;
-  const monthlyLoading = showFamilyData ? familyDataLoading : personalMonthlyLoading;
+    : showFamilyData === false
+      ? personalMonthlySpending
+      : [];
+  const monthlyLoading = !isFamilyDataModeReady
+    ? true
+    : showFamilyData === true
+      ? familyDataLoading
+      : personalMonthlyLoading;
 
   // Compute monthly spending from subscriptions for family mode
   function computeMonthlySpendingFromFamilySubscriptions() {
@@ -275,7 +297,7 @@ export default function Dashboard() {
   }
 
   // Use server data if available, otherwise compute from subscriptions for family mode
-  const effectiveMonthlySpending = showFamilyData
+  const effectiveMonthlySpending = showFamilyData === true
     ? (function () {
         if (familyData?.spending && familyData.spending.length > 0) return familyData.spending;
         if (familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number') {
@@ -285,7 +307,7 @@ export default function Dashboard() {
         }
         return computeMonthlySpendingFromFamilySubscriptions();
       })()
-    : (personalMonthlySpending || []);
+    : (showFamilyData === false ? (personalMonthlySpending || []) : []);
 
   // Normalize monthly spending into a fixed-length recent months series.
   // `months` is the number of months before the current month, so `3` means current month + 3 prior months.
@@ -375,7 +397,7 @@ export default function Dashboard() {
   });
 
   const categorySpending = personalCategorySpending;
-  const categoryLoading = showFamilyData ? familyDataLoading : personalCategoryLoading;
+  const categoryLoading = showFamilyData === true ? familyDataLoading : personalCategoryLoading;
 
   function computeSpendingByCategoryFromSubs(subs: any[] | undefined) {
     if (!subs || subs.length === 0) return [];
@@ -409,7 +431,7 @@ export default function Dashboard() {
     }));
   }
 
-  const categorySpendingComputed = showFamilyData
+  const categorySpendingComputed = showFamilyData === true
     ? ((familyData?.byCategory && familyData.byCategory.length)
         ? familyData.byCategory
         : computeSpendingByCategoryFromSubs(familySubscriptions))
@@ -423,17 +445,17 @@ export default function Dashboard() {
   // Family cost analysis (load if in family mode)
   const { data: familyCostAnalysis, isLoading: familyAnalysisLoading } = useQuery<CostPerUseAnalysis[]>({
     queryKey: [`/api/analysis/cost-per-use?familyGroupId=${familyGroupId}`],
-    enabled: showFamilyData && !!familyGroupId,
+    enabled: showFamilyData === true && !!familyGroupId,
   });
 
-  const analysisLoading = showFamilyData ? familyAnalysisLoading : personalAnalysisLoading;
+  const analysisLoading = showFamilyData === true ? familyAnalysisLoading : personalAnalysisLoading;
 
   // If family mode and server didn't return analyses, compute a simple fallback from visible family subscriptions
-  const computedFamilyCostAnalysis = showFamilyData ? computeCostPerUseFromSubs(familySubscriptions) : [];
+  const computedFamilyCostAnalysis = showFamilyData === true ? computeCostPerUseFromSubs(familySubscriptions) : [];
 
   // Build per-member analyses (label subscriptions with member name) and merge into the effective analyses
   function buildPerMemberAnalyses() {
-    if (!showFamilyData || !familyData?.members || familyData.members.length === 0) return [];
+    if (showFamilyData !== true || !familyData?.members || familyData.members.length === 0) return [];
     const subs = familySubscriptions;
     const perMember: any[] = [];
     for (const m of familyData.members) {
@@ -447,13 +469,13 @@ export default function Dashboard() {
 
   const perMemberAnalyses = buildPerMemberAnalyses();
 
-  const baseAnalysis = showFamilyData
+  const baseAnalysis = showFamilyData === true
     ? ((familyData?.isOwner && familyCostAnalysis && familyCostAnalysis.length)
         ? familyCostAnalysis
         : computedFamilyCostAnalysis)
     : personalCostAnalysis;
   // Prefer per-member labeled entries when deduping, so put them first
-  const mergedAnalyses = showFamilyData ? dedupeByKey([...perMemberAnalyses, ...(baseAnalysis || [])], 'subscriptionId') : baseAnalysis;
+  const mergedAnalyses = showFamilyData === true ? dedupeByKey([...perMemberAnalyses, ...(baseAnalysis || [])], 'subscriptionId') : baseAnalysis;
   const effectiveCostAnalysis = mergedAnalyses;
   const displayCostAnalysis = !showFamilyData && tier === "free"
     ? (effectiveCostAnalysis?.slice(0, limits.maxCostPerUseSubscriptions) ?? [])

@@ -6,7 +6,7 @@ export function useFamilyDataMode() {
   const { user } = useAuth();
 
   // Get family groups for this user
-  const { data: familyGroups } = useQuery<any[], Error>({
+  const { data: familyGroups, isLoading: familyGroupsLoading } = useQuery<any[], Error>({
     queryKey: ["/api/family-groups"],
     enabled: !!user?.id,
     queryFn: async () => {
@@ -19,7 +19,7 @@ export function useFamilyDataMode() {
   const familyGroupId = familyGroups?.[0]?.id;
 
   // Get family settings if user is in a family group
-  const { data: familySettings } = useQuery<any, Error>({
+  const { data: familySettings, isLoading: familySettingsLoading } = useQuery<any, Error>({
     queryKey: ["/api/family-groups", familyGroupId, "settings"],
     enabled: !!familyGroupId,
     queryFn: async () => {
@@ -29,8 +29,16 @@ export function useFamilyDataMode() {
     },
   });
 
-  // Check if we should show family data
-  const showFamilyData = familySettings?.show_family_data === true && !!familyGroupId;
+  // only determine family mode after the family group and settings queries are complete
+  const isFamilyDataModeReady = !familyGroupsLoading && (!familyGroupId || !familySettingsLoading);
+
+  const showFamilyData = familyGroupsLoading
+    ? undefined
+    : familyGroupId
+      ? familySettingsLoading
+        ? undefined
+        : familySettings?.show_family_data === true
+      : false;
 
   // Safety: if no group, clear any state that depends on being in a group
   if (!familyGroups || familyGroups.length === 0) {
@@ -38,6 +46,7 @@ export function useFamilyDataMode() {
       familyGroupId: undefined,
       showFamilyData: false,
       isInFamily: false,
+      isFamilyDataModeReady: true,
     };
   }
 
@@ -45,5 +54,6 @@ export function useFamilyDataMode() {
     familyGroupId,
     showFamilyData,
     isInFamily: !!familyGroupId,
+    isFamilyDataModeReady,
   };
 }
