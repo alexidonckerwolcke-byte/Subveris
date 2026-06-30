@@ -206,14 +206,6 @@ export default function HomePage() {
             </Button>
           </div>
 
-          {/* Social Proof Stats */}
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-12 text-sm mb-12">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">$120</div>
-              <div className="text-muted-foreground">Avg. Monthly Savings</div>
-            </div>
-          </div>
-
           {/* Trust Badges */}
           <div className="flex flex-wrap justify-center items-center gap-8 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">

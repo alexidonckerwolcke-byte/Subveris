@@ -60,6 +60,15 @@ export default function Dashboard() {
     refetchInterval: 30000, // Refetch every 30 seconds to see member deletions
   });
 
+  const { data: familySavingsResponse, isLoading: familySavingsLoading } = useQuery<any>({
+    queryKey: ["/api/analytics/monthly-savings", "family", familyGroupId],
+    enabled: showFamilyData && !!user?.id,
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/analytics/monthly-savings?family=true");
+      return response.json();
+    },
+  });
+
   const familySubscriptions = useMemo<Subscription[]>(() => {
     return getVisibleFamilySubscriptions(familyData, user?.id);
   }, [familyData, user?.id]);
@@ -148,6 +157,12 @@ export default function Dashboard() {
       newServicesTracked: 0,
     };
 
+    const familyCurrentSavings = showFamilyData
+      ? (typeof familySavingsResponse?.monthlySavings === 'number'
+          ? familySavingsResponse.monthlySavings
+          : familySavingsComputed.thisMonthSavings || familyData.metrics.thisMonthSavings || 0)
+      : 0;
+
     const serverMetrics = showFamilyData && familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number'
       ? {
           totalMonthlySpend: familyMonthlyDataForDashboard.length
@@ -155,7 +170,7 @@ export default function Dashboard() {
             : Number(familyData.metrics.totalMonthlySpending) || 0,
           activeSubscriptions: familyData.metrics.activeSubscriptions || 0,
           potentialSavings: familySavingsComputed.potentialSavings || familyData.metrics.potentialSavings || 0,
-          thisMonthSavings: familySavingsComputed.thisMonthSavings || familyData.metrics.thisMonthSavings || 0,
+          thisMonthSavings: familyCurrentSavings,
           unusedSubscriptions: familySavingsComputed.unusedSubscriptions || familyData.metrics.unusedSubscriptions || 0,
           averageCostPerUse: familyData.metrics.averageCostPerUse || 0,
           monthlySpendChange: familyData.metrics.monthlySpendChange || 0,
@@ -675,8 +690,8 @@ export default function Dashboard() {
           {limits.hasSavingsProjections ? (
             <>
                   <SavingsProjection
-                    potentialSavings={showFamilyData ? familySavingsComputed.potentialSavings : (metrics?.potentialSavings || 0)}
-                    currentSavings={showFamilyData ? familySavingsComputed.thisMonthSavings : (metrics?.thisMonthSavings || 0)}
+                    potentialSavings={metrics?.potentialSavings || 0}
+                    currentSavings={metrics?.thisMonthSavings || 0}
                     unusedCount={unusedCount}
                     toCancelCount={toCancelCount}
                     isLoading={metricsLoading}
