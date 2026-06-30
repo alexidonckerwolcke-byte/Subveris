@@ -302,6 +302,18 @@ export default function HomePage() {
           <p className="text-xl text-muted-foreground max-w-3xl mb-12">
             Subveris combines elegant design, trusted privacy, and powerful analytics so you can turn recurring spending into a competitive advantage.
           </p>
+          <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-border/30 bg-slate-50 shadow-2xl shadow-slate-200/50 mb-12">
+            <div className="bg-white p-4 sm:p-6">
+              <div className="relative overflow-hidden rounded-[1.75rem] border border-border/20 bg-slate-50">
+                <img
+                  src="/assets/dashboard-screenshot.png"
+                  alt="Subveris dashboard screenshot"
+                  className="w-full rounded-[1.75rem] object-cover"
+                />
+                <div className="pointer-events-none absolute inset-0 rounded-[1.75rem] bg-gradient-to-t from-slate-950/10 via-transparent to-transparent" />
+              </div>
+            </div>
+          </div>
           <div className="grid md:grid-cols-3 gap-10">
             {featureHighlights.map((feature, index) => (
               <div key={index} className="flex flex-col gap-6 rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg transition-transform hover:-translate-y-1">
