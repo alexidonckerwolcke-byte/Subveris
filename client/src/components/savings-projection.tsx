@@ -24,6 +24,20 @@ interface SavingsProjectionProps {
   isLoading: boolean;
 }
 
+function getSavingsGoalStorageKey(currency: string, isFamilyMode: boolean, userId?: string, familyGroupId?: string) {
+  const normalizedCurrency = String(currency || 'USD').toUpperCase();
+  const suffix = isFamilyMode && familyGroupId ? `-family-${familyGroupId}` : userId ? `-user-${userId}` : '';
+  return `subveris-savings-goal-${normalizedCurrency}${suffix}`;
+}
+
+function getSavingsGoalLegacyKeys(isFamilyMode: boolean, userId?: string, familyGroupId?: string) {
+  const suffix = isFamilyMode && familyGroupId ? `-family-${familyGroupId}` : userId ? `-user-${userId}` : '';
+  return {
+    usd: `subveris-savings-goal-usd${suffix}`,
+    legacy: `subveris-savings-goal${suffix}`,
+  };
+}
+
 export function SavingsProjection({
   potentialSavings,
   currentSavings,
@@ -39,41 +53,38 @@ export function SavingsProjection({
 
   // Load user's saved goal from localStorage (family-aware)
   useEffect(() => {
-    // Use family-specific key in family mode, otherwise user-specific
-    const keySuffix = showFamilyData && familyGroupId ? `-${familyGroupId}` : (user?.id ? `-${user.id}` : '');
-    const stored = localStorage.getItem(`subveris-savings-goal-${currency}${keySuffix}`);
-    const usdStored = localStorage.getItem(`subveris-savings-goal-usd${keySuffix}`);
-    const legacy = localStorage.getItem(`subveris-savings-goal${keySuffix}`);
+    const storageKey = getSavingsGoalStorageKey(currency, showFamilyData === true, user?.id, familyGroupId);
+    const legacyKeys = getSavingsGoalLegacyKeys(showFamilyData === true, user?.id, familyGroupId);
 
-    if (stored) {
+    const stored = localStorage.getItem(storageKey);
+    if (stored !== null) {
       const goalValue = Number(stored);
-      if (!isNaN(goalValue) && goalValue > 0) {
-        // Convert from user's currency to USD for internal calculations
+      if (!isNaN(goalValue) && goalValue >= 0) {
         const goalUSD = convertAmount(goalValue, currency, 'USD');
         setUserGoalUSD(goalUSD);
       }
       return;
     }
 
-    if (usdStored) {
-      // Migrate from USD storage to currency-specific storage
+    const usdStored = localStorage.getItem(legacyKeys.usd);
+    if (usdStored !== null) {
       const usdValue = Number(usdStored);
-      if (!isNaN(usdValue) && usdValue > 0) {
+      if (!isNaN(usdValue) && usdValue >= 0) {
         setUserGoalUSD(usdValue);
-        localStorage.setItem(`subveris-savings-goal-${currency}${keySuffix}`, String(Math.round(convertAmount(usdValue, 'USD', currency) * 100) / 100));
-        localStorage.removeItem(`subveris-savings-goal-usd${keySuffix}`);
+        localStorage.setItem(storageKey, String(Math.round(convertAmount(usdValue, 'USD', currency) * 100) / 100));
+        localStorage.removeItem(legacyKeys.usd);
       }
       return;
     }
 
-    if (legacy) {
-      // Legacy value might have been stored in the user's selected currency
+    const legacy = localStorage.getItem(legacyKeys.legacy);
+    if (legacy !== null) {
       const legacyNum = Number(legacy);
-      if (!isNaN(legacyNum) && legacyNum > 0) {
+      if (!isNaN(legacyNum) && legacyNum >= 0) {
         const goalUSD = convertAmount(legacyNum, currency, 'USD');
         setUserGoalUSD(goalUSD);
-        localStorage.setItem(`subveris-savings-goal-${currency}${keySuffix}`, String(legacyNum));
-        localStorage.removeItem(`subveris-savings-goal${keySuffix}`);
+        localStorage.setItem(storageKey, String(legacyNum));
+        localStorage.removeItem(legacyKeys.legacy);
       }
       return;
     }

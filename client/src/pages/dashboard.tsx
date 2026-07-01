@@ -61,8 +61,10 @@ export default function Dashboard() {
   });
 
   const { data: familySavingsResponse, isLoading: familySavingsLoading } = useQuery<any>({
-    queryKey: ["/api/analytics/monthly-savings", "family", familyGroupId],
+    queryKey: ["/api/analytics/monthly-savings", "family", familyGroupId, new Date().toISOString().slice(0, 7)],
     enabled: showFamilyData === true && !!user?.id,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/analytics/monthly-savings?family=true");
       return response.json();
@@ -383,7 +385,9 @@ export default function Dashboard() {
 
     return {
       ...base,
-      totalMonthlySpend: showFamilyData ? currentChartTotal : base.totalMonthlySpend,
+      totalMonthlySpend: showFamilyData === true
+        ? (currentChartTotal || base.totalMonthlySpend)
+        : base.totalMonthlySpend,
       activeSubscriptions: activeSubsCount,
       monthlySpendChange: dynamicMetrics.monthlySpendChange,
       newServicesTracked: dynamicMetrics.newServicesTracked,
@@ -695,7 +699,9 @@ export default function Dashboard() {
           </div>
           <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Family mode</p>
-            <p className="mt-3 text-2xl font-semibold">{showFamilyData ? "Enabled" : "Personal"}</p>
+            <p className="mt-3 text-2xl font-semibold">
+              {!isFamilyDataModeReady ? "Loading..." : showFamilyData === true ? "Enabled" : "Personal"}
+            </p>
             <p className="mt-2 text-sm text-muted-foreground">View the right set of subscriptions for your account.</p>
           </div>
         </div>

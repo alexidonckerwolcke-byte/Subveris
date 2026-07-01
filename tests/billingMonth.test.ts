@@ -87,4 +87,13 @@ describe('billing month helpers', () => {
     const next = getAdvancedRenewalDateIfNeeded('2026-05-05', 'monthly', now);
     expect(next).toBeNull();
   });
+
+  it('auto-advances a renewal date when it is one or more days overdue', () => {
+    const now = new Date('2026-05-20');
+    const next = getAdvancedRenewalDateIfNeeded('2026-05-19', 'monthly', now);
+    expect(next).not.toBeNull();
+    if (next) {
+      expect(formatDateLocal(next)).toBe('2026-06-19');
+    }
+  });
 });

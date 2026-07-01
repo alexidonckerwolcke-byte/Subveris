@@ -102,6 +102,20 @@ function getCurrentMonthAmount(monthlyData: MonthlySpending[] | undefined) {
   return exactMatch ? exactMatch.amount : 0;
 }
 
+function getSavingsGoalStorageKey(currency: string, isFamilyMode: boolean, userId?: string, familyGroupId?: string) {
+  const normalizedCurrency = String(currency || 'USD').toUpperCase();
+  const suffix = isFamilyMode && familyGroupId ? `-family-${familyGroupId}` : userId ? `-user-${userId}` : '';
+  return `subveris-savings-goal-${normalizedCurrency}${suffix}`;
+}
+
+function getSavingsGoalLegacyKeys(isFamilyMode: boolean, userId?: string, familyGroupId?: string) {
+  const suffix = isFamilyMode && familyGroupId ? `-family-${familyGroupId}` : userId ? `-user-${userId}` : '';
+  return {
+    usd: `subveris-savings-goal-usd${suffix}`,
+    legacy: `subveris-savings-goal${suffix}`,
+  };
+}
+
 function computeFamilySavingsBreakdown(
   subscriptions: Subscription[],
   currentUserId: string | undefined,
@@ -149,21 +163,17 @@ function resolveFamilySavingsValue(serverValue: unknown, fallbackValue?: number)
     return fallbackNumber;
   }
 
-  if (numericServerValue === 0 && fallbackNumber !== 0) {
-    return fallbackNumber;
-  }
-
-  if (fallbackNumber !== 0 && Math.abs(numericServerValue - fallbackNumber) > 0.01) {
-    return fallbackNumber;
-  }
-
   return numericServerValue;
 }
 
 export default function Savings() {
   const { formatAmount, convertAmount, currency } = useCurrency();
   const { user } = useAuth();
-  const { familyGroupId, showFamilyData } = useFamilyDataMode();
+  const { familyGroupId, showFamilyData, isFamilyDataModeReady } = useFamilyDataMode();
+
+  const isFamilyMode = showFamilyData === true;
+  const isPersonalMode = showFamilyData === false;
+  const familyModePending = !isFamilyDataModeReady;
 
   // Personal metrics (always load)
   const { data: personalMetrics, isLoading: personalMetricsLoading } = useQuery<DashboardMetrics>({
@@ -178,8 +188,10 @@ export default function Savings() {
   });
 
   const { data: familySavingsResponse, isLoading: familySavingsLoading } = useQuery<any>({
-    queryKey: ["/api/analytics/monthly-savings", "family"],
-    enabled: showFamilyData && !!user?.id,
+    queryKey: ["/api/analytics/monthly-savings", "family", new Date().toISOString().slice(0, 7)],
+    enabled: showFamilyData === true && !!user?.id,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/analytics/monthly-savings?family=true");
       return response.json();
@@ -270,17 +282,25 @@ export default function Savings() {
 
   // compute metrics depending on mode
   let metrics: DashboardMetrics & { thisMonthSavingsOwner?: number; thisMonthSavingsMembers?: number } | undefined;
-  let metricsLoading = showFamilyData ? familyDataLoading : personalMetricsLoading;
+  let metricsLoading = familyModePending
+    ? true
+    : isFamilyMode
+      ? familyDataLoading
+      : personalMetricsLoading;
 
-  if (showFamilyData) {
+  if (isFamilyMode) {
     const hasServerFamilyMetrics = familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number';
     // Use server spending series for both owners and members
     const familyMonthlyData = familyData?.spending && familyData.spending.length > 0 ? familyData.spending : [];
     const totalMonthlySpendFromSpendingData = getCurrentMonthAmount(familyMonthlyData);
 
     if (hasServerFamilyMetrics) {
+      const totalMonthlySpend = familyMonthlyData.length > 0
+        ? totalMonthlySpendFromSpendingData
+        : Number(familyData.metrics.totalMonthlySpending) || 0;
+
       metrics = {
-        totalMonthlySpend: totalMonthlySpendFromSpendingData,
+        totalMonthlySpend,
         activeSubscriptions: familyData.metrics.activeSubscriptions || 0,
         potentialSavings: familySubscriptions.length > 0
           ? familySavingsComputed.potentialSavings
@@ -416,10 +436,13 @@ export default function Savings() {
       metrics = calculatedMetrics;
       metricsLoading = familyDataLoading;
     }
-  } else {
+  } else if (isPersonalMode) {
     // Use personal metrics when not in family mode
     metrics = personalMetrics;
     metricsLoading = personalMetricsLoading;
+  } else {
+    metrics = undefined;
+    metricsLoading = true;
   }
 
   // Personal spending (always load)
@@ -427,7 +450,11 @@ export default function Savings() {
     queryKey: ["/api/spending/monthly"],
   });
 
-  const spendingLoading = showFamilyData ? familyDataLoading : personalSpendingLoading;
+  const spendingLoading = familyModePending
+    ? true
+    : isFamilyMode
+      ? familyDataLoading
+      : personalSpendingLoading;
 
   // Compute monthly spending from subscriptions for family mode
   function computeMonthlySpendingFromFamilySubscriptions() {
@@ -481,11 +508,11 @@ export default function Savings() {
   }
 
   // Use server data if available for owner views, otherwise compute from visible family subscriptions.
-  const effectiveMonthlySpending = showFamilyData
+  const effectiveMonthlySpending = isFamilyMode
     ? ((familyData?.spending && familyData.spending.length > 0)
         ? familyData.spending
         : computeMonthlySpendingFromFamilySubscriptions())
-    : (personalSpending || []);
+    : (isPersonalMode ? (personalSpending || []) : []);
 
   // Normalize monthly spending into a fixed-length recent months series (defaults to 6 months)
   // Includes the current month and the previous months, with zero-fill for missing months.
@@ -530,15 +557,12 @@ export default function Savings() {
   // Load/migrate stored goal on mount and when user/family mode changes
   // BUT NOT on currency change alone, to prevent losing user's custom goal
   useEffect(() => {
-    // Use family-specific key in family mode, otherwise user-specific
-    const keySuffix = showFamilyData && familyGroupId ? `-${familyGroupId}` : (user?.id ? `-${user.id}` : '');
-    
-    // Try to load from all possible keys (current currency first, then legacy keys)
-    let found = false;
-    
-    // Try current currency key
-    const stored = localStorage.getItem(`subveris-savings-goal-${currency}${keySuffix}`);
-    if (stored) {
+    const storageKey = getSavingsGoalStorageKey(currency, isFamilyMode, user?.id, familyGroupId);
+    const legacyKeys = getSavingsGoalLegacyKeys(isFamilyMode, user?.id, familyGroupId);
+
+    // Try current currency key first
+    const stored = localStorage.getItem(storageKey);
+    if (stored !== null) {
       const goalValue = Number(stored);
       if (!isNaN(goalValue) && goalValue >= 0) {
         setStoredGoal(goalValue);
@@ -547,16 +571,16 @@ export default function Savings() {
         return;
       }
     }
-    
+
     // Try USD legacy key
-    const usdStored = localStorage.getItem(`subveris-savings-goal-usd${keySuffix}`);
-    if (usdStored) {
+    const usdStored = localStorage.getItem(legacyKeys.usd);
+    if (usdStored !== null) {
       const usdValue = Number(usdStored);
       if (!isNaN(usdValue) && usdValue >= 0) {
         const currencyValue = Math.round(convertAmount(usdValue, 'USD', currency) * 100) / 100;
         setStoredGoal(currencyValue);
-        localStorage.setItem(`subveris-savings-goal-${currency}${keySuffix}`, String(currencyValue));
-        localStorage.removeItem(`subveris-savings-goal-usd${keySuffix}`);
+        localStorage.setItem(storageKey, String(currencyValue));
+        localStorage.removeItem(legacyKeys.usd);
         setDisplayInput(String(currencyValue));
         setHasLoadedGoal(true);
         return;
@@ -564,13 +588,13 @@ export default function Savings() {
     }
 
     // Try generic legacy key
-    const legacy = localStorage.getItem(`subveris-savings-goal${keySuffix}`);
-    if (legacy) {
+    const legacy = localStorage.getItem(legacyKeys.legacy);
+    if (legacy !== null) {
       const legacyNum = Number(legacy);
-      if (!isNaN(legacyNum) && legacyNum > 0) {
+      if (!isNaN(legacyNum) && legacyNum >= 0) {
         setStoredGoal(legacyNum);
-        localStorage.setItem(`subveris-savings-goal-${currency}${keySuffix}`, String(legacyNum));
-        localStorage.removeItem(`subveris-savings-goal${keySuffix}`);
+        localStorage.setItem(storageKey, String(legacyNum));
+        localStorage.removeItem(legacyKeys.legacy);
         setDisplayInput(String(legacyNum));
         setHasLoadedGoal(true);
         return;
@@ -582,15 +606,15 @@ export default function Savings() {
     setStoredGoal(defaultInCurrency);
     setDisplayInput(String(defaultInCurrency));
     setHasLoadedGoal(true);
-  }, [showFamilyData, familyGroupId, user?.id]); // Only rerun on user/family mode change, NOT on currency alone
+  }, [showFamilyData, familyGroupId, user?.id, currency]);
 
   // When currency changes, update the displayed input to show the new currency value
   // but don't change the actual stored goal
   useEffect(() => {
     if (!hasLoadedGoal) return; // Wait for goal to be loaded first
     
-    const keySuffix = showFamilyData && familyGroupId ? `-${familyGroupId}` : (user?.id ? `-${user.id}` : '');
-    const stored = localStorage.getItem(`subveris-savings-goal-${currency}${keySuffix}`);
+    const storageKey = getSavingsGoalStorageKey(currency, isFamilyMode, user?.id, familyGroupId);
+    const stored = localStorage.getItem(storageKey);
     
     if (stored) {
       const goalValue = Number(stored);
@@ -638,21 +662,22 @@ export default function Savings() {
     // Round to 2 decimal places to avoid precision issues
     const roundedDisplayVal = Math.round(displayVal * 100) / 100;
     setStoredGoal(roundedDisplayVal);
-    // Use family-specific key in family mode, otherwise user-specific
-    const keySuffix = showFamilyData && familyGroupId ? `-${familyGroupId}` : (user?.id ? `-${user.id}` : '');
-    localStorage.setItem(`subveris-savings-goal-${currency}${keySuffix}`, String(roundedDisplayVal));
+
+    const storageKey = getSavingsGoalStorageKey(currency, isFamilyMode, user?.id, familyGroupId);
+    localStorage.setItem(storageKey, String(roundedDisplayVal));
+
     // Notify other components in this window that the savings goal was updated
     try {
       window.dispatchEvent(new CustomEvent('savingsGoalUpdated', { detail: convertAmount(roundedDisplayVal, currency, 'USD') }));
     } catch (e) {
       // ignore in non-browser environments
     }
-    // Update display input with the rounded value
+
     setDisplayInput(String(roundedDisplayVal));
   };
 
   const fallbackFamilySavings = computeFamilySavingsBreakdown(familySubscriptions, user?.id, convertAmount);
-  const familySavings = showFamilyData
+  const familySavings = isFamilyMode
     ? {
         totalSavings: resolveFamilySavingsValue(
           familySavingsResponse?.monthlySavings,
@@ -669,13 +694,15 @@ export default function Savings() {
       }
     : { ownerSavings: 0, memberSavings: 0, totalSavings: 0 };
 
-  const currentSavings = showFamilyData
+  const currentSavings = isFamilyMode
     ? familySavings.totalSavings
-    : Math.max(metrics?.thisMonthSavings ?? 0, personalDeletedSavings);
-  const familyOwnerSavings = showFamilyData
+    : isPersonalMode
+      ? Math.max(metrics?.thisMonthSavings ?? 0, personalDeletedSavings)
+      : 0;
+  const familyOwnerSavings = isFamilyMode
     ? familySavings.ownerSavings
     : 0;
-  const familyMemberSavings = showFamilyData
+  const familyMemberSavings = isFamilyMode
     ? familySavings.memberSavings
     : 0;
 
@@ -813,7 +840,7 @@ export default function Savings() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <Target className="h-5 w-5" />
-                {showFamilyData ? "Family Savings Goal" : "Savings Goal"}
+                {!familyModePending && isFamilyMode ? "Family Savings Goal" : "Savings Goal"}
               </CardTitle>
               <div className="flex items-center gap-2">
                 <input
@@ -836,7 +863,7 @@ export default function Savings() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {showFamilyData ? "Family progress this month" : "Progress this month"}
+                    {!familyModePending && isFamilyMode ? "Family progress this month" : "Progress this month"}
                   </span>
                   <span className="font-medium">
                     {formatAmount(currentSavingsInCurrency, currency)} of {formatAmount(computedDisplayGoal, currency)}

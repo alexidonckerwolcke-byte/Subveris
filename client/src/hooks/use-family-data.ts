@@ -40,6 +40,15 @@ export function useFamilyDataMode() {
         : familySettings?.show_family_data === true
       : false;
 
+  if (familyGroupsLoading) {
+    return {
+      familyGroupId: undefined,
+      showFamilyData: undefined,
+      isInFamily: false,
+      isFamilyDataModeReady: false,
+    };
+  }
+
   // Safety: if no group, clear any state that depends on being in a group
   if (!familyGroups || familyGroups.length === 0) {
     return {
