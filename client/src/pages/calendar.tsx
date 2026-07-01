@@ -30,11 +30,12 @@ export default function Calendar() {
     enabled: !!familyGroupId,
   });
 
-  // Build the subscriptions list. For family mode include only visible family
-  // subscriptions for the current user.
+  // Build the subscriptions list. For family mode include the current user's
+  // personal subscriptions plus any visible family subscriptions.
   let subscriptions: Subscription[] = personalSubscriptions;
   if (showFamilyData && familyData) {
-    subscriptions = getVisibleFamilySubscriptions(familyData, user?.id);
+    const visibleFamilySubscriptions = getVisibleFamilySubscriptions(familyData, user?.id);
+    subscriptions = dedupeById([...personalSubscriptions, ...visibleFamilySubscriptions]);
   }
 
   // Normalize subscription objects to ensure `nextBillingDate` is available
@@ -112,10 +113,11 @@ export default function Calendar() {
     const today = parseDateOnlyLocal(new Date());
     if (!today) return;
 
-    // Process PERSONAL subscriptions only for auto-advance (not family members')
+    // Process the currently visible subscriptions, including family member
+    // subscriptions when family mode is active.
     (async () => {
       const updates: Array<Promise<any>> = [];
-      for (const sub of personalSubscriptions) {
+      for (const sub of subscriptions) {
         try {
           // Normalize the billing date field (API may return next_billing_at or next_billing_date)
           const billingDateField = (sub as any).nextBillingDate || (sub as any).next_billing_date || (sub as any).next_billing_at || (sub as any).next_billing || (sub as any).next_billingDate;
@@ -166,7 +168,7 @@ export default function Calendar() {
       }
     })();
 
-  }, [personalSubscriptions, updateRenewalDateMutation]);
+  }, [subscriptions, updateRenewalDateMutation, queryClient, familyGroupId]);
 
   // Combine calendar events with subscription renewal dates using useMemo
   const calendarEventsWithRenewals = useMemo(() => {
