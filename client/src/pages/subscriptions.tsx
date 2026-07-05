@@ -381,7 +381,7 @@ export default function Subscriptions() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Subscriptions</h1>
             <p className="text-muted-foreground">
-              Manage and track all your recurring payments.
+              Optimize all your recurring payments and uncover savings opportunities.
             </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -509,8 +509,8 @@ export default function Subscriptions() {
                           <Input placeholder="e.g., spotify.com" {...field} data-testid="input-website-domain" />
                         </FormControl>
                         <div className="text-xs text-muted-foreground">
-                          Add the site domain here if you want browser extension visits to be auto-tracked.
-                          Leave blank if you only want to track the subscription manually.
+                          Add the site domain here to power browser extension usage optimization for this subscription.
+                          Leave blank if you prefer to keep this subscription in manual optimization mode.
                         </div>
                         <FormMessage />
                       </FormItem>

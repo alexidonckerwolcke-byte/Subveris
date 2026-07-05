@@ -177,9 +177,9 @@
 
   body {
     @apply font-sans antialiased text-foreground;
-    background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 28%),
-                radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.12), transparent 28%),
-                hsl(var(--background));
+    background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(96, 165, 250, 0.12), transparent 28%),
+                linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
     color: hsl(var(--foreground));
     min-height: 100vh;
     background-attachment: fixed;
@@ -192,11 +192,11 @@
   .card,
   .panel,
   .section {
-    border: 1px solid hsla(215, 18%, 75%, 0.18);
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(18px);
-    border-radius: 1.5rem;
-    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.09);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(22px);
+    border-radius: 1.75rem;
+    box-shadow: 0 32px 90px rgba(15, 23, 42, 0.10);
   }
   *,
   *::before,

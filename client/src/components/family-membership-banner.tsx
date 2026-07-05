@@ -116,7 +116,7 @@ export function FamilyMembershipBanner() {
             <div className="flex items-center gap-2">
               <Link href="/family-sharing">
                 <Button size="sm" variant="outline">
-                  Manage <ChevronRight className="h-4 w-4 ml-1" />
+                  View <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </Link>
               <Button

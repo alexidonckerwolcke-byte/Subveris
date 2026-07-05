@@ -690,7 +690,7 @@ export default function Dashboard() {
           <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Spend snapshot</p>
             <p className="mt-3 text-2xl font-semibold">{subscriptions?.length || 0} services</p>
-            <p className="mt-2 text-sm text-muted-foreground">Track what matters most in one place.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Optimize what matters most in one place.</p>
           </div>
           <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Savings focus</p>
@@ -772,7 +772,7 @@ export default function Dashboard() {
         <div className="mt-12">
           <div className="mb-6">
             <h2 className="text-2xl font-bold tracking-tight">Active Subscriptions</h2>
-            <p className="text-muted-foreground mt-1">Manage and monitor your subscriptions</p>
+            <p className="text-muted-foreground mt-1">Optimize your subscriptions</p>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {subsLoading ? (
@@ -791,7 +791,7 @@ export default function Dashboard() {
               <div className="col-span-full text-center py-16 px-6">
                 <div className="bg-card/50 border border-border/50 rounded-lg p-12">
                   <p className="text-lg text-muted-foreground font-medium mb-2">No active subscriptions found</p>
-                  <p className="text-sm text-muted-foreground">Install our browser extension and manually add your subscriptions to start tracking usage</p>
+                  <p className="text-sm text-muted-foreground">Install our browser extension or add your subscriptions manually to start optimizing spend and saving money</p>
                 </div>
               </div>
             )}

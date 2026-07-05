@@ -152,7 +152,7 @@ export function FamilySharingManager({ subscriptions }: FamilySharingProps) {
                 <Users className="h-5 w-5" />
                 Family Groups
               </CardTitle>
-              <CardDescription>Manage and share subscriptions with family members</CardDescription>
+              <CardDescription>Share subscriptions with family members and optimize group spending</CardDescription>
             </div>
             <Button
               onClick={() => setShowNewGroup(!showNewGroup)}

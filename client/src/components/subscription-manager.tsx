@@ -284,9 +284,9 @@ export function SubscriptionManager() {
             <div className="space-y-2">
               <h4 className="font-medium">Premium Features Include:</h4>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Unlimited subscriptions tracking</li>
+                <li>• Unlimited subscription optimization</li>
                 <li>• AI-powered recommendations</li>
-                <li>• Browser extension tracking</li>
+                <li>• Browser extension optimization</li>
                 <li>• Cost-per-use analysis</li>
                 <li>• Behavioral insights</li>
                 <li>• Savings projections</li>

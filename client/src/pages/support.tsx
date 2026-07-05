@@ -46,7 +46,7 @@ export default function Support() {
               <Button variant="ghost" className="w-full justify-start h-auto p-2">
                 <div className="text-left">
                   <div className="font-medium text-sm">How do I add a subscription?</div>
-                  <div className="text-xs text-muted-foreground">Learn to track your subscriptions</div>
+                  <div className="text-xs text-muted-foreground">Learn to optimize your subscriptions</div>
                 </div>
               </Button>
               <Button variant="ghost" className="w-full justify-start h-auto p-2">

@@ -38,9 +38,9 @@ export default function PricingPage() {
       tier: "free",
       price: "0,00 €",
       period: "forever",
-      description: "Perfect for getting started with subscription tracking",
+      description: "Perfect for getting started with subscription optimization",
       features: [
-        "Track up to 5 subscriptions",
+        "Optimize up to 5 recurring services",
         "Cost-per-use analytics for up to 2 subscriptions",
         "Basic spending overview",
         "Monthly spending reports",
@@ -58,7 +58,7 @@ export default function PricingPage() {
       features: [
         "Unlimited subscriptions",
         "AI-powered recommendations",
-        "Browser extension tracking",
+        "Browser extension optimization",
         "Cost-per-use analytics",
         "Behavioral insights",
         "Savings projections",
@@ -72,16 +72,16 @@ export default function PricingPage() {
       tier: "family",
       price: "14,99 €",
       period: "per month",
-      description: "Share subscriptions and manage family finances together",
+      description: "Share subscriptions and optimize family spending together",
       features: [
         "All Premium Features",
         "Unlimited subscriptions",
         "AI-powered recommendations",
-        "Browser extension tracking",
+        "Browser extension optimization",
         "Cost-per-use analytics",
         "Behavioral insights",
         "Savings projections",
-        "Family group management",
+        "Family spending insights",
         "Share subscriptions with family",
         "Split costs with family members",
         "Family spending overview",
@@ -166,6 +166,30 @@ export default function PricingPage() {
     },
   });
 
+  const schedulePlanChangeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/stripe/schedule-plan-change");
+      return res.json();
+    },
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/stripe/subscription-status"] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/user/premium-status'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/user/premium-status'] });
+      toast({
+        title: "Premium Downgrade Scheduled",
+        description: data?.message || "Your plan will switch to Premium at the end of your current billing period.",
+      });
+    },
+    onError: (error) => {
+      const errorMessage = error instanceof Error ? error.message : "Failed to schedule the plan downgrade.";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/stripe/cancel-subscription");
@@ -244,7 +268,9 @@ export default function PricingPage() {
       setLocation("/family-sharing");
       return;
     }
-    if (plan.tier === "premium" || plan.tier === "family") {
+    if (plan.tier === "premium" && currentTier === "family") {
+      schedulePlanChangeMutation.mutate();
+    } else if (plan.tier === "premium" || plan.tier === "family") {
       // Upgrade to premium or family - use Stripe checkout
       createCheckoutMutation.mutate(plan.tier);
     } else if (plan.tier === "free" && (currentTier === "premium" || currentTier === "family")) {
@@ -267,6 +293,9 @@ export default function PricingPage() {
     }
     
     if (plan.tier === "premium" || plan.tier === "family") {
+      if (plan.tier === "premium" && currentTier === "family") {
+        return schedulePlanChangeMutation.isPending ? "Scheduling..." : "Schedule Premium Downgrade";
+      }
       return createCheckoutMutation.isPending ? "Redirecting..." : plan.tier === "family" ? "Upgrade to Family" : "Upgrade to Premium";
     }
     
@@ -370,7 +399,7 @@ export default function PricingPage() {
             Premium Plans
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed mb-8">
-            Choose the perfect plan for your subscription management needs. Upgrade, downgrade, or cancel anytime with complete flexibility.
+            Choose the perfect plan for your optimization goals. Upgrade, downgrade, or cancel anytime with complete flexibility.
           </p>
           {priceConfigError ? (
             <div className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 mb-8">

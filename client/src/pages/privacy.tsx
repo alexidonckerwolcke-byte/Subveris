@@ -8,7 +8,7 @@ export default function Privacy() {
         <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Privacy Policy</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white">How Subveris protects your data</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
-          We design our service to keep your information secure, encrypted, and used only in ways that help you manage subscriptions.
+          We design our service to keep your information secure, encrypted, and used only in ways that help you optimize recurring spending.
           This page explains what we collect, why we collect it, and how we safeguard it.
         </p>
         <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5 text-sm text-slate-300 shadow-lg shadow-slate-950/20">
@@ -36,7 +36,8 @@ export default function Privacy() {
               <h2 className="text-lg font-semibold">Data We Collect</h2>
               <ul className="mt-3 space-y-2 text-muted-foreground list-disc pl-6">
                 <li>Account information such as name and email when you sign up.</li>
-                <li>Subscription details you enter and usage tracking from our browser extension.</li>
+                <li>Subscription details you enter and usage data from our browser extension.
+                </li>
                 <li>Billing and payment information for Premium purchases processed through Stripe.</li>
                 <li>Usage analytics and product insights to improve the service.</li>
               </ul>
@@ -45,7 +46,7 @@ export default function Privacy() {
             <div>
               <h2 className="text-lg font-semibold">How We Use Your Data</h2>
               <p className="mt-3 text-muted-foreground">
-                We use data to deliver and improve Subveris, provide insights, track subscriptions, and process payments.
+                We use data to deliver and improve Subveris, provide insights, optimize recurring spend, and process payments.
                 We do not sell your personal data to third parties.
               </p>
             </div>
@@ -53,7 +54,7 @@ export default function Privacy() {
             <div>
               <h2 className="text-lg font-semibold">Third-Party Services</h2>
               <p className="mt-3 text-muted-foreground">
-                We use Stripe to process payments and Supabase to store your content. Our browser extension tracks usage anonymously,
+                We use Stripe to process payments and Supabase to store your content. Our browser extension captures usage anonymously,
                 and third-party services operate under their own privacy terms.
               </p>
             </div>
