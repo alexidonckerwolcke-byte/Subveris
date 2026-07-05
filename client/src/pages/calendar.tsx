@@ -295,8 +295,8 @@ export default function Calendar() {
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Subscription Calendar</h2>
-          <p className="text-muted-foreground">Track renewal dates and manage your subscription timeline</p>
+          <h2 className="text-3xl font-bold tracking-tight">Renewal Calendar</h2>
+          <p className="text-muted-foreground">Track renewal dates and optimize your billing timeline</p>
         </div>
       </div>
 
@@ -307,7 +307,7 @@ export default function Calendar() {
           <p className="mt-2 text-sm text-muted-foreground">Renewals scheduled from today onward</p>
         </div>
         <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Subscriptions tracked</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Subscriptions visible</p>
           <p className="mt-4 text-4xl font-bold">{subscriptions.length}</p>
           <p className="mt-2 text-sm text-muted-foreground">Total active and visible subscriptions</p>
         </div>

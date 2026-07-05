@@ -35,9 +35,9 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
       price: "0,00 €",
       description: 'Perfect for getting started',
       features: [
-        'Track up to 5 subscriptions',
+        'Optimize up to 5 recurring services',
         'Basic spending overview',
-        'Monthly spending reports',
+        'Monthly savings reports',
       ],
     },
     {
@@ -49,7 +49,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
       features: [
         "Unlimited subscriptions",
         "AI-powered recommendations",
-        "Browser extension tracking",
+        "Browser extension optimization",
         "Cost-per-use analytics",
       ],
       popular: true,
@@ -64,7 +64,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
         'Everything in Premium',
         'Up to 5 family members',
         'Shared savings dashboard',
-        'Family subscription alerts',
+        'Family subscription optimization',
       ],
     },
   ];

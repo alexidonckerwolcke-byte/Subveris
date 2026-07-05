@@ -35,17 +35,17 @@ interface TutorialStep {
 const tutorialSteps: TutorialStep[] = [
   {
     title: "Welcome to Subveris!",
-    description: "Your personal subscription management assistant",
+    description: "Your personal subscription optimization assistant",
     icon: CheckCircle2,
     content: (
       <div className="text-center space-y-4">
         <div className="text-6xl">🎉</div>
         <p className="text-lg">
-          Subveris helps you track recurring bills, discover savings, and keep your family subscriptions organized.
+          Subveris helps you optimize recurring bills, discover savings, and keep your family subscriptions organized.
         </p>
       </div>
     ),
-    features: ["Subscription tracking", "Savings insights", "Family sharing"],
+    features: ["Subscription optimization", "Savings insights", "Family sharing"],
   },
   {
     title: "Dashboard Overview",
@@ -73,29 +73,29 @@ const tutorialSteps: TutorialStep[] = [
     features: ["Spend summary", "Renewal alerts", "Savings suggestions"],
   },
   {
-    title: "Manage Subscriptions",
-    description: "Add, edit, and organize your services",
+    title: "Optimize Subscriptions",
+    description: "Add, analyze, and improve your service spend",
     icon: CreditCard,
     content: (
       <div className="space-y-4">
-        <p>Use the Subscriptions page to keep everything current:</p>
+        <p>Use the Subscriptions page to tune your recurring spend:</p>
         <div className="space-y-3">
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">➕ Add subscriptions manually</p>
+            <p className="font-medium">➕ Add subscriptions to your optimizer</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">📝 Edit payment amounts and renewal dates</p>
+            <p className="font-medium">📝 Adjust costs, renewal timing, and usage assumptions</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">🔍 Filter by category or status</p>
+            <p className="font-medium">🔍 Filter services by savings opportunity</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">🗑️ Remove services you no longer use</p>
+            <p className="font-medium">🗑️ Remove services you no longer need</p>
           </div>
         </div>
       </div>
     ),
-    features: ["Add / edit subscriptions", "Renewal tracking", "Category filters"],
+    features: ["Add / edit subscriptions", "Savings insights", "Cost-per-use filters"],
   },
   {
     title: "Insights & Savings",
@@ -124,7 +124,7 @@ const tutorialSteps: TutorialStep[] = [
   },
   {
     title: "Family Sharing",
-    description: "Share subscriptions and manage family costs",
+    description: "Share subscriptions and optimize family costs",
     icon: Users,
     content: (
       <div className="space-y-4">
@@ -140,12 +140,12 @@ const tutorialSteps: TutorialStep[] = [
             <p className="font-medium">💳 See combined family spending</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">⚖️ Manage who sees shared data</p>
+            <p className="font-medium">⚖️ Control who sees shared data</p>
           </div>
         </div>
       </div>
     ),
-    features: ["Family group management", "Shared subscriptions", "Shared spending"],
+    features: ["Family spending insights", "Shared subscriptions", "Shared spending"],
   },
   {
     title: "Settings & Security",
@@ -165,7 +165,7 @@ const tutorialSteps: TutorialStep[] = [
             <p className="font-medium">📘 Retake the onboarding tutorial anytime</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">🧾 Manage account preferences and profile info</p>
+            <p className="font-medium">🧾 Control account preferences and profile info</p>
           </div>
         </div>
       </div>

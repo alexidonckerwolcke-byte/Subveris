@@ -76,6 +76,11 @@ export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, tot
     return "bg-chart-2"; // green
   };
 
+  const dedupedAnalyses = dedupeByKey(analyses, 'subscriptionId') ?? [];
+  const visibleAnalyses = showUpgradePrompt
+    ? dedupedAnalyses.slice(0, maxAllowed)
+    : dedupedAnalyses.slice(0, isExpanded ? undefined : 3);
+
   return (
     <Card>
       <CardHeader>
@@ -88,9 +93,7 @@ export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, tot
       </CardHeader>
       <CardContent>
         <div className="space-y-5">
-          {dedupeByKey(analyses, 'subscriptionId')
-            .slice(0, isExpanded ? undefined : 3)
-            .map((analysis) => {
+          {visibleAnalyses.map((analysis) => {
             const ratingConfig = getRatingBadge(analysis.valueRating);
             const usageCount = Number(analysis.usageCount || 0);
             const percent = getProgressPercentByUsage(usageCount);
@@ -142,7 +145,7 @@ export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, tot
         {(!analyses || analyses.length === 0) && (
           <div className="text-center py-8 text-muted-foreground">
             <p>No usage data available yet.</p>
-            <p className="text-sm">Connect your accounts to start tracking.</p>
+            <p className="text-sm">Connect your accounts to start optimizing your spend.</p>
           </div>
         )}
         {showUpgradePrompt && totalSubscriptions > maxAllowed && (
@@ -166,7 +169,7 @@ export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, tot
             </div>
           </div>
         )}
-        {analyses && analyses.length > 3 && (
+        {!showUpgradePrompt && dedupedAnalyses.length > 3 && (
           <div className="mt-4 border-t border-border pt-4">
             <Button className="w-full" variant="outline" onClick={() => setIsExpanded(!isExpanded)}>
               {isExpanded ? (
@@ -177,7 +180,7 @@ export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, tot
               ) : (
                 <>
                   <ChevronDown className="h-4 w-4 mr-2" />
-                  Show All {analyses.length} Items
+                  Show All {dedupedAnalyses.length} Items
                 </>
               )}
             </Button>

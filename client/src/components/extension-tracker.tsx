@@ -20,10 +20,10 @@ export function ExtensionTracker({ subscriptions }: ExtensionTrackerProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" />
-            Browser Extension Tracking
+            Browser Extension Optimization
           </CardTitle>
           <CardDescription>
-            Set website domains for your subscriptions to enable automatic usage tracking
+            Set website domains for your subscriptions to enable automated usage-based optimization
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -33,7 +33,7 @@ export function ExtensionTracker({ subscriptions }: ExtensionTrackerProps) {
               No subscriptions have website domains configured yet.
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              Edit your subscriptions and add a website domain (for example, spotify.com) to enable automatic usage tracking.
+              Edit your subscriptions and add a website domain (for example, spotify.com) to enable browser extension optimization.
             </p>
           </div>
         </CardContent>
@@ -46,10 +46,10 @@ export function ExtensionTracker({ subscriptions }: ExtensionTrackerProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Activity className="h-5 w-5" />
-          Browser Extension Tracking
+          Browser Extension Optimization
         </CardTitle>
         <CardDescription>
-          Subscriptions being tracked by the browser extension
+          Subscriptions being captured for usage-based optimization
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -82,8 +82,8 @@ export function ExtensionTracker({ subscriptions }: ExtensionTrackerProps) {
           <ul className="list-disc list-inside space-y-1 text-xs">
             <li>Install the Subveris browser extension from your browser's app store</li>
             <li>Log in on Subveris to sync your account</li>
-            <li>The extension automatically tracks time spent on tracked domains</li>
-            <li>Usage counts update in real-time as you visit these websites</li>
+            <li>The extension automatically monitors time spent on linked subscription domains</li>
+            <li>Usage counts update in real-time as you use these services</li>
           </ul>
         </div>
       </CardContent>

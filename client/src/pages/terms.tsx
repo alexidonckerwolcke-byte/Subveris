@@ -35,7 +35,7 @@ export default function Terms() {
             <div>
               <h2 className="text-lg font-semibold">Use of the Service</h2>
               <p className="mt-3 text-muted-foreground">
-                Subveris is built for personal subscription tracking and premium optimization. You must provide accurate information
+                Subveris is built for personal subscription optimization. You must provide accurate information
                 and act in compliance with applicable laws.
               </p>
             </div>

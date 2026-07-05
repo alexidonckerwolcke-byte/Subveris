@@ -157,7 +157,7 @@ export default function Files() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Files & Extensions</h1>
+        <h1 className="text-3xl font-bold">Browser Extension Setup</h1>
       </div>
 
       <Tabs defaultValue="tutorial" className="w-full">
@@ -185,7 +185,7 @@ export default function Files() {
               <Alert className="bg-blue-50 border-blue-200">
                 <Chrome className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-blue-900">
-                  Our browser extension tracks your subscription usage patterns to provide you with AI-powered insights and recommendations.
+                  Our browser extension captures subscription usage patterns to provide you with AI-powered insights and optimization recommendations.
                 </AlertDescription>
               </Alert>
 
@@ -201,9 +201,9 @@ export default function Files() {
                       1
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Download the Extension File</p>
+                      <p className="font-semibold text-sm">Download the Optimization Extension</p>
                       <p className="text-sm text-muted-foreground">
-                        Download the extension files package
+                        Download the Subveris browser extension package for optimization.
                       </p>
                       <Button 
                         variant="outline" 
@@ -344,7 +344,7 @@ export default function Files() {
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex gap-2">
                     <span className="text-primary font-bold">•</span>
-                    The extension will automatically track your visits to subscription websites
+                    The extension will automatically monitor your visits to linked subscription websites
                   </li>
                   <li className="flex gap-2">
                     <span className="text-primary font-bold">•</span>
@@ -375,7 +375,7 @@ export default function Files() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                Download the browser extension as a ZIP file. Extract and load it into your browser to start tracking subscription usage.
+                Download the browser extension as a ZIP file. Extract and load it into your browser to start optimizing subscription usage.
               </p>
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -383,12 +383,12 @@ export default function Files() {
                   <AlertTriangle className="h-5 w-5 text-amber-400" />
                   <div className="ml-3">
                     <h3 className="text-sm font-medium text-amber-800">
-                      Usage Tracking Behavior
+                      Usage Optimization Behavior
                     </h3>
                     <div className="mt-2 text-sm text-amber-700">
                       <p>
-                        The extension tracks time spent on subscription websites when you navigate away from or close tabs.
-                        This means it may track usage even if tabs are left open in the background without active engagement.
+                        The extension measures time spent on linked subscription websites when you navigate away from or close tabs.
+                        This means it may record usage even if tabs are left open in the background without active engagement.
                       </p>
                     </div>
                   </div>

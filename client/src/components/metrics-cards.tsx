@@ -43,7 +43,7 @@ export function MetricsCards({ metrics, isLoading }: MetricsCardsProps) {
       change: `+${metrics?.newServicesTracked ?? 0}`,
       changeType: "neutral" as const,
       icon: CreditCard,
-      description: "services tracked",
+      description: "new services added",
       testId: "metric-active-subs",
     },
     {
