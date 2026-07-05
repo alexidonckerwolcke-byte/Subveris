@@ -1287,15 +1287,33 @@ runtimeDeno?.serve?.(async (req: Request) => {
           });
         }
 
-        // Use the stored plan_type from database
-        const planType: "free" | "premium" | "family" = (userData.plan_type || "free") as "free" | "premium" | "family";
-        const isPremium = (planType === "premium" || planType === "family") && userData.status === "active";
+        const now = new Date();
+        const periodEnd = userData.current_period_end ? new Date(userData.current_period_end) : null;
+        const expiredScheduledCancellation = Boolean(
+          userData.cancel_at_period_end && periodEnd && periodEnd <= now
+        );
+        const effectiveStatus = expiredScheduledCancellation ? "canceled" : (userData.status || "active");
+        const rawPlanType: "free" | "premium" | "family" = (userData.plan_type || "free") as "free" | "premium" | "family";
+        const isPremium = (rawPlanType === "premium" || rawPlanType === "family") && effectiveStatus === "active";
+        const planType: "free" | "premium" | "family" = isPremium ? rawPlanType : "free";
+
+        if (expiredScheduledCancellation) {
+          await supabase
+            .from("user_subscriptions")
+            .update({
+              status: "canceled",
+              plan_type: "free",
+              cancel_at_period_end: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+        }
 
         return sendJson({
           isPremium,
           planType,
-          status: userData.status || "active",
-          cancelAtPeriodEnd: userData.cancel_at_period_end || false,
+          status: effectiveStatus,
+          cancelAtPeriodEnd: expiredScheduledCancellation ? false : (userData.cancel_at_period_end || false),
           currentPeriodEnd: userData.current_period_end,
         });
       } catch (err) {
@@ -3495,15 +3513,274 @@ runtimeDeno?.serve?.(async (req: Request) => {
     }
 
     if (pathname === "/stripe/subscription-status" && req.method === "GET") {
-      return sendJson({ status: "free", tier: "free" });
+      const userId = extractUserId(req);
+      if (!userId) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const { data: userData, error } = await supabase
+        .from("user_subscriptions")
+        .select("stripe_subscription_id, plan_type, status, current_period_end, cancel_at_period_end")
+        .eq("user_id", userId)
+        .single();
+
+      if (error || !userData) {
+        return sendJson({ status: "free", tier: "free" });
+      }
+
+      return sendJson({
+        status: userData.status || "active",
+        tier: userData.plan_type || "free",
+        cancelAtPeriodEnd: userData.cancel_at_period_end || false,
+        currentPeriodEnd: userData.current_period_end,
+        stripeSubscriptionId: userData.stripe_subscription_id ?? null,
+      });
+    }
+
+    if (pathname === "/stripe/schedule-plan-change" && req.method === "POST") {
+      const userId = extractUserId(req);
+      if (!userId) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const { data: userData, error: userError } = await supabase
+        .from("user_subscriptions")
+        .select("stripe_subscription_id, plan_type")
+        .eq("user_id", userId)
+        .single();
+
+      if (userError || !userData?.stripe_subscription_id) {
+        return sendJson({ error: "No Stripe subscription found" }, { status: 400 });
+      }
+
+      if (userData.plan_type !== "family") {
+        return sendJson({ error: "Only family subscriptions can be downgraded to Premium." }, { status: 400 });
+      }
+
+      const stripeSecretKey = Deno?.env?.get("STRIPE_SECRET_KEY") ?? "";
+      if (!stripeSecretKey) {
+        return sendJson({ error: "Stripe not configured" }, { status: 500 });
+      }
+
+      const premiumPriceId = Deno?.env?.get("STRIPE_PREMIUM_PRICE_ID")
+        || Deno?.env?.get("VITE_STRIPE_PREMIUM_PRICE_ID")
+        || "";
+      if (!premiumPriceId) {
+        return sendJson({ error: "Stripe premium price ID is not configured" }, { status: 500 });
+      }
+
+      const auth = btoa(stripeSecretKey + ":");
+      const subscriptionRes = await fetch(`https://api.stripe.com/v1/subscriptions/${userData.stripe_subscription_id}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Basic ${auth}`,
+        },
+      });
+
+      if (!subscriptionRes.ok) {
+        const fetchError = await subscriptionRes.text();
+        console.error("[Stripe] Failed to retrieve subscription for plan change:", subscriptionRes.status, fetchError);
+        return sendJson({ error: "Failed to retrieve Stripe subscription" }, { status: 500 });
+      }
+
+      const subscriptionData = await subscriptionRes.json();
+      const currentItem = subscriptionData.items?.data?.find((item: any) => item?.price?.type === "recurring" && item?.quantity > 0);
+      if (!currentItem || !currentItem.id || !currentItem.price?.id) {
+        return sendJson({ error: "Unable to determine current subscription item" }, { status: 400 });
+      }
+
+      const currentPeriodStart = Number(subscriptionData.current_period_start);
+      const currentPeriodEnd = Number(subscriptionData.current_period_end);
+      if (!currentPeriodStart || !currentPeriodEnd) {
+        return sendJson({ error: "Unable to determine current billing period" }, { status: 400 });
+      }
+
+      const currentQuantity = Number(currentItem.quantity ?? 1);
+      const currentInterval = currentItem.price?.recurring?.interval ?? "month";
+      const currentIntervalCount = Number(currentItem.price?.recurring?.interval_count ?? 1);
+      const scheduleId = subscriptionData.schedule as string | null;
+      let activeScheduleId = scheduleId;
+
+      if (!activeScheduleId) {
+        const createScheduleRes = await fetch(`https://api.stripe.com/v1/subscription_schedules`, {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${auth}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            from_subscription: userData.stripe_subscription_id,
+            end_behavior: "release",
+          }),
+        });
+
+        if (!createScheduleRes.ok) {
+          const scheduleError = await createScheduleRes.text();
+          console.error("[Stripe] Failed to create subscription schedule:", createScheduleRes.status, scheduleError);
+          return sendJson({ error: "Failed to schedule plan change" }, { status: 500 });
+        }
+
+        const scheduleData = await createScheduleRes.json();
+        activeScheduleId = scheduleData.id;
+        if (!activeScheduleId) {
+          return sendJson({ error: "Failed to schedule plan change" }, { status: 500 });
+        }
+      }
+
+      const updateScheduleParams = new URLSearchParams();
+      updateScheduleParams.set("phases[0][items][0][price]", currentItem.price.id);
+      updateScheduleParams.set("phases[0][items][0][quantity]", String(currentQuantity));
+      updateScheduleParams.set("phases[0][start_date]", String(currentPeriodStart));
+      updateScheduleParams.set("phases[0][end_date]", String(currentPeriodEnd));
+      updateScheduleParams.set("phases[1][items][0][price]", premiumPriceId);
+      updateScheduleParams.set("phases[1][items][0][quantity]", String(currentQuantity));
+      updateScheduleParams.set("phases[1][duration][interval]", currentInterval);
+      updateScheduleParams.set("phases[1][duration][interval_count]", String(currentIntervalCount));
+      updateScheduleParams.set("proration_behavior", "none");
+      updateScheduleParams.set("end_behavior", "release");
+
+      const updateScheduleRes = await fetch(`https://api.stripe.com/v1/subscription_schedules/${activeScheduleId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: updateScheduleParams,
+      });
+
+      if (!updateScheduleRes.ok) {
+        const updateError = await updateScheduleRes.text();
+        console.error("[Stripe] Failed to update subscription schedule:", updateScheduleRes.status, updateError);
+        return sendJson({ error: "Failed to schedule plan change" }, { status: 500 });
+      }
+
+      const updateData = await updateScheduleRes.json();
+
+      await supabase
+        .from("user_subscriptions")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("user_id", userId);
+
+      return sendJson({
+        success: true,
+        message: "Your family plan will switch to Premium at the end of the current billing cycle.",
+        scheduleId: updateData.id,
+        currentPeriodEnd: new Date(currentPeriodEnd * 1000).toISOString(),
+      });
     }
 
     if (pathname === "/stripe/cancel-subscription" && req.method === "POST") {
-      return sendJson({ success: true, status: "canceled" });
+      const userId = extractUserId(req);
+      if (!userId) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const { data: userData, error: userError } = await supabase
+        .from("user_subscriptions")
+        .select("stripe_subscription_id")
+        .eq("user_id", userId)
+        .single();
+
+      if (userError || !userData?.stripe_subscription_id) {
+        return sendJson({ error: "No Stripe subscription found" }, { status: 400 });
+      }
+
+      const stripeSecretKey = Deno?.env?.get("STRIPE_SECRET_KEY") ?? "";
+      if (!stripeSecretKey) {
+        return sendJson({ error: "Stripe not configured" }, { status: 500 });
+      }
+
+      const auth = btoa(stripeSecretKey + ":");
+      const cancelRes = await fetch(
+        `https://api.stripe.com/v1/subscriptions/${userData.stripe_subscription_id}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${auth}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            cancel_at_period_end: "true",
+          }),
+        }
+      );
+
+      if (!cancelRes.ok) {
+        const cancelError = await cancelRes.text();
+        console.error("[Stripe] Failed to schedule subscription cancellation:", cancelRes.status, cancelError);
+        return sendJson({ error: "Failed to schedule cancellation" }, { status: 500 });
+      }
+
+      const cancelData = await cancelRes.json();
+      const dbUpdates: any = {
+        cancel_at_period_end: true,
+        status: cancelData.status || "active",
+        updated_at: new Date().toISOString(),
+      };
+      if (cancelData.current_period_end) {
+        dbUpdates.current_period_end = new Date(cancelData.current_period_end * 1000).toISOString();
+      }
+
+      await supabase.from("user_subscriptions").update(dbUpdates).eq("user_id", userId);
+
+      return sendJson({ success: true, status: cancelData.status });
     }
 
     if (pathname === "/stripe/reactivate-subscription" && req.method === "POST") {
-      return sendJson({ success: true, status: "active" });
+      const userId = extractUserId(req);
+      if (!userId) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const { data: userData, error: userError } = await supabase
+        .from("user_subscriptions")
+        .select("stripe_subscription_id")
+        .eq("user_id", userId)
+        .single();
+
+      if (userError || !userData?.stripe_subscription_id) {
+        return sendJson({ error: "No Stripe subscription found" }, { status: 400 });
+      }
+
+      const stripeSecretKey = Deno?.env?.get("STRIPE_SECRET_KEY") ?? "";
+      if (!stripeSecretKey) {
+        return sendJson({ error: "Stripe not configured" }, { status: 500 });
+      }
+
+      const auth = btoa(stripeSecretKey + ":");
+      const reactivateRes = await fetch(
+        `https://api.stripe.com/v1/subscriptions/${userData.stripe_subscription_id}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${auth}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            cancel_at_period_end: "false",
+          }),
+        }
+      );
+
+      if (!reactivateRes.ok) {
+        const reactivateError = await reactivateRes.text();
+        console.error("[Stripe] Failed to reactivate subscription:", reactivateRes.status, reactivateError);
+        return sendJson({ error: "Failed to reactivate subscription" }, { status: 500 });
+      }
+
+      const reactivateData = await reactivateRes.json();
+      const dbUpdates: any = {
+        cancel_at_period_end: false,
+        status: reactivateData.status || "active",
+        updated_at: new Date().toISOString(),
+      };
+      if (reactivateData.current_period_end) {
+        dbUpdates.current_period_end = new Date(reactivateData.current_period_end * 1000).toISOString();
+      }
+
+      await supabase.from("user_subscriptions").update(dbUpdates).eq("user_id", userId);
+
+      return sendJson({ success: true, status: reactivateData.status });
     }
 
     if (pathname === "/healthz" && req.method === "GET") {

@@ -87,16 +87,22 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   const subscriptionStatus = subscriptionData ? {
     status: subscriptionData.status,
-    tier: subscriptionData.planType || (subscriptionData.isPremium ? "premium" : "free") as SubscriptionTier,
+    tier: subscriptionData.status === "active"
+      ? (subscriptionData.planType || (subscriptionData.isPremium ? "premium" : "free")) as SubscriptionTier
+      : "free",
     currentPeriodEnd: subscriptionData.currentPeriodEnd,
     cancelAtPeriodEnd: subscriptionData.cancelAtPeriodEnd,
   } : null;
 
   useEffect(() => {
-    if (subscriptionData?.planType) {
-      setTierState(subscriptionData.planType);
-    } else if (subscriptionData?.isPremium) {
-      setTierState("premium");
+    if (subscriptionData?.status === "active") {
+      if (subscriptionData?.planType) {
+        setTierState(subscriptionData.planType);
+      } else if (subscriptionData?.isPremium) {
+        setTierState("premium");
+      } else {
+        setTierState("free");
+      }
     } else {
       setTierState("free");
     }

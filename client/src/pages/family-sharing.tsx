@@ -29,7 +29,7 @@ export default function FamilySharingPage() {
       <div className="flex items-center justify-between space-y-2">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Family Sharing</h2>
-          <p className="text-muted-foreground">Share subscriptions with family members and manage costs</p>
+          <p className="text-muted-foreground">Share subscriptions with family members and optimize shared spending</p>
         </div>
       </div>
       <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">

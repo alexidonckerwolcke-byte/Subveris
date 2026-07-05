@@ -66,6 +66,8 @@ export default function Insights() {
         : generateRecommendationsFromSubscriptions(personalSubscriptions || [])
       );
   const personalSubscriptionCount = (personalSubscriptions || []).filter((s) => s && s.status !== 'deleted').length;
+  const familySubscriptionCount = (familySubscriptions || []).filter((s) => s && s.status !== 'deleted').length;
+  const visibleSubscriptionCount = showFamilyData ? familySubscriptionCount : personalSubscriptionCount;
   const recommendations: AIRecommendation[] = dedupeByKey(recommendationsRaw, "subscriptionId") as AIRecommendation[];
   const recsLoading = showFamilyData ? familyDataLoading : personalRecsLoading;
   const recsRefreshing = showFamilyData ? familyDataFetching : personalRecsFetching;
@@ -409,7 +411,7 @@ export default function Insights() {
               analyses={displayCostAnalysis}
               isLoading={analysisLoading}
               showUpgradePrompt={tier === "free"}
-              totalSubscriptions={personalSubscriptionCount}
+              totalSubscriptions={visibleSubscriptionCount}
               maxAllowed={limits.maxCostPerUseSubscriptions}
             />
           ) : (

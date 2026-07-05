@@ -116,7 +116,7 @@ export default function FamilyCalendarPage() {
         <div className="mb-2">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Family & Calendar</h1>
           <p className="text-muted-foreground">
-            Share subscriptions with family and manage renewal dates
+            Share subscriptions with family and optimize renewal timing
           </p>
         </div>
 

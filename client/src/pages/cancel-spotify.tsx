@@ -124,7 +124,7 @@ export default function CancelSpotifyPage() {
                 Keep track of every subscription 
               </h2>
               <p className="mt-3 text-base leading-8 text-slate-600 dark:text-slate-300">
-                Subscription tracking is the best way to avoid paying for services you no longer use. Subveris shows everything in one dashboard.
+                Subscription optimization is the best way to avoid paying for services you no longer use. Subveris shows everything in one dashboard.
               </p>
             </section>
           </aside>

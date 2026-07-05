@@ -433,7 +433,7 @@ export function FamilySharing() {
             <Users className="h-5 w-5" />
             Family Groups
           </CardTitle>
-          <CardDescription>Create and manage family subscription sharing</CardDescription>
+          <CardDescription>Create and optimize family subscription sharing</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* New Group Form */}

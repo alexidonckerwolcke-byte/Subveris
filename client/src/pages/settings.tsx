@@ -117,7 +117,7 @@ export default function Settings() {
         <div className="mb-2">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
           <p className="text-muted-foreground">
-            Manage your account and preferences
+            Control your account and preferences
           </p>
         </div>
         <div className="space-y-4">
@@ -217,7 +217,7 @@ export default function Settings() {
               </div>
               <div>
                 <CardTitle className="text-lg">Account</CardTitle>
-                <CardDescription>Manage your account settings</CardDescription>
+                <CardDescription>Control your account preferences</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -264,7 +264,7 @@ export default function Settings() {
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={openTwoFAModal} data-testid="button-enable-2fa">
-                {twoFAEnabled ? "Manage" : "Enable"}
+                {twoFAEnabled ? "Edit" : "Enable"}
               </Button>
             </div>
             <div className="flex items-center justify-between p-4 rounded-lg border border-border">

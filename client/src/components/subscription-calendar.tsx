@@ -199,7 +199,7 @@ export function SubscriptionCalendar({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Subscription Calendar
+            Renewal Calendar
           </CardTitle>
           <div className="flex items-center gap-2">
             <Button

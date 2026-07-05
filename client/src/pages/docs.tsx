@@ -4,7 +4,7 @@ import React, { useRef, useEffect, useMemo, useCallback } from "react";
 const menuItems = [
   { label: "Getting Started", id: "getting-started" },
   { label: "User Guide", id: "user-guide" },
-  { label: "How Subscription Tracking Works", id: "how-subscription-tracking-works" },
+  { label: "How Subscription Optimization Works", id: "how-subscription-optimization-works" },
   { label: "AI & Accuracy", id: "ai-accuracy" },
   { label: "API Documentation", id: "api-documentation" },
   { label: "Managing Your Account", id: "managing-your-account" },
@@ -56,17 +56,17 @@ const DocsPage: React.FC = () => {
       </aside>
       <main className="prose lg:prose-lg dark:prose-invert flex-1 mx-auto px-8 py-8">
         <h1>Subveris Documentation</h1>
-        <p>Welcome to the official documentation for Subveris, your all-in-one subscription tracking and analytics platform. All information is available on this page.</p>
+        <p>Welcome to the official documentation for Subveris, your all-in-one subscription optimization and analytics platform. All information is available on this page.</p>
         <hr />
       <div ref={sectionRefs["getting-started"]} id="getting-started">
       <section>
       <h2>Getting Started</h2>
-      <p>Subveris is a modern SaaS platform that helps you track, analyze, and optimize your recurring subscriptions. Whether you have streaming services, SaaS tools, or memberships, Subveris gives you clarity and control.</p>
+      <p>Subveris is a modern SaaS platform that helps you optimize, analyze, and control your recurring subscriptions. Whether you have streaming services, SaaS tools, or memberships, Subveris gives you clarity and control.</p>
       <h3>What Subveris Does</h3>
       <ul>
-        <li>Tracks all your subscriptions in one place</li>
+        <li>Brings all your subscriptions into one optimization workspace</li>
         <li>Analyzes usage and cost per use to help you save money</li>
-        <li>Flags inactive subscriptions and suggests cancellations</li>
+        <li>Flags inactive subscriptions and suggests savings actions</li>
         <li>Integrates with Stripe for secure premium payments</li>
         <li>Provides actionable insights to optimize your spending</li>
       </ul>
@@ -97,12 +97,12 @@ const DocsPage: React.FC = () => {
     <section>
       <h2>User Guide</h2>
       <h3>Dashboard Overview</h3>
-      <p>The dashboard is your command center for subscription management. Here's what you'll find:</p>
+      <p>The dashboard is your command center for subscription optimization. Here's what you'll find:</p>
       <ul>
-        <li><b>Subscriptions Tab:</b> View all your subscriptions with details like cost, frequency, and status</li>
-        <li><b>Insights Tab:</b> Deep dive into analytics and recommendations based on your spending</li>
-        <li><b>Calendar Tab:</b> Track renewal dates and upcoming billing events</li>
-        <li><b>Family Sharing Tab:</b> Manage shared subscriptions with family members (Premium feature)</li>
+        <li><b>Subscriptions Tab:</b> View all your subscriptions with cost, usage, and savings potential</li>
+        <li><b>Insights Tab:</b> Deep dive into analytics and AI recommendations to cut waste</li>
+        <li><b>Calendar Tab:</b> Track renewals and schedule savings actions before bills hit</li>
+        <li><b>Family Sharing Tab:</b> Coordinate shared services and reduce collective spend (Premium feature)</li>
       </ul>
       <h3>Adding Subscriptions</h3>
       <ol>
@@ -115,13 +115,14 @@ const DocsPage: React.FC = () => {
       <ul>
         <li>Click on any subscription to edit its details</li>
         <li>Use the delete option to remove subscriptions (you can always add them back)</li>
-        <li>Set subscriptions to "inactive" if you want to pause tracking temporarily</li>
+        <li>Set subscriptions to "inactive" if you want to pause optimization temporarily</li>
       </ul>
-      <h3>Tracking Usage</h3>
+      <h3>Optimizing Usage</h3>
       <ul>
         <li>Log usage manually by clicking "Log Usage" on a subscription</li>
-        <li>Subveris uses your usage data to calculate cost per use</li>
-        <li>Subscriptions with zero usage are flagged as potential cancellations</li>
+        <li>Subveris uses your usage data to calculate cost per use and optimize your spend</li>
+        <li>Subscriptions with zero usage are flagged as potential cancellations
+</li>
       </ul>
       <h3>Setting Reminders</h3>
       <ul>
@@ -132,14 +133,14 @@ const DocsPage: React.FC = () => {
     </section>
     </div>
     <hr />
-    <div ref={sectionRefs["how-subscription-tracking-works"]} id="how-subscription-tracking-works">
+    <div ref={sectionRefs["how-subscription-optimization-works"]} id="how-subscription-optimization-works">
     <section>
-      <h2>How Subscription Tracking Works</h2>
-      <p>Subveris uses a combination of user input, smart analytics, and optional integrations to provide a comprehensive view of your subscriptions.</p>
+      <h2>How Subscription Optimization Works</h2>
+      <p>Subveris uses a combination of user input, smart analytics, and optional integrations to help you optimize your recurring spending, identify waste, and prioritize savings actions.</p>
       <h3>Workflow Overview</h3>
       <ol>
         <li>Add Subscriptions: Enter details such as name, cost, renewal date, and category.</li>
-        <li>Track Usage: Log usage manually or connect supported integrations (where available).</li>
+        <li>Capture Usage: Log usage manually or connect supported integrations (where available).</li>
         <li>Analyze: View cost per use, monthly spend, and get recommendations.</li>
         <li>Take Action: Cancel, upgrade, or adjust subscriptions as needed.</li>
       </ol>
@@ -170,7 +171,7 @@ const DocsPage: React.FC = () => {
       <h3>How Accurate Are the Analytics?</h3>
       <ul>
         <li>Analytics are only as accurate as the data you provide.</li>
-        <li>Integrations (where available) can improve accuracy by automating usage tracking.</li>
+        <li>Integrations (where available) can improve accuracy by automating usage-based optimization.</li>
         <li>AI suggestions are transparent and explainable—no "black box" decisions.</li>
       </ul>
       <h3>Limitations</h3>
@@ -238,17 +239,17 @@ const DocsPage: React.FC = () => {
         <li>You can upgrade or downgrade at any time</li>
         <li>Canceling premium disables advanced features immediately and stops future billing</li>
       </ul>
-      <h3>Managing Subscriptions</h3>
+      <h3>Optimizing Subscriptions</h3>
       <ul>
-        <li>Add, edit, or remove subscriptions from your dashboard</li>
+        <li>Add, edit, or remove subscriptions to improve spend efficiency</li>
         <li>Set reminders for renewal dates</li>
-        <li>Track usage and spending trends</li>
+        <li>Optimize usage and spending trends</li>
       </ul>
       <h3>Account Settings</h3>
       <ul>
         <li>Update your email or password</li>
         <li>Delete your account (all data is permanently removed)</li>
-        <li>Manage notification preferences</li>
+        <li>Control notification preferences</li>
       </ul>
     </section>
     </div>

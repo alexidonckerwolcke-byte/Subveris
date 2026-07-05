@@ -86,17 +86,17 @@ export default function HomePage() {
     {
       icon: DollarSign,
       title: "Cost Per Use",
-      description: "Know what each subscription actually costs you per session. Make informed decisions based on real value.",
+      description: "Know what each subscription actually costs you per session so you can optimize spend and keep only the highest-value services.",
     },
     {
       icon: AlertCircle,
-      title: "Smart Renewal Alerts",
-      description: "Never get surprised by unexpected renewals. Get notified before your subscriptions renew.",
+      title: "Renewal Risk Alerts",
+      description: "Spot upcoming renewals, identify overpaying services, and prioritize the subscriptions that deserve to stay.",
     },
     {
       icon: Brain,
-      title: "AI Recommendations",
-      description: "Our machine learning analyzes your usage and suggests which subscriptions to keep, downgrade, or cancel.",
+      title: "AI Optimization",
+      description: "Our AI highlights savings opportunities, recommends plan changes, and helps you reduce wasted recurring spend.",
     },
   ];
 
@@ -121,8 +121,8 @@ export default function HomePage() {
 
   const faqs = [
     {
-      question: "How does Subveris track my subscriptions?",
-      answer: "We use a lightweight browser extension that monitors which services you actually visit. That's it. We don't connect to your bank, track transactions, or sell your data. Just real usage tracking.",
+      question: "How does Subveris understand my subscription value?",
+      answer: "We use a lightweight browser extension that detects the services you use most. We never connect to your bank, don't sell your data, and only use this information to help you optimize recurring spend.",
     },
     {
       question: "Is my data safe?",
@@ -130,7 +130,7 @@ export default function HomePage() {
     },
     {
       question: "Can I use it on mobile?",
-      answer: "The browser extension works on Chrome and Edge desktop. Mobile app is coming soon. Full subscription management is available on all devices right now.",
+      answer: "The browser extension works on Chrome and Edge desktop. Mobile app is coming soon. Full optimization and insights are available on all devices right now.",
     },
     {
       question: "How accurate are the AI recommendations?",
@@ -200,32 +200,28 @@ export default function HomePage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <Button size="lg" className="text-lg px-10 py-7 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all" onClick={() => setAuthModalOpen(true)}>
+            <Button size="lg" className="text-lg px-12 py-7 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-700 shadow-2xl hover:shadow-[0_30px_120px_rgba(59,130,246,0.18)] transition-all duration-300" onClick={() => setAuthModalOpen(true)}>
               Get Started Free
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
 
-          {/* Trust Badges */}
-          <div className="flex flex-wrap justify-center items-center gap-8 text-sm text-muted-foreground">
+          <div className="mx-auto flex flex-wrap justify-center items-center gap-6 rounded-full border border-slate-200/70 bg-white/80 px-6 py-4 shadow-lg shadow-slate-200/50 backdrop-blur-sm text-sm text-slate-600">
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-green-500" />
-              <span>SOC 2 Type II Certified</span>
+              <span>SOC 2 Type II</span>
             </div>
-            <div className="w-px h-4 bg-border hidden sm:block" />
             <div className="flex items-center gap-2">
               <Lock className="h-4 w-4 text-blue-500" />
-              <span>Bank-Level Security</span>
+              <span>Bank-level security</span>
             </div>
-            <div className="w-px h-4 bg-border hidden sm:block" />
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
-              <span>GDPR Compliant</span>
+              <span>GDPR compliant</span>
             </div>
-            <div className="w-px h-4 bg-border hidden sm:block" />
             <div className="flex items-center gap-2">
               <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-              <span>4.9/5 User Rating</span>
+              <span>4.9 / 5 user rating</span>
             </div>
           </div>
 
@@ -236,25 +232,25 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-semibold mb-2">Cost Per Use Intelligence</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Understand the true value of every service with usage-based cost analytics that show you what each subscription costs per session.
+                Understand the real value of every subscription and uncover exactly which services are worth keeping.
               </p>
             </div>
             <div className="rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg">
               <div className="inline-flex items-center justify-center rounded-2xl bg-blue-500/10 p-3 mb-4">
                 <BarChart3 className="h-6 w-6 text-blue-600" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Premium Insights</h3>
+              <h3 className="text-xl font-semibold mb-2">Renewal Risk Intelligence</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Drill into renewal risk, value trends, and savings opportunities with a polished dashboard built for professionals.
+                Find subscriptions that are about to renew, flag services with low return, and keep your budget from leaking.
               </p>
             </div>
             <div className="rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg">
               <div className="inline-flex items-center justify-center rounded-2xl bg-green-500/10 p-3 mb-4">
                 <Sparkles className="h-6 w-6 text-green-600" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Executive-Level Control</h3>
+              <h3 className="text-xl font-semibold mb-2">Optimization Workflows</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Get premium alerts, spend summaries, and actionable recommendations so every decision feels confident and high-value.
+                Turn insights into action with recommendations, plan change suggestions, and savings opportunities you can act on now.
               </p>
             </div>
           </div>
@@ -275,11 +271,11 @@ export default function HomePage() {
 
           <div className="grid md:grid-cols-4 gap-8">
             {problems.map((item, index) => (
-              <div key={index} className="bg-background p-8 rounded-2xl shadow-sm border border-border/50 hover:shadow-md transition-all group">
-                <div className="h-12 w-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div key={index} className="bg-white/90 p-8 rounded-[1.75rem] shadow-lg border border-slate-200/70 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(15,23,42,0.10)] transition-all duration-300 group">
+                <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors duration-300">
                   <item.icon className="h-6 w-6 text-primary" />
                 </div>
-                <p className="text-lg font-medium leading-snug">{item.text}</p>
+                <p className="text-lg font-semibold leading-snug text-slate-800">{item.text}</p>
               </div>
             ))}
           </div>
@@ -308,13 +304,13 @@ export default function HomePage() {
           </div>
           <div className="grid md:grid-cols-3 gap-10">
             {featureHighlights.map((feature, index) => (
-              <div key={index} className="flex flex-col gap-6 rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg transition-transform hover:-translate-y-1">
-                <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <div key={index} className="group flex flex-col gap-6 rounded-[2rem] border border-slate-200/60 bg-white/90 p-8 shadow-xl transition duration-500 ease-out hover:-translate-y-2 hover:shadow-[0_30px_90px_rgba(15,23,42,0.12)]">
+                <div className="h-14 w-14 rounded-3xl bg-primary/10 flex items-center justify-center transition-colors duration-500 group-hover:bg-primary/15">
                   <feature.icon className="h-7 w-7 text-primary" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+                  <p className="text-slate-600 leading-relaxed">{feature.description}</p>
                 </div>
               </div>
             ))}
@@ -328,17 +324,17 @@ export default function HomePage() {
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">Why Subveris?</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Most "subscription managers" just read your bank transactions. We track actual usage, cost per use, and renewal impact so you can make smarter decisions.
+              Most subscription services only list your bills. We analyze value, cost-per-use, and renewal risk so you can cut waste, optimize spend, and keep the services that truly matter.
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto bg-background rounded-3xl shadow-xl border border-border/50 overflow-hidden">
+          <div className="max-w-4xl mx-auto rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200/70 bg-white/95">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-border">
-                  <th className="p-8 text-lg font-bold">Feature</th>
-                  <th className="p-8 text-lg font-bold text-muted-foreground text-center">Others</th>
-                  <th className="p-8 text-lg font-bold text-primary text-center bg-primary/5">Subveris</th>
+                <tr className="bg-slate-950/5 border-b border-slate-200/70">
+                  <th className="p-8 text-lg font-bold text-slate-900">Feature</th>
+                  <th className="p-8 text-lg font-bold text-slate-500 text-center">Others</th>
+                  <th className="p-8 text-lg font-bold text-slate-900 text-center bg-primary/5">Subveris</th>
                 </tr>
               </thead>
               <tbody>
@@ -461,14 +457,14 @@ export default function HomePage() {
                   <span className="text-muted-foreground ml-2">/month</span>
                 </div>
                 <CardDescription className="mt-4 text-base">
-                  Perfect for getting started with subscription management
+                  Perfect for getting started with subscription optimization
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-1 pb-6">
                 <ul className="space-y-4">
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Track up to 5 subscriptions</span>
+                    <span className="text-sm font-medium">Optimize up to 5 recurring services</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
@@ -532,7 +528,7 @@ export default function HomePage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Browser extension tracking</span>
+                    <span className="text-sm font-medium">Browser extension optimization</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
@@ -595,7 +591,7 @@ export default function HomePage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Family group management</span>
+                    <span className="text-sm font-medium">Family spending optimization</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
@@ -654,7 +650,7 @@ export default function HomePage() {
                 </thead>
                 <tbody className="divide-y divide-border/50">
                   <tr className="hover:bg-muted/30 transition-colors">
-                    <td className="py-4 px-6 font-medium">Subscriptions Tracked</td>
+                    <td className="py-4 px-6 font-medium">Subscriptions Managed</td>
                     <td className="text-center py-4 px-6 text-muted-foreground">Up to 5</td>
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Unlimited</td>
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Unlimited</td>
@@ -672,7 +668,7 @@ export default function HomePage() {
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Yes, unlimited</td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
-                    <td className="py-4 px-6 font-medium">Usage Tracking</td>
+                    <td className="py-4 px-6 font-medium">Usage-based Optimization</td>
                     <td className="text-center py-4 px-6 text-muted-foreground">Manual only</td>
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Automatic</td>
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Automatic</td>
