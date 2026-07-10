@@ -17,6 +17,7 @@ import NotFound from "./pages/not-found.js";
 import Dashboard from "./pages/dashboard.js";
 import Subscriptions from "./pages/subscriptions.js";
 import Insights from "./pages/insights.js";
+import CostOptimizer from "./pages/cost-optimizer.js";
 import Savings from "./pages/savings.js";
 import Settings from "./pages/settings.js";
 import Pricing from "./pages/pricing.js";
@@ -68,6 +69,7 @@ function Router({ user }: { user: any }) {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/subscriptions" component={Subscriptions} />
       <Route path="/insights" component={Insights} />
+      <Route path="/cost-optimizer" component={CostOptimizer} />
       <Route path="/savings" component={Savings} />
       <Route path="/calendar" component={Calendar} />
       <Route path="/family-sharing" component={FamilySharingPage} />
