@@ -184,19 +184,17 @@ export default function HomePage() {
         <div className="max-w-4xl mx-auto">
           <Badge variant="secondary" className="mb-6 px-4 py-2 text-sm font-semibold">
             <Sparkles className="h-3 w-3 mr-2" />
-            The Subscription Optimization Platform
+            The subscription operating system
           </Badge>
           
           <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-8 leading-tight">
-            Discover subscriptions you're paying for
+            Take control of recurring spend
             <br />
-            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">but barely use.</span>
+            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">before it quietly compounds.</span>
           </h1>
           
           <p className="text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed font-light">
-            See what you pay. See what you use. 
-            <br />
-            <span className="font-semibold text-foreground">Stop wasting money.</span>
+            See what you pay, what you actually use, and which services deserve to stay.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
@@ -218,22 +216,22 @@ export default function HomePage() {
           <div className="flex flex-wrap justify-center items-center gap-8 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-green-500" />
-              <span>SOC 2 Type II Certified</span>
+              <span>No bank connection required</span>
             </div>
             <div className="w-px h-4 bg-border hidden sm:block" />
             <div className="flex items-center gap-2">
               <Lock className="h-4 w-4 text-blue-500" />
-              <span>Bank-Level Security</span>
+              <span>Private by design</span>
             </div>
             <div className="w-px h-4 bg-border hidden sm:block" />
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
-              <span>GDPR Compliant</span>
+              <span>Usage-based insights</span>
             </div>
             <div className="w-px h-4 bg-border hidden sm:block" />
             <div className="flex items-center gap-2">
               <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-              <span>4.9/5 User Rating</span>
+              <span>Fast to set up</span>
             </div>
           </div>
 
@@ -304,7 +302,7 @@ export default function HomePage() {
           </p>
           <div className="grid md:grid-cols-3 gap-10">
             {featureHighlights.map((feature, index) => (
-              <div key={index} className="flex flex-col gap-6 rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg transition-transform hover:-translate-y-1">
+              <div key={index} className="flex flex-col gap-6 rounded-3xl border border-border/40 bg-white/80 p-8 shadow-lg transition-transform hover:-translate-y-1 dark:bg-slate-900/70">
                 <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <feature.icon className="h-7 w-7 text-primary" />
                 </div>
@@ -377,7 +375,7 @@ export default function HomePage() {
               saving: "$380/year"
             }
           ].map((testimonial, index) => (
-            <Card key={index} className="border-border/50 shadow-md hover:shadow-xl transition-all bg-card/50">
+            <Card key={index} className="border-border/50 shadow-md hover:shadow-xl transition-all bg-white/80 dark:bg-slate-900/70">
               <CardContent className="pt-8">
                 <div className="flex gap-1 mb-6">
                   {[...Array(5)].map((_, i) => (
@@ -449,7 +447,7 @@ export default function HomePage() {
 
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-16">
             {/* FREE PLAN */}
-            <Card className="relative flex flex-col transition-all border border-border/50 shadow-md hover:shadow-lg hover:border-primary/30 bg-card/50">
+            <Card className="relative flex flex-col transition-all border border-border/50 shadow-md hover:shadow-lg hover:border-primary/30 bg-white/80 dark:bg-slate-900/70">
               <CardHeader className="text-center pb-6 pt-8">
                 <CardTitle className="text-3xl font-bold">Free</CardTitle>
                 <div className="mt-6">
@@ -828,7 +826,7 @@ export default function HomePage() {
               Start saving money and gain complete control over your recurring spending.
             </p>
 
-            <div className="bg-card/50 border border-border/50 rounded-lg p-6 mb-8 max-w-2xl mx-auto">
+            <div className="bg-white/80 border border-border/50 rounded-lg p-6 mb-8 max-w-2xl mx-auto dark:bg-slate-900/70">
               <div className="flex items-center justify-center gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-green-500" />

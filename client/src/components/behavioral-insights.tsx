@@ -110,7 +110,7 @@ export function BehavioralInsights({
             .map((insight) => (
             <div
               key={insight.subscriptionId}
-              className="p-3 rounded-xl border border-border bg-background/80 shadow-sm"
+              className="p-3 rounded-xl border border-border bg-white/80 shadow-sm dark:bg-slate-900/70"
               data-testid={`insight-${insight.subscriptionId}`}
             >
               <div className="flex items-center justify-between mb-2">

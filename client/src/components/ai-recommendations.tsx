@@ -142,7 +142,7 @@ export function AIRecommendations({
               return (
                 <div
                   key={rec.id}
-                  className="space-y-2 rounded-xl border border-border bg-background/80 p-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  className="space-y-2 rounded-xl border border-border bg-white/80 p-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-900/70"
                   data-testid={`recommendation-${rec.id}`}
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
