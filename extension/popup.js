@@ -8,19 +8,45 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Check both chrome.storage and localStorage from tab
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const currentTab = tabs[0];
+    const currentTab = tabs[0] || {};
+    const currentUrl = currentTab.url || '';
     
     // Get stored user data
-    chrome.storage.local.get(['supabaseUserUUID', 'authToken'], (result) => {
+    chrome.storage.local.get(['supabaseUserUUID', 'authToken', 'subscription_status', 'trackingPaused', 'upgradePrompt'], (result) => {
       console.log('[Popup] Storage check:', result);
+      const subscriptionStatus = (result.subscription_status || 'free').toLowerCase();
+      const isFreeTier = subscriptionStatus === 'free';
       
       if (result.supabaseUserUUID && result.authToken) {
         statusDiv.textContent = '✅ Connected to Subveris';
         statusDiv.className = 'status connected';
         
-        // Try to get current domain
-        const url = new URL(currentTab.url);
-        const domain = url.hostname.replace('www.', '');
+        let domain = 'current site';
+        if (currentUrl) {
+          try {
+            const url = new URL(currentUrl);
+            domain = url.hostname.replace('www.', '');
+          } catch (error) {
+            console.warn('[Popup] Could not parse current tab URL:', error);
+          }
+        }
+
+        if (isFreeTier || result.trackingPaused) {
+          if (trackingStatus) {
+            trackingStatus.textContent = `⚠️ Upgrade required for ${domain}: ${result.upgradePrompt || 'Unlock full tracking and discovery features.'}`;
+            trackingStatus.className = 'status disconnected';
+          }
+          
+          if (debugInfo) {
+            debugInfo.innerHTML = `
+              <strong>Upgrade Required:</strong><br>
+              Your current plan is ${subscriptionStatus}.<br>
+              Premium or Family unlocks full usage tracking, onboarding discovery, and zero-usage alerts.<br>
+              <small style="color: #999;">Tracking is currently paused for this extension.</small>
+            `;
+          }
+          return;
+        }
         
         if (trackingStatus) {
           trackingStatus.textContent = `📊 Tracking enabled for: ${domain}`;

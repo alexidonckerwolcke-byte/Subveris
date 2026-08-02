@@ -82,10 +82,13 @@ describe('billing month helpers', () => {
     }
   });
 
-  it('does not auto-advance a renewal date while still in the same month', () => {
+  it('auto-advances an overdue renewal date even if it is still in the current month', () => {
     const now = new Date('2026-05-20');
     const next = getAdvancedRenewalDateIfNeeded('2026-05-05', 'monthly', now);
-    expect(next).toBeNull();
+    expect(next).not.toBeNull();
+    if (next) {
+      expect(formatDateLocal(next)).toBe('2026-06-05');
+    }
   });
 
   it('auto-advances a renewal date when it is one or more days overdue', () => {

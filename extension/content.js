@@ -1,10 +1,28 @@
 let startTime = Date.now();
 let cachedAuthToken = null;
+let pricingScanTimer = null;
+let pricingObserver = null;
 
 function getRootDomain(hostname) {
-  const parts = hostname.split(".");
+  const parts = hostname.split('.');
   if (parts.length <= 2) return hostname;
-  return parts.slice(-2).join(".");
+  return parts.slice(-2).join('.');
+}
+
+function getSubscriptionStatus(callback) {
+  if (!window.chrome || !chrome.storage || !chrome.storage.local) {
+    callback('free');
+    return;
+  }
+
+  chrome.storage.local.get(['subscription_status'], (result) => {
+    const status = (result.subscription_status || 'free').toLowerCase();
+    callback(status);
+  });
+}
+
+function isTierAllowed(status) {
+  return status === 'premium' || status === 'family';
 }
 
 // Inject script to capture auth token from page context
@@ -58,8 +76,6 @@ window.addEventListener('message', (event) => {
 
   const apiUrl = localStorage.getItem('subverisApiUrl') || null;
 
-  // Forward to background script for storage (content scripts can't reliably set chrome.storage)
-  // Use a timeout to ensure background script is ready
   setTimeout(() => {
     const success = sendMessageToBackground({ type: 'SUBVERIS_AUTH_TOKEN', token, userId, apiUrl }, (response, err) => {
       if (err) {
@@ -73,7 +89,7 @@ window.addEventListener('message', (event) => {
     if (!success) {
       console.error('[Extension] ❌ SUBVERIS_AUTH_TOKEN message could not be sent. Reload the page after reloading the extension.');
     }
-  }, 100); // Small delay to ensure background is ready
+  }, 100);
 });
 
 // Get auth token from chrome storage (set by inject script via background)
@@ -112,15 +128,191 @@ function sendUsageTracking(domain, timeSpent) {
   }
 }
 
-function sendUsageTrackingToBackground(domain, timeSpent) {
-  sendUsageTracking(domain, timeSpent);
+function saveDiscoveredPrice(priceData) {
+  if (!priceData) {
+    return;
+  }
+
+  chrome.storage.local.set({
+    detectedSubscription: priceData,
+    lastDetectedSubscriptionAt: Date.now()
+  }, () => {
+    if (chrome.runtime.lastError) {
+      console.error('[Extension] Failed to store detected subscription:', chrome.runtime.lastError);
+      return;
+    }
+    console.log('[Extension] Saved detected subscription payload:', priceData);
+  });
+
+  sendMessageToBackground({ type: 'PRICE_DISCOVERY', payload: priceData }, () => {});
+}
+
+function normalizeDetectedDate(rawDate) {
+  const trimmed = String(rawDate || '').trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const cleaned = trimmed
+    .replace(/^(?:on|at|the)\s+/i, '')
+    .replace(/[.,]$/, '')
+    .trim();
+
+  if (!cleaned) {
+    return null;
+  }
+
+  const slashMatch = cleaned.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
+  if (slashMatch) {
+    const [, dayRaw, monthRaw, yearRaw] = slashMatch;
+    let year = Number(yearRaw);
+    if (year < 100) {
+      year += year < 70 ? 2000 : 1900;
+    }
+    const month = Number(monthRaw) - 1;
+    const day = Number(dayRaw);
+    const parsed = new Date(year, month, day);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().split('T')[0];
+    }
+  }
+
+  const parsed = new Date(cleaned);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().split('T')[0];
+  }
+
+  return cleaned;
+}
+
+function detectBillingCycle(text) {
+  const normalizedText = String(text || '').toLowerCase();
+  if (!normalizedText) {
+    return 'monthly';
+  }
+
+  if (/\b(per year|per annum|annually|annual|yearly|\/yr|\/year)\b/.test(normalizedText)) {
+    return 'yearly';
+  }
+
+  if (/\b(per month|monthly|\/mo|\/month|\/months)\b/.test(normalizedText)) {
+    return 'monthly';
+  }
+
+  return 'monthly';
+}
+
+function detectRenewalDate(text) {
+  const normalizedText = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!normalizedText) {
+    return null;
+  }
+
+  const patterns = [
+    /\b(?:next billing date|billing date|renews on|renews|next invoice|subscription ends|subscription renews|expires on|next renewal)\b[\s:.-]*(?:on\s+)?([A-Za-z]{3,9}\s+\d{1,2}(?:,\s*\d{4})?|\d{4}-\d{2}-\d{2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i,
+    /\b(?:next billing date|billing date|renews on|renews|next invoice|subscription ends|subscription renews|expires on|next renewal)\b[\s:.-]*(?:on\s+)?([A-Za-z]{3,9}\s+\d{1,2}(?:,\s*\d{4})?|\d{4}-\d{2}-\d{2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = normalizedText.match(pattern);
+    if (match && match[1]) {
+      return normalizeDetectedDate(match[1]);
+    }
+  }
+
+  return null;
+}
+
+function extractSubscriptionPriceData() {
+  const bodyText = document.body?.innerText || document.body?.textContent || '';
+  const normalizedText = bodyText.replace(/\s+/g, ' ').trim();
+
+  if (!normalizedText) {
+    return null;
+  }
+
+  const currencyRegex = /(€|£|\$)\s*([0-9]+(?:[.,][0-9]{1,2})?)/g;
+  const frequencyRegex = /(\/\s*(mo|maand|month|months|m|year|jaar|yr|annually|annual|y))/i;
+  const planRegex = /(premium plan|pro tier|active subscription|subscription plan|billing plan|plan)/i;
+  const matches = [...normalizedText.matchAll(currencyRegex)];
+
+  if (!matches.length) {
+    return null;
+  }
+
+  const [priceMatch] = matches;
+  const currency = priceMatch[1];
+  const price = priceMatch[2];
+  const parsedPrice = parseFloat(price.replace(',', '.'));
+  const frequencyMatch = normalizedText.match(frequencyRegex);
+  const planMatch = normalizedText.match(planRegex);
+  const detectedBillingCycle = detectBillingCycle(normalizedText);
+  const detectedRenewalDate = detectRenewalDate(normalizedText);
+
+  if (!Number.isFinite(parsedPrice)) {
+    return null;
+  }
+
+  if (!frequencyMatch && !planMatch) {
+    return null;
+  }
+
+  return {
+    domain: window.location.hostname.replace(/^www\./i, ''),
+    price: parsedPrice,
+    currency,
+    frequency: frequencyMatch ? frequencyMatch[1] : 'unknown',
+    detectedBillingCycle,
+    detectedRenewalDate,
+    planLabel: planMatch ? planMatch[1] : 'Subscription Plan',
+    detectedAt: Date.now(),
+    source: 'content-dom-scan'
+  };
+}
+
+function scanForSubscriptionPricing() {
+  getSubscriptionStatus((status) => {
+    if (!isTierAllowed(status)) {
+      return;
+    }
+
+    const priceData = extractSubscriptionPriceData();
+    if (!priceData) {
+      return;
+    }
+
+    console.log('[Extension] Detected pricing signal:', priceData);
+    saveDiscoveredPrice(priceData);
+  });
+}
+
+function observePricingChanges() {
+  if (!document.body || pricingObserver) {
+    return;
+  }
+
+  pricingObserver = new MutationObserver(() => {
+    if (pricingScanTimer) {
+      clearTimeout(pricingScanTimer);
+    }
+
+    pricingScanTimer = window.setTimeout(() => {
+      scanForSubscriptionPricing();
+    }, 1200);
+  });
+
+  pricingObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
 }
 
 // Log when script starts
 console.log('[Extension] Content script loaded on:', window.location.hostname);
 
 // Initialize auth token immediately
-getAuthToken().then(token => {
+getAuthToken().then((token) => {
   if (token) {
     console.log('[Extension] ✅ Auth token loaded on page load');
   } else {
@@ -135,13 +327,30 @@ function trackUsageIfNeeded() {
   console.log(`[Extension] Page unload detected. Time spent: ${timeSpent}s on ${window.location.hostname}`);
 
   if (timeSpent < 10) {
-    console.log(`[Extension] ⏭️  Skipping - less than 10 seconds`);
+    console.log('[Extension] ⏭️  Skipping - less than 10 seconds');
     return;
   }
 
-  const domain = getRootDomain(window.location.hostname);
-  console.log(`[Extension] 📊 Tracking usage for domain: ${domain}`);
-  sendUsageTrackingToBackground(domain, timeSpent);
+  getSubscriptionStatus((status) => {
+    if (!isTierAllowed(status)) {
+      console.log('[Extension] Tracking paused because the tier is not premium or family.');
+      return;
+    }
+
+    const domain = getRootDomain(window.location.hostname);
+    console.log(`[Extension] 📊 Tracking usage for domain: ${domain}`);
+    sendUsageTracking(domain, timeSpent);
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    scanForSubscriptionPricing();
+    observePricingChanges();
+  });
+} else {
+  scanForSubscriptionPricing();
+  observePricingChanges();
 }
 
 window.addEventListener('pagehide', trackUsageIfNeeded);

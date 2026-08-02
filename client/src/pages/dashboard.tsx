@@ -9,6 +9,7 @@ import { SavingsProjection } from "@/components/savings-projection";
 import { SubscriptionCard } from "@/components/subscription-card";
 import { PremiumGate } from "@/components/premium-gate";
 import { FamilyMembershipBanner } from "@/components/family-membership-banner";
+import { AutomationAlerts } from "@/components/automation-alerts";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -551,6 +552,29 @@ export default function Dashboard() {
   const recsLoading = showFamilyData ? familyDataLoading : personalRecsLoading;
   const recsRefreshing = showFamilyData ? familyDataFetching : personalRecsFetching;
 
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: async (subscriptionId: string) => {
+      const res = await apiRequest("POST", "/api/subscriptions/cancel", { subscriptionId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: ["/api/subscriptions"] });
+      queryClient.refetchQueries({ queryKey: ["/api/metrics"] });
+      queryClient.refetchQueries({ queryKey: ["/api/insights/behavioral"] });
+      toast({
+        title: "Cancellation requested",
+        description: "Your cancellation request has been recorded and the subscription is now marked as cancelling.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "We couldn't process the cancellation request right now.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: SubscriptionStatus }) => {
       const res = await apiRequest("PATCH", `/api/subscriptions/${id}/status`, { status });
@@ -610,6 +634,10 @@ export default function Dashboard() {
 
   const handleStatusChange = (id: string, status: SubscriptionStatus) => {
     updateStatusMutation.mutate({ id, status });
+  };
+
+  const handleCancelSubscription = (subscriptionId: string) => {
+    cancelSubscriptionMutation.mutate(subscriptionId);
   };
 
   const handleRefreshRecommendations = async () => {
@@ -672,6 +700,7 @@ export default function Dashboard() {
   const activeSubscriptions = subscriptions?.filter((s: Subscription) => s.status === "active") || [];
   const unusedCount = subscriptions?.filter((s: Subscription) => s.status === "unused").length || 0;
   const toCancelCount = subscriptions?.filter((s: Subscription) => s.status === "to-cancel").length || 0;
+  const zeroUsageSubscriptions = subscriptions?.filter((s: Subscription) => s.isZeroUsageFlag === true) || [];
   const costPerUseSubscriptionCount = subscriptions?.filter((s: Subscription) => !isSubscriptionDeleted(s)).length || 0;
 
   return (
@@ -707,6 +736,14 @@ export default function Dashboard() {
         </div>
 
         <MetricsCards metrics={finalMetrics} isLoading={metricsLoading} />
+
+        <AutomationAlerts
+          isFreeTier={tier === "free"}
+          zeroUsageSubscriptions={zeroUsageSubscriptions}
+          onCancelSubscription={handleCancelSubscription}
+          isCancelling={cancelSubscriptionMutation.isPending}
+          cancellingSubscriptionId={cancelSubscriptionMutation.variables ?? null}
+        />
 
         <div className="grid gap-6 lg:grid-cols-2">
           <SpendingChart

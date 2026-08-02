@@ -15,6 +15,7 @@ interface SubscriptionContextType {
     hasBehavioralInsights: boolean;
     hasSavingsProjections: boolean;
     hasExportReports: boolean;
+    hasAutopilot: boolean;
   };
   subscriptionStatus: {
     status: string;
@@ -36,6 +37,7 @@ const TIER_LIMITS = {
     hasBehavioralInsights: false,
     hasSavingsProjections: false,
     hasExportReports: false,
+    hasAutopilot: false,
   },
   premium: {
     maxSubscriptions: Infinity,
@@ -54,6 +56,7 @@ const TIER_LIMITS = {
     hasBehavioralInsights: true,
     hasSavingsProjections: true,
     hasExportReports: true,
+    hasAutopilot: true,
   },
 };
 

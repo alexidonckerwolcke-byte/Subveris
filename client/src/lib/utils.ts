@@ -202,14 +202,6 @@ export function getAdvancedRenewalDateIfNeeded(date: string | Date | null | unde
   if (!today) return null;
   if (renewalDate >= today) return null;
 
-  const renewalMonthStart = new Date(renewalDate.getFullYear(), renewalDate.getMonth(), 1);
-  const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-
-  // Preserve the current month's data until the calendar rolls over on the first of the next month.
-  if (renewalMonthStart.getTime() === currentMonthStart.getTime()) {
-    return null;
-  }
-
   let nextDate = new Date(renewalDate);
   let attempts = 0;
   while (nextDate < today && attempts < 100) {
@@ -236,42 +228,25 @@ export function isSubscriptionBilledInMonth(
 ): boolean {
   const targetMonth = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`;
   const billingMonth = getSubscriptionBillingMonth(sub);
-
-  // If billing_month explicitly matches the target month, only include it
-  // for the current month when the renewal date has arrived or passed.
-  if (billingMonth === targetMonth) {
-    if (isCurrentMonth) {
-      const renewalDate = parseSubscriptionRenewalDate(
-        (sub as any).nextBillingDate || (sub as any).next_billing_at || (sub as any).next_billing_date || (sub as any).next_billing,
-      );
-      if (!renewalDate) return false;
-      const renewalDay = parseDateOnlyLocal(renewalDate);
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      // If renewal already occurred today or earlier in this month, include it.
-      // Also include auto-advanced renewals pushed into another month because the
-      // subscription was billed earlier this month.
-      if (renewalDay && renewalDay <= today) return true;
-      return false;
-    }
-    return true;
-  }
+  const monthStartDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), 1);
+  const monthEndDate = new Date(monthEnd.getFullYear(), monthEnd.getMonth() + 1, 0, 23, 59, 59, 999);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const renewalDate = parseSubscriptionRenewalDate(
     (sub as any).nextBillingDate || (sub as any).next_billing_at || (sub as any).next_billing_date || (sub as any).next_billing,
   );
   if (!renewalDate) return false;
 
-  if (`${renewalDate.getFullYear()}-${String(renewalDate.getMonth() + 1).padStart(2, '0')}` !== targetMonth) {
-    return false;
+  const renewalDay = parseDateOnlyLocal(renewalDate);
+  if (!renewalDay) return false;
+
+  if (billingMonth === targetMonth) {
+    return isCurrentMonth ? renewalDay <= today : true;
   }
 
-  if (isCurrentMonth) {
-    const renewalDay = parseDateOnlyLocal(renewalDate);
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return renewalDay ? renewalDay <= today : false;
-  }
-
-  return true;
+  if (renewalDay < monthStartDate) return false;
+  if (renewalDay > monthEndDate) return false;
+  return isCurrentMonth ? renewalDay <= today : true;
 }
 
 export function isRenewalDateInCurrentMonth(date: Date, now = new Date()): boolean {

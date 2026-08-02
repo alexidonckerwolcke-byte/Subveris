@@ -9,7 +9,8 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
+const HOST = process.env.HOST || '127.0.0.1';
 const STATIC_DIR = process.env.STATIC_DIR || 'dist/public';
 let DIST_PATH = path.join(__dirname, STATIC_DIR);
 if (!fs.existsSync(DIST_PATH)) {
@@ -1065,8 +1066,8 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`Server running on http://${HOST}:${PORT}`);
 });
 
 // Handle graceful shutdown
