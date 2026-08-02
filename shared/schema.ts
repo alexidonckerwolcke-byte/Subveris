@@ -8,7 +8,7 @@ export const authUsers = pgTable("auth.users", {
 });
 
 // Subscription status types
-export type SubscriptionStatus = "active" | "unused" | "to-cancel" | "canceled" | "deleted";
+export type SubscriptionStatus = "active" | "unused" | "to-cancel" | "canceled" | "deleted" | "cancelling";
 
 // Subscription categories
 export type SubscriptionCategory = 
@@ -35,6 +35,8 @@ export const subscriptions = pgTable("subscriptions", {
   amount: real("amount").notNull(),
   currency: text("currency").notNull().default("USD"),
   frequency: text("frequency").notNull().$type<BillingFrequency>(),
+  billingCycle: text("billing_cycle"),
+  nextRenewalDate: timestamp("next_renewal_date", { withTimezone: true }),
   nextBillingDate: text("next_billing_at").notNull(),
   status: text("status").notNull().$type<SubscriptionStatus>().default("active"),
   usageCount: integer("usage_count").notNull().default(0),
@@ -49,6 +51,8 @@ export const subscriptions = pgTable("subscriptions", {
   monthlyUsageCount: integer("monthly_usage_count").notNull().default(0),
   usageMonth: text("usage_month"),
   billingMonth: text("billing_month"), // YYYY-MM format, tracks which month subscription is billed for (persists until end of month)
+  totalActiveSeconds: integer("total_active_seconds").notNull().default(0),
+  isZeroUsageFlag: boolean("is_zero_usage_flag").notNull().default(false),
 });
 
 export const insertSubscriptionSchema = (createInsertSchema(subscriptions).omit as any)(['id']);

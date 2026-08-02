@@ -81,9 +81,31 @@ function convertToUSD(amount: number, currency: string | undefined) {
   return amount / getExchangeRate(currency);
 }
 
-function calculateMonthlyCost(amount: number, frequency: string | undefined) {
+function normalizeBillingCycle(value: unknown): "monthly" | "yearly" | null {
+  const normalizedValue = String(value ?? "").trim().toLowerCase();
+  if (!normalizedValue) return null;
+  if (["yearly", "annual", "annually", "yr", "per year"].includes(normalizedValue)) return "yearly";
+  if (["monthly", "month", "mo", "per month"].includes(normalizedValue)) return "monthly";
+  return null;
+}
+
+function normalizeRenewalDate(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  const input = String(value).trim();
+  if (!input) return null;
+
+  const parsedDate = new Date(input);
+  if (!Number.isNaN(parsedDate.getTime())) {
+    return parsedDate.toISOString();
+  }
+
+  return input;
+}
+
+function calculateMonthlyCost(amount: number, frequency: string | undefined, billingCycle?: string | null) {
+  const normalizedBillingCycle = normalizeBillingCycle(billingCycle);
   const normalizedFrequency = (frequency || "monthly").toLowerCase();
-  if (normalizedFrequency === "yearly") return amount / 12;
+  if (normalizedBillingCycle === "yearly" || normalizedFrequency === "yearly") return amount / 12;
   if (normalizedFrequency === "quarterly") return amount / 3;
   if (normalizedFrequency === "weekly") return amount * 4;
   return amount;
@@ -126,6 +148,168 @@ function jsonResponse(body: unknown, initOrOrigin?: ResponseInit | string | null
 
 function generateId() {
   return crypto.randomUUID();
+}
+
+function normalizeDomain(input: string | null | undefined): string | null {
+  if (typeof input !== "string") return null;
+  const trimmed = input.trim().toLowerCase();
+  if (!trimmed) return null;
+  return trimmed.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0].replace(/:\d+$/, "");
+}
+
+function toIsoDateString(value: Date): string {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+}
+
+function getBillingMonth(value: Date): string {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
+}
+
+async function sendZeroUsageAlertEmail(userId: string, domain: string): Promise<void> {
+  try {
+    if (!supabase) {
+      console.warn("[Extension Sync] Cannot send zero-usage email because Supabase client is unavailable.");
+      return;
+    }
+
+    let recipientEmail: string | null = null;
+    const { data: authUserData, error: authUserError } = await supabase.auth.admin.getUserById(userId);
+    if (!authUserError && authUserData?.user?.email) {
+      recipientEmail = authUserData.user.email;
+    }
+
+    if (!recipientEmail) {
+      const { data: familyMember, error: familyMemberError } = await supabase
+        .from("family_group_members")
+        .select("family_group_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!familyMemberError && familyMember?.family_group_id) {
+        const { data: familyGroup } = await supabase
+          .from("family_groups")
+          .select("created_by")
+          .eq("id", familyMember.family_group_id)
+          .maybeSingle();
+
+        if (familyGroup?.created_by) {
+          const { data: ownerUserData } = await supabase.auth.admin.getUserById(familyGroup.created_by);
+          recipientEmail = ownerUserData?.user?.email || recipientEmail;
+        }
+      }
+    }
+
+    if (!recipientEmail) {
+      console.warn(`[Extension Sync] No recipient email found for zero-usage alert for user ${userId}.`);
+      return;
+    }
+
+    const RESEND_API_KEY = Deno?.env?.get("RESEND_API_KEY")?.trim();
+    const SENDGRID_API_KEY = Deno?.env?.get("SENDGRID_API_KEY")?.trim();
+    const subject = `Unused subscription detected for ${domain}`;
+    const html = `
+      <h2>Unused subscription alert</h2>
+      <p>We noticed that your subscription for <strong>${domain}</strong> has not been used recently. This may be wasting money.</p>
+      <p>Please review the subscription and cancel it if you no longer need it.</p>
+    `;
+
+    if (RESEND_API_KEY) {
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "noreply@subveris.com",
+          to: recipientEmail,
+          subject,
+          html,
+        }),
+      });
+      return;
+    }
+
+    if (SENDGRID_API_KEY) {
+      await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${SENDGRID_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: recipientEmail }], subject }],
+          from: { email: "noreply@subveris.com" },
+          content: [{ type: "text/html", value: html }],
+        }),
+      });
+      return;
+    }
+
+    console.log(`[Extension Sync] Zero-usage alert email hook invoked for ${recipientEmail}.`);
+  } catch (error) {
+    console.error("[Extension Sync] Failed to send zero-usage alert email:", error);
+  }
+}
+
+async function sendCancellationNoticeEmail(userEmail: string, subscriptionDetails: Record<string, any> | null | undefined): Promise<void> {
+  try {
+    const subscriptionName = String(subscriptionDetails?.name || subscriptionDetails?.companyName || "Subscription");
+    const companyName = String(subscriptionDetails?.companyName || subscriptionDetails?.name || "Adobe");
+    const policyNumber = String(subscriptionDetails?.policyNumber || subscriptionDetails?.contractId || subscriptionDetails?.id || "TBD");
+    const customerName = String(subscriptionDetails?.customerName || subscriptionDetails?.userName || "Customer");
+    const subject = `Official cancellation notice for ${subscriptionName}`;
+    const html = `
+      <h2>Official Cancellation Notice</h2>
+      <p>This letter serves as formal notice to cancel the subscription for <strong>${subscriptionName}</strong>.</p>
+      <p><strong>Customer:</strong> ${customerName}</p>
+      <p><strong>Company:</strong> ${companyName}</p>
+      <p><strong>Policy / Contract ID:</strong> ${policyNumber}</p>
+      <p>Please treat this as an official request to end the recurring service agreement and confirm receipt.</p>
+      <p>Regards,<br />Subveris Automation</p>
+    `;
+
+    const recipients = Array.from(new Set([userEmail, "support@subveris.com"].filter(Boolean))) as string[];
+    const RESEND_API_KEY = Deno?.env?.get("RESEND_API_KEY")?.trim();
+    const SENDGRID_API_KEY = Deno?.env?.get("SENDGRID_API_KEY")?.trim();
+
+    if (RESEND_API_KEY) {
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "noreply@subveris.com",
+          to: recipients,
+          subject,
+          html,
+        }),
+      });
+      return;
+    }
+
+    if (SENDGRID_API_KEY) {
+      await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${SENDGRID_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: recipients.map((email) => ({ email })), subject }],
+          from: { email: "noreply@subveris.com" },
+          content: [{ type: "text/html", value: html }],
+        }),
+      });
+      return;
+    }
+
+    console.log(`[Cancel] Simulated cancellation notice email sent to support@subveris.com for ${subscriptionName}.`);
+  } catch (error) {
+    console.error("[Cancel] Failed to send cancellation notice email:", error);
+  }
 }
 
 function toErrorMessage(error: unknown): string {
@@ -209,10 +393,14 @@ function isSubscriptionBilledInCurrentMonth(sub: any, now: Date, renewalDate?: D
   const renewal = renewalDate ?? toDateOnlyLocal(normalizeSubscriptionDate(sub) || '');
   if (!renewal) return false;
 
-  const targetMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const renewalMonth = `${renewal.getFullYear()}-${String(renewal.getMonth() + 1).padStart(2, '0')}`;
-  if (renewalMonth !== targetMonth) return false;
-  return renewal <= now;
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const renewalDay = toDateOnlyLocal(renewal);
+
+  if (!renewalDay) return false;
+  if (renewalDay < monthStart) return false;
+  if (renewalDay > monthEnd) return false;
+  return renewalDay <= now;
 }
 
 function calculateTotalMonthlySpending(subscriptions: any[], monthStart: Date, monthEnd: Date, now: Date): number {
@@ -267,27 +455,9 @@ export function isSubscriptionBilledInMonth(
 ): boolean {
   const targetMonth = formatBillingMonth(monthStart);
   const billingMonth = getSubscriptionBillingMonth(sub);
-  // If billing_month explicitly matches the target month, only include it for
-  // the current month when the renewal date has arrived or passed.
-  if (billingMonth === targetMonth) {
-    if (isCurrentMonth) {
-      let renewal: Date | undefined = renewalDate;
-      if (!renewal) {
-        const renewalDateStr = normalizeSubscriptionDate(sub);
-        if (!renewalDateStr) return false;
-        renewal = parseSubscriptionDate(renewalDateStr) || undefined;
-      }
-      if (!renewal || isNaN(renewal.getTime())) return false;
-      const renewalDay = toDateOnlyLocal(renewal);
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      // Include if renewal already occurred today or earlier in this month.
-      // Also include auto-advanced renewals pushed into another month because
-      // the subscription was billed earlier this month.
-      if (renewalDay && renewalDay <= today) return true;
-      return false;
-    }
-    return true;
-  }
+  const monthStartDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), 1);
+  const monthEndDate = new Date(monthEnd.getFullYear(), monthEnd.getMonth() + 1, 0, 23, 59, 59, 999);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   let renewal: Date | undefined = renewalDate;
   if (!renewal) {
@@ -300,17 +470,16 @@ export function isSubscriptionBilledInMonth(
     return false;
   }
 
-  if (formatBillingMonth(renewal) !== targetMonth) {
-    return false;
+  const renewalDay = toDateOnlyLocal(renewal);
+  if (!renewalDay) return false;
+
+  if (billingMonth === targetMonth) {
+    return isCurrentMonth ? renewalDay <= today : true;
   }
 
-  if (isCurrentMonth) {
-    const renewalDay = toDateOnlyLocal(renewal);
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return renewalDay ? renewalDay <= today : false;
-  }
-
-  return true;
+  if (renewalDay < monthStartDate) return false;
+  if (renewalDay > monthEndDate) return false;
+  return isCurrentMonth ? renewalDay <= today : true;
 }
 
 function getNestedFamilyGroup(m: any) {
@@ -488,6 +657,24 @@ function getRequestOffsetMinutes(url: URL): number {
   if (!offsetParam) return 0;
   const offset = Number(offsetParam);
   return Number.isFinite(offset) ? offset : 0;
+}
+
+function getMonthlySpendingBuckets(now: Date, monthsBack = 6): Array<{ monthStart: Date; monthEnd: Date; monthLabel: string; isCurrentMonth: boolean }> {
+  const buckets: Array<{ monthStart: Date; monthEnd: Date; monthLabel: string; isCurrentMonth: boolean }> = [];
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  for (let i = monthsBack; i >= 0; i--) {
+    const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+    buckets.push({
+      monthStart,
+      monthEnd,
+      monthLabel: `${monthNames[monthStart.getMonth()]} ${monthStart.getFullYear()}`,
+      isCurrentMonth: i === 0,
+    });
+  }
+
+  return buckets;
 }
 
 function getRequestLocalNow(url: URL): Date {
@@ -1010,9 +1197,22 @@ runtimeDeno?.serve?.(async (req: Request) => {
       return sendJson({ message: "API is working!" });
     }
 
-    // Test route
-    if (pathname === "/test" && req.method === "GET") {
-      return sendJson({ message: "API is working!" });
+    if (pathname === "/extension/download" && req.method === "GET") {
+      try {
+        const zipPath = new URL("../../subveris-extension.zip", import.meta.url);
+        const file = await Deno.readFile(zipPath);
+        return new Response(file, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/zip",
+            "Content-Disposition": 'attachment; filename="subveris-extension.zip"',
+            "Cache-Control": "no-store",
+          },
+        });
+      } catch (error) {
+        console.error("Extension download failed:", error);
+        return sendJson({ error: "Extension download unavailable" }, { status: 404 });
+      }
     }
 
     // Get subscriptions
@@ -1753,6 +1953,391 @@ runtimeDeno?.serve?.(async (req: Request) => {
       } catch (error) {
         console.error("[Currency] Error updating currency:", error);
         return sendJson({ error: "Failed to update currency" }, { status: 500 });
+      }
+    }
+
+    // Browser extension usage sync endpoint
+    if ((pathname === "/track-usage-for-all-members" || pathname === "/track-usage-by-domain" || pathname === "/extension/usage-sync") && req.method === "POST") {
+      const body = await req.json().catch(() => null);
+      if (!body || typeof body !== "object") {
+        return sendJson({ error: "Invalid request body" }, { status: 400 });
+      }
+
+      const authToken = typeof body.authToken === "string" && body.authToken.trim()
+        ? body.authToken.trim()
+        : req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
+      const explicitUserId = typeof body.userId === "string" && body.userId.trim()
+        ? body.userId.trim()
+        : null;
+
+      if (!supabaseAuth || !supabase) {
+        return sendJson({ error: "Authentication service is unavailable" }, { status: 503 });
+      }
+
+      let userId = explicitUserId;
+      let authUser: any = null;
+
+      try {
+        if (authToken) {
+          const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(authToken);
+          if (authError || !user) {
+            console.error("[Extension Sync] Invalid auth token:", authError);
+            return sendJson({ error: "Unauthorized" }, { status: 401 });
+          }
+          authUser = user;
+          userId = user.id;
+        } else {
+          const testUserId = req.headers.get("x-test-user-id");
+          if (!testUserId) {
+            return sendJson({ error: "Unauthorized" }, { status: 401 });
+          }
+          userId = testUserId;
+        }
+
+        if (!userId) {
+          return sendJson({ error: "User ID is required" }, { status: 400 });
+        }
+
+        const { data: userSubscription, error: userSubscriptionError } = await supabase
+          .from("user_subscriptions")
+          .select("plan_type, status")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        let planType: "free" | "premium" | "family" = "free";
+        if (!userSubscriptionError && userSubscription) {
+          const rawPlanType = String(userSubscription.plan_type || "free").toLowerCase();
+          const normalizedPlanType = rawPlanType === "premium" || rawPlanType === "family" ? rawPlanType : "free";
+          const effectiveStatus = String(userSubscription.status || "active").toLowerCase();
+          const isActivePlan = effectiveStatus === "active" || effectiveStatus === "trialing";
+          planType = (normalizedPlanType === "premium" || normalizedPlanType === "family") && isActivePlan ? normalizedPlanType : "free";
+        }
+
+        const { count: subscriptionCount, error: subscriptionCountError } = await supabase
+          .from("subscriptions")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId);
+
+        if (subscriptionCountError) {
+          console.error("[Extension Sync] Failed to count subscriptions:", subscriptionCountError);
+          return sendJson({ error: "Failed to validate subscription access" }, { status: 500 });
+        }
+
+        if (planType === "free") {
+          const count = Number(subscriptionCount || 0);
+          if (count >= 5) {
+            return sendJson(
+              { error: "Subscription limit reached for Free Tier. Upgrade to Premium." },
+              { status: 403 }
+            );
+          }
+
+          return sendJson(
+            { error: "Browser extension tracking is unavailable for Free Tier. Upgrade to Premium." },
+            { status: 403 }
+          );
+        }
+
+        const discoveredDomains = Array.isArray(body.discoveredDomains)
+          ? body.discoveredDomains.filter((value: unknown): value is string => typeof value === "string" && value.trim() !== "")
+          : [];
+
+        const createdDomains: string[] = [];
+        for (const discoveredDomain of discoveredDomains) {
+          const normalizedDiscoveredDomain = normalizeDomain(discoveredDomain);
+          if (!normalizedDiscoveredDomain) {
+            continue;
+          }
+
+          const { data: existingDiscovery, error: discoveryLookupError } = await supabase
+            .from("subscriptions")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("website_domain", normalizedDiscoveredDomain)
+            .maybeSingle();
+
+          if (discoveryLookupError) {
+            console.warn("[Extension Sync] Failed to lookup discovered domain:", discoveryLookupError);
+            continue;
+          }
+
+          if (existingDiscovery) {
+            continue;
+          }
+
+          const now = new Date();
+          const detectedBillingCycle = normalizeBillingCycle(body.detectedBillingCycle ?? body.billingCycle ?? null);
+          const detectedRenewalDate = normalizeRenewalDate(body.detectedRenewalDate ?? body.nextRenewalDate ?? null);
+          const insertedSubscription = {
+            id: generateId(),
+            user_id: userId,
+            name: normalizedDiscoveredDomain,
+            category: "other",
+            amount: 0,
+            currency: "USD",
+            frequency: "monthly",
+            billing_cycle: detectedBillingCycle || null,
+            next_renewal_date: detectedRenewalDate || null,
+            next_billing_at: toIsoDateString(new Date(now.getFullYear(), now.getMonth() + 1, now.getDate())),
+            status: "detected_pending_verification",
+            usage_count: 0,
+            monthly_usage_count: 0,
+            usage_month: getBillingMonth(now),
+            last_used_at: null,
+            is_detected: true,
+            website_domain: normalizedDiscoveredDomain,
+            billing_month: getBillingMonth(now),
+            description: "Auto-discovered from extension scan",
+          };
+
+          const { error: insertError } = await supabase.from("subscriptions").insert(insertedSubscription);
+          if (insertError) {
+            console.error("[Extension Sync] Failed to create detected subscription:", insertError);
+          } else {
+            createdDomains.push(normalizedDiscoveredDomain);
+          }
+        }
+
+        let matchingSubscription: any = null;
+        const normalizedDomain = normalizeDomain(typeof body.domain === "string" ? body.domain : null);
+        if (normalizedDomain) {
+          const { data: matchingSubscriptions, error: matchingError } = await supabase
+            .from("subscriptions")
+            .select("*")
+            .eq("user_id", userId)
+            .eq("website_domain", normalizedDomain);
+
+          if (!matchingError && matchingSubscriptions?.length) {
+            matchingSubscription = matchingSubscriptions[0];
+          }
+        }
+
+        let updatedSubscription: any = matchingSubscription;
+        if (matchingSubscription) {
+          const activeTimeSeconds = typeof body.activeTimeSeconds === "number"
+            ? body.activeTimeSeconds
+            : (typeof body.timeSpent === "number" ? body.timeSpent : 0);
+          const detectedPrice = typeof body.detectedPrice === "number" ? body.detectedPrice : null;
+          const detectedPlanName = typeof body.detectedPlanName === "string" && body.detectedPlanName.trim()
+            ? body.detectedPlanName.trim()
+            : null;
+          const detectedBillingCycle = normalizeBillingCycle(body.detectedBillingCycle ?? body.billingCycle ?? null);
+          const detectedRenewalDate = normalizeRenewalDate(body.detectedRenewalDate ?? body.nextRenewalDate ?? null);
+
+          const currentMonth = new Date().toISOString().slice(0, 7);
+          const currentMonthlyUsage = matchingSubscription.usage_month === currentMonth
+            ? Number(matchingSubscription.monthly_usage_count || 0)
+            : 0;
+          const nextMonthlyUsage = currentMonthlyUsage + 1;
+          const updatePayload: Record<string, any> = {
+            usage_count: Number(matchingSubscription.usage_count || 0) + 1,
+            monthly_usage_count: nextMonthlyUsage,
+            usage_month: currentMonth,
+            last_used_at: new Date().toISOString(),
+            total_active_seconds: Number(matchingSubscription.total_active_seconds || 0) + Math.max(0, activeTimeSeconds),
+          };
+
+          if (detectedPrice !== null && Number.isFinite(detectedPrice)) {
+            updatePayload.amount = detectedPrice;
+          }
+
+          if (detectedPlanName) {
+            const nextDescription = [matchingSubscription.description, detectedPlanName]
+              .filter(Boolean)
+              .join(" | ");
+            updatePayload.description = nextDescription;
+          }
+
+          if (detectedBillingCycle) {
+            updatePayload.billing_cycle = detectedBillingCycle;
+          }
+
+          if (detectedRenewalDate) {
+            updatePayload.next_renewal_date = detectedRenewalDate;
+          }
+
+          const { data: updatedRows, error: updateError } = await supabase
+            .from("subscriptions")
+            .update(updatePayload)
+            .eq("id", matchingSubscription.id)
+            .select("id, amount, monthly_usage_count, usage_count, last_used_at, description, total_active_seconds");
+
+          if (updateError) {
+            console.error("[Extension Sync] Failed to update subscription usage:", updateError);
+          } else {
+            updatedSubscription = updatedRows?.[0] || matchingSubscription;
+          }
+        }
+
+        const shouldTriggerZeroUsage = Boolean(body.isZeroUsage);
+        const lastUsedAt = matchingSubscription?.last_used_at ? new Date(matchingSubscription.last_used_at) : null;
+        const staleUsage = Boolean(lastUsedAt && (Date.now() - lastUsedAt.getTime()) > 45 * 24 * 60 * 60 * 1000);
+        const zeroUsageTriggered = Boolean(shouldTriggerZeroUsage || staleUsage);
+
+        if (matchingSubscription && zeroUsageTriggered) {
+          const zeroUsageUpdatePayload: Record<string, any> = { is_zero_usage_flag: true };
+          const { error: zeroUsageFlagError } = await supabase
+            .from("subscriptions")
+            .update(zeroUsageUpdatePayload)
+            .eq("id", matchingSubscription.id);
+
+          if (zeroUsageFlagError) {
+            console.warn("[Extension Sync] Zero-usage flag update failed, using description fallback:", zeroUsageFlagError);
+            await supabase
+              .from("subscriptions")
+              .update({ description: `${matchingSubscription.description || ""} | zero-usage-alert`.trim() })
+              .eq("id", matchingSubscription.id);
+          }
+
+          await sendZeroUsageAlertEmail(userId, normalizedDomain || matchingSubscription.name || "your subscription");
+        }
+
+        const subscriptionForCost = updatedSubscription || matchingSubscription;
+        const monthlyPrice = subscriptionForCost
+          ? calculateMonthlyCost(
+              Number(subscriptionForCost.amount || 0),
+              subscriptionForCost.frequency,
+              subscriptionForCost.billing_cycle || subscriptionForCost.billingCycle
+            )
+          : 0;
+        const usageBasis = Math.max(1, Number(updatedSubscription?.monthly_usage_count || matchingSubscription?.monthly_usage_count || 0));
+        const costPerUse = monthlyPrice > 0 ? monthlyPrice / usageBasis : 0;
+
+        return sendJson({
+          success: true,
+          message: "Extension usage sync processed successfully",
+          userId,
+          profile: authUser ? { id: authUser.id, email: authUser.email || null } : null,
+          tier: planType,
+          domain: normalizedDomain || null,
+          createdDomains,
+          updatedSubscriptionId: updatedSubscription?.id || null,
+          zeroUsageTriggered,
+          costPerUse: Number(costPerUse.toFixed(2)),
+        });
+      } catch (error) {
+        console.error("[Extension Sync] Exception processing extension sync:", error);
+        return sendJson({ error: "Failed to process extension sync" }, { status: 500 });
+      }
+    }
+
+    // One-click cancellation request for extension-triggered alerts
+    if (pathname === "/subscriptions/cancel" && req.method === "POST") {
+      const body = await req.json().catch(() => null);
+      if (!body || typeof body !== "object") {
+        return sendJson({ error: "Invalid request body" }, { status: 400 });
+      }
+
+      const subscriptionId = typeof body.subscriptionId === "string" ? body.subscriptionId.trim() : "";
+      const providedUserId = typeof body.userId === "string" ? body.userId.trim() : "";
+      const providedEmail = typeof body.email === "string" ? body.email.trim() : "";
+      const customerName = typeof body.customerName === "string" ? body.customerName.trim() : "";
+      const authToken = typeof body.authToken === "string" && body.authToken.trim()
+        ? body.authToken.trim()
+        : req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
+
+      if (!subscriptionId) {
+        return sendJson({ error: "Subscription ID is required" }, { status: 400 });
+      }
+
+      if (!supabaseAuth || !supabase) {
+        return sendJson({ error: "Authentication service is unavailable" }, { status: 503 });
+      }
+
+      let userId = providedUserId || extractUserId(req) || null;
+
+      try {
+        if (authToken) {
+          const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(authToken);
+          if (authError || !user?.id) {
+            console.error("[Cancel] Invalid auth token:", authError);
+            return sendJson({ error: "Unauthorized" }, { status: 401 });
+          }
+          userId = user.id;
+        } else if (!userId) {
+          const testUserId = req.headers.get("x-test-user-id");
+          if (!testUserId) {
+            return sendJson({ error: "Unauthorized" }, { status: 401 });
+          }
+          userId = testUserId;
+        }
+
+        if (!userId) {
+          return sendJson({ error: "User ID is required" }, { status: 400 });
+        }
+
+        const { data: userSubscription, error: userSubscriptionError } = await supabase
+          .from("user_subscriptions")
+          .select("plan_type, status")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        let planType: "free" | "premium" | "family" = "free";
+        if (!userSubscriptionError && userSubscription) {
+          const rawPlanType = String(userSubscription.plan_type || "free").toLowerCase();
+          const normalizedPlanType = rawPlanType === "premium" || rawPlanType === "family" ? rawPlanType : "free";
+          const effectiveStatus = String(userSubscription.status || "active").toLowerCase();
+          const isActivePlan = effectiveStatus === "active" || effectiveStatus === "trialing";
+          planType = (normalizedPlanType === "premium" || normalizedPlanType === "family") && isActivePlan ? normalizedPlanType : "free";
+        }
+
+        if (planType === "free") {
+          return sendJson({ error: "Cancellation is only available on Premium or Family plans" }, { status: 403 });
+        }
+
+        const { data: subscription, error: subscriptionError } = await supabase
+          .from("subscriptions")
+          .select("id, user_id, name, description, website_domain, amount, currency, frequency")
+          .eq("id", subscriptionId)
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (subscriptionError || !subscription) {
+          return sendJson({ error: "Subscription not found" }, { status: 404 });
+        }
+
+        const { error: updateError } = await supabase
+          .from("subscriptions")
+          .update({
+            status: "cancelling",
+            description: `${subscription.name || "Subscription"} cancellation requested via Subveris`,
+          })
+          .eq("id", subscriptionId)
+          .eq("user_id", userId);
+
+        if (updateError) {
+          console.error("[Cancel] Failed to mark subscription as cancelling:", updateError);
+          return sendJson({ error: "Failed to initiate cancellation" }, { status: 500 });
+        }
+
+        let userEmail = providedEmail || null;
+        if (!userEmail) {
+          try {
+            const { data: authUserData } = await supabase.auth.admin.getUserById(userId);
+            userEmail = authUserData?.user?.email || null;
+          } catch (emailLookupError) {
+            console.warn("[Cancel] Failed to lookup user email:", emailLookupError);
+          }
+        }
+
+        await sendCancellationNoticeEmail(userEmail || "support@subveris.com", {
+          id: subscription.id,
+          name: subscription.name,
+          companyName: subscription.name || subscription.website_domain || "Adobe",
+          customerName: customerName || "Customer",
+          contractId: subscription.id,
+          policyNumber: subscription.id,
+        });
+
+        return sendJson({
+          success: true,
+          message: "Cancellation process initiated. PDF notice sent to email.",
+          subscriptionId,
+          status: "cancelling",
+        });
+      } catch (error) {
+        console.error("[Cancel] Exception processing cancellation request:", error);
+        return sendJson({ error: "Failed to initiate cancellation" }, { status: 500 });
       }
     }
 
@@ -3813,25 +4398,20 @@ runtimeDeno?.serve?.(async (req: Request) => {
         console.log(`[spending/monthly] Found ${subscriptions.length} subscriptions for user`);
 
         // Generate monthly spending for LAST 6 COMPLETE MONTHS + CURRENT MONTH
-        const monthlyData = [];
+        const monthlyData: Array<{ month: string; amount: number; isCurrentMonth: boolean }> = [];
         const offsetMinutes = getRequestOffsetMinutes(url);
         const now = getRequestLocalNow(url);
-        const currentDayOfMonth = now.getUTCDate();
-        
+
         console.log(`[spending/monthly] Current date: ${now.toISOString()} (offsetMinutes=${offsetMinutes})`);
-        
-        // Start from 6 months ago to get 6 complete months + current month (7 total data points)
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        for (let i = 6; i >= 0; i--) {
-          const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-          const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i + 1, 0, 23, 59, 59));
-          const monthStr = `${monthNames[monthStart.getUTCMonth()]} ${monthStart.getUTCFullYear()}`;
-          const isCurrentMonth = i === 0;
-          
+
+        const monthBuckets = getMonthlySpendingBuckets(now, 6);
+        for (const bucket of monthBuckets) {
+          const { monthStart, monthEnd, monthLabel, isCurrentMonth } = bucket;
+
           // Calculate spending for this month based on subscriptions that RENEW in that month
           let monthlyAmount = 0;
           let currentMonthIncluded = 0;
-          
+
           for (const sub of subscriptions) {
             if (isSubscriptionDeleted(sub)) {
               if (isCurrentMonth) console.log(`[spending/monthly] Skip ${sub.name}: deleted subscription`);
@@ -3842,20 +4422,20 @@ runtimeDeno?.serve?.(async (req: Request) => {
               if (isCurrentMonth) console.log(`[spending/monthly] Skip ${sub.name}: invalid status ${sub.status}`);
               continue;
             }
-            
+
             // Get the renewal date for this subscription
             const renewalDateStr = normalizeSubscriptionDate(sub);
             if (!renewalDateStr) {
               if (isCurrentMonth) console.log(`[spending/monthly] Skip ${sub.name}: no renewal date found`);
               continue;
             }
-            
+
             const renewalDate = toLocalDateTimeInOffset(renewalDateStr, offsetMinutes);
             if (!renewalDate) {
               if (isCurrentMonth) console.log(`[spending/monthly] Skip ${sub.name}: failed to parse renewal date ${renewalDateStr}`);
               continue;
             }
-            
+
             let includeInMonthlySpend = false;
             if (isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate)) {
               includeInMonthlySpend = true;
@@ -3865,7 +4445,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             } else if (isCurrentMonth) {
               console.log(`[spending/monthly] Skip ${sub.name} (${renewalDateStr}): renewal date in future`);
             }
-            
+
             if (includeInMonthlySpend) {
               // Calculate monthly cost
               const frequency = (sub.frequency || 'monthly').toLowerCase();
@@ -3873,7 +4453,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
               const cost = frequency === 'yearly' ? amount / 12 :
                           frequency === 'quarterly' ? amount / 3 :
                           frequency === 'weekly' ? amount * 4 : amount;
-              
+
               const convertedCost = convertToUSD(cost, sub.currency);
               monthlyAmount += convertedCost;
               if (isCurrentMonth) {
@@ -3882,15 +4462,15 @@ runtimeDeno?.serve?.(async (req: Request) => {
               }
             }
           }
-          
+
           if (isCurrentMonth) {
             console.log(`[spending/monthly] Current month: ${currentMonthIncluded} subscriptions included, total = $${monthlyAmount.toFixed(2)}`);
           }
-          
+
           monthlyData.push({
-            month: monthStr,
+            month: monthLabel,
             amount: Math.round(monthlyAmount * 100) / 100,
-            isCurrentMonth: isCurrentMonth
+            isCurrentMonth,
           });
         }
 
@@ -4520,15 +5100,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
           }, 0);
 
         const now = getRequestLocalNow(url);
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const spending = [];
+        const spending: Array<{ month: string; amount: number; isCurrentMonth: boolean }> = [];
+        const monthBuckets = getMonthlySpendingBuckets(now, 6);
 
-        for (let i = 6; i >= 0; i--) {
-          const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
-          const monthStr = `${monthNames[monthStart.getMonth()]} ${monthStart.getFullYear()}`;
-          const isCurrentMonth = i === 0;
-
+        for (const bucket of monthBuckets) {
+          const { monthStart, monthEnd, monthLabel, isCurrentMonth } = bucket;
           let monthlyAmount = 0;
           for (const sub of visibleSubscriptions) {
             const status = normalizeSubscriptionStatus(sub.status);
@@ -4552,7 +5128,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           }
 
           spending.push({
-            month: monthStr,
+            month: monthLabel,
             amount: Math.round(monthlyAmount * 100) / 100,
             isCurrentMonth,
           });
@@ -4708,15 +5284,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }, 0);
 
       const now = getRequestLocalNow(url);
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      const spending = [];
+      const spending: Array<{ month: string; amount: number; isCurrentMonth: boolean }> = [];
+      const monthBuckets = getMonthlySpendingBuckets(now, 6);
 
-      for (let i = 6; i >= 0; i--) {
-        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
-        const monthStr = `${monthNames[monthStart.getMonth()]} ${monthStart.getFullYear()}`;
-        const isCurrentMonth = i === 0;
-
+      for (const bucket of monthBuckets) {
+        const { monthStart, monthEnd, monthLabel, isCurrentMonth } = bucket;
         let monthlyAmount = 0;
         for (const sub of visibleSubscriptions) {
           const status = normalizeSubscriptionStatus(sub.status);
@@ -4740,7 +5312,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }
 
         spending.push({
-          month: monthStr,
+          month: monthLabel,
           amount: Math.round(monthlyAmount * 100) / 100,
           isCurrentMonth,
         });

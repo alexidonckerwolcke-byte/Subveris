@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Download, AlertTriangle, Chrome, BookOpen, Settings } from "lucide-react";
+import { PremiumGate } from "@/components/premium-gate";
 import { useSubscription } from "@/lib/subscription-context";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -14,7 +15,7 @@ export default function Files() {
   const [downloadingExtension, setDownloadingExtension] = useState(false);
   const [downloadingData, setDownloadingData] = useState(false);
 
-  const isPremium = limits?.hasExportReports || false;
+  const hasAutopilotAccess = limits?.hasAutopilot || false;
 
   const handleDownloadExtension = async (e: React.MouseEvent) => {
     console.log("Button clicked!");
@@ -24,13 +25,8 @@ export default function Files() {
     setDownloadingExtension(true);
     try {
       console.log("[1] Starting extension download...");
-      
-      const response = await apiFetch("/api/extension/download", {
-        method: "GET",
-        headers: {
-          "Accept": "application/zip",
-        },
-      });
+      const downloadUrl = `${window.location.origin}/subveris-extension.zip`;
+      const response = await fetch(downloadUrl, { method: "GET" });
       
       console.log("[2] Response received:", {
         status: response.status,
@@ -99,13 +95,8 @@ export default function Files() {
     setDownloadingData(true);
     try {
       console.log("[1] Starting extension download...");
-      
-      const response = await apiFetch("/api/extension/download", {
-        method: "GET",
-        headers: {
-          "Accept": "application/zip",
-        },
-      });
+      const downloadUrl = `${window.location.origin}/subveris-extension.zip`;
+      const response = await fetch(downloadUrl, { method: "GET" });
       
       console.log("[2] Response received:", {
         status: response.status,
@@ -157,9 +148,10 @@ export default function Files() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Browser Extension Setup</h1>
+        <h1 className="text-3xl font-bold">Autopilot</h1>
       </div>
 
+      <PremiumGate feature="Autopilot" showBlurred={false}>
       <Tabs defaultValue="tutorial" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="tutorial" className="flex items-center gap-2">
@@ -178,14 +170,14 @@ export default function Files() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Chrome className="h-5 w-5" />
-                Browser Extension Installation Guide
+                Extension Installation Guide
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-8">
               <Alert className="bg-blue-50 border-blue-200">
                 <Chrome className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-blue-900">
-                  Our browser extension captures subscription usage patterns to provide you with AI-powered insights and optimization recommendations.
+                  Our extension toolkit helps you install, configure, and manage the browser extension that captures subscription usage patterns for AI-powered insights and optimization recommendations.
                 </AlertDescription>
               </Alert>
 
@@ -201,9 +193,9 @@ export default function Files() {
                       1
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Download the Optimization Extension</p>
+                      <p className="font-semibold text-sm">Download the Extension Pack</p>
                       <p className="text-sm text-muted-foreground">
-                        Download the Subveris browser extension package for optimization.
+                        Download the Subveris browser extension package so you can install the tracking and automation tools.
                       </p>
                       <Button 
                         variant="outline" 
@@ -224,9 +216,9 @@ export default function Files() {
                       2
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Extract the Files</p>
+                      <p className="font-semibold text-sm">Extract the Extension Files</p>
                       <p className="text-sm text-muted-foreground">
-                        The downloaded file contains all extension files. Create a folder and copy each file into it
+                        The downloaded package contains the extension files. Create a folder and copy each file into it.
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
                         You need: <code className="bg-muted px-2 py-1 rounded text-xs">manifest.json</code>, <code className="bg-muted px-2 py-1 rounded text-xs">popup.html</code>, <code className="bg-muted px-2 py-1 rounded text-xs">popup.js</code>, <code className="bg-muted px-2 py-1 rounded text-xs">content.js</code>, <code className="bg-muted px-2 py-1 rounded text-xs">background.js</code>, and <code className="bg-muted px-2 py-1 rounded text-xs">inject.js</code>
@@ -407,6 +399,7 @@ export default function Files() {
           </Card>
         </TabsContent>
       </Tabs>
+      </PremiumGate>
     </div>
   );
 }

@@ -68,7 +68,7 @@ const mainNavItems = [
 
 const settingsItems = [
   {
-    title: "Files",
+    title: "Autopilot",
     url: "/files",
     icon: FileText,
   },
