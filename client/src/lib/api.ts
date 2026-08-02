@@ -49,21 +49,38 @@ function normalizeBase(base: string) {
   return base.replace(/\/$/, "");
 }
 
+function withTimeout(ms: number, promise: Promise<Response>): Promise<Response> {
+  const timeoutPromise = new Promise<Response>((_, reject) => {
+    const id = window.setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms);
+    promise.finally(() => window.clearTimeout(id));
+  });
+  return Promise.race([promise, timeoutPromise]);
+}
+
+async function fetchWithRetry(url: string, init: RequestInit, retries = 2): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await withTimeout(8000, fetch(url, init));
+    } catch (error) {
+      lastError = error;
+      if (attempt === retries) {
+        throw error;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 250 * (attempt + 1)));
+    }
+  }
+
+  throw lastError;
+}
+
 export function resolveApiUrl(path: string) {
   if (/^https?:\/\//.test(path)) {
     return path;
   }
 
   if (path.startsWith("/api")) {
-    if (import.meta.env.DEV) {
-      if (!hasWarnedNoApiUrl) {
-        console.info(
-          "Development mode: forcing local /api proxy for all /api requests."
-        );
-        hasWarnedNoApiUrl = true;
-      }
-      return path;
-    }
     return resolveRemoteApiUrl(path);
   }
 
@@ -104,11 +121,15 @@ export async function fetchWithRemoteFallback(url: string, init: RequestInit) {
 
   const attemptFetch = async (fetchUrl: string) => {
     try {
-      return await fetch(fetchUrl, init);
+      return await fetchWithRetry(fetchUrl, init);
     } catch (error) {
       if (secondaryUrl && fetchUrl === primaryUrl) {
         console.warn("[apiFetch] primary /api request failed, retrying against remote API", { primaryUrl, secondaryUrl, error });
-        return await fetch(secondaryUrl, init);
+        try {
+          return await fetchWithRetry(secondaryUrl, init);
+        } catch (retryError) {
+          throw retryError;
+        }
       }
       throw error;
     }
@@ -165,7 +186,17 @@ export async function apiFetch(input: string, init?: RequestInit) {
     },
   });
 
-  let res = await fetchWithRemoteFallback(primaryUrl, buildRequest(effectiveToken));
+  let res: Response;
+  try {
+    res = await fetchWithRemoteFallback(primaryUrl, buildRequest(effectiveToken));
+  } catch (error) {
+    console.warn("[apiFetch] request failed before response", error);
+    return new Response(JSON.stringify({ error: "Request timed out" }), {
+      status: 504,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (res.ok) {
     return res;
   }
@@ -174,11 +205,19 @@ export async function apiFetch(input: string, init?: RequestInit) {
     const refreshedToken = await resolveAuthToken(true);
     const retryToken = refreshedToken || supabaseAnonKey;
     if (retryToken && retryToken !== effectiveToken) {
-      const retryRes = await fetchWithRemoteFallback(primaryUrl, buildRequest(retryToken));
-      if (retryRes.ok) {
+      try {
+        const retryRes = await fetchWithRemoteFallback(primaryUrl, buildRequest(retryToken));
+        if (retryRes.ok) {
+          return retryRes;
+        }
         return retryRes;
+      } catch (retryError) {
+        console.warn("[apiFetch] retry request failed", retryError);
+        return new Response(JSON.stringify({ error: "Request timed out" }), {
+          status: 504,
+          headers: { "Content-Type": "application/json" },
+        });
       }
-      return retryRes;
     }
   }
 
