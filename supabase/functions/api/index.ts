@@ -955,10 +955,26 @@ async function updateSubscription(userId: string, subscriptionId: string, update
     console.warn('[API] Failed to delete stored renewal calendar events', { subscriptionId, userId, err });
   }
 
-  console.log('[API] updateSubscription calling supabase.update with payload:', updates);
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const normalizedUpdates = { ...updates };
+  if (normalizedUpdates.monthly_usage_count !== undefined || normalizedUpdates.usage_month !== undefined) {
+    const currentUsageMonth = normalizedUpdates.usage_month || currentMonth;
+    if (normalizedUpdates.usage_month === undefined) {
+      normalizedUpdates.usage_month = currentUsageMonth;
+    }
+    if (normalizedUpdates.monthly_usage_count === undefined && normalizedUpdates.usage_count !== undefined) {
+      normalizedUpdates.monthly_usage_count = normalizedUpdates.usage_count;
+    }
+    if (normalizedUpdates.usage_month !== currentMonth) {
+      normalizedUpdates.monthly_usage_count = 0;
+      normalizedUpdates.usage_month = currentMonth;
+    }
+  }
+
+  console.log('[API] updateSubscription calling supabase.update with payload:', normalizedUpdates);
   const { data, error } = await supabase
     .from("subscriptions")
-    .update(updates)
+    .update(normalizedUpdates)
     .eq("id", subscriptionId)
     .eq("user_id", userId)
     .select()
@@ -1370,9 +1386,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       try {
         const currentMonth = new Date().toISOString().slice(0, 7);
+        const existing = await getSubscriptionById(userId, subscriptionId);
+        const existingMonth = (existing as any)?.usage_month || null;
+        const normalizedMonthlyUsageCount = existingMonth === currentMonth
+          ? Number(body.monthlyUsageCount ?? 0)
+          : Number(body.monthlyUsageCount ?? 0);
         const updated = await updateSubscription(userId, subscriptionId, {
-          usage_count: body.monthlyUsageCount,
-          monthly_usage_count: body.monthlyUsageCount,
+          usage_count: normalizedMonthlyUsageCount,
+          monthly_usage_count: normalizedMonthlyUsageCount,
           usage_month: currentMonth,
           last_used_at: new Date().toISOString().split("T")[0],
         });
