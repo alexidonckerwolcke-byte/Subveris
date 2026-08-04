@@ -50,6 +50,11 @@ const mainNavItems = [
     icon: Lightbulb,
   },
   {
+    title: "AI Optimization",
+    url: "/cost-optimizer",
+    icon: Zap,
+  },
+  {
     title: "Savings",
     url: "/savings",
     icon: PiggyBank,
@@ -132,14 +137,14 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b border-sidebar-border px-6 py-4 bg-gradient-to-r from-primary/60 to-indigo-300/70 dark:from-blue-400/70 dark:to-blue-300/60 text-primary-foreground">
+      <SidebarHeader className="border-b border-sidebar-border/70 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-6 py-4 text-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 dark:text-white">
         <Link href={disabled ? "#" : "/"} className={`flex items-center gap-3 ${disabled ? 'pointer-events-none opacity-70' : ''}`}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden shadow-md bg-blue-50">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden shadow-md bg-white/80 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10">
             <img src="/assets/logo.png" alt="Subveris Logo" className="h-full w-full object-cover" />
           </div>
           <div className="flex flex-col">
-            <span className="text-lg font-bold tracking-tight text-white">Subveris</span>
-            <span className="text-xs text-indigo-100/90">Smart Financial HQ</span>
+            <span className="text-lg font-semibold tracking-tight">Subveris</span>
+            <span className="text-xs text-slate-600 dark:text-slate-300">Subscription intelligence</span>
           </div>
         </Link>
       </SidebarHeader>
@@ -201,28 +206,30 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border p-4">
-        <div className={`flex items-center gap-3 rounded-lg bg-sidebar-accent/50 p-3 ${disabled ? 'opacity-50' : ''}`}>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <PiggyBank className="h-4 w-4" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xs font-medium">
-              {showFamilyData ? "This Month (family)" : "This Month"}
-            </span>
-            <span className="text-sm font-semibold text-chart-2">
-              {loading ? "Loading..." : (
-                monthlySavings > 0
-                  ? `+${formatCurrency(monthlySavings)}`
-                  : formatCurrency(monthlySavings)
-              )}
-            </span>
-            {showFamilyData && !loading && (
-              <span className="text-xs font-medium text-foreground">
-                You: {ownerMonthlySavings > 0 ? `+${formatCurrency(ownerMonthlySavings)}` : formatCurrency(ownerMonthlySavings)} · Members: {memberMonthlySavings > 0 ? `+${formatCurrency(memberMonthlySavings)}` : formatCurrency(memberMonthlySavings)}
+      <SidebarFooter className="border-t border-sidebar-border/70 p-4">
+        <div className={`rounded-xl border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/80 ${disabled ? 'opacity-50' : ''}`}>
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+              <PiggyBank className="h-4 w-4" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                {showFamilyData ? "This month (family)" : "This month"}
               </span>
-            )}
+              <span className="text-sm font-semibold text-slate-900">
+                {loading ? "Loading..." : (
+                  monthlySavings > 0
+                    ? `+${formatCurrency(monthlySavings)}`
+                    : formatCurrency(monthlySavings)
+                )}
+              </span>
+            </div>
           </div>
+          {showFamilyData && !loading && (
+            <p className="mt-2 text-xs text-slate-600">
+              You: {ownerMonthlySavings > 0 ? `+${formatCurrency(ownerMonthlySavings)}` : formatCurrency(ownerMonthlySavings)} · Members: {memberMonthlySavings > 0 ? `+${formatCurrency(memberMonthlySavings)}` : formatCurrency(memberMonthlySavings)}
+            </p>
+          )}
         </div>
       </SidebarFooter>
     </Sidebar>

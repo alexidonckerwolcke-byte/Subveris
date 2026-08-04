@@ -1,20 +1,23 @@
 import type { AIRecommendation } from "@shared/schema";
-import { calculateMonthlyCost } from "./utils";
+import { getSubscriptionUsageCount } from "./health-score";
+import { calculateMonthlyCost, parseSubscriptionRenewalDate } from "./utils";
 
 function normalizeText(value: unknown): string {
   return String(value || "").trim().toLowerCase();
 }
 
 function getUsageValue(sub: any): number | null {
-  const usage = sub.monthly_usage_count ?? sub.monthlyUsageCount ?? sub.usage_count ?? sub.usageCount;
-  return typeof usage === "number" ? usage : null;
+  const usage = getSubscriptionUsageCount(sub);
+  return Number.isFinite(usage) ? usage : null;
 }
 
 function getRenewalText(sub: any): string {
   const nextBilling = sub.nextBillingDate || sub.next_billing_date || sub.next_billing_at || sub.next_billing;
   if (!nextBilling) return "";
-  const date = new Date(nextBilling);
-  if (Number.isNaN(date.getTime())) return "";
+
+  const date = parseSubscriptionRenewalDate(nextBilling);
+  if (!date) return "";
+
   return ` Next payment is due ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`;
 }
 

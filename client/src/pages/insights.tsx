@@ -331,15 +331,26 @@ export default function Insights() {
   return (
     <div className="flex-1 overflow-auto">
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
-        <div className="mb-2">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Insights & Opportunities</h1>
-          <p className="text-muted-foreground">
-            AI-powered analysis to highlight wasted spend, unused services, and smart cost-saving decisions.
-          </p>
+        <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6 text-slate-900 shadow-sm dark:border-slate-700 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 dark:text-white">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-600 dark:text-slate-300">Intelligence layer</p>
+              <h1 className="mt-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Insights & Opportunities</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                A sharper view of waste, value, and the actions that matter most so your subscriptions work harder for you.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/10">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300">Opportunity focus</p>
+              <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
+                {highPriorityCount > 0 ? `${highPriorityCount} immediate actions available` : "Your account is in good shape"}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <Card className="hover-elevate">
+          <Card className="border-slate-200 shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">
@@ -358,7 +369,7 @@ export default function Insights() {
             </CardContent>
           </Card>
 
-          <Card className="hover-elevate">
+          <Card className="border-slate-200 shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">
@@ -377,7 +388,7 @@ export default function Insights() {
             </CardContent>
           </Card>
 
-          <Card className="hover-elevate">
+          <Card className="border-slate-200 shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">

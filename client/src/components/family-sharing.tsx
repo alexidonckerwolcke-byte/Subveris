@@ -32,6 +32,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrency, type Currency } from "@/lib/currency-context";
 import { useAuth } from "@/lib/auth-context";
+import { useFamilyDataMode } from "@/hooks/use-family-data";
 
 export function FamilySharing() {
   const { toast } = useToast();
@@ -95,6 +96,8 @@ export function FamilySharing() {
     enabled: !!selectedGroupId && !!selectedMemberId,
   });
 
+  const { familyGroupId: ownerGroupId, showFamilyData: isFamilyAccessEnabled } = useFamilyDataMode();
+
   // Fetch family group settings
   const { data: familySettings, isLoading: settingsLoading, error: settingsError, refetch: refetchSettings } = useQuery<any>({
     queryKey: ["/api/family-groups", selectedGroupId, "settings"],
@@ -103,10 +106,14 @@ export function FamilySharing() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  // Determine effective family-data visibility by combining server setting
+  // with the client's subscription eligibility (so downgrades immediately hide data).
+  const effectiveShowFamilyData = Boolean(isFamilyAccessEnabled && familySettings?.show_family_data && selectedGroupId);
+
   // Fetch aggregated family data
   const { data: familyData } = useQuery<any>({
     queryKey: ["/api/family-groups", selectedGroupId, "family-data"],
-    enabled: !!selectedGroupId && familySettings?.show_family_data,
+    enabled: effectiveShowFamilyData,
   });
 
   // Fetch personal subscriptions (always available)
@@ -118,7 +125,7 @@ export function FamilySharing() {
   // `allSubscriptions` will be the family-wide subscriptions when the
   // owner has enabled family data and the server returns a `subscriptions`
   // array; otherwise fall back to personal subscriptions.
-  const allSubscriptions: Subscription[] = isOwner
+  const allSubscriptions: Subscription[] = isOwner && effectiveShowFamilyData
     ? (familyData?.subscriptions ?? personalSubscriptions)
     : personalSubscriptions;
 
@@ -140,7 +147,7 @@ export function FamilySharing() {
 
   // Also include any shared subscriptions returned inside the `familyData`
   // payload (some endpoints return them together). Merge both sources.
-  const sharedFromFamilyData = (familyData?.sharedSubscriptions || []).map((shared: any) => ({
+  const sharedFromFamilyData = (effectiveShowFamilyData ? (familyData?.sharedSubscriptions || []) : []).map((shared: any) => ({
     ...shared,
     subscription: allSubscriptions.find((sub) => sub.id === shared.subscription_id) || null,
   }));
@@ -164,18 +171,18 @@ export function FamilySharing() {
     allSharedSubscriptions.map((shared) => shared.subscription_id || shared.subscription?.id).filter(Boolean)
   );
 
-  const filteredFamilyDataSubscriptions = (familyData?.subscriptions || []).filter(
-    (sub: any) => sub.status !== 'deleted' && !sharedSubscriptionIds.has(sub.id)
-  );
+  const filteredFamilyDataSubscriptions = effectiveShowFamilyData
+    ? (familyData?.subscriptions || []).filter((sub: any) => sub.status !== 'deleted' && !sharedSubscriptionIds.has(sub.id))
+    : [];
 
   // compute list of subscriptions that can be shared (excludes already-shared)
   // Use the shared utility to centralize logic and avoid duplicate filtering bugs.
   // merge any sharedSubscriptions that came directly in the familyData payload
   const mergedSharedSources = [
     ...(allSharedSubscriptions || []),
-    ...(familyData?.sharedSubscriptions || []),
+    ...(effectiveShowFamilyData ? (familyData?.sharedSubscriptions || []) : []),
   ];
-  const sharedIdsFromFamilyData = new Set((familyData?.sharedSubscriptions || []).map((s: any) => s.subscription_id || s.subscription?.id).filter(Boolean));
+  const sharedIdsFromFamilyData = new Set((effectiveShowFamilyData ? (familyData?.sharedSubscriptions || []) : []).map((s: any) => s.subscription_id || s.subscription?.id).filter(Boolean));
 
   // Exclude subscriptions already present in the family-data shared list from
   // the visible pool so they do not appear in the "available to share" list
@@ -660,19 +667,19 @@ export function FamilySharing() {
                 <div>
                   <div className="font-medium">Show Family Data</div>
                   <div className="text-sm text-muted-foreground">
-                    {familySettings?.show_family_data 
+                    {effectiveShowFamilyData
                       ? "✓ You're viewing combined family data"
                       : "Your personal data only"}
                   </div>
                 </div>
                 <Button
-                  variant={familySettings?.show_family_data ? "default" : "outline"}
+                  variant={effectiveShowFamilyData ? "default" : "outline"}
                   size="sm"
                   onClick={() => {
                     console.log('[toggle] Current show_family_data:', familySettings?.show_family_data);
                     toggleFamilyDataMutation.mutate(!familySettings?.show_family_data);
                   }}
-                  disabled={toggleFamilyDataMutation.isPending || settingsLoading}
+                  disabled={toggleFamilyDataMutation.isPending || settingsLoading || !isFamilyAccessEnabled}
                 >
                   {toggleFamilyDataMutation.isPending ? "Updating..." : (familySettings?.show_family_data ? "Disable" : "Enable")}
                 </Button>
