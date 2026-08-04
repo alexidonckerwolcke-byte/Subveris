@@ -89,6 +89,17 @@ console.log('[Startup] Remote API Base:', {
   isSet: REMOTE_API_BASE ? '✓' : '✗'
 });
 
+const RUNTIME_CONFIG = {
+  VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
+  VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+  VITE_API_URL: process.env.VITE_API_URL || process.env.SUPABASE_API_URL || process.env.SUPABASE_FUNCTIONS_URL || '',
+};
+
+function injectRuntimeConfig(html) {
+  const configScript = `<script>window.__SUPABASE_CONFIG__ = ${JSON.stringify(RUNTIME_CONFIG)};</script>`;
+  return html.replace(/<\/head>/i, `${configScript}</head>`);
+}
+
 async function proxyStripeRequest(req, res, pathSuffix) {
   if (!REMOTE_API_BASE) {
     return false;
@@ -1058,11 +1069,17 @@ const server = http.createServer(async (req, res) => {
       ? 'no-cache, must-revalidate'
       : 'public, max-age=31536000, immutable';
 
+    let responseBody = data;
+    if (isHtmlResponse && filePath.endsWith(path.join(DIST_PATH, 'index.html'))) {
+      const html = data.toString('utf-8');
+      responseBody = Buffer.from(injectRuntimeConfig(html));
+    }
+
     res.writeHead(200, {
       'Content-Type': contentType,
       'Cache-Control': cacheControl,
     });
-    res.end(data);
+    res.end(responseBody);
   });
 });
 
