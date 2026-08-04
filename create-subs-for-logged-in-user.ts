@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const supabase = createClient(
   'https://xuilgccacufwinvkocfl.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1aWxnY2NhY3Vmd2ludmtvY2ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTk3Njg5NiwiZXhwIjoyMDgxNTUyODk2fQ.34j0sSX9lWR5ujGFfXusv_zMt1VnFbzR59JZSdg1gKA'
+  'REDACTED_SUPABASE_SERVICE_ROLE_KEY'
 );
 
 async function main() {

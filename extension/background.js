@@ -269,17 +269,60 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'PRICE_DISCOVERY') {
-    chrome.storage.local.set({
-      detectedSubscription: request.payload,
-      lastDetectedSubscriptionAt: Date.now()
-    }, () => {
-      if (chrome.runtime.lastError) {
-        console.error('[Background] Failed to store detected subscription:', chrome.runtime.lastError);
-        sendResponse({ success: false, error: chrome.runtime.lastError });
-        return;
-      }
-      console.log('[Background] Saved detected subscription payload:', request.payload);
-      sendResponse({ success: true, stored: true });
+    const payload = request.payload || {};
+
+    chrome.storage.local.get(['authToken', 'subverisApiUrl', 'supabaseUserUUID'], (result) => {
+      const token = result.authToken;
+      const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
+
+      chrome.storage.local.set({
+        detectedSubscription: payload,
+        lastDetectedSubscriptionAt: Date.now()
+      }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('[Background] Failed to store detected subscription:', chrome.runtime.lastError);
+          sendResponse({ success: false, error: chrome.runtime.lastError });
+          return;
+        }
+
+        if (!token) {
+          console.warn('[Background] Skipped syncing detected subscription because no auth token was available.');
+          sendResponse({ success: true, stored: true, synced: false });
+          return;
+        }
+
+        const syncPayload = {
+          ...payload,
+          authToken: token,
+          userId: result.supabaseUserUUID || null,
+          rollingWindowDays: 30,
+        };
+
+        fetch(`${apiUrl}/api/extension/usage-sync`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(syncPayload),
+          keepalive: true
+        }).then((response) => {
+          console.log('[Background] Discovery sync response status:', response.status);
+          if (!response.ok) {
+            console.warn('[Background] Discovery sync failed:', response.status, response.statusText);
+            sendResponse({ success: true, stored: true, synced: false, status: response.status });
+            return;
+          }
+
+          response.json().catch(() => ({})).then((body) => {
+            console.log('[Background] Discovery sync success:', body);
+            sendResponse({ success: true, stored: true, synced: true, body });
+          });
+        }).catch((error) => {
+          console.error('[Background] Discovery sync request failed:', error);
+          sendResponse({ success: true, stored: true, synced: false, error: String(error) });
+        });
+      });
     });
     return true;
   }
