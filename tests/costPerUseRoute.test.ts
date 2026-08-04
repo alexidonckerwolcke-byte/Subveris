@@ -115,7 +115,6 @@ describe('handleCostPerUse route', () => {
   });
 
   it('resets stale monthly usage to zero when computing cost per use', async () => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
     const staleMonth = '2000-01';
     const fakeClient = {
       from: (table: string) => {
