@@ -301,6 +301,31 @@ export default function Insights() {
   })();
 
   const highPriorityCount = (insights as any)?.filter((i: any) => i?.priority === 1)?.length || 0;
+  const recommendationCount = recommendations?.length || 0;
+  const totalSubscriptionCount = showFamilyData ? familySubscriptionCount : personalSubscriptionCount;
+  const opportunityFocusMessage = (() => {
+    if (!totalSubscriptionCount) {
+      return "Add subscriptions to unlock your first opportunities.";
+    }
+
+    if (highPriorityCount > 0 && totalPotentialSavings > 0) {
+      return `${highPriorityCount} high-priority action${highPriorityCount === 1 ? "" : "s"} available to save ${formatAmount(totalPotentialSavings)}/mo.`;
+    }
+
+    if (highPriorityCount > 0) {
+      return `${highPriorityCount} immediate action${highPriorityCount === 1 ? "" : "s"} available to improve your spend.`;
+    }
+
+    if (totalPotentialSavings > 0) {
+      return `You can save ${formatAmount(totalPotentialSavings)}/mo by addressing low-value subscriptions.`;
+    }
+
+    if (recommendationCount > 0) {
+      return `You have ${recommendationCount} recommendation${recommendationCount === 1 ? "" : "s"} to review based on your subscriptions.`;
+    }
+
+    return `Your ${totalSubscriptionCount} tracked subscription${totalSubscriptionCount === 1 ? "" : "s"} are looking healthy. Keep logging usage to stay ahead.`;
+  })();
 
   const getInsightIcon = (type: string) => {
     switch (type) {
@@ -343,7 +368,7 @@ export default function Insights() {
             <div className="rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/10">
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300">Opportunity focus</p>
               <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
-                {highPriorityCount > 0 ? `${highPriorityCount} immediate actions available` : "Your account is in good shape"}
+                {opportunityFocusMessage}
               </p>
             </div>
           </div>

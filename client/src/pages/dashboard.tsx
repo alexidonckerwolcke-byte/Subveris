@@ -703,6 +703,23 @@ export default function Dashboard() {
   const zeroUsageSubscriptions = subscriptions?.filter((s: Subscription) => s.isZeroUsageFlag === true) || [];
   const costPerUseSubscriptionCount = subscriptions?.filter((s: Subscription) => !isSubscriptionDeleted(s)).length || 0;
 
+  const todayFocusMessage = (() => {
+    const totalAtRisk = unusedCount + toCancelCount;
+    if (!subscriptions || subscriptions.length === 0) {
+      return "Start tracking subscriptions to see your spending and savings opportunities.";
+    }
+    if (totalAtRisk > 0) {
+      return `Review ${totalAtRisk} subscription${totalAtRisk === 1 ? "" : "s"} marked as unused or to cancel.`;
+    }
+    if (zeroUsageSubscriptions.length > 0) {
+      return `You have ${zeroUsageSubscriptions.length} subscription${zeroUsageSubscriptions.length === 1 ? "" : "s"} with no recorded usage this month.`;
+    }
+    if (costPerUseSubscriptionCount > 0 && activeSubscriptions.length > 0) {
+      return `Excellent! ${activeSubscriptions.length} active subscription${activeSubscriptions.length === 1 ? "" : "s"} are being monitored for cost-per-use.`;
+    }
+    return "Your subscriptions are being tracked. Keep logging usage for better insights.";
+  })();
+
   return (
     <div className="flex-1 overflow-auto bg-gradient-to-br from-background via-background to-muted/5">
       <div className="p-6 md:p-10 space-y-8 max-w-7xl mx-auto">
@@ -718,7 +735,7 @@ export default function Dashboard() {
             <div className="rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/10">
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300">Today’s focus</p>
               <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
-                Review {unusedCount + toCancelCount} subscriptions that may be draining budget.
+                {todayFocusMessage}
               </p>
             </div>
           </div>
@@ -742,26 +759,6 @@ export default function Dashboard() {
         </div>
 
         <FamilyMembershipBanner />
-
-        <div className="grid gap-4 md:grid-cols-3 mb-6">
-          <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Spend snapshot</p>
-            <p className="mt-3 text-2xl font-semibold">{subscriptions?.length || 0} services</p>
-            <p className="mt-2 text-sm text-muted-foreground">Optimize what matters most in one place.</p>
-          </div>
-          <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Savings focus</p>
-            <p className="mt-3 text-2xl font-semibold">{unusedCount + toCancelCount}</p>
-            <p className="mt-2 text-sm text-muted-foreground">Unused or at-risk payments to review.</p>
-          </div>
-          <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Family mode</p>
-            <p className="mt-3 text-2xl font-semibold">
-              {!isFamilyDataModeReady ? "Loading..." : showFamilyData === true ? "Enabled" : "Personal"}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">View the right set of subscriptions for your account.</p>
-          </div>
-        </div>
 
         <MetricsCards metrics={finalMetrics} isLoading={metricsLoading} />
 
