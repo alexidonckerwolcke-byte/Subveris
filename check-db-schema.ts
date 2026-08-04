@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = "https://xuilgccacufwinvkocfl.supabase.co";
-const supabaseServiceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1aWxnY2NhY3Vmd2ludmtvY2ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwOTAyMTE4OCwiZXhwIjoyMDI0NTk3MTg4fQ.E-SvgBH8SU-nqPaLKi7jZROiMDM8Kgzp-JdQIBPKl5E";
+const supabaseServiceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1aWxnY2NhY3Vmd2ludmtvY2ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwOTAyMTE4OCwiZXhwIjoyMDI0NTk3MTg4fQ.REDACTED_SUPABASE_SERVICE_ROLE_KEY";
 
 async function testSchema() {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);

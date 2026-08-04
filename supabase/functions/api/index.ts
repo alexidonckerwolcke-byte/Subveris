@@ -2041,6 +2041,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
         const discoveredDomains = Array.isArray(body.discoveredDomains)
           ? body.discoveredDomains.filter((value: unknown): value is string => typeof value === "string" && value.trim() !== "")
           : [];
+        const fallbackDomain = normalizeDomain(typeof body.domain === "string"
+          ? body.domain
+          : typeof body.hostname === "string"
+            ? body.hostname
+            : null);
+        if (fallbackDomain && !discoveredDomains.includes(fallbackDomain)) {
+          discoveredDomains.push(fallbackDomain);
+        }
 
         const createdDomains: string[] = [];
         for (const discoveredDomain of discoveredDomains) {
@@ -2068,13 +2076,22 @@ runtimeDeno?.serve?.(async (req: Request) => {
           const now = new Date();
           const detectedBillingCycle = normalizeBillingCycle(body.detectedBillingCycle ?? body.billingCycle ?? null);
           const detectedRenewalDate = normalizeRenewalDate(body.detectedRenewalDate ?? body.nextRenewalDate ?? null);
+          const detectedPrice = typeof body.detectedPrice === "number" && Number.isFinite(body.detectedPrice)
+            ? body.detectedPrice
+            : null;
+          const detectedPlanName = typeof body.detectedPlanName === "string" && body.detectedPlanName.trim()
+            ? body.detectedPlanName.trim()
+            : null;
+          const detectedCurrency = typeof body.currency === "string" && body.currency.trim()
+            ? body.currency.trim().toUpperCase()
+            : "USD";
           const insertedSubscription = {
             id: generateId(),
             user_id: userId,
-            name: normalizedDiscoveredDomain,
+            name: detectedPlanName || normalizedDiscoveredDomain,
             category: "other",
-            amount: 0,
-            currency: "USD",
+            amount: detectedPrice ?? 0,
+            currency: detectedCurrency,
             frequency: "monthly",
             billing_cycle: detectedBillingCycle || null,
             next_renewal_date: detectedRenewalDate || null,
@@ -2087,7 +2104,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             is_detected: true,
             website_domain: normalizedDiscoveredDomain,
             billing_month: getBillingMonth(now),
-            description: "Auto-discovered from extension scan",
+            description: detectedPlanName ? `Auto-discovered from extension scan: ${detectedPlanName}` : "Auto-discovered from extension scan",
           };
 
           const { error: insertError } = await supabase.from("subscriptions").insert(insertedSubscription);

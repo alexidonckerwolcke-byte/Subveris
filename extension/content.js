@@ -133,18 +133,34 @@ function saveDiscoveredPrice(priceData) {
     return;
   }
 
+  const domain = window.location.hostname.replace(/^www\./i, '').toLowerCase();
+  const payload = {
+    domain,
+    discoveredDomains: [domain],
+    detectedPrice: typeof priceData.price === 'number' ? priceData.price : null,
+    detectedPlanName: priceData.planLabel || null,
+    detectedBillingCycle: priceData.detectedBillingCycle || null,
+    detectedRenewalDate: priceData.detectedRenewalDate || null,
+    currency: priceData.currency || null,
+    frequency: priceData.frequency || null,
+    source: priceData.source || 'content-dom-scan',
+    hostname: window.location.hostname,
+    activeTimeSeconds: Math.max(0, Math.round((Date.now() - startTime) / 1000)),
+    isZeroUsage: false,
+  };
+
   chrome.storage.local.set({
-    detectedSubscription: priceData,
+    detectedSubscription: payload,
     lastDetectedSubscriptionAt: Date.now()
   }, () => {
     if (chrome.runtime.lastError) {
       console.error('[Extension] Failed to store detected subscription:', chrome.runtime.lastError);
       return;
     }
-    console.log('[Extension] Saved detected subscription payload:', priceData);
+    console.log('[Extension] Saved detected subscription payload:', payload);
   });
 
-  sendMessageToBackground({ type: 'PRICE_DISCOVERY', payload: priceData }, () => {});
+  sendMessageToBackground({ type: 'PRICE_DISCOVERY', payload }, () => {});
 }
 
 function normalizeDetectedDate(rawDate) {

@@ -3,5 +3,7 @@ __pycache__/
 *.pyc
 .vscode/
 .env
+.env.local
+.env.*.local
 /dist/
 /build/
