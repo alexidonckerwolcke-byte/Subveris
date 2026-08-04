@@ -16,6 +16,9 @@ const workspaceRoot = path.resolve(__dirname);
 const env = loadEnv('development', workspaceRoot);
 const clientRoot = path.resolve(workspaceRoot, "client");
 const srcRoot = path.resolve(clientRoot, "src");
+const apiTarget = env.VITE_API_URL && !env.VITE_API_URL.includes("supabase.co")
+  ? env.VITE_API_URL
+  : "http://127.0.0.1:5000";
 
 export default defineConfig({
   logLevel: 'info',
@@ -108,7 +111,7 @@ export default defineConfig({
     },
     proxy: {
       "/api": {
-        target: env.VITE_API_URL || "http://127.0.0.1:3000",
+        target: apiTarget,
         changeOrigin: true,
         rewrite: (path) => path,
         secure: false,

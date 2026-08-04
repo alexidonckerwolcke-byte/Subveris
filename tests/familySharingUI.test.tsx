@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // create a map that our mocked useQuery will read from
 const mockQueryData: Record<string, any> = {};
+let mockTier: 'free' | 'premium' | 'family' = 'premium';
 
 vi.mock('@tanstack/react-query', async () => {
   const actual = await vi.importActual<any>('@tanstack/react-query');
@@ -45,6 +46,10 @@ vi.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ user: { id: 'owner-1' } }),
 }));
 
+vi.mock('@/lib/subscription-context', () => ({
+  useSubscription: () => ({ tier: mockTier }),
+}));
+
 // import after the mocks are defined
 import { FamilySharing } from '../client/src/components/family-sharing';
 
@@ -53,6 +58,7 @@ beforeEach(() => {
   for (const k of Object.keys(mockQueryData)) {
     delete mockQueryData[k];
   }
+  mockTier = 'premium';
 });
 
 describe('FamilySharing UI', () => {
@@ -116,6 +122,10 @@ describe('FamilySharing UI', () => {
     mockQueryData[JSON.stringify(['/api/family-groups'])] = [
       { id: 'g1', name: 'Group1', ownerId: 'owner-1', memberCount: 0 },
     ];
+    // ensure there is at least one other member to share with
+    mockQueryData[JSON.stringify(['/api/family-groups', 'g1', 'members'])] = [
+      { userId: 'member-2', email: 'member2@example.com' },
+    ];
     // the family-data query is only enabled when the owner has allowed
     // family data to be shown; we need to replicate that so our helper
     // receives the shared subscription payload we configured above.
@@ -131,8 +141,28 @@ describe('FamilySharing UI', () => {
     await screen.findByText(/Share subscriptions/i);
 
     // the eligible list should contain only sub2 (since sub1 is already shared)
-    expect(screen.getByText('sub2')).toBeInTheDocument();
-    expect(screen.queryByText('sub1')).not.toBeInTheDocument();
+    const shareHeader = await screen.findByText(/Share subscriptions/i);
+    const shareSection = shareHeader.closest('div')?.parentElement as HTMLElement;
+    const shareWithin = within(shareSection);
+    // Find all 'Share' buttons in the share section and check their nearby
+    // subscription names. This avoids matching 'sub1' that appears in the
+    // shared-subscriptions list and is more deterministic than raw text matching.
+    // Verify `sub2` appears in the available-to-share list (has a Share button nearby)
+    const sub2Node = await screen.findByText('sub2');
+    // Walk up from the name node to find the nearest ancestor that contains a button
+    let ancestor: HTMLElement | null = sub2Node.closest('div');
+    while (ancestor && ancestor.querySelector('button') === null) {
+      ancestor = ancestor.parentElement as HTMLElement;
+    }
+    expect(ancestor).not.toBeNull();
+    expect(within(ancestor as HTMLElement).getByRole('button', { name: /^Share$/i })).toBeTruthy();
+
+    // `sub1` may appear in the shared list; ensure it's not present in the *available* list
+    const sub1Node = screen.queryByText('sub1');
+    if (sub1Node) {
+      const sub1Container = sub1Node.closest('div') as HTMLElement;
+      expect(within(sub1Container).queryByRole('button', { name: /^Share$/i })).toBeNull();
+    }
 
     // simulate sharing sub2: clicking the button should invoke our mutation
     // stub which calls onSuccess (and therefore fires a toast). we then
@@ -142,12 +172,20 @@ describe('FamilySharing UI', () => {
     // contains the word "share".
     const shareButton = screen.getByRole('button', { name: /^Share$/i });
     fireEvent.click(shareButton);
+
+    // Wait for the confirmation dialog and click its confirm Share button
+    const dialog = await screen.findByRole('dialog');
+    // select a member to share with so the confirm button is enabled
+    const checkbox = within(dialog).getByRole('checkbox');
+    fireEvent.click(checkbox);
+    const confirmShare = within(dialog).getByRole('button', { name: /^Share$/i });
+    fireEvent.click(confirmShare);
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Shared' })
     );
 
     // close the dialog so the main sharing UI is visible again
-    const cancelButton = screen.getByRole('button', { name: /Cancel/i });
+    const cancelButton = within(dialog).getByRole('button', { name: /Cancel/i });
     fireEvent.click(cancelButton);
 
     // now pretend the server tells us sub2 is shared as well
@@ -160,9 +198,9 @@ describe('FamilySharing UI', () => {
     };
     rerender(<FamilySharing />);
 
-    // after re-render the eligible list should no longer show sub2
+    // after re-render the available-to-share section should no longer show sub2
     await waitFor(() => {
-      expect(screen.queryByText('sub2')).not.toBeInTheDocument();
+      expect(shareWithin.queryByText('sub2')).not.toBeInTheDocument();
     });
   });
 
@@ -188,5 +226,25 @@ describe('FamilySharing UI', () => {
 
     expect(await screen.findByText('Shared Active')).toBeInTheDocument();
     expect(screen.queryByText('No subscriptions available')).not.toBeInTheDocument();
+  });
+
+  it('disables family data view when the subscription tier falls back to free', async () => {
+    mockTier = 'free';
+    mockQueryData[JSON.stringify(['/api/family-groups'])] = [
+      { id: 'g1', name: 'Family Group', ownerId: 'owner-1', memberCount: 1 },
+    ];
+    mockQueryData[JSON.stringify(['/api/family-groups', 'g1', 'settings'])] = { show_family_data: true };
+    mockQueryData[JSON.stringify(['/api/family-groups', 'g1', 'family-data'])] = {
+      subscriptions: [{ id: 'shared-sub', status: 'active', name: 'Shared Active' }],
+      sharedSubscriptions: [],
+      metrics: {},
+    };
+
+    render(<FamilySharing />);
+    const grpEl = await screen.findByText('Family Group');
+    fireEvent.click(grpEl);
+
+    expect(await screen.findByText(/Your personal data only/i)).toBeInTheDocument();
+    expect(screen.queryByText('Shared Active')).not.toBeInTheDocument();
   });
 });

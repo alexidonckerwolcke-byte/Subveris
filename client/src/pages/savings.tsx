@@ -31,6 +31,7 @@ import { useCurrency, type Currency } from "@/lib/currency-context";
 import { calculateMonthlyCost, isSubscriptionBilledInMonth } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
+import { calculatePotentialSavings } from "@/lib/health-score";
  
 function isTimestampInCurrentMonth(timestamp?: string | null) {
   if (!timestamp) return false;
@@ -235,12 +236,11 @@ export default function Savings() {
       return date >= currentMonthStart && date < nextMonthStart;
     };
 
-    const potentialSavings = familySubscriptions
-      .filter((sub) => sub && (sub.status === 'unused' || sub.status === 'to-cancel'))
-      .reduce((sum: number, sub) => {
-        const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
-        return sum + convertAmount(monthlyAmount, (sub as any).currency || 'USD', 'USD');
-      }, 0);
+    const potentialSavings = Math.round(
+      calculatePotentialSavings(familySubscriptions, (amount, from, to) =>
+        convertAmount(amount, (from as Currency) || 'USD', 'USD')
+      ) * 100
+    ) / 100;
 
     const thisMonthSavings = familySubscriptions
       .filter(isDeletedThisMonth)
@@ -732,17 +732,22 @@ export default function Savings() {
   return (
     <div className="flex-1 overflow-auto">
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
-        <div className="mb-2">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Savings</h1>
-          <p className="text-muted-foreground">
-            Track your progress and achieve your savings goals.
-          </p>
-        </div>
-
-        <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
-          <p className="text-sm text-muted-foreground">
-            Use this page to measure real savings, set a monthly target, and see what your family is saving together when shared mode is enabled.
-          </p>
+        <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6 text-slate-900 shadow-sm dark:border-slate-700 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 dark:text-white">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-600 dark:text-slate-300">Savings control</p>
+              <h1 className="mt-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Savings</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Track what you have already saved, set a target, and keep your monthly spend moving in the right direction.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/10">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300">Monthly target</p>
+              <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
+                {showFamilyData ? "Track shared wins with your household" : "Stay consistent with your plan"}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">

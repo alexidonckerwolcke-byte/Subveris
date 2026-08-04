@@ -5036,7 +5036,31 @@ runtimeDeno?.serve?.(async (req: Request) => {
         return sendJson({ error: "Failed to load family settings" }, { status: 500 });
       }
 
-      const showFamilyData = settingsData?.show_family_data !== undefined ? settingsData.show_family_data : true;
+      let showFamilyData = settingsData?.show_family_data !== undefined ? settingsData.show_family_data : true;
+
+      // Verify owner's subscription tier — if the owner no longer has a premium/family plan
+      // we must not expose combined family data even if `show_family_data` was left enabled.
+      try {
+        const { data: ownerSub, error: ownerSubError } = await supabase
+          .from('user_subscriptions')
+          .select('plan_type, status')
+          .eq('user_id', ownerId)
+          .single();
+
+        if (!ownerSub || ownerSubError) {
+          // treat missing subscription record as non-eligible
+          showFamilyData = false;
+        } else {
+          const planType = ownerSub.plan_type || 'free';
+          const active = ownerSub.status === 'active';
+          if (!(planType === 'premium' || planType === 'family') || !active) {
+            showFamilyData = false;
+          }
+        }
+      } catch (err) {
+        console.error('Error checking owner subscription eligibility for family-data:', err);
+        showFamilyData = false;
+      }
       const isMember = !!membership;
 
       const ownerId = String(groupRow.owner_id);

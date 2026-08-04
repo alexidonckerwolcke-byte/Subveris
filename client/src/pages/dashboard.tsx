@@ -20,6 +20,7 @@ import { getVisibleFamilySubscriptions } from "@/lib/family-data";
 import { generateRecommendationsFromSubscriptions } from "@/lib/recommendations";
 import { useCurrency, type Currency } from "@/lib/currency-context";
 import { computeCostPerUseFromSubs } from "@/lib/cost-analysis";
+import { calculatePotentialSavings } from "@/lib/health-score";
 import type {
   DashboardMetrics,
   MonthlySpending,
@@ -97,12 +98,11 @@ export default function Dashboard() {
       return deletedDate >= currentMonthStart && deletedDate <= currentMonthEnd;
     };
 
-    const potentialSavings = familySubscriptions
-      .filter((sub) => sub && (sub.status === 'unused' || sub.status === 'to-cancel'))
-      .reduce((sum, sub) => {
-        const monthlyCost = calculateMonthlyCost(Number(sub.amount) || 0, sub.frequency || 'monthly');
-        return sum + convertAmount(monthlyCost, (sub.currency as Currency) || 'USD', 'USD');
-      }, 0);
+    const potentialSavings = Math.round(
+      calculatePotentialSavings(familySubscriptions, (amount, from, to) =>
+        convertAmount(amount, (from as Currency) || 'USD', 'USD')
+      ) * 100
+    ) / 100;
 
     const thisMonthSavings = familySubscriptions
       .filter(isDeletedThisMonth)
@@ -706,11 +706,39 @@ export default function Dashboard() {
   return (
     <div className="flex-1 overflow-auto bg-gradient-to-br from-background via-background to-muted/5">
       <div className="p-6 md:p-10 space-y-8 max-w-7xl mx-auto">
-        <div className="mb-4 animate-slide-in-right">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent mb-2">Dashboard</h1>
-          <p className="text-lg text-muted-foreground">
-            Your subscription command center for spend, renewal timing, and savings action.
-          </p>
+        <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6 text-slate-900 shadow-sm dark:border-slate-700 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 dark:text-white">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-600 dark:text-slate-300">Command center</p>
+              <h1 className="mt-2 text-3xl md:text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">Dashboard</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                See your recurring spend, act on the next best move, and keep your subscriptions aligned with actual value.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/10">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300">Today’s focus</p>
+              <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
+                Review {unusedCount + toCancelCount} subscriptions that may be draining budget.
+              </p>
+            </div>
+          </div>
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/10">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">Spend snapshot</p>
+              <p className="mt-3 text-2xl font-semibold text-slate-900 dark:text-white">{subscriptions?.length || 0} services</p>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Track what matters most in one place.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/10">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">Savings focus</p>
+              <p className="mt-3 text-2xl font-semibold text-slate-900 dark:text-white">{unusedCount + toCancelCount}</p>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Unused or at-risk payments to review.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/10">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">Family mode</p>
+              <p className="mt-3 text-2xl font-semibold text-slate-900 dark:text-white">{showFamilyData ? "Enabled" : "Personal"}</p>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">View the right set of subscriptions for your account.</p>
+            </div>
+          </div>
         </div>
 
         <FamilyMembershipBanner />

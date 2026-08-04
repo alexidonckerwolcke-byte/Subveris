@@ -376,12 +376,13 @@ export default function Subscriptions() {
   return (
     <div className="flex-1 overflow-auto">
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
-        <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
+        <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6 text-slate-900 shadow-sm dark:border-slate-700 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 dark:text-white">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Subscriptions</h1>
-            <p className="text-muted-foreground">
-              Optimize all your recurring payments and uncover savings opportunities.
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-600 dark:text-slate-300">Subscription hub</p>
+            <h1 className="mt-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Subscriptions</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+              Manage the services you keep, review the ones that are slipping, and stay ahead of renewals without the noise.
             </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

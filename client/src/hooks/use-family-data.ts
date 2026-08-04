@@ -1,9 +1,12 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useSubscription } from "@/lib/subscription-context";
 
 export function useFamilyDataMode() {
   const { user } = useAuth();
+  const { tier } = useSubscription();
 
   // Get family groups for this user
   const { data: familyGroups, isLoading: familyGroupsLoading } = useQuery<any[], Error>({
@@ -37,20 +40,19 @@ export function useFamilyDataMode() {
     : familyGroupId
       ? familySettingsLoading
         ? undefined
-        : familySettings?.show_family_data === true
+        : tier !== "free" && familySettings?.show_family_data === true
       : false;
 
-  if (familyGroupsLoading) {
-    return {
-      familyGroupId: undefined,
-      showFamilyData: undefined,
-      isInFamily: false,
-      isFamilyDataModeReady: false,
-    };
-  }
+  useEffect(() => {
+    if (tier === "free" && familyGroupId) {
+      queryClient.setQueryData(["/api/family-groups", familyGroupId, "settings"], {
+        show_family_data: false,
+        family_group_id: familyGroupId,
+      });
+    }
+  }, [tier, familyGroupId]);
 
-  // Safety: if no group, clear any state that depends on being in a group
-  if (!familyGroups || familyGroups.length === 0) {
+  if (familyGroupsLoading) {
     return {
       familyGroupId: undefined,
       showFamilyData: false,
