@@ -1,862 +1,363 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { MetricsCards } from "@/components/metrics-cards";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { BarChart3, Calendar, Clock, DollarSign, Sparkles } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { SpendingChart } from "@/components/spending-chart";
-import { CostPerUse } from "@/components/cost-per-use";
-import { BehavioralInsights } from "@/components/behavioral-insights";
-import { AIRecommendations } from "@/components/ai-recommendations";
-import { SavingsProjection } from "@/components/savings-projection";
-import { SubscriptionCard } from "@/components/subscription-card";
-import { PremiumGate } from "@/components/premium-gate";
-import { FamilyMembershipBanner } from "@/components/family-membership-banner";
-import { AutomationAlerts } from "@/components/automation-alerts";
-import { useFamilyDataMode } from "@/hooks/use-family-data";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { useSubscription } from "@/lib/subscription-context";
+import { apiRequest } from "@/lib/queryClient";
+import { useCurrency } from "@/lib/currency-context";
 import { useAuth } from "@/lib/auth-context";
-import { dedupeByKey, calculateMonthlyCost, generateOpportunityCosts, isSubscriptionBilledInMonth, isSubscriptionDeleted } from "@/lib/utils";
+import { useFamilyDataMode } from "@/hooks/use-family-data";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
-import { generateRecommendationsFromSubscriptions } from "@/lib/recommendations";
-import { useCurrency, type Currency } from "@/lib/currency-context";
-import { computeCostPerUseFromSubs } from "@/lib/cost-analysis";
 import { calculatePotentialSavings } from "@/lib/health-score";
-import type {
-  DashboardMetrics,
-  MonthlySpending,
-  SpendingByCategory,
-  CostPerUseAnalysis,
-  OpportunityCost,
-  AIRecommendation,
-  Subscription,
-  SubscriptionStatus,
-} from "@shared/schema";
+import { normalizeMonthlySpendingSeries } from "@/lib/utils";
+import type { Subscription, MonthlySpending, SpendingByCategory } from "@shared/schema";
+
+function parseBillingDate(date?: string | Date | null) {
+  if (!date) return null;
+  const parsed = date instanceof Date ? date : new Date(String(date));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatShortDate(date?: string | Date | null) {
+  const parsed = parseBillingDate(date);
+  if (!parsed) return "Unknown";
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getCurrentMonthAmount(monthlyData: MonthlySpending[] | undefined) {
+  if (!monthlyData || monthlyData.length === 0) return 0;
+  const now = new Date();
+  const currentMonthLabel = now.toLocaleString("en-US", { month: "short", year: "numeric" });
+  const entry = monthlyData.find((item) => item.month === currentMonthLabel);
+  return entry ? entry.amount : 0;
+}
+
+function getUpcomingRenewals(subscriptions: Subscription[] = []) {
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  return subscriptions
+    .map((subscription) => {
+      const rawDate =
+        (subscription as any).nextBillingDate ||
+        (subscription as any).next_billing_at ||
+        (subscription as any).next_billing_date ||
+        (subscription as any).next_billing ||
+        null;
+      const date = parseBillingDate(rawDate);
+      if (!date) return null;
+      return { subscription, date };
+    })
+    .filter((item): item is { subscription: Subscription; date: Date } => item !== null)
+    .filter((item) => item.date.getFullYear() === currentYear && item.date.getMonth() === currentMonth)
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .slice(0, 3)
+    .map((item) => ({
+      id: item.subscription.id,
+      title: item.subscription.name || "Subscription",
+      amount: Number(item.subscription.amount || 0),
+      date: item.date,
+      frequency: item.subscription.frequency || "monthly",
+    }));
+}
 
 export default function Dashboard() {
-  const { toast } = useToast();
-  const { limits, tier } = useSubscription();
+  const { formatAmount } = useCurrency();
   const { user } = useAuth();
-  const { familyGroupId, showFamilyData, isFamilyDataModeReady } = useFamilyDataMode();
-  const { convertAmount, currency: displayCurrency } = useCurrency();
+  const { familyGroupId, showFamilyData } = useFamilyDataMode();
+  const [, navigate] = useLocation();
 
-  // Personal metrics (always load)
-  const { data: personalMetrics, isLoading: personalMetricsLoading } = useQuery({
+  const { data: metrics, isLoading: metricsLoading } = useQuery({
     queryKey: ["/api/metrics"],
-    refetchInterval: 30000, // Refetch every 30 seconds to stay fresh
-    select: (data: any) => ({
-      totalMonthlySpend: data.totalMonthlySpend || 0,
-      activeSubscriptions: data.activeSubscriptions || 0,
-      potentialSavings: data.potentialSavings || 0,
-      thisMonthSavings: data.thisMonthSavings || 0,
-      unusedSubscriptions: data.inactiveSubscriptions || 0,
-      averageCostPerUse: data.averageCostPerUse || 0,
-      monthlySpendChange: data.monthlySpendChange,
-      newServicesTracked: data.newServicesTracked,
-    }),
-  });
-
-  // Family data (load if in family group)
-  const { data: familyData, isLoading: familyDataLoading, isFetching: familyDataFetching, refetch: refetchFamilyData } = useQuery<any>({
-    queryKey: ["/api/family-groups", familyGroupId, "family-data"],
-    enabled: !!familyGroupId,
-    refetchInterval: 30000, // Refetch every 30 seconds to see member deletions
-  });
-
-  const { data: familySavingsResponse, isLoading: familySavingsLoading } = useQuery<any>({
-    queryKey: ["/api/analytics/monthly-savings", "family", familyGroupId, new Date().toISOString().slice(0, 7)],
-    enabled: showFamilyData === true && !!user?.id,
-    refetchInterval: 30000,
-    refetchOnWindowFocus: true,
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/analytics/monthly-savings?family=true");
+      const response = await apiRequest("GET", "/api/metrics");
       return response.json();
     },
+    refetchInterval: 30000,
   });
 
-  const familySubscriptions = useMemo<Subscription[]>(() => {
-    return getVisibleFamilySubscriptions(familyData, user?.id);
-  }, [familyData, user?.id]);
-
-  const familySavingsComputed = useMemo(() => {
-    if (!familySubscriptions || familySubscriptions.length === 0) {
-      return {
-        potentialSavings: 0,
-        thisMonthSavings: 0,
-        unusedSubscriptions: 0,
-      };
-    }
-
-    const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-    const isDeletedThisMonth = (sub: Subscription) => {
-      if (!sub || !isSubscriptionDeleted(sub)) return false;
-      const deletedAt = (sub as any).deletedAt || (sub as any).deleted_at || (sub as any).updatedAt || (sub as any).updated_at;
-      if (!deletedAt) return true;
-      const deletedDate = new Date(deletedAt);
-      return deletedDate >= currentMonthStart && deletedDate <= currentMonthEnd;
-    };
-
-    const potentialSavings = Math.round(
-      calculatePotentialSavings(familySubscriptions, (amount, from, to) =>
-        convertAmount(amount, (from as Currency) || 'USD', 'USD')
-      ) * 100
-    ) / 100;
-
-    const thisMonthSavings = familySubscriptions
-      .filter(isDeletedThisMonth)
-      .reduce((sum, sub) => {
-        const monthlyCost = calculateMonthlyCost(Number(sub.amount) || 0, sub.frequency || 'monthly');
-        return sum + convertAmount(monthlyCost, (sub.currency as Currency) || 'USD', 'USD');
-      }, 0);
-
-    const unusedSubscriptions = familySubscriptions.filter((sub) => sub?.status === 'unused').length;
-
-    return {
-      potentialSavings: Math.round(potentialSavings * 100) / 100,
-      thisMonthSavings: Math.round(thisMonthSavings * 100) / 100,
-      unusedSubscriptions,
-    };
-  }, [familySubscriptions, convertAmount]);
-
-  function getCurrentMonthAmount(monthlyData: MonthlySpending[] | undefined) {
-    if (!monthlyData || monthlyData.length === 0) return 0;
-    const now = new Date();
-    const currentMonthLabel = now.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-    const exactMatch = monthlyData.find((entry) => entry.month === currentMonthLabel);
-    if (exactMatch) return exactMatch.amount;
-    return 0;
-  }
-
-  // Calculate metrics reactively based on family mode
-  const metrics = useMemo(() => {
-    const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-    // Use server-provided spending series for both owners and members
-    const familyMonthlyDataForDashboard = showFamilyData === true
-      ? (familyData?.spending && familyData.spending.length > 0 ? familyData.spending : [])
-      : [];
-
-    const totalMonthlySpendFromSpendingData = getCurrentMonthAmount(familyMonthlyDataForDashboard);
-    
-    if (showFamilyData === true) {
-      console.log('[Dashboard] Family mode - familyData:', familyData);
-      console.log('[Dashboard] Family mode - familyMonthlyDataForDashboard:', familyMonthlyDataForDashboard);
-      console.log('[Dashboard] Family mode - totalMonthlySpendFromSpendingData:', totalMonthlySpendFromSpendingData);
-      console.log('[Dashboard] Family mode - familyData.metrics:', familyData?.metrics);
-    }
-
-    const defaultMetrics = {
-      totalMonthlySpend: 0,
-      activeSubscriptions: 0,
-      potentialSavings: 0,
-      thisMonthSavings: 0,
-      unusedSubscriptions: 0,
-      averageCostPerUse: 0,
-      monthlySpendChange: 0,
-      newServicesTracked: 0,
-    };
-
-    const familyCurrentSavings = showFamilyData === true
-      ? (typeof familySavingsResponse?.monthlySavings === 'number'
-          ? familySavingsResponse.monthlySavings
-          : familySavingsComputed.thisMonthSavings || familyData?.metrics?.thisMonthSavings || 0)
-      : 0;
-
-    const familyMetricsFallback = {
-      totalMonthlySpend: familyMonthlyDataForDashboard.length ? totalMonthlySpendFromSpendingData : 0,
-      activeSubscriptions: familySubscriptions.filter((sub) => sub?.status === 'active').length,
-      potentialSavings: familySavingsComputed.potentialSavings,
-      thisMonthSavings: familyCurrentSavings,
-      unusedSubscriptions: familySavingsComputed.unusedSubscriptions,
-      averageCostPerUse: 0,
-      monthlySpendChange: 0,
-      newServicesTracked: 0,
-    };
-
-    const serverMetrics = showFamilyData === true && familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number'
-      ? {
-          totalMonthlySpend: familyMonthlyDataForDashboard.length
-            ? totalMonthlySpendFromSpendingData
-            : Number(familyData.metrics.totalMonthlySpending) || 0,
-          activeSubscriptions: familyData.metrics.activeSubscriptions || 0,
-          potentialSavings: familySavingsComputed.potentialSavings || familyData.metrics.potentialSavings || 0,
-          thisMonthSavings: familyCurrentSavings,
-          unusedSubscriptions: familySavingsComputed.unusedSubscriptions || familyData.metrics.unusedSubscriptions || 0,
-          averageCostPerUse: familyData.metrics?.averageCostPerUse || 0,
-          monthlySpendChange: familyData.metrics?.monthlySpendChange || 0,
-          newServicesTracked: familyData.metrics?.newServicesTracked || 0,
-        }
-      : (showFamilyData === true ? familyMetricsFallback : personalMetrics || defaultMetrics);
-
-    // For members in family mode, trust the server metrics completely
-    // The server has already calculated all metrics including the member's own subscriptions
-    if (showFamilyData === true && familyData) {
-      console.log('[Dashboard] Returning serverMetrics for family mode:', serverMetrics);
-      return serverMetrics;
-    }
-
-    return serverMetrics;
-  }, [
-    showFamilyData,
-    familyData,
-    familySubscriptions,
-    personalMetrics,
-  ]);
-
-  // Metrics loading flag (value computed below after subscriptions are known)
-  const metricsLoading = !isFamilyDataModeReady
-    ? true
-    : showFamilyData === true
-      ? familyDataLoading
-      : personalMetricsLoading;
-
-  // Personal subscriptions (always load)
-  const { data: personalSubscriptions, isLoading: personalSubsLoading } = useQuery<Subscription[]>({
+  const { data: personalSubscriptions = [], isLoading: subscriptionsLoading } = useQuery<Subscription[]>({
     queryKey: ["/api/subscriptions"],
-    enabled: showFamilyData !== undefined,
-    refetchInterval: 30000, // Refetch every 30 seconds to stay fresh
-  });
-
-  const rawSubscriptions = showFamilyData === true ? familySubscriptions : showFamilyData === false ? personalSubscriptions || [] : [];
-  // dedupe by id to avoid duplicate keys when family aggregation returns duplicates
-  const subscriptions = (function () {
-    const map = new Map<string, Subscription>();
-    for (const s of rawSubscriptions || []) {
-      if (!s || !s.id) continue;
-      if (!map.has(s.id)) map.set(s.id, s);
-    }
-    return Array.from(map.values());
-  })();
-  const subsLoading = !isFamilyDataModeReady ? true : showFamilyData === true ? familyDataLoading : personalSubsLoading;
-
-  // Personal spending (always load)
-  const { data: personalMonthlySpending, isLoading: personalMonthlyLoading } = useQuery<MonthlySpending[]>({
-    queryKey: ["/api/spending/monthly"],
-    refetchInterval: 30000, // Refetch every 30 seconds to stay fresh
-  });
-
-  const monthlySpending = showFamilyData === true
-    ? ((familyData?.spending && familyData.spending.length > 0)
-        ? familyData.spending
-        : computeMonthlySpendingFromFamilySubscriptions())
-    : showFamilyData === false
-      ? personalMonthlySpending
-      : [];
-  const monthlyLoading = !isFamilyDataModeReady
-    ? true
-    : showFamilyData === true
-      ? familyDataLoading
-      : personalMonthlyLoading;
-
-  // Compute monthly spending from subscriptions for family mode
-  function computeMonthlySpendingFromFamilySubscriptions() {
-    if (!familyData?.subscriptions || familyData.subscriptions.length === 0) return [];
-    
-    const now = new Date();
-    const currentDayOfMonth = now.getDate();
-    const months: { [key: string]: number } = {};
-    
-    // Create labels for last 6 months + current month (7 total)
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const label = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-      months[label] = 0;
-    }
-    
-    // Add subscription costs to months where they renew
-    for (const sub of familySubscriptions) {
-      if (!sub || isSubscriptionDeleted(sub) || sub.status === 'canceled') continue;
-      if (sub.status !== 'active' && sub.status !== 'unused' && sub.status !== 'to-cancel') continue;
-      
-      const monthlyCost = calculateMonthlyCost(sub.amount || 0, sub.frequency || 'monthly');
-      
-      // Check each month to see if this subscription should be included
-      for (const [monthLabel, _] of Object.entries(months)) {
-        let includeInMonth = false;
-        const monthDate = new Date(monthLabel + " 1");
-        const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-        const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59);
-        const isCurrentMonth = monthDate.getFullYear() === now.getFullYear() && monthDate.getMonth() === now.getMonth();
-        
-        // Get the renewal date for this subscription
-        if (isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth)) {
-          includeInMonth = true;
-        }
-        
-        if (includeInMonth) {
-          months[monthLabel] += convertAmount(monthlyCost, (sub.currency as Currency) || 'USD', 'USD');
-        }
-      }
-    }
-    
-    return Object.entries(months).map(([month, amount]) => ({ 
-      month, 
-      amount: Math.round(amount * 100) / 100 
-    }));
-  }
-
-  // Use server data if available, otherwise compute from subscriptions for family mode
-  const effectiveMonthlySpending = showFamilyData === true
-    ? (function () {
-        if (familyData?.spending && familyData.spending.length > 0) return familyData.spending;
-        if (familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number') {
-          const now = new Date();
-          const label = now.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-          return [{ month: label, amount: Math.round(Number(familyData.metrics.totalMonthlySpending) * 100) / 100 }];
-        }
-        return computeMonthlySpendingFromFamilySubscriptions();
-      })()
-    : (showFamilyData === false ? (personalMonthlySpending || []) : []);
-
-  // Normalize monthly spending into a fixed-length recent months series.
-  // `months` is the number of months before the current month, so `3` means current month + 3 prior months.
-  function normalizeMonthlySeries(data: MonthlySpending[] | undefined, months = 6) {
-    const now = new Date();
-    const monthKeys: string[] = [];
-    const monthMap = new Map<string, number>();
-
-    for (let i = months; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-      monthKeys.push(key);
-      monthMap.set(key, 0);
-    }
-
-    if (data && data.length > 0) {
-      for (const entry of data) {
-        const amount = Number(entry.amount) || 0;
-        if (monthMap.has(entry.month)) {
-          monthMap.set(entry.month, monthMap.get(entry.month)! + amount);
-        }
-      }
-    }
-
-    return monthKeys.map((month) => ({
-      month,
-      amount: Math.round((monthMap.get(month) || 0) * 100) / 100,
-    }));
-  }
-
-  const chartMonthlyData = normalizeMonthlySeries(effectiveMonthlySpending, 3);
-
-  // Calculate monthlySpendChange and newServicesTracked dynamically
-  const dynamicMetrics = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
-
-    // Calculate monthly spend change
-    const spending = (effectiveMonthlySpending as MonthlySpending[]) || [];
-    const currentMonthSpend = spending.find(m => m.month === currentMonth)?.amount || 0;
-    const lastMonthSpend = spending.find(m => m.month === lastMonth)?.amount || 0;
-    const spendChange = lastMonthSpend > 0 ? Math.round(((currentMonthSpend - lastMonthSpend) / lastMonthSpend) * 100) : 0;
-
-    // Calculate newServicesTracked based on active subscriptions in current mode
-    const activeCount = subscriptions.filter((s: Subscription) => s.status === 'active').length;
-
-    return {
-      monthlySpendChange: spendChange,
-      newServicesTracked: activeCount,
-    };
-  }, [effectiveMonthlySpending, subscriptions]);
-
-  // Apply dynamic metrics to override server values
-  const finalMetrics = useMemo((): DashboardMetrics => {
-    const base = metrics || {
-      totalMonthlySpend: 0,
-      activeSubscriptions: 0,
-      potentialSavings: 0,
-      thisMonthSavings: 0,
-      unusedSubscriptions: 0,
-      averageCostPerUse: 0,
-      monthlySpendChange: 0,
-      newServicesTracked: 0,
-    };
-
-    // Recalculate activeSubscriptions based on actual subscriptions to match current mode
-    const activeSubsCount = subscriptions.filter((s: Subscription) => s.status === 'active').length;
-
-    const now = new Date();
-    const currentMonthLabel = now.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-    const currentChartTotal = chartMonthlyData.find((entry) => entry.month === currentMonthLabel)?.amount || 0;
-
-    return {
-      ...base,
-      totalMonthlySpend: showFamilyData === true
-        ? (currentChartTotal || base.totalMonthlySpend)
-        : base.totalMonthlySpend,
-      activeSubscriptions: activeSubsCount,
-      monthlySpendChange: dynamicMetrics.monthlySpendChange,
-      newServicesTracked: dynamicMetrics.newServicesTracked,
-    };
-  }, [metrics, dynamicMetrics, subscriptions, showFamilyData, chartMonthlyData]);
-
-  // Personal category spending (always load)
-  const { data: personalCategorySpending, isLoading: personalCategoryLoading } = useQuery<SpendingByCategory[]>({
-    queryKey: ["/api/spending/category"],
-    refetchInterval: 30000, // Refetch every 30 seconds to stay fresh
-  });
-
-  const categorySpending = personalCategorySpending;
-  const categoryLoading = showFamilyData === true ? familyDataLoading : personalCategoryLoading;
-
-  function computeSpendingByCategoryFromSubs(subs: any[] | undefined) {
-    if (!subs || subs.length === 0) return [];
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    const categoryMap = new Map<string, { amount: number; count: number }>();
-
-    for (const sub of subs) {
-      if (!sub) continue;
-      if (isSubscriptionDeleted(sub)) continue;
-      if (!isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, true)) continue;
-
-      const frequency = (sub.frequency || 'monthly').toString().toLowerCase();
-      const amount = Number(sub.amount) || 0;
-      const monthlyAmount = calculateMonthlyCost(amount, frequency);
-
-      const existing = categoryMap.get(sub.category) || { amount: 0, count: 0 };
-      categoryMap.set(sub.category, {
-        amount: existing.amount + monthlyAmount,
-        count: existing.count + 1,
-      });
-    }
-
-    const totalAmount = Array.from(categoryMap.values()).reduce((sum, v) => sum + v.amount, 0);
-    return Array.from(categoryMap.entries()).map(([category, data]) => ({
-      category,
-      amount: Math.round(data.amount * 100) / 100,
-      percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0,
-      count: data.count,
-    }));
-  }
-
-  const categorySpendingComputed = showFamilyData === true
-    ? ((familyData?.byCategory && familyData.byCategory.length)
-        ? familyData.byCategory
-        : computeSpendingByCategoryFromSubs(familySubscriptions))
-    : personalCategorySpending;
-
-  // Personal cost analysis (always load)
-  const { data: personalCostAnalysis, isLoading: personalAnalysisLoading } = useQuery<CostPerUseAnalysis[]>({
-    queryKey: ["/api/analysis/cost-per-use"],
-  });
-
-  // Family cost analysis (load if in family mode)
-  const { data: familyCostAnalysis, isLoading: familyAnalysisLoading } = useQuery<CostPerUseAnalysis[]>({
-    queryKey: [`/api/analysis/cost-per-use?familyGroupId=${familyGroupId}`],
-    enabled: showFamilyData === true && !!familyGroupId,
-  });
-
-  const analysisLoading = showFamilyData === true ? familyAnalysisLoading : personalAnalysisLoading;
-
-  // If family mode and server didn't return analyses, compute a simple fallback from visible family subscriptions
-  const computedFamilyCostAnalysis = showFamilyData === true ? computeCostPerUseFromSubs(familySubscriptions) : [];
-
-  // Build per-member analyses (label subscriptions with member name) and merge into the effective analyses
-  function buildPerMemberAnalyses() {
-    if (showFamilyData !== true || !familyData?.members || familyData.members.length === 0) return [];
-    const subs = familySubscriptions;
-    const perMember: any[] = [];
-    for (const m of familyData.members) {
-      const memberName = m.displayName || m.email || m.userId || 'Member';
-      const memberSubs = subs.filter((s: any) => s && (s.user_id === m.userId || s.userId === m.userId || s.owner_id === m.userId));
-      const analyses = computeCostPerUseFromSubs(memberSubs || []).map((a: any) => ({ ...a, name: `${memberName} — ${a.name}` }));
-      perMember.push(...analyses);
-    }
-    return perMember;
-  }
-
-  const perMemberAnalyses = buildPerMemberAnalyses();
-
-  const baseAnalysis = showFamilyData === true
-    ? ((familyData?.isOwner && familyCostAnalysis && familyCostAnalysis.length)
-        ? familyCostAnalysis
-        : computedFamilyCostAnalysis)
-    : personalCostAnalysis;
-  // Prefer per-member labeled entries when deduping, so put them first
-  const mergedAnalyses = showFamilyData === true ? dedupeByKey([...perMemberAnalyses, ...(baseAnalysis || [])], 'subscriptionId') : baseAnalysis;
-  const effectiveCostAnalysis = mergedAnalyses;
-  const displayCostAnalysis = !showFamilyData && tier === "free"
-    ? (effectiveCostAnalysis?.slice(0, limits.maxCostPerUseSubscriptions) ?? [])
-    : effectiveCostAnalysis;
-
-  // Compute family-derived metrics after subscriptions are available
-
-  // Personal behavioral insights (always load)
-  const { data: personalBehavioralInsights, isLoading: personalInsightsLoading } = useQuery<OpportunityCost[]>({
-    queryKey: ["/api/insights/behavioral"],
-  });
-
-  // Family behavioral insights (load if in family mode)
-  const { data: familyBehavioralInsights, isLoading: familyInsightsLoading } = useQuery<OpportunityCost[]>({
-    queryKey: ["/api/insights/behavioral", "family", familyGroupId],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/insights/behavioral?family=true");
-      return res.json();
+      const response = await apiRequest("GET", "/api/subscriptions");
+      return response.json();
     },
-    enabled: showFamilyData && !!familyGroupId,
+    refetchInterval: 30000,
   });
 
-  const insightsLoading = showFamilyData ? familyInsightsLoading : personalInsightsLoading;
-  function computeBehavioralFromSubs(subs: any[] | undefined) {
-    if (!subs || subs.length === 0) return [];
-    return subs
-      .filter(s => s && (s.status === 'unused' || s.status === 'to-cancel'))
-      .map(sub => {
-        const rawMonthlyAmount = calculateMonthlyCost(sub.amount || 0, sub.frequency || 'monthly');
-        const monthlyAmount = Math.round(convertAmount(rawMonthlyAmount, (sub.currency || 'USD') as any, displayCurrency) * 100) / 100;
-        const equivalents = generateOpportunityCosts(monthlyAmount, displayCurrency);
-
-        return {
-          subscriptionId: sub.id,
-          subscriptionName: sub.name,
-          monthlyAmount,
-          currency: displayCurrency,
-          equivalents,
-        };
-      });
-  }
-
-  const computedFamilyBehavioral = showFamilyData ? computeBehavioralFromSubs(familySubscriptions) : [];
-  const baseInsights = showFamilyData
-    ? ((familyBehavioralInsights && familyBehavioralInsights.length > (computedFamilyBehavioral.length || 0))
-        ? familyBehavioralInsights
-        : computedFamilyBehavioral)
-    : personalBehavioralInsights;
-  const behavioralInsights = baseInsights;
-
-  // Personal recommendations (always load)
-  const [refreshingRecommendations, setRefreshingRecommendations] = useState(false);
-  const { data: personalRecommendations, isLoading: personalRecsLoading, isFetching: personalRecsFetching, refetch: refetchRecs } = useQuery<AIRecommendation[]>({
-    queryKey: ["/api/recommendations"],
+  const { data: familyData } = useQuery<any>({
+    queryKey: ["/api/family-groups", familyGroupId, "family-data"],
+    enabled: !!familyGroupId,
+    queryFn: async () => {
+      if (!familyGroupId) return null;
+      const response = await apiRequest("GET", `/api/family-groups/${familyGroupId}/family-data`);
+      return response.json();
+    },
+    refetchInterval: 30000,
   });
 
-  const recommendationsRaw: AIRecommendation[] = showFamilyData
-    ? (familyData?.recommendations && familyData.recommendations.length
-        ? (familyData.recommendations as AIRecommendation[])
-        : generateRecommendationsFromSubscriptions(familySubscriptions)
-      )
-    : (personalRecommendations && personalRecommendations.length
-        ? personalRecommendations
-        : generateRecommendationsFromSubscriptions(personalSubscriptions || [])
-      );
-  const allRecommendations = dedupeByKey(recommendationsRaw, "subscriptionId");
-  const recommendations = allRecommendations.slice(0, 3);
-  const hasMoreRecommendations = allRecommendations.length > 3;
-  const recsLoading = showFamilyData ? familyDataLoading : personalRecsLoading;
-  const recsRefreshing = showFamilyData ? familyDataFetching : personalRecsFetching;
-
-  const cancelSubscriptionMutation = useMutation({
-    mutationFn: async (subscriptionId: string) => {
-      const res = await apiRequest("POST", "/api/subscriptions/cancel", { subscriptionId });
-      return res.json();
+  const { data: monthlySpending, isLoading: monthlySpendingLoading } = useQuery<MonthlySpending[]>({
+    queryKey: ["/api/spending/monthly"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/spending/monthly");
+      return response.json();
     },
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ["/api/subscriptions"] });
-      queryClient.refetchQueries({ queryKey: ["/api/metrics"] });
-      queryClient.refetchQueries({ queryKey: ["/api/insights/behavioral"] });
-      toast({
-        title: "Cancellation requested",
-        description: "Your cancellation request has been recorded and the subscription is now marked as cancelling.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "We couldn't process the cancellation request right now.",
-        variant: "destructive",
-      });
-    },
+    refetchInterval: 30000,
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: SubscriptionStatus }) => {
-      const res = await apiRequest("PATCH", `/api/subscriptions/${id}/status`, { status });
-      return res.json();
+  const { data: categorySpending, isLoading: categorySpendingLoading } = useQuery<SpendingByCategory[]>({
+    queryKey: ["/api/spending/category"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/spending/category");
+      return response.json();
     },
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ["/api/subscriptions"] });
-      queryClient.refetchQueries({ queryKey: ["/api/metrics"] });
-      queryClient.refetchQueries({ queryKey: ["/api/insights"] });
-      queryClient.refetchQueries({ queryKey: ["/api/insights/behavioral"] });
-      queryClient.refetchQueries({ queryKey: ["/api/analysis/cost-per-use"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-savings"], exact: false });
-      queryClient.refetchQueries({ queryKey: ["/api/spending/monthly"] });
-      queryClient.refetchQueries({ queryKey: ["/api/spending/category"] });
-      queryClient.refetchQueries({ queryKey: ["/api/recommendations"] });
-      toast({
-        title: "Status updated",
-        description: "Subscription status has been updated successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update subscription status.",
-        variant: "destructive",
-      });
-    },
+    refetchInterval: 30000,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/subscriptions/${id}`);
-      // 204 No Content has no body, so don't try to parse JSON
-      if (res.status === 204) {
-        return { success: true };
-      }
-      return res.json();
+  const familySubscriptions = useMemo(
+    () => getVisibleFamilySubscriptions(familyData, user?.id),
+    [familyData, user?.id]
+  );
+
+  const subscriptions = showFamilyData === true ? familySubscriptions : personalSubscriptions;
+
+  const monthlySpendingData = showFamilyData === true && familyData?.spending && familyData.spending.length > 0
+    ? familyData.spending
+    : monthlySpending;
+
+  const categorySpendingData = showFamilyData === true && familyData?.byCategory && familyData.byCategory.length > 0
+    ? familyData.byCategory
+    : categorySpending;
+
+  const normalizedMonthlySpending = normalizeMonthlySpendingSeries(monthlySpendingData, 6);
+
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
+  const currentMonthAmount = getCurrentMonthAmount(normalizedMonthlySpending);
+
+  const yearToDateSpend = normalizedMonthlySpending.reduce((sum, entry) => {
+    const parsed = new Date(`${entry.month} 1`);
+    if (Number.isNaN(parsed.getTime()) || parsed.getFullYear() !== currentYear) return sum;
+    return sum + entry.amount;
+  }, 0);
+
+  const remainingMonthsInYear = Math.max(0, 11 - currentMonth);
+  const yearlyProjection = Math.round((yearToDateSpend + currentMonthAmount * remainingMonthsInYear) * 100) / 100;
+
+  const totalMonthlySpend = metrics?.totalMonthlySpend ?? 0;
+  const annualProjection = Number.isFinite(yearlyProjection) && yearlyProjection > 0
+    ? yearlyProjection
+    : Math.round(totalMonthlySpend * 12 * 100) / 100;
+  const activeSubscriptions = (subscriptions || []).filter((sub) => sub?.status === "active").length;
+  const potentialSavings = useMemo(
+    () => calculatePotentialSavings(subscriptions || []),
+    [subscriptions]
+  );
+  const unusedSubscriptionCount = metrics?.unusedSubscriptions ?? 0;
+  const averageSubscriptionCost = activeSubscriptions > 0 ? Math.round((totalMonthlySpend / activeSubscriptions) * 100) / 100 : 0;
+  const chartLoading = monthlySpendingLoading || categorySpendingLoading || (showFamilyData === true && !familyData);
+  const heroTitle = potentialSavings > 0 ? `${formatAmount(potentialSavings)}/mo` : "No immediate savings";
+  const heroSubtitle = potentialSavings > 0 ? `Subveris has identified ${formatAmount(potentialSavings)} in recoverable monthly spend.` : "Your subscriptions are currently balanced. Check back for new opportunities.";
+  const metricCards = [
+    {
+      label: "Monthly spend",
+      value: formatAmount(totalMonthlySpend),
+      helper: "/mo",
+      Icon: DollarSign,
+      iconClass: "text-sky-500",
     },
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ["/api/subscriptions"] });
-      queryClient.refetchQueries({ queryKey: ["/api/metrics"] });
-      queryClient.refetchQueries({ queryKey: ["/api/insights"] });
-      queryClient.refetchQueries({ queryKey: ["/api/insights/behavioral"] });
-      toast({
-        title: "Subscription deleted",
-        description: "The subscription has been removed.",
-      });
+    {
+      label: "Yearly projection",
+      value: formatAmount(annualProjection),
+      helper: "/yr",
+      Icon: BarChart3,
+      iconClass: "text-emerald-500",
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete subscription.",
-        variant: "destructive",
-      });
+    {
+      label: "Active subscriptions",
+      value: `${activeSubscriptions}`,
+      helper: "active",
+      Icon: Clock,
+      iconClass: "text-violet-500",
     },
-  });
+  ];
 
-  const handleStatusChange = (id: string, status: SubscriptionStatus) => {
-    updateStatusMutation.mutate({ id, status });
-  };
-
-  const handleCancelSubscription = (subscriptionId: string) => {
-    cancelSubscriptionMutation.mutate(subscriptionId);
-  };
-
-  const handleRefreshRecommendations = async () => {
-    setRefreshingRecommendations(true);
-    try {
-      if (showFamilyData && familyGroupId) {
-        queryClient.removeQueries({ queryKey: ["/api/family-groups", familyGroupId, "family-data"], exact: true });
-        queryClient.removeQueries({ queryKey: ["/api/subscriptions"], exact: true });
-
-        await queryClient.fetchQuery({
-          queryKey: ["/api/family-groups", familyGroupId, "family-data"],
-          queryFn: async () => {
-            const res = await apiRequest("GET", `/api/family-groups/${familyGroupId}/family-data`);
-            return res.json();
-          },
-          staleTime: 0,
-        });
-
-        await queryClient.fetchQuery({
-          queryKey: ["/api/subscriptions"],
-          queryFn: async () => {
-            const res = await apiRequest("GET", "/api/subscriptions");
-            return res.json();
-          },
-          staleTime: 0,
-        });
-
-        await refetchFamilyData?.();
-      } else {
-        queryClient.removeQueries({ queryKey: ["/api/recommendations"], exact: true });
-        queryClient.removeQueries({ queryKey: ["/api/subscriptions"], exact: true });
-
-        await queryClient.fetchQuery({
-          queryKey: ["/api/recommendations"],
-          queryFn: async () => {
-            const res = await apiRequest("GET", "/api/recommendations");
-            return res.json();
-          },
-          staleTime: 0,
-        });
-
-        await queryClient.fetchQuery({
-          queryKey: ["/api/subscriptions"],
-          queryFn: async () => {
-            const res = await apiRequest("GET", "/api/subscriptions");
-            return res.json();
-          },
-          staleTime: 0,
-        });
-
-        await refetchRecs?.();
-      }
-    } catch (error) {
-      console.error("[Dashboard] Failed to refresh recommendations", error);
-    } finally {
-      setRefreshingRecommendations(false);
-    }
-  };
-
-  const activeSubscriptions = subscriptions?.filter((s: Subscription) => s.status === "active") || [];
-  const unusedCount = subscriptions?.filter((s: Subscription) => s.status === "unused").length || 0;
-  const toCancelCount = subscriptions?.filter((s: Subscription) => s.status === "to-cancel").length || 0;
-  const zeroUsageSubscriptions = subscriptions?.filter((s: Subscription) => s.isZeroUsageFlag === true) || [];
-  const costPerUseSubscriptionCount = subscriptions?.filter((s: Subscription) => !isSubscriptionDeleted(s)).length || 0;
-
-  const todayFocusMessage = (() => {
-    const totalAtRisk = unusedCount + toCancelCount;
-    if (!subscriptions || subscriptions.length === 0) {
-      return "Start tracking subscriptions to see your spending and savings opportunities.";
-    }
-    if (totalAtRisk > 0) {
-      return `Review ${totalAtRisk} subscription${totalAtRisk === 1 ? "" : "s"} marked as unused or to cancel.`;
-    }
-    if (zeroUsageSubscriptions.length > 0) {
-      return `You have ${zeroUsageSubscriptions.length} subscription${zeroUsageSubscriptions.length === 1 ? "" : "s"} with no recorded usage this month.`;
-    }
-    if (costPerUseSubscriptionCount > 0 && activeSubscriptions.length > 0) {
-      return `Excellent! ${activeSubscriptions.length} active subscription${activeSubscriptions.length === 1 ? "" : "s"} are being monitored for cost-per-use.`;
-    }
-    return "Your subscriptions are being tracked. Keep logging usage for better insights.";
-  })();
+  const upcomingRenewals = useMemo(() => getUpcomingRenewals(subscriptions), [subscriptions]);
 
   return (
-    <div className="flex-1 overflow-auto bg-gradient-to-br from-background via-background to-muted/5">
-      <div className="p-6 md:p-10 space-y-8 max-w-7xl mx-auto">
-        <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6 text-slate-900 shadow-sm dark:border-slate-700 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 dark:text-white">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-600 dark:text-slate-300">Command center</p>
-              <h1 className="mt-2 text-3xl md:text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">Dashboard</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                See your recurring spend, act on the next best move, and keep your subscriptions aligned with actual value.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/10">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300">Today’s focus</p>
-              <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
-                {todayFocusMessage}
-              </p>
-            </div>
-          </div>
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/10">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">Spend snapshot</p>
-              <p className="mt-3 text-2xl font-semibold text-slate-900 dark:text-white">{subscriptions?.length || 0} services</p>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Track what matters most in one place.</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/10">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">Savings focus</p>
-              <p className="mt-3 text-2xl font-semibold text-slate-900 dark:text-white">{unusedCount + toCancelCount}</p>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Unused or at-risk payments to review.</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/10">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">Family mode</p>
-              <p className="mt-3 text-2xl font-semibold text-slate-900 dark:text-white">{showFamilyData ? "Enabled" : "Personal"}</p>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">View the right set of subscriptions for your account.</p>
-            </div>
-          </div>
+    <div className="flex-1 overflow-auto">
+      <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+        <div className="mb-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500 dark:text-slate-400">
+            Command Center
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+            Dashboard
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+            A clean overview of your subscription spend, top alerts, next renewals, and quick actions.
+          </p>
         </div>
 
-        <FamilyMembershipBanner />
-
-        <MetricsCards metrics={finalMetrics} isLoading={metricsLoading} />
-
-        <AutomationAlerts
-          isFreeTier={tier === "free"}
-          zeroUsageSubscriptions={zeroUsageSubscriptions}
-          onCancelSubscription={handleCancelSubscription}
-          isCancelling={cancelSubscriptionMutation.isPending}
-          cancellingSubscriptionId={cancelSubscriptionMutation.variables ?? null}
-        />
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <SpendingChart
-            monthlyData={chartMonthlyData}
-            categoryData={categorySpendingComputed}
-            isLoading={monthlyLoading || categoryLoading}
-            trendLabel="4-Month Trend"
-          />
-          {limits.hasSavingsProjections ? (
-            <>
-                  <SavingsProjection
-                    potentialSavings={metrics?.potentialSavings || 0}
-                    currentSavings={metrics?.thisMonthSavings || 0}
-                    unusedCount={unusedCount}
-                    toCancelCount={toCancelCount}
-                    isLoading={metricsLoading}
-                  />
-            </>
-          ) : (
-            <PremiumGate feature="Savings Projections" showBlurred={false} />
-          )}
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          {limits.hasCostPerUse ? (
-            <CostPerUse
-              analyses={displayCostAnalysis}
-              isLoading={analysisLoading}
-              showUpgradePrompt={tier === "free"}
-              totalSubscriptions={costPerUseSubscriptionCount}
-              maxAllowed={limits.maxCostPerUseSubscriptions}
-            />
-          ) : (
-            <PremiumGate feature="Cost-per-use analytics" showBlurred={false} />
-          )}
-          {limits.hasBehavioralInsights ? (
-            <BehavioralInsights 
-              insights={behavioralInsights} 
-              isLoading={insightsLoading}
-              familyMembers={familyData?.members}
-              currentUserId={familyData?.currentUserId}
-              showMemberLabels={showFamilyData}
-            />
-          ) : (
-            <PremiumGate feature="Behavioral insights" showBlurred={false} />
-          )}
-        </div>
-
-        {limits.hasAIRecommendations ? (
-          <AIRecommendations
-            recommendations={recommendations}
-            isLoading={recsLoading}
-            onRefresh={handleRefreshRecommendations}
-            isRefreshing={refreshingRecommendations || recsRefreshing}
-            maxRecommendations={3}
-            showViewAll={hasMoreRecommendations}
-            totalCount={allRecommendations.length}
-          />
-        ) : (
-          <PremiumGate feature="AI-powered recommendations" showBlurred={false} />
-        )}
-
-        <div className="mt-12">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold tracking-tight">Active Subscriptions</h2>
-            <p className="text-muted-foreground mt-1">Optimize your subscriptions</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {subsLoading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-48 rounded-lg bg-gradient-to-br from-muted to-muted/50 animate-pulse" />
-              ))
-            ) : activeSubscriptions.length > 0 ? (
-              activeSubscriptions.slice(0, 6).map((sub: Subscription) => (
-                <SubscriptionCard
-                  key={sub.id}
-                  subscription={sub}
-                  onStatusChange={handleStatusChange}
-                />
-              ))
-            ) : (
-              <div className="col-span-full text-center py-16 px-6">
-                <div className="bg-card/50 border border-border/50 rounded-lg p-12">
-                  <p className="text-lg text-muted-foreground font-medium mb-2">No active subscriptions found</p>
-                  <p className="text-sm text-muted-foreground">Install our browser extension or add your subscriptions manually to start optimizing spend and saving money</p>
+        <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+          <div className="space-y-6">
+            <Card className="rounded-3xl border-transparent bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6 text-slate-900 shadow-sm dark:border-transparent dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 dark:text-white">
+              <CardHeader className="p-0">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.32em] text-slate-500 dark:text-slate-400">
+                      Total potential savings
+                    </p>
+                    <h2 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">
+                      {heroTitle}
+                    </h2>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                      {heroSubtitle}
+                    </p>
+                  </div>
+                  <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-900/10 text-slate-900 shadow-lg shadow-slate-900/10 dark:bg-white/10 dark:text-white">
+                    <Sparkles className="h-7 w-7" />
+                  </div>
                 </div>
-              </div>
-            )}
+              </CardHeader>
+            </Card>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              {metricCards.map((metric) => {
+                const Icon = metric.Icon;
+                return (
+                  <Card key={metric.label} className="rounded-3xl shadow-sm">
+                    <div className="flex items-start gap-4">
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 ${metric.iconClass} bg-opacity-20`}>
+                        <Icon className={`h-5 w-5 ${metric.iconClass}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                          {metric.label}
+                        </p>
+                        <p className="mt-3 text-2xl font-semibold text-slate-900 dark:text-white">
+                          {metric.value}
+                        </p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">{metric.helper}</p>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+
+            <Card className="rounded-3xl border-slate-200/80 bg-card p-6 shadow-sm">
+              <CardHeader className="p-0">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white">
+                      Spending overview
+                    </CardTitle>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                      Monthly trend and category breakdown.
+                    </p>
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <BarChart3 className="h-4 w-4" />
+                    Chart
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="mt-6 p-0">
+                <SpendingChart
+                  monthlyData={normalizedMonthlySpending}
+                  categoryData={categorySpendingData}
+                  isLoading={chartLoading}
+                  trendLabel="Last 6 months"
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card className="rounded-3xl border-slate-200/80 bg-card p-6 shadow-sm">
+              <CardHeader className="p-0">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white">Quick actions</CardTitle>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Manage subscriptions faster.</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="mt-6 p-0">
+                <div className="grid gap-3">
+                  <Button
+                    type="button"
+                    className="w-full rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-slate-200"
+                    onClick={() => window.location.assign("/subscriptions")}
+                  >
+                    + Add Subscription
+                  </Button>
+
+                  <Button
+                    type="button"
+                    className="w-full rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
+                    onClick={() => navigate("/cost-optimizer")}
+                  >
+                    Review AI recommendations
+                  </Button>
+
+                  <Button
+                    type="button"
+                    className="w-full rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
+                    onClick={() => navigate("/calendar")}
+                  >
+                    View upcoming renewals
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-3xl border-slate-200/80 bg-card p-6 shadow-sm">
+              <CardHeader className="p-0">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white">Upcoming renewals</CardTitle>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Next 3 bills due this month.</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="mt-6 p-0">
+                <div className="space-y-4">
+                  {upcomingRenewals.length > 0 ? (
+                    upcomingRenewals.map((renewal) => (
+                      <div key={renewal.id} className="flex gap-4 rounded-3xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/60">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950">
+                          <Calendar className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-semibold text-slate-900 dark:text-white">{renewal.title}</p>
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                              {renewal.frequency}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Due {formatShortDate(renewal.date)}</p>
+                          <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+                            {formatAmount(renewal.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-3xl border border-dashed border-slate-300/70 bg-slate-50 px-4 py-10 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-400">
+                      No renewals due this month. Your next charges will appear here once they are scheduled.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

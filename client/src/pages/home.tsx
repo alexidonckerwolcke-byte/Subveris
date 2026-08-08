@@ -56,7 +56,12 @@ export default function HomePage() {
       us: "No",
     },
     {
-      feature: "Usage-based insights",
+      feature: "Browser extension tracking",
+      others: "No",
+      us: "Yes",
+    },
+    {
+      feature: "Autopilot optimization",
       others: "No",
       us: "Yes",
     },
@@ -69,11 +74,6 @@ export default function HomePage() {
       feature: "Privacy-focused",
       others: "Medium",
       us: "High",
-    },
-    {
-      feature: "Lightweight",
-      others: "No",
-      us: "Yes",
     },
     {
       feature: "AI recommendations",
@@ -89,14 +89,14 @@ export default function HomePage() {
       description: "Know what each subscription actually costs you per session so you can optimize spend and keep only the highest-value services.",
     },
     {
-      icon: AlertCircle,
-      title: "Renewal Risk Alerts",
-      description: "Spot upcoming renewals, identify overpaying services, and prioritize the subscriptions that deserve to stay.",
+      icon: Zap,
+      title: "Browser Extension Optimization",
+      description: "Capture real usage signals with our browser extension so optimization recommendations are based on what you actually use.",
     },
     {
       icon: Brain,
-      title: "AI Optimization",
-      description: "Our AI highlights savings opportunities, recommends plan changes, and helps you reduce wasted recurring spend.",
+      title: "Autopilot AI Optimization",
+      description: "Let Subveris automatically highlight savings, smartly prioritize renewals, and recommend the best actions for your subscriptions.",
     },
   ];
 
@@ -122,7 +122,7 @@ export default function HomePage() {
   const faqs = [
     {
       question: "How does Subveris understand my subscription value?",
-      answer: "We use a lightweight browser extension that detects the services you use most. We never connect to your bank, don't sell your data, and only use this information to help you optimize recurring spend.",
+      answer: "Our browser extension captures the services you use most, and our Autopilot engine turns that signal into savings recommendations. We never connect to your bank, don't sell your data, and only use this information to optimize recurring spend.",
     },
     {
       question: "Is my data safe?",
@@ -184,17 +184,19 @@ export default function HomePage() {
         <div className="max-w-4xl mx-auto">
           <Badge variant="secondary" className="mb-6 px-4 py-2 text-sm font-semibold">
             <Sparkles className="h-3 w-3 mr-2" />
-            The subscription operating system
+            The Subscription Optimization Platform
           </Badge>
           
           <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-8 leading-tight">
-            Take control of recurring spend
+            Discover subscriptions you're paying for
             <br />
-            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">before it quietly compounds.</span>
+            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">but barely use.</span>
           </h1>
           
           <p className="text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed font-light">
-            See what you pay, what you actually use, and which services deserve to stay.
+            See what you pay. See what you use.
+            <br />
+            <span className="font-semibold text-foreground">Stop wasting money.</span>
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
