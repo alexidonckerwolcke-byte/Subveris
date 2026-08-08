@@ -12,7 +12,7 @@ import {
   Package,
   Code,
 } from "lucide-react";
-import type { SubscriptionCategory, SubscriptionStatus } from "@shared/schema";
+import type { MonthlySpending, SubscriptionCategory, SubscriptionStatus } from "@shared/schema";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -132,6 +132,33 @@ export function calculateMonthlyCost(amount: number, frequency: string): number 
     default:
       return amount;
   }
+}
+
+export function normalizeMonthlySpendingSeries(data: MonthlySpending[] | undefined, months = 6): MonthlySpending[] {
+  const now = new Date();
+  const monthLabels: string[] = [];
+
+  for (let i = months; i >= 0; i--) {
+    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    monthLabels.push(monthDate.toLocaleString('en-US', { month: 'short', year: 'numeric' }));
+  }
+
+  const monthAmountMap = new Map<string, number>(monthLabels.map((label) => [label, 0]));
+
+  if (data && data.length > 0) {
+    for (const entry of data) {
+      if (!entry || typeof entry.month !== 'string') continue;
+      const normalizedMonth = entry.month.trim();
+      if (monthAmountMap.has(normalizedMonth)) {
+        monthAmountMap.set(normalizedMonth, Math.round((entry.amount || 0) * 100) / 100);
+      }
+    }
+  }
+
+  return monthLabels.map((month) => ({
+    month,
+    amount: monthAmountMap.get(month) ?? 0,
+  }));
 }
 
 export function parseSubscriptionRenewalDate(date?: string | Date | null): Date | null {
