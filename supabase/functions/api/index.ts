@@ -1530,10 +1530,27 @@ runtimeDeno?.serve?.(async (req: Request) => {
             .eq("user_id", userId);
         }
 
+        let currency = "USD";
+        try {
+          const { data: userRow } = await supabase
+            .from('users')
+            .select('currency')
+            .eq('id', userId)
+            .single();
+
+          const rawCurrency = String(userRow?.currency || "USD").toUpperCase();
+          if (/^[A-Z]{3}$/.test(rawCurrency)) {
+            currency = rawCurrency;
+          }
+        } catch (currencyError) {
+          console.warn("[PremiumStatus] Failed to load saved currency preference:", currencyError);
+        }
+
         return sendJson({
           isPremium,
           planType,
           status: effectiveStatus,
+          currency,
           cancelAtPeriodEnd: expiredScheduledCancellation ? false : (userData.cancel_at_period_end || false),
           currentPeriodEnd: userData.current_period_end,
         });
@@ -1543,6 +1560,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           isPremium: false,
           planType: "free",
           status: "active",
+          currency: "USD",
           cancelAtPeriodEnd: false,
           currentPeriodEnd: null,
         });
@@ -5012,7 +5030,28 @@ runtimeDeno?.serve?.(async (req: Request) => {
     }
 
     if (pathname === "/user/currency" && req.method === "GET") {
-      return sendJson({ currency: "USD", symbol: "$" });
+      const userId = extractUserId(req);
+      if (!userId) {
+        return sendJson({ currency: "USD", symbol: "$" });
+      }
+
+      let currency = "USD";
+      try {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('currency')
+          .eq('id', userId)
+          .single();
+
+        const rawCurrency = String(userRow?.currency || "USD").toUpperCase();
+        if (/^[A-Z]{3}$/.test(rawCurrency)) {
+          currency = rawCurrency;
+        }
+      } catch (currencyError) {
+        console.warn("[UserCurrency] Failed to load saved currency preference:", currencyError);
+      }
+
+      return sendJson({ currency, symbol: "$" });
     }
 
     if (pathname.match(/^\/family-groups\/[^/]+\/family-data$/) && req.method === "GET") {

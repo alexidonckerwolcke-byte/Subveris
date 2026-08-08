@@ -228,7 +228,7 @@ export function OnboardingTutorial() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="w-full max-w-[min(calc(100vw-2rem),40rem)]">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

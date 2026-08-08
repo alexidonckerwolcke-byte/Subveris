@@ -139,6 +139,7 @@ interface PriorityAction {
   title: string;
   description: string;
   savings: number;
+  currency: string;
   confidence: number;
   priority: "critical" | "high" | "medium" | "low";
   action: string;
@@ -150,7 +151,12 @@ interface PriorityAction {
   costPerUse: number;
 }
 
-function mapRecommendationToPriorityAction(rec: AIRecommendation, sub: any, health: HealthScore): PriorityAction {
+function mapRecommendationToPriorityAction(
+  rec: AIRecommendation,
+  sub: any,
+  health: HealthScore,
+  formatAmount?: (amount: number, fromCurrency?: string) => string
+): PriorityAction {
   const priority = rec.confidence >= 0.9
     ? "critical"
     : rec.confidence >= 0.75
@@ -184,11 +190,14 @@ function mapRecommendationToPriorityAction(rec: AIRecommendation, sub: any, heal
     ? `${Math.max(0, Math.floor((Date.now() - lastUsedDate.getTime()) / (1000 * 60 * 60 * 24)))}d ago`
     : "No recent usage";
 
+  const displayCurrency = rec.currency || (sub?.currency as string) || "USD";
+
   return {
     subscriptionId: rec.subscriptionId || sub?.id || "",
     title: rec.title,
     description: rec.description.split(".")[0].trim(),
     savings: rec.savings,
+    currency: displayCurrency,
     confidence: Math.round(rec.confidence * 100),
     priority,
     action,
@@ -201,7 +210,7 @@ function mapRecommendationToPriorityAction(rec: AIRecommendation, sub: any, heal
   };
 }
 
-function generatePriorityActions(subscriptions: any[], formatAmount?: (amount: number) => string): PriorityAction[] {
+function generatePriorityActions(subscriptions: any[], formatAmount?: (amount: number, fromCurrency?: string) => string): PriorityAction[] {
   const activeSubscriptions = (subscriptions || []).filter((sub) => sub && sub.status !== "deleted");
   const actionMap = new Map<string, PriorityAction>();
 
@@ -211,7 +220,7 @@ function generatePriorityActions(subscriptions: any[], formatAmount?: (amount: n
     const directRecommendations = generateRecommendationsFromSubscriptions([sub]);
 
     const directAction = directRecommendations[0]
-      ? mapRecommendationToPriorityAction(directRecommendations[0], sub, health)
+      ? mapRecommendationToPriorityAction(directRecommendations[0], sub, health, formatAmount)
       : null;
 
     const fallbackAction = waste
@@ -248,13 +257,14 @@ function generatePriorityActions(subscriptions: any[], formatAmount?: (amount: n
               title: `Reassess ${sub.name}`,
               description: `Usage is very low for the amount you are paying.`,
               savings: monthlyAmount * 0.7,
+              currency: sub.currency || "USD",
               confidence: 88,
               priority: "high" as const,
               action: "Cancel or downgrade",
               recommendation: `${sub.name} is costing too much for the value you are getting. Consider cancelling or moving to a cheaper plan.`,
               reasoning: [
                 `Only ${sessionsPerMonth.toFixed(1)} uses/month`,
-                `Cost per use is ${formatAmount ? formatAmount(costPerUse) : costPerUse.toFixed(2)}`,
+                `Cost per use is ${formatAmount ? formatAmount(costPerUse, sub.currency || "USD") : costPerUse.toFixed(2)}`,
               ],
               dataQuality: 92,
               usageCount: getSubscriptionUsageCount(sub),
@@ -269,6 +279,7 @@ function generatePriorityActions(subscriptions: any[], formatAmount?: (amount: n
               title: `Downgrade ${sub.name}`,
               description: `This looks like a good candidate for a cheaper tier.`,
               savings: monthlyAmount * 0.4,
+              currency: sub.currency || "USD",
               confidence: 74,
               priority: "medium" as const,
               action: "Downgrade plan",
@@ -578,18 +589,18 @@ export default function CostOptimizer() {
             </div>
 
             {priorityActions[0] && (
-              <Card className="border-emerald-200 bg-emerald-50/80 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/30">
+              <Card className="border-emerald-200 bg-emerald-50/80 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-slate-100">
                 <CardContent className="p-5">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-emerald-700">Best next action</p>
-                      <h3 className="mt-1 text-lg font-semibold text-slate-900">{priorityActions[0].title}</h3>
-                      <p className="mt-1 text-sm text-slate-600">{priorityActions[0].recommendation}</p>
+                      <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Best next action</p>
+                      <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{priorityActions[0].title}</h3>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{priorityActions[0].recommendation}</p>
                     </div>
-                    <div className="rounded-lg border border-emerald-200 bg-white/80 px-4 py-3 text-sm">
-                      <p className="font-semibold text-emerald-700">Expected impact</p>
-                      <p className="mt-1 text-lg font-semibold text-slate-900">
-                        {formatAmount(priorityActions[0].savings)}/mo
+                    <div className="rounded-lg border border-emerald-200 bg-white/80 px-4 py-3 text-sm dark:border-emerald-700 dark:bg-slate-900/80">
+                      <p className="font-semibold text-emerald-700 dark:text-emerald-300">Expected impact</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                        {formatAmount(priorityActions[0].savings, priorityActions[0].currency as any)}/mo
                       </p>
                     </div>
                   </div>
@@ -620,17 +631,17 @@ export default function CostOptimizer() {
               </CardHeader>
               <CardContent>
                 <div className="mb-4 grid gap-3 md:grid-cols-3">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-950/50">
                     <p className="text-xs font-medium text-muted-foreground">Usage this month</p>
-                    <p className="mt-1 text-lg font-semibold">{usageSnapshot.usageCount}</p>
+                    <p className="mt-1 text-lg font-semibold dark:text-white">{usageSnapshot.usageCount}</p>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-950/50">
                     <p className="text-xs font-medium text-muted-foreground">Active subscriptions</p>
-                    <p className="mt-1 text-lg font-semibold">{usageSnapshot.activeSubscriptions}</p>
+                    <p className="mt-1 text-lg font-semibold dark:text-white">{usageSnapshot.activeSubscriptions}</p>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-950/50">
                     <p className="text-xs font-medium text-muted-foreground">Used recently</p>
-                    <p className="mt-1 text-lg font-semibold">{usageSnapshot.recentlyUsed}</p>
+                    <p className="mt-1 text-lg font-semibold dark:text-white">{usageSnapshot.recentlyUsed}</p>
                   </div>
                 </div>
 
@@ -646,12 +657,12 @@ export default function CostOptimizer() {
                         key={action.subscriptionId}
                         className={`border-l-4 shadow-sm ${
                           action.priority === "critical"
-                            ? "border-l-red-600 bg-red-50/20"
+                            ? "border-l-red-600 bg-red-50/20 dark:border-l-red-400 dark:bg-red-950/20"
                             : action.priority === "high"
-                              ? "border-l-orange-600 bg-orange-50/20"
+                              ? "border-l-orange-600 bg-orange-50/20 dark:border-l-orange-400 dark:bg-orange-950/20"
                               : action.priority === "medium"
-                                ? "border-l-yellow-600 bg-yellow-50/20"
-                                : "border-l-blue-600 bg-blue-50/20"
+                                ? "border-l-yellow-600 bg-yellow-50/20 dark:border-l-yellow-400 dark:bg-yellow-950/20"
+                                : "border-l-blue-600 bg-blue-50/20 dark:border-l-blue-400 dark:bg-blue-950/20"
                         }`}
                       >
                         <CardContent className="p-4">
@@ -659,30 +670,30 @@ export default function CostOptimizer() {
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <h3 className="font-bold text-lg">{action.title}</h3>
+                                  <h3 className="font-bold text-lg dark:text-white">{action.title}</h3>
                                   {idx === 0 && action.priority === "critical" && (
-                                    <Badge className="bg-red-100 text-red-800 text-xs animate-pulse">🔥 TOP PRIORITY</Badge>
+                                    <Badge className="bg-red-100 text-red-800 text-xs animate-pulse dark:bg-red-900/80 dark:text-red-200">🔥 TOP PRIORITY</Badge>
                                   )}
                                 </div>
-                                <p className="text-xs text-muted-foreground font-medium">{action.action}</p>
+                                <p className="text-xs text-muted-foreground font-medium dark:text-slate-300">{action.action}</p>
                               </div>
                               <Badge
                                 className={`text-xs font-semibold whitespace-nowrap h-fit ${
                                   action.priority === "critical"
-                                    ? "bg-red-100 text-red-800"
+                                    ? "bg-red-100 text-red-800 dark:bg-red-900/80 dark:text-red-200"
                                     : action.priority === "high"
-                                      ? "bg-orange-100 text-orange-800"
+                                      ? "bg-orange-100 text-orange-800 dark:bg-orange-900/80 dark:text-orange-200"
                                       : action.priority === "medium"
-                                        ? "bg-yellow-100 text-yellow-800"
-                                        : "bg-blue-100 text-blue-800"
+                                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/80 dark:text-yellow-200"
+                                        : "bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-200"
                                 }`}
                               >
                                 {action.priority.toUpperCase()}
                               </Badge>
                             </div>
 
-                            <div className="bg-white/70 rounded p-3 border border-current/10">
-                              <p className="text-sm leading-relaxed font-medium text-foreground">
+                            <div className="bg-white/70 rounded p-3 border border-current/10 dark:bg-slate-900/70 dark:border-slate-700/20">
+                              <p className="text-sm leading-relaxed font-medium text-foreground dark:text-slate-100">
                                 💡 {action.recommendation}
                               </p>
                             </div>
@@ -705,7 +716,7 @@ export default function CostOptimizer() {
                               {action.savings > 0 && (
                                 <div className="flex items-center gap-1 text-green-600 font-semibold text-sm">
                                   <DollarSign className="h-4 w-4" />
-                                  Save {formatAmount(action.savings)}/mo
+                                  Save {formatAmount(action.savings, action.currency as any)}/mo
                                 </div>
                               )}
                               <Badge variant="outline" className="text-xs">
@@ -715,7 +726,7 @@ export default function CostOptimizer() {
                                 {action.lastUsedLabel}
                               </Badge>
                               <Badge variant="outline" className="text-xs">
-                                {formatAmount(action.costPerUse)}/use
+                                {formatAmount(action.costPerUse, action.currency as any)}/use
                               </Badge>
                               <Badge variant="outline" className="text-xs">
                                 {action.confidence}% confident
@@ -809,7 +820,7 @@ export default function CostOptimizer() {
                 ) : (
                   <div className="space-y-3">
                     {wasteItems.map((item) => (
-                      <div key={item.subscriptionId} className="rounded-lg border border-red-100 bg-red-50/30 p-4">
+                      <div key={item.subscriptionId} className="rounded-lg border border-red-100 bg-red-50/30 p-4 dark:border-red-900/20 dark:bg-red-950/30">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-center justify-between gap-2 mb-2">
@@ -858,33 +869,33 @@ export default function CostOptimizer() {
               </CardContent>
             </Card>
 
-            <Card className="border-blue-200 bg-blue-50">
+            <Card className="border-blue-200 bg-blue-50 shadow-sm dark:border-blue-700 dark:bg-blue-950/30 dark:text-slate-100">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold">Monthly AI Report</CardTitle>
+                <CardTitle className="text-lg font-semibold dark:text-white">Monthly AI Report</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">
+                  <p className="text-sm font-semibold text-muted-foreground dark:text-slate-300 mb-1">
                     Spending Overview
                   </p>
-                  <p className="text-lg font-bold">
+                  <p className="text-lg font-bold dark:text-white">
                     {formatAmount(currentMonthSpending)}
                   </p>
-                  <p className="text-xs text-muted-foreground">on subscriptions this month</p>
+                  <p className="text-xs text-muted-foreground dark:text-slate-400">on subscriptions this month</p>
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">
+                  <p className="text-sm font-semibold text-muted-foreground dark:text-slate-300 mb-1">
                     Savings Potential
                   </p>
-                  <p className="text-lg font-bold text-green-600">
+                  <p className="text-lg font-bold text-green-600 dark:text-emerald-300">
                     {formatAmount(monthlySavingsPotential)}
                   </p>
-                  <p className="text-xs text-muted-foreground">could potentially save</p>
+                  <p className="text-xs text-muted-foreground dark:text-slate-400">could potentially save</p>
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-2">
+                  <p className="text-sm font-semibold text-muted-foreground dark:text-slate-300 mb-2">
                     Critical Issues
                   </p>
                   {criticalCount > 0 ? (
@@ -905,7 +916,7 @@ export default function CostOptimizer() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-2">
+                  <p className="text-sm font-semibold text-muted-foreground dark:text-slate-300 mb-2">
                     Best Value Subscriptions
                   </p>
                   <div className="space-y-1">

@@ -28,7 +28,7 @@ import {
 } from "recharts";
 import type { DashboardMetrics, MonthlySpending, Subscription } from "@shared/schema";
 import { useCurrency, type Currency } from "@/lib/currency-context";
-import { calculateMonthlyCost, isSubscriptionBilledInMonth } from "@/lib/utils";
+import { calculateMonthlyCost, isSubscriptionBilledInMonth, normalizeMonthlySpendingSeries } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
 import { calculatePotentialSavings } from "@/lib/health-score";
@@ -208,9 +208,18 @@ export default function Savings() {
     return Math.round(computeDeletedSubscriptionSavings(personalSubscriptions) * 100) / 100;
   }, [personalSubscriptions]);
 
+  const personalPotentialSavings = useMemo(() => {
+    if (!personalSubscriptions || personalSubscriptions.length === 0) return 0;
+    return calculatePotentialSavings(personalSubscriptions);
+  }, [personalSubscriptions]);
+
   const familySubscriptions = useMemo<Subscription[]>(() => {
     return getVisibleFamilySubscriptions(familyData, user?.id);
   }, [familyData, user?.id]);
+
+  const familyPotentialSavings = useMemo(() => {
+    return calculatePotentialSavings(familySubscriptions || []);
+  }, [familySubscriptions]);
 
   const familySavingsComputed = useMemo(() => {
     if (!familySubscriptions || familySubscriptions.length === 0) {
@@ -236,11 +245,7 @@ export default function Savings() {
       return date >= currentMonthStart && date < nextMonthStart;
     };
 
-    const potentialSavings = Math.round(
-      calculatePotentialSavings(familySubscriptions, (amount, from, to) =>
-        convertAmount(amount, (from as Currency) || 'USD', 'USD')
-      ) * 100
-    ) / 100;
+    const potentialSavings = calculatePotentialSavings(familySubscriptions);
 
     const thisMonthSavings = familySubscriptions
       .filter(isDeletedThisMonth)
@@ -276,6 +281,10 @@ export default function Savings() {
       unusedSubscriptions,
     };
   }, [familySubscriptions, user?.id, convertAmount]);
+
+  const displayedPotentialSavings = isFamilyMode
+    ? familyPotentialSavings
+    : personalPotentialSavings;
 
   // Personal behavioral insights (always load)
 
@@ -516,34 +525,7 @@ export default function Savings() {
 
   // Normalize monthly spending into a fixed-length recent months series (defaults to 6 months)
   // Includes the current month and the previous months, with zero-fill for missing months.
-  function normalizeMonthlySeries(data: MonthlySpending[] | undefined, months = 6) {
-    const now = new Date();
-    const monthLabels: string[] = [];
-
-    for (let i = months; i >= 0; i--) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      monthLabels.push(monthDate.toLocaleString('en-US', { month: 'short', year: 'numeric' }));
-    }
-
-    const monthAmountMap = new Map<string, number>(monthLabels.map((label) => [label, 0]));
-
-    if (data && data.length > 0) {
-      for (const entry of data) {
-        if (!entry || typeof entry.month !== 'string') continue;
-        const normalizedMonth = entry.month.trim();
-        if (monthAmountMap.has(normalizedMonth)) {
-          monthAmountMap.set(normalizedMonth, Math.round((entry.amount || 0) * 100) / 100);
-        }
-      }
-    }
-
-    return monthLabels.map((month) => ({
-      month,
-      amount: monthAmountMap.get(month) ?? 0,
-    }));
-  }
-
-  const chartMonthlyData = normalizeMonthlySeries(effectiveMonthlySpending, 6);
+  const chartMonthlyData = normalizeMonthlySpendingSeries(effectiveMonthlySpending, 6);
 
   // Editable savings goal logic (store in user's selected currency)
   // Default goal is a fixed baseline; we no longer auto‑populate using
@@ -792,7 +774,7 @@ export default function Savings() {
                 <Skeleton className="h-9 w-24" />
               ) : (
                 <span className="text-3xl font-bold text-chart-2 dark:text-foreground" data-testid="text-potential-savings">
-                    {formatAmount(metrics?.potentialSavings || 0, 'USD')}
+                    {formatAmount(displayedPotentialSavings, 'USD')}
                   <span className="text-sm font-normal text-muted-foreground">/mo</span>
                 </span>
               )}
