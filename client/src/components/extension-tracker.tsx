@@ -10,9 +10,10 @@ interface ExtensionTrackerProps {
 
 export function ExtensionTracker({ subscriptions }: ExtensionTrackerProps) {
   // Filter subscriptions that have a websiteDomain set
-  const trackedSubscriptions = subscriptions.filter(
-    (sub) => sub.websiteDomain && sub.status !== "deleted" && sub.status !== "to-cancel"
-  );
+  const trackedSubscriptions = subscriptions.filter((sub) => {
+    const websiteDomain = sub.websiteDomain || (sub as any).website_domain;
+    return Boolean(websiteDomain) && sub.status !== "deleted" && sub.status !== "to-cancel";
+  });
 
   if (trackedSubscriptions.length === 0) {
     return (
@@ -54,28 +55,31 @@ export function ExtensionTracker({ subscriptions }: ExtensionTrackerProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {trackedSubscriptions.map((sub) => (
-            <div
-              key={sub.id}
-              className="flex items-center justify-between p-3 bg-muted rounded-lg border border-muted-foreground/10"
-            >
-              <div className="flex items-center gap-3 flex-1">
-                <Globe className="h-4 w-4 text-primary" />
-                <div className="min-w-0">
-                  <p className="font-medium text-sm">{sub.name}</p>
-                  <p className="text-xs text-muted-foreground">{sub.websiteDomain}</p>
+          {trackedSubscriptions.map((sub) => {
+            const websiteDomain = sub.websiteDomain || (sub as any).website_domain;
+            return (
+              <div
+                key={sub.id}
+                className="flex items-center justify-between p-3 bg-muted rounded-lg border border-muted-foreground/10"
+              >
+                <div className="flex items-center gap-3 flex-1">
+                  <Globe className="h-4 w-4 text-primary" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm">{sub.name}</p>
+                    <p className="text-xs text-muted-foreground">{websiteDomain}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      {sub.usageCount || 0} uses
+                    </Badge>
+                  </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    {sub.usageCount || 0} uses
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-900 border border-blue-200">
           <p className="font-medium mb-1">💡 How it works:</p>

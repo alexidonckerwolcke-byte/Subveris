@@ -23,14 +23,25 @@ function isOwnerFromMembers(familyData: any, currentUserId?: string): boolean {
   });
 }
 
+function normalizeFamilySubscription(sub: any): Subscription {
+  if (!sub || typeof sub !== 'object') return sub;
+  if (sub.websiteDomain || sub.website_domain) {
+    return {
+      ...sub,
+      websiteDomain: sub.websiteDomain || sub.website_domain,
+    };
+  }
+  return sub;
+}
+
 function getSubscriptionCandidateFromShared(shared: any): Subscription | null {
   if (!shared) return null;
   if (shared.subscription && shared.subscription.id) {
-    return shared.subscription;
+    return normalizeFamilySubscription(shared.subscription);
   }
 
   if (shared.id && shared.name && shared.amount !== undefined) {
-    return shared as Subscription;
+    return normalizeFamilySubscription(shared as Subscription);
   }
 
   return null;
@@ -38,7 +49,7 @@ function getSubscriptionCandidateFromShared(shared: any): Subscription | null {
 
 export function getVisibleFamilySubscriptions(familyData: any, currentUserId?: string): Subscription[] {
   const sharedSubscriptions = Array.isArray(familyData?.sharedSubscriptions) ? familyData.sharedSubscriptions : [];
-  const subscriptions = Array.isArray(familyData?.subscriptions) ? familyData.subscriptions : [];
+  const subscriptions = Array.isArray(familyData?.subscriptions) ? familyData.subscriptions.map(normalizeFamilySubscription) : [];
   if (subscriptions.length === 0 && sharedSubscriptions.length === 0) return [];
 
   const allSubs: Subscription[] = [...subscriptions];

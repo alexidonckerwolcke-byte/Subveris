@@ -869,6 +869,28 @@ function buildSubscriptionTotals(subscriptions: any[]) {
   };
 }
 
+function normalizeSubscriptionRow(sub: any) {
+  if (!sub || typeof sub !== 'object') return sub;
+  const rawNextBillingDate = sub.next_billing_at || sub.next_billing_date;
+  return {
+    ...sub,
+    userId: sub.user_id,
+    usageCount: sub.usage_count,
+    monthlyUsageCount: sub.monthly_usage_count,
+    usageMonth: sub.usage_month,
+    lastUsedDate: sub.last_used_at,
+    logoUrl: sub.logo_url,
+    isDetected: sub.is_detected,
+    websiteDomain: sub.website_domain,
+    scheduledCancellationDate: sub.scheduled_cancellation_date,
+    cancellationUrl: sub.cancellation_url,
+    nextBillingDate: (() => {
+      const parsed = toDateOnlyLocal(rawNextBillingDate);
+      return parsed ? formatDateLocal(parsed) : rawNextBillingDate;
+    })(),
+  };
+}
+
 async function loadSubscriptions(userId: string, page = 1, perPage = 1000) {
   const rangeStart = (page - 1) * perPage;
   const rangeEnd = page * perPage - 1;
@@ -884,23 +906,7 @@ async function loadSubscriptions(userId: string, page = 1, perPage = 1000) {
   }
 
   // Transform snake_case to camelCase to match frontend expectations
-  const transformedData = ((data as any[]) || []).map((sub: any) => ({
-    ...sub,
-    usageCount: sub.usage_count,
-    monthlyUsageCount: sub.monthly_usage_count,
-    usageMonth: sub.usage_month,
-    lastUsedDate: sub.last_used_at,
-    logoUrl: sub.logo_url,
-    isDetected: sub.is_detected,
-    websiteDomain: sub.website_domain,
-    scheduledCancellationDate: sub.scheduled_cancellation_date,
-    cancellationUrl: sub.cancellation_url,
-    nextBillingDate: (() => {
-      const raw = sub.next_billing_at || sub.next_billing_date;
-      const parsed = toDateOnlyLocal(raw);
-      return parsed ? formatDateLocal(parsed) : raw;
-    })(),
-  }));
+  const transformedData = ((data as any[]) || []).map(normalizeSubscriptionRow);
 
   return {
     subscriptions: transformedData,
@@ -919,23 +925,7 @@ async function loadAllSubscriptions(userId: string) {
     throw error;
   }
 
-  const transformedData = (data || []).map((sub: any) => ({
-    ...sub,
-    usageCount: sub.usage_count,
-    monthlyUsageCount: sub.monthly_usage_count,
-    usageMonth: sub.usage_month,
-    lastUsedDate: sub.last_used_at,
-    logoUrl: sub.logo_url,
-    isDetected: sub.is_detected,
-    websiteDomain: sub.website_domain,
-    scheduledCancellationDate: sub.scheduled_cancellation_date,
-    cancellationUrl: sub.cancellation_url,
-    nextBillingDate: (() => {
-      const raw = sub.next_billing_at || sub.next_billing_date;
-      const parsed = toDateOnlyLocal(raw);
-      return parsed ? formatDateLocal(parsed) : raw;
-    })(),
-  }));
+  const transformedData = (data || []).map(normalizeSubscriptionRow);
 
   return { subscriptions: transformedData, count: data?.length ?? 0 };
 }
@@ -5114,6 +5104,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       let showFamilyData = settingsData?.show_family_data !== undefined ? settingsData.show_family_data : true;
+      const ownerId = String(groupRow.owner_id);
 
       // Verify owner's subscription tier — if the owner no longer has a premium/family plan
       // we must not expose combined family data even if `show_family_data` was left enabled.
@@ -5140,13 +5131,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
       const isMember = !!membership;
 
-      const ownerId = String(groupRow.owner_id);
       const memberIds = Array.from(new Set([ownerId, ...(members || []).map((m: any) => String(m.user_id))]));
 
       if (!showFamilyData) {
         const { data: personalSubscriptions, error: personalSubsError } = await supabase
           .from("subscriptions")
-          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, deleted_at")
+          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, deleted_at, website_domain")
           .eq("user_id", userId);
 
         if (personalSubsError) {
@@ -5154,7 +5144,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           return sendJson({ error: "Failed to load personal subscriptions" }, { status: 500 });
         }
 
-        const allSubs = personalSubscriptions || [];
+        const allSubs = (personalSubscriptions || []).map(normalizeSubscriptionRow);
         const deletedSubscriptions = allSubs.filter((sub: any) => isSubscriptionDeleted(sub));
         const visibleSubscriptions = allSubs.filter((sub: any) => !isSubscriptionDeleted(sub));
 
@@ -5301,13 +5291,15 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       const { data: allSubscriptions, error: subsError } = await supabase
         .from("subscriptions")
-        .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, deleted_at")
+        .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, deleted_at, website_domain")
         .in("user_id", memberIds);
 
       if (subsError) {
         console.error("Error fetching family subscriptions:", subsError);
         return sendJson({ error: "Failed to load family subscriptions" }, { status: 500 });
       }
+
+      const allSubs = (allSubscriptions || []).map(normalizeSubscriptionRow);
 
       const { data: sharedRecords, error: sharedError } = await supabase
         .from('shared_subscriptions')
