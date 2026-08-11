@@ -45,10 +45,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon-v3.png" sizes="180x180" />
     <link rel="manifest" href="/site.webmanifest?v=3" />
     
-    <!-- Preconnect for fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <!-- Avoid remote font requests on the first paint; use system-native font stack instead -->
     
     <!-- Organization Schema (JSON-LD) - For Google Knowledge Graph & Logo Recognition -->
     <script type="application/ld+json">
@@ -78,10 +75,10 @@
     }
     </script>
     
-    <script src="/init.js"></script>
+    <script src="/init.js" defer></script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/main.tsx" defer></script>
   </body>
 </html>
