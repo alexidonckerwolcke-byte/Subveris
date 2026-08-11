@@ -183,9 +183,14 @@ export function parseSubscriptionRenewalDate(date?: string | Date | null): Date 
 export function isSubscriptionDeleted(sub: any): boolean {
   if (!sub) return false;
   const status = String(sub.status || '').trim().toLowerCase();
+
+  // Soft delete metadata is authoritative even if the status string is still
+  // active/unused/to-cancel on a row that was transitioned to the deleted bucket.
+  if (Boolean(sub.deleted_at || sub.deletedAt)) return true;
   if (status === 'deleted' || status === 'canceled') return true;
   if (status === 'active' || status === 'unused' || status === 'to-cancel') return false;
-  return Boolean(sub.deleted_at || sub.deletedAt);
+
+  return false;
 }
 
 export function advanceDateByFrequency(date: Date, frequency: string): Date {

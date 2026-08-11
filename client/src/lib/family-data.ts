@@ -1,4 +1,5 @@
 import type { Subscription } from "@shared/schema";
+import { isSubscriptionDeleted } from "@/lib/utils";
 
 function normalizeId(value: any): string | undefined {
   if (!value && value !== 0) return undefined;
@@ -74,11 +75,15 @@ export function getVisibleFamilySubscriptions(familyData: any, currentUserId?: s
 
   if (!isOwner && currentUserId) {
     const visibleIds = new Set<string>();
+    const memberDeletedIds = new Set<string>();
 
     for (const sub of subscriptions) {
       const ownerId = normalizeSubscriptionOwnerId(sub);
       if (sub?.id && ownerId === currentUserId) {
         visibleIds.add(sub.id);
+        if (isSubscriptionDeleted(sub)) {
+          memberDeletedIds.add(sub.id);
+        }
       }
     }
 
@@ -87,7 +92,10 @@ export function getVisibleFamilySubscriptions(familyData: any, currentUserId?: s
       if (sharedId) visibleIds.add(sharedId);
     }
 
-    return Array.from(uniqueSubs.values()).filter((sub) => sub?.id && visibleIds.has(sub.id));
+    return Array.from(uniqueSubs.values()).filter((sub) => {
+      if (!sub?.id) return false;
+      return visibleIds.has(sub.id) || memberDeletedIds.has(sub.id);
+    });
   }
 
   return Array.from(uniqueSubs.values());

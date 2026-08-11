@@ -213,10 +213,10 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
               <PiggyBank className="h-4 w-4" />
             </div>
             <div className="flex flex-col">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-300">
                 {showFamilyData ? "This month (family)" : "This month"}
               </span>
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-slate-900 dark:text-white">
                 {loading ? "Loading..." : (
                   monthlySavings > 0
                     ? `+${formatCurrency(monthlySavings)}`
@@ -226,7 +226,7 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
             </div>
           </div>
           {showFamilyData && !loading && (
-            <p className="mt-2 text-xs text-slate-600">
+            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
               You: {ownerMonthlySavings > 0 ? `+${formatCurrency(ownerMonthlySavings)}` : formatCurrency(ownerMonthlySavings)} · Members: {memberMonthlySavings > 0 ? `+${formatCurrency(memberMonthlySavings)}` : formatCurrency(memberMonthlySavings)}
             </p>
           )}

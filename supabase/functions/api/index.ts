@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 declare const Deno: {
   env: { get(name: string): string | undefined };
   serve?: (handler: (req: Request) => Promise<Response>) => void;
+  readFile?: (path: string | URL) => Promise<Uint8Array>;
 } | undefined;
 const runtimeDeno = typeof globalThis !== "undefined" ? (globalThis as any).Deno : undefined;
 const SUPABASE_URL = runtimeDeno?.env?.get("SUPABASE_URL") ?? "";
@@ -29,11 +30,22 @@ const ALLOWED_ORIGINS = [
   "https://www.subveris.com",
   "https://subveris.com",
   "http://localhost:5173",
+  "http://localhost:5174",
   "http://localhost:3000",
 ];
 
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+const LOCAL_ORIGIN_PATTERN = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i;
+
+function chooseCorsOrigin(origin: string | null | undefined): string {
+  if (!origin) return ALLOWED_ORIGINS[0];
+  const trimmed = String(origin).trim();
+  if (!trimmed) return ALLOWED_ORIGINS[0];
+  if (ALLOWED_ORIGINS.includes(trimmed) || LOCAL_ORIGIN_PATTERN.test(trimmed)) return trimmed;
+  return ALLOWED_ORIGINS[0];
+}
+
+function buildCorsHeaders(origin: string | null | undefined): Record<string, string> {
+  const allowedOrigin = chooseCorsOrigin(origin);
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
@@ -113,7 +125,7 @@ function calculateMonthlyCost(amount: number, frequency: string | undefined, bil
 
 function addCorsHeaders(response: Response, origin?: string | null): Response {
   const newHeaders = new Headers(response.headers);
-  Object.entries(getCorsHeaders(origin ?? null)).forEach(([key, value]) => {
+  Object.entries(buildCorsHeaders(origin ?? null)).forEach(([key, value]) => {
     newHeaders.set(key, value);
   });
   return new Response(response.body, {
@@ -135,9 +147,9 @@ function jsonResponse(body: unknown, initOrOrigin?: ResponseInit | string | null
     actualInit = initOrOrigin;
   }
   
-  const headers = {
+    const headers = {
     "Content-Type": "application/json",
-    ...getCorsHeaders(actualOrigin),
+    ...buildCorsHeaders(actualOrigin),
     ...actualInit.headers,
   };
   return new Response(JSON.stringify(body), {
@@ -931,6 +943,13 @@ async function loadAllSubscriptions(userId: string) {
 }
 
 async function updateSubscription(userId: string, subscriptionId: string, updates: any) {
+  console.log('[API] updateSubscription owner check', { userId, subscriptionId });
+  const subscription = await getSubscriptionById(userId, subscriptionId);
+  if (!subscription) {
+    console.warn('[API] updateSubscription could not find subscription for owner', { userId, subscriptionId, updates });
+    return null;
+  }
+
   // Remove any stored calendar renewal events for this subscription so
   // generated renewal events (from the subscription row) take precedence.
   try {
@@ -938,7 +957,7 @@ async function updateSubscription(userId: string, subscriptionId: string, update
       .from('subscription_calendar_events')
       .delete()
       .eq('subscription_id', subscriptionId)
-      .eq('user_id', userId)
+      .eq('user_id', subscription.user_id)
       .eq('event_type', 'renewal');
   } catch (err) {
     // non-fatal: log and continue with the update
@@ -968,12 +987,26 @@ async function updateSubscription(userId: string, subscriptionId: string, update
     .eq("id", subscriptionId)
     .eq("user_id", userId)
     .select()
-    .single();
+    .maybeSingle();
 
-  console.log('[API] supabase update response (single):', { data, error });
+  console.log('[API] supabase update response (maybeSingle):', { data, error });
 
   if (error) {
+    const normalizedError = error as any;
+    const isNoRowsError = normalizedError?.code === 'PGRST116'
+      || String(normalizedError?.message || '').includes('Cannot coerce the result to a single JSON object')
+      || String(normalizedError?.details || '').includes('0 rows');
+
+    if (isNoRowsError) {
+      console.warn('[API] updateSubscription no rows matched for update', { subscriptionId, userId, normalizedUpdates, error });
+      return null;
+    }
     throw error;
+  }
+
+  if (!data) {
+    console.warn('[API] updateSubscription found no matching row', { subscriptionId, userId, normalizedUpdates });
+    return null;
   }
 
   const normalizeSubscription = (sub: any) => ({
@@ -999,8 +1032,33 @@ async function updateSubscription(userId: string, subscriptionId: string, update
   return null;
 }
 
+async function getSubscriptionById(userId: string, subscriptionId: string) {
+  const { data: subscription, error } = await supabase
+    .from("subscriptions")
+    .select("*")
+    .eq("id", subscriptionId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !subscription) {
+    const { data: found, error: foundError } = await supabase
+      .from("subscriptions")
+      .select("id, user_id, status")
+      .eq("id", subscriptionId)
+      .maybeSingle();
+    console.warn('[API] getSubscriptionById no match', { userId, subscriptionId, error, found, foundError });
+    return null;
+  }
+
+  return subscription;
+}
 
 async function deleteSubscription(userId: string, subscriptionId: string) {
+  const subscription = await getSubscriptionById(userId, subscriptionId);
+  if (!subscription) {
+    return false;
+  }
+
   const { error } = await supabase
     .from("subscriptions")
     .update({ status: "deleted", deleted_at: new Date().toISOString() })
@@ -1015,11 +1073,15 @@ async function deleteSubscription(userId: string, subscriptionId: string) {
 }
 
 async function incrementSubscriptionUsageCount(userId: string, subscriptionId: string) {
+  const subscription = await getSubscriptionById(userId, subscriptionId);
+  if (!subscription) {
+    return null;
+  }
+
   const { data, error } = await supabase
     .from("subscriptions")
     .select("usage_count, monthly_usage_count, usage_month")
     .eq("id", subscriptionId)
-    .eq("user_id", userId)
     .single();
 
   if (error) {
@@ -1170,7 +1232,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       const headers = {
         "Content-Type": "application/json",
-        ...getCorsHeaders(actualOrigin),
+        ...buildCorsHeaders(actualOrigin),
         ...actualInit.headers,
       };
       return new Response(JSON.stringify(body), {
@@ -1194,6 +1256,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
     const url = new URL(req.url);
     let pathname = url.pathname.replace(/^\/functions\/v1\/api/, "").replace(/^\/api/, "") || "/";
+    pathname = pathname.replace(/\/+$/, "") || "/";
     if (pathname === "") {
       pathname = "/";
     }
@@ -1204,21 +1267,27 @@ runtimeDeno?.serve?.(async (req: Request) => {
     }
 
     if (pathname === "/extension/download" && req.method === "GET") {
-      try {
-        const zipPath = new URL("../../subveris-extension.zip", import.meta.url);
-        const file = await Deno.readFile(zipPath);
-        return new Response(file, {
-          status: 200,
-          headers: {
-            "Content-Type": "application/zip",
-            "Content-Disposition": 'attachment; filename="subveris-extension.zip"',
-            "Cache-Control": "no-store",
-          },
-        });
-      } catch (error) {
-        console.error("Extension download failed:", error);
-        return sendJson({ error: "Extension download unavailable" }, { status: 404 });
+      const zipUrl = Deno?.env?.get("EXTENSION_ZIP_URL")?.trim();
+      if (zipUrl) {
+        try {
+          const response = await fetch(zipUrl);
+          if (response.ok) {
+            const body = await response.arrayBuffer();
+            return new Response(body, {
+              status: 200,
+              headers: {
+                "Content-Type": "application/zip",
+                "Content-Disposition": 'attachment; filename="subveris-extension.zip"',
+                "Cache-Control": "no-store",
+              },
+            });
+          }
+          console.error("Extension download fetch failed:", response.status, response.statusText);
+        } catch (error) {
+          console.error("Extension download fetch exception:", error);
+        }
       }
+      return sendJson({ error: "Extension download unavailable" }, { status: 404 });
     }
 
     // Get subscriptions
@@ -1326,7 +1395,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
         console.log(`[API] PATCH /subscriptions/${subscriptionId} update payload:`, updates);
         const updated = await updateSubscription(userId, subscriptionId, updates);
         console.log(`[API] PATCH /subscriptions/${subscriptionId} update result:`, updated);
-        return sendJson(updated || { success: true });
+        if (!updated) {
+          return sendJson({ error: "Subscription not found" }, { status: 404 });
+        }
+        return sendJson(updated);
       } catch (err) {
         console.error("Error updating subscription:", err);
         return sendJson(
@@ -1349,9 +1421,15 @@ runtimeDeno?.serve?.(async (req: Request) => {
         return sendJson({ error: "Missing subscription ID or status" }, { status: 400 });
       }
 
+      console.log(`[API] PATCH /subscriptions/${subscriptionId}/status requested by user ${userId} with status=${body.status}`);
+
       try {
         const updated = await updateSubscription(userId, subscriptionId, { status: body.status });
-        return sendJson(updated || { success: true });
+        if (!updated) {
+          console.warn(`[API] PATCH /subscriptions/${subscriptionId}/status failed: no matching subscription for user ${userId}`);
+          return sendJson({ error: "Subscription not found or not owned by the current user" }, { status: 404 });
+        }
+        return sendJson(updated);
       } catch (err) {
         console.error("Error updating subscription status:", err);
         return sendJson(
@@ -1457,7 +1535,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
-        await deleteSubscription(userId, subscriptionId);
+        const deleted = await deleteSubscription(userId, subscriptionId);
+        if (!deleted) {
+          return sendJson({ error: "Subscription not found or not owned by the current user" }, { status: 404 });
+        }
         return sendJson({ success: true });
       } catch (err) {
         console.error("Error deleting subscription:", err);
@@ -5268,7 +5349,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }));
 
         return sendJson({
-          subscriptions: visibleSubscriptions,
+          subscriptions: allSubs,
           sharedSubscriptions: [],
           members: members || [],
           isOwner,
@@ -5319,14 +5400,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
       // Owners see all shared subscriptions in their group
 
-      const allSubs = allSubscriptions || [];
+      const allSubsRaw = allSubscriptions || [];
       const sharedSubscriptionIds = filteredSharedRecords
         .map((shared: any) => shared.subscription_id)
         .filter((id: any) => id !== null && id !== undefined)
         .map((id: any) => String(id));
 
-      const deletedSubscriptions = allSubs.filter((sub: any) => isSubscriptionDeleted(sub));
-      const visibleSubscriptions = allSubs.filter((sub: any) => {
+      const deletedSubscriptions = allSubsRaw.filter((sub: any) => isSubscriptionDeleted(sub));
+      const visibleSubscriptions = allSubsRaw.filter((sub: any) => {
         if (isSubscriptionDeleted(sub)) return false;
         if (isOwner) return true;
         const subOwnerId = String(sub.user_id);
@@ -5454,7 +5535,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }));
 
       return sendJson({
-        subscriptions: visibleSubscriptions,
+        subscriptions: allSubsRaw,
         sharedSubscriptions: filteredSharedRecords,
         members: members || [],
         isOwner,

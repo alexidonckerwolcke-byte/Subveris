@@ -27,6 +27,7 @@ import { CostPerUse } from "@/components/cost-per-use";
 import { computeCostPerUseFromSubs } from "@/lib/cost-analysis";
 import { computeFamilyMetrics, FamilyMetrics } from "@/lib/family-metrics";
 import { filterAvailableToShare } from "@/lib/family-sharing-utils";
+import { isSubscriptionDeleted } from "@/lib/utils";
 import type { FamilyGroup, FamilyGroupMember, Subscription } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -172,7 +173,7 @@ export function FamilySharing() {
   );
 
   const filteredFamilyDataSubscriptions = effectiveShowFamilyData
-    ? (familyData?.subscriptions || []).filter((sub: any) => sub.status !== 'deleted' && !sharedSubscriptionIds.has(sub.id))
+    ? (familyData?.subscriptions || []).filter((sub: any) => !isSubscriptionDeleted(sub) && !sharedSubscriptionIds.has(sub.id))
     : [];
 
   // compute list of subscriptions that can be shared (excludes already-shared)
@@ -886,9 +887,7 @@ export function FamilySharing() {
                 {memberData.subscriptions && memberData.subscriptions.length > 0 ? (
                   <div className="grid grid-cols-1 gap-2">
                     {memberData.subscriptions
-                      .filter((sub: any) =>
-                        sub.status !== 'deleted'
-                      )
+                      .filter((sub: any) => !isSubscriptionDeleted(sub))
                       .map((sub: any) => (
                         <div key={sub.id} className="flex items-center justify-between p-3 rounded border">
                           <div>
@@ -937,7 +936,7 @@ export function FamilySharing() {
                   ) : (
                     <CostPerUse
                       analyses={computeCostPerUseFromSubs(
-                        memberData.subscriptions.filter((s: any) => s && s.status !== 'deleted')
+                        memberData.subscriptions.filter((s: any) => s && !isSubscriptionDeleted(s))
                       )}
                       isLoading={false}
                     />
