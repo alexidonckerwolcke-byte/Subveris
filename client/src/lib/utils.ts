@@ -273,7 +273,10 @@ export function isSubscriptionBilledInMonth(
   if (!renewalDay) return false;
 
   if (billingMonth === targetMonth) {
-    return isCurrentMonth ? renewalDay <= today : true;
+    if (!isCurrentMonth) return true;
+    if (renewalDay <= today) return true;
+    if (renewalDay > monthEndDate) return true;
+    return false;
   }
 
   if (renewalDay < monthStartDate) return false;

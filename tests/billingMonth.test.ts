@@ -7,7 +7,7 @@ describe('billing month helpers', () => {
     expect(getSubscriptionBillingMonth(sub)).toBe('2026-05');
   });
 
-  it('does not count future-month renewals in current month even with billing_month set to current month', () => {
+  it('preserves current-month spend for a next-month renewal when billing_month is still current month', () => {
     const sub = {
       nextBillingDate: '2026-06-09',
       billing_month: '2026-05',
@@ -16,7 +16,7 @@ describe('billing month helpers', () => {
     const now = new Date('2026-05-10');
     const monthStart = new Date(2026, 4, 1);
     const monthEnd = new Date(2026, 4, 31, 23, 59, 59, 999);
-    expect(isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, true)).toBe(false);
+    expect(isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, true)).toBe(true);
   });
 
   it('counts same-day renewals as current-month spend', () => {
@@ -26,6 +26,19 @@ describe('billing month helpers', () => {
       status: 'active',
     };
     const now = new Date('2026-05-16T12:00:00Z');
+    const monthStart = new Date(2026, 4, 1);
+    const monthEnd = new Date(2026, 4, 31, 23, 59, 59, 999);
+
+    expect(isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, true)).toBe(true);
+  });
+
+  it('preserves current-month spend when renewal is advanced to next month but billing_month remains current month', () => {
+    const sub = {
+      nextBillingDate: '2026-06-03',
+      billing_month: '2026-05',
+      status: 'active',
+    };
+    const now = new Date('2026-05-14T12:00:00Z');
     const monthStart = new Date(2026, 4, 1);
     const monthEnd = new Date(2026, 4, 31, 23, 59, 59, 999);
 
