@@ -25,6 +25,30 @@ export default defineConfig({
   build: {
     outDir: path.resolve(workspaceRoot, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return;
+          }
+
+          // Keep all third-party dependencies in a single shared vendor chunk to
+          // avoid circular evaluation order issues between React, React Query, and
+          // other shared helpers in production builds.
+          if (/\/node_modules\/@radix-ui\//.test(id) ||
+              /\/node_modules\/lucide-react\//.test(id) ||
+              /\/node_modules\/cmdk\//.test(id)) {
+            return "ui-vendor";
+          }
+
+          if (/\/node_modules\/recharts\//.test(id)) {
+            return "charts-vendor";
+          }
+
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     host: true,
