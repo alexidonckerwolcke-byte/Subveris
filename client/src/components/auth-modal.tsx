@@ -120,7 +120,7 @@ export function AuthModal({ open, onOpenChange, defaultTab = 'signin' }: AuthMod
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]" aria-describedby="auth-modal-desc">
+      <DialogContent className="w-full max-w-[min(calc(100vw-2rem),425px)]" aria-describedby="auth-modal-desc">
         <DialogHeader>
           <DialogTitle>Welcome to Subveris</DialogTitle>
           <DialogDescription id="auth-modal-desc">

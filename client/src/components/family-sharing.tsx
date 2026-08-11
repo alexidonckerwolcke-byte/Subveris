@@ -797,7 +797,7 @@ export function FamilySharing() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="max-w-md" aria-describedby="delete-group-desc">
+        <DialogContent className="w-full max-w-[min(calc(100vw-2rem),28rem)]" aria-describedby="delete-group-desc">
           <DialogHeader>
             <DialogTitle className="text-red-600">Delete Family Group</DialogTitle>
             <DialogDescription id="delete-group-desc">
@@ -864,7 +864,7 @@ export function FamilySharing() {
 
       {/* Member Details Dialog */}
       <Dialog open={!!selectedMemberId} onOpenChange={(open) => !open && setSelectedMemberId(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto" aria-describedby="member-details-desc">
+        <DialogContent className="w-full max-w-[min(calc(100vw-2rem),64rem)] max-h-[calc(100vh-2rem)] overflow-y-auto" aria-describedby="member-details-desc">
           <DialogHeader>
             <DialogTitle>Member Details</DialogTitle>
             <DialogDescription id="member-details-desc">
@@ -1035,7 +1035,7 @@ export function FamilySharing() {
 
       {/* Share Subscription Dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-        <DialogContent className="max-w-md" aria-describedby="share-sub-desc">
+        <DialogContent className="w-full max-w-[min(calc(100vw-2rem),28rem)]" aria-describedby="share-sub-desc">
           <DialogHeader>
             <DialogTitle>Share Subscription</DialogTitle>
             <DialogDescription id="share-sub-desc">

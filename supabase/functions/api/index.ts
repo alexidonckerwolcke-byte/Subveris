@@ -29,11 +29,22 @@ const ALLOWED_ORIGINS = [
   "https://www.subveris.com",
   "https://subveris.com",
   "http://localhost:5173",
+  "http://localhost:5174",
   "http://localhost:3000",
 ];
 
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+const LOCAL_ORIGIN_PATTERN = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i;
+
+function chooseCorsOrigin(origin: string | null | undefined): string {
+  if (!origin) return ALLOWED_ORIGINS[0];
+  const trimmed = String(origin).trim();
+  if (!trimmed) return ALLOWED_ORIGINS[0];
+  if (ALLOWED_ORIGINS.includes(trimmed) || LOCAL_ORIGIN_PATTERN.test(trimmed)) return trimmed;
+  return ALLOWED_ORIGINS[0];
+}
+
+function buildCorsHeaders(origin: string | null | undefined): Record<string, string> {
+  const allowedOrigin = chooseCorsOrigin(origin);
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
@@ -113,7 +124,7 @@ function calculateMonthlyCost(amount: number, frequency: string | undefined, bil
 
 function addCorsHeaders(response: Response, origin?: string | null): Response {
   const newHeaders = new Headers(response.headers);
-  Object.entries(getCorsHeaders(origin ?? null)).forEach(([key, value]) => {
+  Object.entries(buildCorsHeaders(origin ?? null)).forEach(([key, value]) => {
     newHeaders.set(key, value);
   });
   return new Response(response.body, {
@@ -137,7 +148,7 @@ function jsonResponse(body: unknown, initOrOrigin?: ResponseInit | string | null
   
   const headers = {
     "Content-Type": "application/json",
-    ...getCorsHeaders(actualOrigin),
+    ...buildCorsHeaders(actualOrigin),
     ...actualInit.headers,
   };
   return new Response(JSON.stringify(body), {
@@ -1180,7 +1191,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       const headers = {
         "Content-Type": "application/json",
-        ...getCorsHeaders(actualOrigin),
+        ...buildCorsHeaders(actualOrigin),
         ...actualInit.headers,
       };
       return new Response(JSON.stringify(body), {

@@ -113,7 +113,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
         onClose();
       }}>
         <DialogContent 
-          className="sm:max-w-[500px]" 
+          className="w-full max-w-[min(calc(100vw-2rem),500px)] max-h-[calc(100vh-2rem)] overflow-y-auto"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
@@ -130,7 +130,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-2 py-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 py-4">
             {currencies.map((curr) => (
               <Button
                 key={curr.code}
@@ -156,7 +156,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
   if (step === 'plan') {
     return (
       <Dialog open={open}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" aria-describedby="plan-selection-desc">
+        <DialogContent className="w-full max-w-[min(calc(100vw-2rem),700px)] max-h-[calc(100vh-2rem)] overflow-y-auto" aria-describedby="plan-selection-desc">
           <DialogHeader>
             <DialogTitle>Welcome to Subveris! 🎉</DialogTitle>
             <DialogDescription id="plan-selection-desc">
@@ -168,7 +168,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
             {plans.map((plan) => (
               <Card
                 key={plan.tier}
-                className={`relative flex flex-col cursor-pointer transition-all ${
+                className={`relative flex min-h-[280px] flex-col cursor-pointer transition-all ${
                   plan.popular ? 'ring-2 ring-primary' : ''
                 } hover:shadow-md`}
                 onClick={() => handlePlanSelect(plan.tier)}
@@ -226,7 +226,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
   if (step === 'mfa') {
     return (
       <Dialog open={open}>
-        <DialogContent className="sm:max-w-[425px]" aria-describedby="mfa-protect-desc">
+        <DialogContent className="w-full max-w-[min(calc(100vw-2rem),425px)]" aria-describedby="mfa-protect-desc">
           <DialogHeader>
             <div className="flex items-center gap-2">
               <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">

@@ -65,7 +65,7 @@ export function MFAChallengeModal({ open, onOpenChange, onVerifySuccess }: MFACh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]" aria-describedby="mfa-challenge-desc">
+      <DialogContent className="w-full max-w-[min(calc(100vw-2rem),425px)]" aria-describedby="mfa-challenge-desc">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
