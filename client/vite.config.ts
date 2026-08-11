@@ -32,9 +32,8 @@ export default defineConfig({
             return;
           }
 
-          // Keep all third-party dependencies in a single shared vendor chunk to
-          // avoid circular evaluation order issues between React, React Query, and
-          // other shared helpers in production builds.
+          // Keep most third-party dependencies together to avoid cross-vendor
+          // circular import/evaluation problems in production.
           if (/\/node_modules\/@radix-ui\//.test(id) ||
               /\/node_modules\/lucide-react\//.test(id) ||
               /\/node_modules\/cmdk\//.test(id)) {

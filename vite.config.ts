@@ -83,36 +83,13 @@ export default defineConfig({
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {
+        // Keep a single shared vendor chunk for all node_modules to avoid
+        // circular evaluation order problems between React, React Query, and
+        // other shared third-party modules.
         manualChunks(id) {
-          if (!id.includes('node_modules')) {
-            return undefined;
+          if (id.includes('node_modules')) {
+            return 'vendor';
           }
-
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/wouter')) {
-            return 'react-vendor';
-          }
-
-          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-') || id.includes('node_modules/d3')) {
-            return 'charts-vendor';
-          }
-
-          if (id.includes('node_modules/@tanstack') || id.includes('node_modules/@supabase')) {
-            return 'data-vendor';
-          }
-
-          if (id.includes('node_modules/lucide-react') || id.includes('node_modules/react-icons')) {
-            return 'icon-vendor';
-          }
-
-          if (id.includes('node_modules/@radix-ui') || id.includes('node_modules/class-variance-authority') || id.includes('node_modules/clsx') || id.includes('node_modules/tailwind-merge')) {
-            return 'ui-vendor';
-          }
-
-          if (id.includes('node_modules/framer-motion') || id.includes('node_modules/embla-carousel-react')) {
-            return 'motion-vendor';
-          }
-
-          return 'vendor';
         },
       },
       onwarn(warning, warn) {
