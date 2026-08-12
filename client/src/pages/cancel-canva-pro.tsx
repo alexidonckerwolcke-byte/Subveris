@@ -1,9 +1,19 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 import { AlertCircle } from "lucide-react";
 
 export default function CancelCanvaProPage() {
+          usePageMeta({
+    title: "How to cancel Canva Pro subscription | Subveris",
+    description: "How to cancel Canva Pro subscription, stop recurring canva pro charges, and avoid unexpected renewals.",
+    keywords: "how to cancel Canva Pro, cancel Canva Pro subscription, stop Canva Pro recurring payment, Canva Pro cancellation guide",
+    canonical: "https://www.subveris.com/cancel-canva-pro",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
@@ -15,10 +25,10 @@ export default function CancelCanvaProPage() {
             Personal finance guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to cancel Canva Pro
+            How to cancel Canva Pro subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            Are you no longer designing social posts daily, or is the free tier of Canva more than enough for your occasional graphics? It's time to cut off Canva Pro before the next billing cycle hits.
+            Learn how to cancel Canva Pro, stop automatic renewals, and avoid further monthly fees for design software.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -64,6 +74,10 @@ export default function CancelCanvaProPage() {
             </ol>
           </section>
         </div>
+
+        <CancelRelatedGuides current="/cancel-canva-pro" />
+        <CancelPageFaq productName="Canva Pro" />
+        <CancelPageJsonLd productName="Canva Pro" url="https://www.subveris.com/cancel-canva-pro" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

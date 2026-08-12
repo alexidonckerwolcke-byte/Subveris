@@ -2,8 +2,18 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
 import { AlertCircle } from "lucide-react";
+import { usePageMeta } from "@/lib/usePageMeta";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 export default function CancelNordVPNPage() {
+          usePageMeta({
+    title: "How to cancel NordVPN subscription | Subveris",
+    description: "How to cancel NordVPN subscription, stop recurring nordvpn charges, and avoid unexpected renewals.",
+    keywords: "how to cancel NordVPN, cancel NordVPN subscription, stop NordVPN recurring payment, NordVPN cancellation guide",
+    canonical: "https://www.subveris.com/cancel-nordvpn",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
@@ -15,10 +25,10 @@ export default function CancelNordVPNPage() {
             Personal finance guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to cancel NordVPN
+            How to cancel NordVPN subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            Secured your digital privacy with another provider, or just don't need a VPN anymore? Cancelling NordVPN requires a bit of vigilance, as they are notorious for making you walk through a digital maze.
+            This guide shows how to cancel NordVPN, avoid the confirmation maze, and stop recurring VPN charges.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -64,6 +74,10 @@ export default function CancelNordVPNPage() {
             </ol>
           </section>
         </div>
+
+        <CancelRelatedGuides current="/cancel-nordvpn" />
+        <CancelPageFaq productName="NordVPN" />
+        <CancelPageJsonLd productName="NordVPN" url="https://www.subveris.com/cancel-nordvpn" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

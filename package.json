@@ -8,8 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server.js",
+    "sitemap:build": "node scripts/generate-sitemap.mjs",
     "cron:weekly-digest": "npx tsx script/send-weekly-digests.ts",
-    "predeploy": "npm run build",
+    "predeploy": "npm run sitemap:build && npm run build",
     "deploy": "gh-pages -d dist/public"
   },
   "dependencies": {

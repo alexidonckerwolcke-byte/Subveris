@@ -1,9 +1,19 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
 import { AlertCircle } from "lucide-react";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 export default function CancelMicrosoft365Page() {
+          usePageMeta({
+    title: "How to cancel Microsoft 365 subscription | Subveris",
+    description: "How to cancel Microsoft 365 subscription, stop recurring microsoft 365 charges, and avoid unexpected renewals.",
+    keywords: "how to cancel Microsoft 365, cancel Microsoft 365 subscription, stop Microsoft 365 recurring payment, Microsoft 365 cancellation guide",
+    canonical: "https://www.subveris.com/cancel-microsoft-365",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
@@ -15,10 +25,10 @@ export default function CancelMicrosoft365Page() {
             Personal finance guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to cancel Microsoft 365
+            How to cancel Microsoft 365 subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            Paying monthly or annually for Word, Excel, and cloud storage, but switched to free alternatives like Google Docs? Canceling your Microsoft subscription is straightforward, as long as you don't let their corporate wording confuse you.
+            This guide shows how to cancel Microsoft 365, stop auto renewal, and avoid future Office subscription charges.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -64,6 +74,10 @@ export default function CancelMicrosoft365Page() {
             </ol>
           </section>
         </div>
+
+        <CancelRelatedGuides current="/cancel-microsoft-365" />
+        <CancelPageFaq productName="Microsoft 365" />
+        <CancelPageJsonLd productName="Microsoft 365" url="https://www.subveris.com/cancel-microsoft-365" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

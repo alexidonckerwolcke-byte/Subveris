@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 const steps = [
   {
@@ -33,6 +35,14 @@ const afterCancellation = [
 ];
 
 export default function CancelPlayStationPlusPage() {
+          usePageMeta({
+    title: "How to cancel PlayStation Plus subscription | Subveris",
+    description: "How to cancel PlayStation Plus subscription, stop recurring playstation plus charges, and avoid unexpected renewals.",
+    keywords: "how to cancel PlayStation Plus, cancel PlayStation Plus subscription, stop PlayStation Plus recurring payment, PlayStation Plus cancellation guide",
+    canonical: "https://www.subveris.com/cancel-playstation-plus",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
@@ -44,10 +54,10 @@ export default function CancelPlayStationPlusPage() {
             Personal finance guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to cancel PlayStation Plus in 3 simple steps
+            How to cancel PlayStation Plus subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            Whether you are taking a break from gaming or trying to cut back on costs, canceling PlayStation Plus is quick and straightforward.
+            Whether you are taking a break from gaming or trying to cut costs, canceling PlayStation Plus and turning off auto renewal is quick and straightforward.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -120,6 +130,10 @@ export default function CancelPlayStationPlusPage() {
             </section>
           </aside>
         </div>
+
+        <CancelRelatedGuides current="/cancel-playstation-plus" />
+        <CancelPageFaq productName="PlayStation Plus" />
+        <CancelPageJsonLd productName="PlayStation Plus" url="https://www.subveris.com/cancel-playstation-plus" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Take control of your subscriptions</h2>

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 const steps = [
   {
@@ -33,6 +35,14 @@ const afterCancellation = [
 ];
 
 export default function CancelXboxGamePassPage() {
+  usePageMeta({
+    title: "How to cancel Xbox Game Pass subscription | Subveris",
+    description: "How to cancel Xbox Game Pass subscription, stop recurring xbox game pass charges, and avoid unexpected renewals.",
+    keywords: "how to cancel Xbox Game Pass, cancel Xbox Game Pass subscription, stop Xbox Game Pass recurring payment, Xbox Game Pass cancellation guide",
+    canonical: "https://www.subveris.com/cancel-xbox-game-pass",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
@@ -120,6 +130,10 @@ export default function CancelXboxGamePassPage() {
             </section>
           </aside>
         </div>
+
+        <CancelRelatedGuides current="/cancel-xbox-game-pass" />
+        <CancelPageFaq productName="Xbox Game Pass" />
+        <CancelPageJsonLd productName="Xbox Game Pass" url="https://www.subveris.com/cancel-xbox-game-pass" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Protect your bank account from automated renewals</h2>

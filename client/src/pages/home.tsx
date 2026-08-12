@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { AuthModal } from "@/components/auth-modal";
 import { CurrencySelector } from "@/components/currency-selector";
+import { usePageMeta } from "@/lib/usePageMeta";
 import {
   TrendingUp,
   Shield,
@@ -40,6 +41,13 @@ import {
 } from "lucide-react";
 
 export default function HomePage() {
+  usePageMeta({
+    title: "Subveris | Subscription Optimization to Save Money on Recurring Payments",
+    description: "Subveris helps you discover subscription waste, optimize recurring payments, and save money with AI-powered subscription optimization.",
+    keywords: "subscription optimization, recurring payments, save money, cancel subscriptions, subscription savings, subscription tracker",
+    canonical: "https://www.subveris.com/",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
   const [expandedFAQ, setExpandedFAQ] = useState<number | string | null>(null);
@@ -188,15 +196,15 @@ export default function HomePage() {
           </Badge>
           
           <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-8 leading-tight">
-            Discover subscriptions you're paying for
+            Smart subscription optimization to stop
             <br />
-            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">but barely use.</span>
+            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">wasting money on recurring payments.</span>
           </h1>
           
           <p className="text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed font-light">
-            See what you pay. See what you use.
+            Subveris helps you discover subscription waste, track recurring payments, and keep only the services you really use.
             <br />
-            <span className="font-semibold text-foreground">Stop wasting money.</span>
+            <span className="font-semibold text-foreground">Save money on subscriptions today.</span>
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
