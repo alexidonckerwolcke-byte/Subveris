@@ -12,7 +12,7 @@ import {
   Package,
   Code,
 } from "lucide-react";
-import type { SubscriptionCategory, SubscriptionStatus } from "@shared/schema";
+import type { MonthlySpending, SubscriptionCategory, SubscriptionStatus } from "@shared/schema";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -134,6 +134,33 @@ export function calculateMonthlyCost(amount: number, frequency: string): number 
   }
 }
 
+export function normalizeMonthlySpendingSeries(data: MonthlySpending[] | undefined, months = 6): MonthlySpending[] {
+  const now = new Date();
+  const monthLabels: string[] = [];
+
+  for (let i = months; i >= 0; i--) {
+    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    monthLabels.push(monthDate.toLocaleString('en-US', { month: 'short', year: 'numeric' }));
+  }
+
+  const monthAmountMap = new Map<string, number>(monthLabels.map((label) => [label, 0]));
+
+  if (data && data.length > 0) {
+    for (const entry of data) {
+      if (!entry || typeof entry.month !== 'string') continue;
+      const normalizedMonth = entry.month.trim();
+      if (monthAmountMap.has(normalizedMonth)) {
+        monthAmountMap.set(normalizedMonth, Math.round((entry.amount || 0) * 100) / 100);
+      }
+    }
+  }
+
+  return monthLabels.map((month) => ({
+    month,
+    amount: monthAmountMap.get(month) ?? 0,
+  }));
+}
+
 export function parseSubscriptionRenewalDate(date?: string | Date | null): Date | null {
   if (!date) return null;
   if (date instanceof Date) return new Date(date);
@@ -156,9 +183,14 @@ export function parseSubscriptionRenewalDate(date?: string | Date | null): Date 
 export function isSubscriptionDeleted(sub: any): boolean {
   if (!sub) return false;
   const status = String(sub.status || '').trim().toLowerCase();
+
+  // Soft delete metadata is authoritative even if the status string is still
+  // active/unused/to-cancel on a row that was transitioned to the deleted bucket.
+  if (Boolean(sub.deleted_at || sub.deletedAt)) return true;
   if (status === 'deleted' || status === 'canceled') return true;
   if (status === 'active' || status === 'unused' || status === 'to-cancel') return false;
-  return Boolean(sub.deleted_at || sub.deletedAt);
+
+  return false;
 }
 
 export function advanceDateByFrequency(date: Date, frequency: string): Date {
@@ -241,7 +273,10 @@ export function isSubscriptionBilledInMonth(
   if (!renewalDay) return false;
 
   if (billingMonth === targetMonth) {
-    return isCurrentMonth ? renewalDay <= today : true;
+    if (!isCurrentMonth) return true;
+    if (renewalDay <= today) return true;
+    if (renewalDay > monthEndDate) return true;
+    return false;
   }
 
   if (renewalDay < monthStartDate) return false;

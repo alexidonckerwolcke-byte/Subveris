@@ -305,12 +305,28 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
+        let currency = 'USD';
+        try {
+          const { data: userRow } = await supabase
+            .from('users')
+            .select('currency')
+            .eq('id', user.id)
+            .single();
+
+          const rawCurrency = String(userRow?.currency || user.user_metadata?.currency || 'USD').toUpperCase();
+          if (/^[A-Z]{3}$/.test(rawCurrency)) {
+            currency = rawCurrency;
+          }
+        } catch (currencyError) {
+          console.warn('Failed to load saved currency preference:', currencyError);
+        }
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           isPremium: data?.plan_type !== 'free' && data?.status === 'active',
           status: data?.status || 'inactive',
           planType: data?.plan_type || 'free',
-          currency: 'USD',
+          currency,
           cancelAtPeriodEnd: data?.cancel_at_period_end || false,
           currentPeriodEnd: data?.current_period_end || null,
         }));
@@ -330,8 +346,50 @@ const server = http.createServer(async (req, res) => {
     }
     
     if (urlPath === '/api/user/currency' && req.method === 'PATCH') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true }));
+      if (!supabase) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Server not configured - SUPABASE_SERVICE_ROLE_KEY missing' }));
+        return;
+      }
+
+      const user = await getUser(req.headers.authorization);
+      if (!user) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+
+      try {
+        const body = await parseBody(req);
+        const currency = String(body.currency || '').toUpperCase();
+
+        if (!currency || !/^[A-Z]{3}$/.test(currency)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid currency code' }));
+          return;
+        }
+
+        try {
+          await supabase.auth.admin.updateUserById(user.id, {
+            user_metadata: { currency },
+          });
+        } catch (authError) {
+          console.warn('[Currency] Auth update error:', authError);
+        }
+
+        try {
+          await supabase.from('users').upsert({ id: user.id, currency });
+        } catch (dbError) {
+          console.warn('[Currency] Failed to upsert currency into users table:', dbError);
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, currency }));
+      } catch (error) {
+        console.error('Error updating currency:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to update currency' }));
+      }
       return;
     }
     

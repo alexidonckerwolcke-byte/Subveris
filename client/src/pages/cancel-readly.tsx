@@ -1,12 +1,21 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
 import { AlertCircle } from "lucide-react";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 export default function CancelReadlyPage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
+          usePageMeta({
+    title: "How to cancel Readly subscription | Subveris",
+    description: "How to cancel Readly subscription, stop recurring readly charges, and avoid unexpected renewals.",
+    keywords: "how to cancel Readly, cancel Readly subscription, stop Readly recurring payment, Readly cancellation guide",
+    canonical: "https://www.subveris.com/cancel-readly",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.14),_transparent_35%),linear-gradient(135deg,_#f8fffc_0%,_#f3f7f9_100%)] text-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_35%),linear-gradient(135deg,_#07140f_0%,_#0f172a_100%)] dark:text-slate-100">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
@@ -15,10 +24,10 @@ export default function CancelReadlyPage() {
             Personal finance guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to cancel Readly
+            How to cancel Readly subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            If your digital magazine stack is gathering virtual dust, it's time to stop your monthly Readly subscription and clean up your banking statements.
+            This guide shows how to cancel Readly, stop the recurring fee, and capture the confirmation details you need.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -63,6 +72,10 @@ export default function CancelReadlyPage() {
             </ol>
           </section>
         </div>
+
+        <CancelRelatedGuides current="/cancel-readly" />
+        <CancelPageFaq productName="Readly" />
+        <CancelPageJsonLd productName="Readly" url="https://www.subveris.com/cancel-readly" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

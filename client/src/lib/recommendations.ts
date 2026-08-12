@@ -59,12 +59,20 @@ export function generateRecommendationsFromSubscriptions(subs: any[] | undefined
     const subId = sub.id || `sub-${Math.random().toString(36).slice(2)}`;
 
     if (normalizeText(sub.status) === "to-cancel") {
+      const titleOptions = [
+        `Finalize cancellation for ${name}`,
+        `Complete the cancellation for ${name}`,
+        `Stop ${name} before the next renewal`,
+      ];
+      const title = titleOptions[name.length % titleOptions.length];
+      const description = `${name} is already marked to stop. Finish the cancellation process${nextBillingText ? ` before the next payment (${nextBillingText.trim()})` : ""} to avoid another charge.`;
+
       recommendations.push(
         createRecommendation({
           id: `rec-${subId}-complete-cancel`,
           type: "cancel",
-          title: `Finalize cancellation for ${name}`,
-          description: `${name} is already flagged to stop. Finish the cancellation process before the next payment to avoid another charge.${nextBillingText}`,
+          title,
+          description,
           currentCost: monthlyCost,
           suggestedCost: 0,
           savings: monthlyCost,
@@ -81,15 +89,31 @@ export function generateRecommendationsFromSubscriptions(subs: any[] | undefined
         usage === null
           ? "There has been little to no activity."
           : usage === 0
-          ? "There has been little to no activity."
-          : `It was used only ${usage} time${usage === 1 ? "" : "s"} this month.`;
+          ? "There has been no activity this month."
+          : usage === 1
+          ? "It was used only once this month."
+          : `It was used only ${usage} times this month.`;
+
+      const title =
+        usage === null || usage === 0
+          ? `Cancel ${name}`
+          : usage === 1
+            ? `Review ${name}`
+            : `Reduce ${name} spend`;
+
+      const detail =
+        usage === null || usage === 0
+          ? `${name} still has recurring cost with no recent activity.`
+          : usage === 1
+            ? `${name} still has recurring cost for just one use this month.`
+            : `${name} still has recurring cost for only ${usage} uses this month.`;
 
       recommendations.push(
         createRecommendation({
           id: `rec-${subId}-cancel-unused`,
           type: "cancel",
-          title: `Cancel ${name}`,
-          description: `${usageMessage} ${name} still costs ${monthlyCost.toFixed(2)} ${currency}/mo. Cancel it before the next renewal to keep your subscription spend lean.${nextBillingText}`,
+          title,
+          description: `${usageMessage} ${detail} Cancel it before the next renewal to keep your subscription spend lean.${nextBillingText}`,
           currentCost: monthlyCost,
           suggestedCost: 0,
           savings: monthlyCost,

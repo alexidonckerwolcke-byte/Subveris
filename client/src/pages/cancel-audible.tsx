@@ -1,11 +1,21 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 import { AlertCircle } from "lucide-react";
 
 export default function CancelAudiblePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
+  
+          usePageMeta({
+    title: "How to cancel Audible subscription | Subveris",
+    description: "How to cancel Audible subscription, stop recurring audible charges, and avoid unexpected renewals.",
+    keywords: "how to cancel Audible, cancel Audible subscription, stop Audible recurring payment, Audible cancellation guide",
+    canonical: "https://www.subveris.com/cancel-audible",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.14),_transparent_35%),linear-gradient(135deg,_#f8fffc_0%,_#f3f7f9_100%)] text-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_35%),linear-gradient(135deg,_#07140f_0%,_#0f172a_100%)] dark:text-slate-100">
@@ -15,10 +25,10 @@ export default function CancelAudiblePage() {
             Personal finance guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to cancel Audible
+            How to cancel Audible subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            Ready to take a break from audiobooks, or did your unlistened backlog grow way too big? Cancelling your Amazon Audible membership is easy enough, but you need to act strategically before hitting that button.
+            This guide shows how to cancel Audible, stop recurring audiobook payments, and keep your account data safe.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -63,6 +73,10 @@ export default function CancelAudiblePage() {
             </ol>
           </section>
         </div>
+
+        <CancelRelatedGuides current="/cancel-audible" />
+        <CancelPageFaq productName="Audible" />
+        <CancelPageJsonLd productName="Audible" url="https://www.subveris.com/cancel-audible" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

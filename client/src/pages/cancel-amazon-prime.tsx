@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 const steps = [
   {
@@ -36,6 +38,14 @@ const reasons = [
 ];
 
 export default function CancelAmazonPrimePage() {
+          usePageMeta({
+    title: "How to cancel Amazon Prime subscription | Subveris",
+    description: "How to cancel Amazon Prime subscription, stop recurring amazon prime charges, and avoid unexpected renewals.",
+    keywords: "how to cancel Amazon Prime, cancel Amazon Prime subscription, stop Amazon Prime recurring payment, Amazon Prime cancellation guide",
+    canonical: "https://www.subveris.com/cancel-amazon-prime",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
@@ -47,10 +57,10 @@ export default function CancelAmazonPrimePage() {
             Consumer finance guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to Cancel Amazon Prime in 3 Simple Steps
+            How to cancel Amazon Prime membership
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            Is your Amazon Prime membership no longer worth the monthly fee? You're not alone. Many people sign up for Prime for free shipping or Prime Video and forget that the subscription renews automatically.
+            If Prime is no longer worth the monthly fee, this guide walks you through canceling Amazon Prime and stopping future renewals.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -129,6 +139,10 @@ export default function CancelAmazonPrimePage() {
             </section>
           </aside>
         </div>
+
+        <CancelRelatedGuides current="/cancel-amazon-prime" />
+        <CancelPageFaq productName="Amazon Prime" />
+        <CancelPageJsonLd productName="Amazon Prime" url="https://www.subveris.com/cancel-amazon-prime" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop wasting money on forgotten subscriptions</h2>

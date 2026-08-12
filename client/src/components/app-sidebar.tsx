@@ -140,7 +140,7 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
       <SidebarHeader className="border-b border-sidebar-border/70 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-6 py-4 text-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 dark:text-white">
         <Link href={disabled ? "#" : "/"} className={`flex items-center gap-3 ${disabled ? 'pointer-events-none opacity-70' : ''}`}>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden shadow-md bg-white/80 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10">
-            <img src="/assets/logo.png" alt="Subveris Logo" className="h-full w-full object-cover" />
+            <img src="/assets/logo.png" alt="Subveris Logo" width={40} height={40} className="h-full w-full object-cover" />
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-semibold tracking-tight">Subveris</span>
@@ -213,10 +213,10 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
               <PiggyBank className="h-4 w-4" />
             </div>
             <div className="flex flex-col">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-300">
                 {showFamilyData ? "This month (family)" : "This month"}
               </span>
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-slate-900 dark:text-white">
                 {loading ? "Loading..." : (
                   monthlySavings > 0
                     ? `+${formatCurrency(monthlySavings)}`
@@ -226,7 +226,7 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
             </div>
           </div>
           {showFamilyData && !loading && (
-            <p className="mt-2 text-xs text-slate-600">
+            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
               You: {ownerMonthlySavings > 0 ? `+${formatCurrency(ownerMonthlySavings)}` : formatCurrency(ownerMonthlySavings)} · Members: {memberMonthlySavings > 0 ? `+${formatCurrency(memberMonthlySavings)}` : formatCurrency(memberMonthlySavings)}
             </p>
           )}

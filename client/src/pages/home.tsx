@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { AuthModal } from "@/components/auth-modal";
 import { CurrencySelector } from "@/components/currency-selector";
+import { usePageMeta } from "@/lib/usePageMeta";
 import {
   TrendingUp,
   Shield,
@@ -40,6 +41,13 @@ import {
 } from "lucide-react";
 
 export default function HomePage() {
+  usePageMeta({
+    title: "Subveris | Subscription Optimization to Save Money on Recurring Payments",
+    description: "Subveris helps you discover subscription waste, optimize recurring payments, and save money with AI-powered subscription optimization.",
+    keywords: "subscription optimization, recurring payments, save money, cancel subscriptions, subscription savings, subscription tracker",
+    canonical: "https://www.subveris.com/",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
   const [expandedFAQ, setExpandedFAQ] = useState<number | string | null>(null);
@@ -145,7 +153,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden shadow-sm">
-              <img src="/assets/logo.png" alt="Subveris Logo" className="h-full w-full object-cover" />
+              <img src="/assets/logo-icon.png" alt="Subveris Logo" width={40} height={40} className="h-full w-full object-cover" />
             </div>
             <span className="text-xl font-bold tracking-tight">Subveris</span>
           </div>
@@ -188,15 +196,15 @@ export default function HomePage() {
           </Badge>
           
           <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-8 leading-tight">
-            Discover subscriptions you're paying for
+            Smart subscription optimization to stop
             <br />
-            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">but barely use.</span>
+            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">wasting money on recurring payments.</span>
           </h1>
           
           <p className="text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed font-light">
-            See what you pay. See what you use.
+            Subveris helps you discover subscription waste, track recurring payments, and keep only the services you really use.
             <br />
-            <span className="font-semibold text-foreground">Stop wasting money.</span>
+            <span className="font-semibold text-foreground">Save money on subscriptions today.</span>
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
@@ -293,11 +301,22 @@ export default function HomePage() {
           <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-border/30 bg-slate-50 shadow-2xl shadow-slate-200/50 mb-12">
             <div className="bg-white p-4 sm:p-6">
               <div className="relative overflow-hidden rounded-[1.75rem] border border-border/20 bg-slate-50">
-                <img
-                  src="/assets/dashboard-screenshot.png"
-                  alt="Subveris dashboard screenshot"
-                  className="w-full rounded-[1.75rem] object-cover"
-                />
+                <picture>
+                  <source
+                    type="image/jpeg"
+                    srcSet="/assets/dashboard-screenshot-800.jpg 800w, /assets/dashboard-screenshot-1200.jpg 1200w"
+                    sizes="(max-width: 768px) 100vw, 1200px"
+                  />
+                  <img
+                    src="/assets/dashboard-screenshot-1200.jpg"
+                    alt="Subveris dashboard screenshot"
+                    width={1200}
+                    height={682}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full rounded-[1.75rem] object-cover"
+                  />
+                </picture>
                 <div className="pointer-events-none absolute inset-0 rounded-[1.75rem] bg-gradient-to-t from-slate-950/10 via-transparent to-transparent" />
               </div>
             </div>
@@ -911,7 +930,7 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden shadow-sm">
-                <img src="/assets/logo.png" alt="Subveris Logo" className="h-full w-full object-cover" />
+                <img src="/assets/logo-icon.png" alt="Subveris Logo" width={32} height={32} className="h-full w-full object-cover" />
               </div>
               <span className="text-lg font-bold tracking-tight">Subveris</span>
             </div>

@@ -1,5 +1,5 @@
 import { Switch, Route, Link } from "wouter";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,46 +13,6 @@ import { OnboardingTutorial } from "./components/onboarding-tutorial.js";
 import { PostSignupFlow } from "./components/post-signup-flow.js";
 import { MFAChallengeModal } from "./components/mfa-challenge-modal.js";
 import { Button } from "./components/ui/button.js";
-import NotFound from "./pages/not-found.js";
-import Dashboard from "./pages/dashboard.js";
-import Subscriptions from "./pages/subscriptions.js";
-import Insights from "./pages/insights.js";
-import CostOptimizer from "./pages/cost-optimizer.js";
-import Savings from "./pages/savings.js";
-import Settings from "./pages/settings.js";
-import Pricing from "./pages/pricing.js";
-import Support from "./pages/support.js";
-import Files from "./pages/files.js";
-import HomePage from "./pages/home.js";
-import Privacy from "./pages/privacy.js";
-import CancelNetflixPage from "./pages/cancel-netflix.js";
-import CancelAmazonPrimePage from "./pages/cancel-amazon-prime.js";
-import CancelSpotifyPage from "./pages/cancel-spotify.js";
-import CancelAdobePage from "./pages/cancel-adobe.js";
-import CancelHelloFreshPage from "./pages/cancel-hellofresh.js";
-import CancelDisneyPlusPage from "./pages/cancel-disney-plus.js";
-import CancelYouTubePremiumPage from "./pages/cancel-youtube-premium.js";
-import CancelICloudPage from "./pages/cancel-icloud.js";
-import CancelXboxGamePassPage from "./pages/cancel-xbox-game-pass.js";
-import CancelPlayStationPlusPage from "./pages/cancel-playstation-plus.js";
-import CancelHBOMaxPage from "./pages/cancel-hbo-max.js";
-import CancelViaplayPage from "./pages/cancel-viaplay.js";
-import CancelTinderGoldPage from "./pages/cancel-tinder-gold.js";
-import CancelDuolingoPage from "./pages/cancel-duolingo.js";
-import CancelMicrosoft365Page from "./pages/cancel-microsoft-365.js";
-import CancelCanvaProPage from "./pages/cancel-canva-pro.js";
-import CancelLinkedInPremiumPage from "./pages/cancel-linkedin-premium.js";
-import CancelNordVPNPage from "./pages/cancel-nordvpn.js";
-import CancelAudiblePage from "./pages/cancel-audible.js";
-import CancelReadlyPage from "./pages/cancel-readly.js";
-import Terms from "./pages/terms.js";
-import Security from "./pages/security.js";
-import AuthCallback from "./pages/auth-callback.js";
-import FamilyCalendar from "./pages/family-calendar.js";
-import Calendar from "./pages/calendar.js";
-import FamilySharingPage from "./pages/family-sharing.js";
-import DocsPage from "./pages/docs.js";
-import { ContactPage } from "./pages/contact.js";
 import { useLocation } from "wouter";
 import { CurrencyProvider } from "./lib/currency-context.js";
 import { ErrorBoundary } from "./components/error-boundary.js";
@@ -66,87 +26,131 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "./components/ui/avatar.js";
 import React from "react";
 
+const NotFound = lazy(() => import("./pages/not-found.js"));
+const Dashboard = lazy(() => import("./pages/dashboard.js"));
+const Subscriptions = lazy(() => import("./pages/subscriptions.js"));
+const Insights = lazy(() => import("./pages/insights.js"));
+const CostOptimizer = lazy(() => import("./pages/cost-optimizer.js"));
+const Savings = lazy(() => import("./pages/savings.js"));
+const Settings = lazy(() => import("./pages/settings.js"));
+const Pricing = lazy(() => import("./pages/pricing.js"));
+const Support = lazy(() => import("./pages/support.js"));
+const Files = lazy(() => import("./pages/files.js"));
+const HomePage = lazy(() => import("./pages/home.js"));
+const Privacy = lazy(() => import("./pages/privacy.js"));
+const CancelNetflixPage = lazy(() => import("./pages/cancel-netflix.js"));
+const CancelAmazonPrimePage = lazy(() => import("./pages/cancel-amazon-prime.js"));
+const CancelSpotifyPage = lazy(() => import("./pages/cancel-spotify.js"));
+const CancelAdobePage = lazy(() => import("./pages/cancel-adobe.js"));
+const CancelHelloFreshPage = lazy(() => import("./pages/cancel-hellofresh.js"));
+const CancelDisneyPlusPage = lazy(() => import("./pages/cancel-disney-plus.js"));
+const CancelYouTubePremiumPage = lazy(() => import("./pages/cancel-youtube-premium.js"));
+const CancelICloudPage = lazy(() => import("./pages/cancel-icloud.js"));
+const CancelXboxGamePassPage = lazy(() => import("./pages/cancel-xbox-game-pass.js"));
+const CancelPlayStationPlusPage = lazy(() => import("./pages/cancel-playstation-plus.js"));
+const CancelHBOMaxPage = lazy(() => import("./pages/cancel-hbo-max.js"));
+const CancelViaplayPage = lazy(() => import("./pages/cancel-viaplay.js"));
+const CancelTinderGoldPage = lazy(() => import("./pages/cancel-tinder-gold.js"));
+const CancelDuolingoPage = lazy(() => import("./pages/cancel-duolingo.js"));
+const CancelMicrosoft365Page = lazy(() => import("./pages/cancel-microsoft-365.js"));
+const CancelCanvaProPage = lazy(() => import("./pages/cancel-canva-pro.js"));
+const CancelLinkedInPremiumPage = lazy(() => import("./pages/cancel-linkedin-premium.js"));
+const CancelNordVPNPage = lazy(() => import("./pages/cancel-nordvpn.js"));
+const CancelAudiblePage = lazy(() => import("./pages/cancel-audible.js"));
+const CancelReadlyPage = lazy(() => import("./pages/cancel-readly.js"));
+const Terms = lazy(() => import("./pages/terms.js"));
+const Security = lazy(() => import("./pages/security.js"));
+const AuthCallback = lazy(() => import("./pages/auth-callback.js"));
+const FamilyCalendar = lazy(() => import("./pages/family-calendar.js"));
+const Calendar = lazy(() => import("./pages/calendar.js"));
+const FamilySharingPage = lazy(() => import("./pages/family-sharing.js"));
+const DocsPage = lazy(() => import("./pages/docs.js"));
+const ContactPage = lazy(async () => {
+  const mod = await import("./pages/contact.js");
+  return { default: mod.ContactPage };
+});
+
 function Router({ user }: { user: any }) {
-  if (!user) {
-    return (
-      <Switch>
-        <Route path="/" component={HomePage} />
-        <Route path="/privacy" component={Privacy} />
-        <Route path="/terms" component={Terms} />
-        <Route path="/security" component={Security} />
-        <Route path="/contact" component={ContactPage} />
-        <Route path="/docs" component={DocsPage} />
-        <Route path="/cancel-netflix" component={CancelNetflixPage} />
-        <Route path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />
-        <Route path="/cancel-spotify" component={CancelSpotifyPage} />
-        <Route path="/cancel-adobe" component={CancelAdobePage} />
-        <Route path="/cancel-hellofresh" component={CancelHelloFreshPage} />
-        <Route path="/cancel-disney-plus" component={CancelDisneyPlusPage} />
-        <Route path="/cancel-youtube-premium" component={CancelYouTubePremiumPage} />
-        <Route path="/cancel-icloud" component={CancelICloudPage} />
-        <Route path="/cancel-xbox-game-pass" component={CancelXboxGamePassPage} />
-        <Route path="/cancel-playstation-plus" component={CancelPlayStationPlusPage} />
-        <Route path="/cancel-hbo-max" component={CancelHBOMaxPage} />
-        <Route path="/cancel-viaplay" component={CancelViaplayPage} />
-        <Route path="/cancel-tinder-gold" component={CancelTinderGoldPage} />
-        <Route path="/cancel-duolingo" component={CancelDuolingoPage} />
-        <Route path="/cancel-microsoft-365" component={CancelMicrosoft365Page} />
-        <Route path="/cancel-canva-pro" component={CancelCanvaProPage} />
-        <Route path="/cancel-linkedin-premium" component={CancelLinkedInPremiumPage} />
-        <Route path="/cancel-nordvpn" component={CancelNordVPNPage} />
-        <Route path="/cancel-audible" component={CancelAudiblePage} />
-        <Route path="/cancel-readly" component={CancelReadlyPage} />
-        <Route path="/auth/callback" component={AuthCallback} />
-        <Route path="/auth/callback/" component={AuthCallback} />
-        <Route component={NotFound} />
-      </Switch>
-    );
-  }
+  const authRoutes = [
+    <Route key="dashboard" path="/" component={Dashboard} />,
+    <Route key="dashboard-alt" path="/dashboard" component={Dashboard} />,
+    <Route key="subscriptions" path="/subscriptions" component={Subscriptions} />,
+    <Route key="insights" path="/insights" component={Insights} />,
+    <Route key="cost-optimizer" path="/cost-optimizer" component={CostOptimizer} />,
+    <Route key="savings" path="/savings" component={Savings} />,
+    <Route key="calendar" path="/calendar" component={Calendar} />,
+    <Route key="family-sharing" path="/family-sharing" component={FamilySharingPage} />,
+    <Route key="family-calendar" path="/family-calendar" component={FamilyCalendar} />,
+    <Route key="settings" path="/settings" component={Settings} />,
+    <Route key="pricing" path="/pricing" component={Pricing} />,
+    <Route key="privacy" path="/privacy" component={Privacy} />,
+    <Route key="terms" path="/terms" component={Terms} />,
+    <Route key="security" path="/security" component={Security} />,
+    <Route key="contact" path="/contact" component={ContactPage} />,
+    <Route key="docs" path="/docs" component={DocsPage} />,
+    <Route key="cancel-netflix" path="/cancel-netflix" component={CancelNetflixPage} />,
+    <Route key="cancel-amazon-prime" path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />,
+    <Route key="cancel-spotify" path="/cancel-spotify" component={CancelSpotifyPage} />,
+    <Route key="cancel-adobe" path="/cancel-adobe" component={CancelAdobePage} />,
+    <Route key="cancel-hellofresh" path="/cancel-hellofresh" component={CancelHelloFreshPage} />,
+    <Route key="cancel-disney-plus" path="/cancel-disney-plus" component={CancelDisneyPlusPage} />,
+    <Route key="cancel-youtube-premium" path="/cancel-youtube-premium" component={CancelYouTubePremiumPage} />,
+    <Route key="cancel-icloud" path="/cancel-icloud" component={CancelICloudPage} />,
+    <Route key="cancel-xbox-game-pass" path="/cancel-xbox-game-pass" component={CancelXboxGamePassPage} />,
+    <Route key="cancel-playstation-plus" path="/cancel-playstation-plus" component={CancelPlayStationPlusPage} />,
+    <Route key="cancel-hbo-max" path="/cancel-hbo-max" component={CancelHBOMaxPage} />,
+    <Route key="cancel-viaplay" path="/cancel-viaplay" component={CancelViaplayPage} />,
+    <Route key="cancel-tinder-gold" path="/cancel-tinder-gold" component={CancelTinderGoldPage} />,
+    <Route key="cancel-duolingo" path="/cancel-duolingo" component={CancelDuolingoPage} />,
+    <Route key="cancel-microsoft-365" path="/cancel-microsoft-365" component={CancelMicrosoft365Page} />,
+    <Route key="cancel-canva-pro" path="/cancel-canva-pro" component={CancelCanvaProPage} />,
+    <Route key="cancel-linkedin-premium" path="/cancel-linkedin-premium" component={CancelLinkedInPremiumPage} />,
+    <Route key="cancel-nordvpn" path="/cancel-nordvpn" component={CancelNordVPNPage} />,
+    <Route key="cancel-audible" path="/cancel-audible" component={CancelAudiblePage} />,
+    <Route key="cancel-readly" path="/cancel-readly" component={CancelReadlyPage} />,
+    <Route key="support" path="/support" component={Support} />,
+    <Route key="files" path="/files" component={Files} />,
+    <Route key="auth-callback" path="/auth/callback" component={AuthCallback} />,
+    <Route key="auth-callback-trailing" path="/auth/callback/" component={AuthCallback} />,
+    <Route key="not-found" path="*" component={NotFound} />,
+  ];
+
+  const publicRoutes = [
+    <Route key="home" path="/" component={HomePage} />,
+    <Route key="privacy" path="/privacy" component={Privacy} />,
+    <Route key="terms" path="/terms" component={Terms} />,
+    <Route key="security" path="/security" component={Security} />,
+    <Route key="contact" path="/contact" component={ContactPage} />,
+    <Route key="docs" path="/docs" component={DocsPage} />,
+    <Route key="cancel-netflix" path="/cancel-netflix" component={CancelNetflixPage} />,
+    <Route key="cancel-amazon-prime" path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />,
+    <Route key="cancel-spotify" path="/cancel-spotify" component={CancelSpotifyPage} />,
+    <Route key="cancel-adobe" path="/cancel-adobe" component={CancelAdobePage} />,
+    <Route key="cancel-hellofresh" path="/cancel-hellofresh" component={CancelHelloFreshPage} />,
+    <Route key="cancel-disney-plus" path="/cancel-disney-plus" component={CancelDisneyPlusPage} />,
+    <Route key="cancel-youtube-premium" path="/cancel-youtube-premium" component={CancelYouTubePremiumPage} />,
+    <Route key="cancel-icloud" path="/cancel-icloud" component={CancelICloudPage} />,
+    <Route key="cancel-xbox-game-pass" path="/cancel-xbox-game-pass" component={CancelXboxGamePassPage} />,
+    <Route key="cancel-playstation-plus" path="/cancel-playstation-plus" component={CancelPlayStationPlusPage} />,
+    <Route key="cancel-hbo-max" path="/cancel-hbo-max" component={CancelHBOMaxPage} />,
+    <Route key="cancel-viaplay" path="/cancel-viaplay" component={CancelViaplayPage} />,
+    <Route key="cancel-tinder-gold" path="/cancel-tinder-gold" component={CancelTinderGoldPage} />,
+    <Route key="cancel-duolingo" path="/cancel-duolingo" component={CancelDuolingoPage} />,
+    <Route key="cancel-microsoft-365" path="/cancel-microsoft-365" component={CancelMicrosoft365Page} />,
+    <Route key="cancel-canva-pro" path="/cancel-canva-pro" component={CancelCanvaProPage} />,
+    <Route key="cancel-linkedin-premium" path="/cancel-linkedin-premium" component={CancelLinkedInPremiumPage} />,
+    <Route key="cancel-nordvpn" path="/cancel-nordvpn" component={CancelNordVPNPage} />,
+    <Route key="cancel-audible" path="/cancel-audible" component={CancelAudiblePage} />,
+    <Route key="cancel-readly" path="/cancel-readly" component={CancelReadlyPage} />,
+    <Route key="auth-callback" path="/auth/callback" component={AuthCallback} />,
+    <Route key="auth-callback-trailing" path="/auth/callback/" component={AuthCallback} />,
+    <Route key="not-found" path="*" component={NotFound} />,
+  ];
 
   return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/subscriptions" component={Subscriptions} />
-      <Route path="/insights" component={Insights} />
-      <Route path="/cost-optimizer" component={CostOptimizer} />
-      <Route path="/savings" component={Savings} />
-      <Route path="/calendar" component={Calendar} />
-      <Route path="/family-sharing" component={FamilySharingPage} />
-      <Route path="/family-calendar" component={FamilyCalendar} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/privacy" component={Privacy} />
-      <Route path="/terms" component={Terms} />
-      <Route path="/security" component={Security} />
-      <Route path="/contact" component={ContactPage} />
-      <Route path="/docs" component={DocsPage} />
-      <Route path="/cancel-netflix" component={CancelNetflixPage} />
-      <Route path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />
-      <Route path="/cancel-spotify" component={CancelSpotifyPage} />
-      <Route path="/cancel-adobe" component={CancelAdobePage} />
-      <Route path="/cancel-hellofresh" component={CancelHelloFreshPage} />
-      <Route path="/cancel-disney-plus" component={CancelDisneyPlusPage} />
-      <Route path="/cancel-youtube-premium" component={CancelYouTubePremiumPage} />
-      <Route path="/cancel-icloud" component={CancelICloudPage} />
-      <Route path="/cancel-xbox-game-pass" component={CancelXboxGamePassPage} />
-      <Route path="/cancel-playstation-plus" component={CancelPlayStationPlusPage} />
-      <Route path="/cancel-hbo-max" component={CancelHBOMaxPage} />
-      <Route path="/cancel-viaplay" component={CancelViaplayPage} />
-      <Route path="/cancel-tinder-gold" component={CancelTinderGoldPage} />
-      <Route path="/cancel-duolingo" component={CancelDuolingoPage} />
-      <Route path="/cancel-microsoft-365" component={CancelMicrosoft365Page} />
-      <Route path="/cancel-canva-pro" component={CancelCanvaProPage} />
-      <Route path="/cancel-linkedin-premium" component={CancelLinkedInPremiumPage} />
-      <Route path="/cancel-nordvpn" component={CancelNordVPNPage} />
-      <Route path="/cancel-audible" component={CancelAudiblePage} />
-      <Route path="/cancel-readly" component={CancelReadlyPage} />
-      <Route path="/support" component={Support} />
-      <Route path="/files" component={Files} />
-      <Route path="/auth/callback" component={AuthCallback} />
-      <Route path="/auth/callback/" component={AuthCallback} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Loading...</div>}>
+      <Switch>{user ? authRoutes : publicRoutes}</Switch>
+    </Suspense>
   );
 }
 

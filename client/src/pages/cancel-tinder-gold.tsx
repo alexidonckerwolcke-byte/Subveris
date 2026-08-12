@@ -1,11 +1,21 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
 import { AlertCircle } from "lucide-react";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 export default function CancelTinderGoldPage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
+
+  usePageMeta({
+    title: "How to cancel Tinder Gold subscription | Subveris",
+    description: "How to cancel Tinder Gold subscription, stop recurring tinder gold charges, and avoid unexpected renewals.",
+    keywords: "how to cancel Tinder Gold, cancel Tinder Gold subscription, stop Tinder Gold recurring payment, Tinder Gold cancellation guide",
+    canonical: "https://www.subveris.com/cancel-tinder-gold",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.14),_transparent_35%),linear-gradient(135deg,_#f8fffc_0%,_#f3f7f9_100%)] text-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_35%),linear-gradient(135deg,_#07140f_0%,_#0f172a_100%)] dark:text-slate-100">
@@ -75,6 +85,10 @@ export default function CancelTinderGoldPage() {
             </ol>
           </section>
         </div>
+
+        <CancelRelatedGuides current="/cancel-tinder-gold" />
+        <CancelPageFaq productName="Tinder Gold" />
+        <CancelPageJsonLd productName="Tinder Gold" url="https://www.subveris.com/cancel-tinder-gold" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

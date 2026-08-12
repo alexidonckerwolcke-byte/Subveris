@@ -1,9 +1,19 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 import { AlertCircle } from "lucide-react";
 
 export default function CancelDuolingoPage() {
+          usePageMeta({
+    title: "How to cancel Duolingo subscription | Subveris",
+    description: "How to cancel Duolingo subscription, stop recurring duolingo charges, and avoid unexpected renewals.",
+    keywords: "how to cancel Duolingo, cancel Duolingo subscription, stop Duolingo recurring payment, Duolingo cancellation guide",
+    canonical: "https://www.subveris.com/cancel-duolingo",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
@@ -15,10 +25,10 @@ export default function CancelDuolingoPage() {
             Personal finance guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to cancel Duolingo Plus and Super Duolingo
+            How to cancel Duolingo Plus subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            Has the green owl overstayed its welcome, or are you just not using the premium features enough to justify the price? You can easily cancel Super Duolingo and drop back down to the standard tier.
+            This guide shows how to cancel Duolingo Plus, stop the recurring payment, and keep your progress safe while switching back to free learning.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -70,6 +80,10 @@ export default function CancelDuolingoPage() {
             </p>
           </section>
         </div>
+
+        <CancelRelatedGuides current="/cancel-duolingo" />
+        <CancelPageFaq productName="Duolingo Plus" />
+        <CancelPageJsonLd productName="Duolingo Plus" url="https://www.subveris.com/cancel-duolingo" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

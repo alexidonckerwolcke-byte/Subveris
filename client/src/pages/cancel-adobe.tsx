@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 const steps = [
   {
@@ -37,6 +39,14 @@ const benefits = [
 export default function CancelAdobePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
+  
+          usePageMeta({
+    title: "How to cancel Adobe subscription | Subveris",
+    description: "How to cancel Adobe subscription, stop recurring adobe charges, and avoid unexpected renewals.",
+    keywords: "how to cancel Adobe, cancel Adobe subscription, stop Adobe recurring payment, Adobe cancellation guide",
+    canonical: "https://www.subveris.com/cancel-adobe",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.14),_transparent_35%),linear-gradient(135deg,_#f8fffc_0%,_#f3f7f9_100%)] text-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_35%),linear-gradient(135deg,_#07140f_0%,_#0f172a_100%)] dark:text-slate-100">
@@ -46,10 +56,10 @@ export default function CancelAdobePage() {
             Smart subscription guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to Cancel Adobe Creative Cloud Without Fees
+            How to cancel Adobe subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            Adobe is known for annual contracts that can feel hard to escape. The good news is that there are practical ways to cancel and avoid or reduce early termination fees.
+            Whether you want to stop Creative Cloud or a different Adobe plan, this guide shows how to cancel Adobe and avoid unexpected renewal charges.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -125,6 +135,10 @@ export default function CancelAdobePage() {
             </section>
           </aside>
         </div>
+
+        <CancelRelatedGuides current="/cancel-adobe" />
+        <CancelPageFaq productName="Adobe" />
+        <CancelPageJsonLd productName="Adobe" url="https://www.subveris.com/cancel-adobe" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Take control of your subscriptions</h2>

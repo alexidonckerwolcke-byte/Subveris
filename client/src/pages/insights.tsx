@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AIRecommendations } from "@/components/ai-recommendations";
 import { BehavioralInsights } from "@/components/behavioral-insights";
 import { CostPerUse } from "@/components/cost-per-use";
 import { PremiumGate } from "@/components/premium-gate";
@@ -18,7 +17,6 @@ import {
   Target,
 } from "lucide-react";
 import type {
-  AIRecommendation,
   OpportunityCost,
   CostPerUseAnalysis,
   Insight,
@@ -26,9 +24,9 @@ import type {
 import { useAuth } from "@/lib/auth-context";
 import { useCurrency } from "@/lib/currency-context";
 import { dedupeByKey, calculateMonthlyCost, generateOpportunityCosts } from "@/lib/utils";
-import { generateRecommendationsFromSubscriptions } from "@/lib/recommendations";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
 import { computeCostPerUseFromSubs } from "@/lib/cost-analysis";
+import { calculatePotentialSavings } from "@/lib/health-score";
 
 export default function Insights() {
   const { formatAmount, convertAmount, currency: displayCurrency } = useCurrency();
@@ -36,98 +34,19 @@ export default function Insights() {
   const { user } = useAuth();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
 
-  const [refreshingRecommendations, setRefreshingRecommendations] = useState(false);
-  const { data: personalRecommendations, isLoading: personalRecsLoading, isFetching: personalRecsFetching, refetch: refetchRecs } = useQuery<AIRecommendation[]>({
-    queryKey: ["/api/recommendations"],
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-  });
-
-  // Personal subscriptions (fallback source for recommendations)
   const { data: personalSubscriptions } = useQuery<any[]>({
     queryKey: ["/api/subscriptions"],
   });
 
-  // Family recommendations
   const { data: familyData, isLoading: familyDataLoading, isFetching: familyDataFetching, refetch: refetchFamilyData } = useQuery<any>({
     queryKey: ["/api/family-groups", familyGroupId, "family-data"],
     enabled: !!familyGroupId,
   });
 
   const familySubscriptions = useMemo(() => getVisibleFamilySubscriptions(familyData, user?.id), [familyData, user?.id]);
-
-  const recommendationsRaw = showFamilyData
-    ? (familyData?.recommendations && familyData.recommendations.length
-        ? familyData.recommendations
-        : generateRecommendationsFromSubscriptions(familySubscriptions)
-      )
-    : (personalRecommendations && personalRecommendations.length
-        ? personalRecommendations
-        : generateRecommendationsFromSubscriptions(personalSubscriptions || [])
-      );
   const personalSubscriptionCount = (personalSubscriptions || []).filter((s) => s && s.status !== 'deleted').length;
   const familySubscriptionCount = (familySubscriptions || []).filter((s) => s && s.status !== 'deleted').length;
   const visibleSubscriptionCount = showFamilyData ? familySubscriptionCount : personalSubscriptionCount;
-  const recommendations: AIRecommendation[] = dedupeByKey(recommendationsRaw, "subscriptionId") as AIRecommendation[];
-  const recsLoading = showFamilyData ? familyDataLoading : personalRecsLoading;
-  const recsRefreshing = showFamilyData ? familyDataFetching : personalRecsFetching;
-
-  const handleRefreshRecommendations = async () => {
-    setRefreshingRecommendations(true);
-    try {
-      if (showFamilyData && familyGroupId) {
-        queryClient.removeQueries({ queryKey: ["/api/family-groups", familyGroupId, "family-data"], exact: true });
-        queryClient.removeQueries({ queryKey: ["/api/subscriptions"], exact: true });
-
-        await queryClient.fetchQuery({
-          queryKey: ["/api/family-groups", familyGroupId, "family-data"],
-          queryFn: async () => {
-            const res = await apiRequest("GET", `/api/family-groups/${familyGroupId}/family-data`);
-            return res.json();
-          },
-          staleTime: 0,
-        });
-
-        await queryClient.fetchQuery({
-          queryKey: ["/api/subscriptions"],
-          queryFn: async () => {
-            const res = await apiRequest("GET", "/api/subscriptions");
-            return res.json();
-          },
-          staleTime: 0,
-        });
-
-        await refetchFamilyData?.();
-      } else {
-        queryClient.removeQueries({ queryKey: ["/api/recommendations"], exact: true });
-        queryClient.removeQueries({ queryKey: ["/api/subscriptions"], exact: true });
-
-        await queryClient.fetchQuery({
-          queryKey: ["/api/recommendations"],
-          queryFn: async () => {
-            const res = await apiRequest("GET", "/api/recommendations");
-            return res.json();
-          },
-          staleTime: 0,
-        });
-
-        await queryClient.fetchQuery({
-          queryKey: ["/api/subscriptions"],
-          queryFn: async () => {
-            const res = await apiRequest("GET", "/api/subscriptions");
-            return res.json();
-          },
-          staleTime: 0,
-        });
-
-        await refetchRecs?.();
-      }
-    } catch (error) {
-      console.error("[Insights] Failed to refresh recommendations", error);
-    } finally {
-      setRefreshingRecommendations(false);
-    }
-  };
 
   // Personal behavioral insights
   const { data: personalMetrics, isLoading: personalMetricsLoading } = useQuery<any>({
@@ -277,30 +196,32 @@ export default function Insights() {
   }, [refetchBehavioral, showFamilyData]);
 
   // compute potential savings using server metrics when available (no pagination issues)
-  const totalPotentialSavings = (() => {
-    if (showFamilyData) {
-      const fromFamilyMetrics = familyData?.metrics?.potentialSavings;
-      if (typeof fromFamilyMetrics === 'number') {
-        return fromFamilyMetrics;
-      }
-      const subs: any[] = familyData?.subscriptions || [];
-      return subs
-        .filter(s => s && (s.status === 'unused' || s.status === 'to-cancel'))
-        .reduce((sum: number, s: any) => sum + calculateMonthlyCost(s.amount || 0, s.frequency || 'monthly'), 0);
-    }
-
-    if (personalMetrics?.potentialSavings != null) {
-      return personalMetrics.potentialSavings;
-    }
-
-    const subs: any[] = personalSubscriptions || [];
-    if (!subs || subs.length === 0) return 0;
-    return subs
-      .filter(s => s && (s.status === 'unused' || s.status === 'to-cancel'))
-      .reduce((sum: number, s: any) => sum + calculateMonthlyCost(s.amount || 0, s.frequency || 'monthly'), 0);
-  })();
+  const totalPotentialSavings = useMemo(() => {
+    const subs = showFamilyData ? familySubscriptions : personalSubscriptions || [];
+    return calculatePotentialSavings(subs);
+  }, [familySubscriptions, personalSubscriptions, showFamilyData]);
 
   const highPriorityCount = (insights as any)?.filter((i: any) => i?.priority === 1)?.length || 0;
+  const totalSubscriptionCount = showFamilyData ? familySubscriptionCount : personalSubscriptionCount;
+  const opportunityFocusMessage = (() => {
+    if (!totalSubscriptionCount) {
+      return "Add subscriptions to unlock your first opportunities.";
+    }
+
+    if (highPriorityCount > 0 && totalPotentialSavings > 0) {
+      return `${highPriorityCount} high-priority action${highPriorityCount === 1 ? "" : "s"} available to save ${formatAmount(totalPotentialSavings)}/mo.`;
+    }
+
+    if (highPriorityCount > 0) {
+      return `${highPriorityCount} immediate action${highPriorityCount === 1 ? "" : "s"} available to improve your spend.`;
+    }
+
+    if (totalPotentialSavings > 0) {
+      return `You can save ${formatAmount(totalPotentialSavings)}/mo by addressing low-value subscriptions.`;
+    }
+
+    return `Your ${totalSubscriptionCount} tracked subscription${totalSubscriptionCount === 1 ? "" : "s"} are looking healthy. Keep logging usage to stay ahead.`;
+  })();
 
   const getInsightIcon = (type: string) => {
     switch (type) {
@@ -343,13 +264,13 @@ export default function Insights() {
             <div className="rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/10">
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600 dark:text-slate-300">Opportunity focus</p>
               <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
-                {highPriorityCount > 0 ? `${highPriorityCount} immediate actions available` : "Your account is in good shape"}
+                {opportunityFocusMessage}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <Card className="border-slate-200 shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -373,25 +294,6 @@ export default function Insights() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">
-                  Recommendations
-                </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-chart-1/10">
-                  <Lightbulb className="h-4 w-4 text-chart-1" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-3xl font-bold tracking-tight">
-                  {recommendations?.length || 0}
-                </span>
-                <span className="text-sm text-muted-foreground ml-2">available</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">
                   High Priority
                 </span>
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-chart-5/10">
@@ -407,14 +309,6 @@ export default function Insights() {
             </CardContent>
           </Card>
         </div>
-
-        <AIRecommendations
-          recommendations={recommendations}
-          isLoading={recsLoading}
-          onRefresh={handleRefreshRecommendations}
-          isRefreshing={refreshingRecommendations || recsRefreshing}
-          expandable={true}
-        />
 
         <div className="grid gap-6 lg:grid-cols-2">
           {limits.hasCostPerUse ? (

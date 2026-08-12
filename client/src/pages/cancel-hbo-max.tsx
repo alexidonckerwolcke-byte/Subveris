@@ -2,8 +2,18 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
 import { AlertCircle } from "lucide-react";
+import { usePageMeta } from "@/lib/usePageMeta";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 export default function CancelHBOMaxPage() {
+          usePageMeta({
+    title: "How to cancel HBO Max subscription | Subveris",
+    description: "How to cancel HBO Max subscription, stop recurring hbo max charges, and avoid unexpected renewals.",
+    keywords: "how to cancel HBO Max, cancel HBO Max subscription, stop HBO Max recurring payment, HBO Max cancellation guide",
+    canonical: "https://www.subveris.com/cancel-hbo-max",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
@@ -15,10 +25,10 @@ export default function CancelHBOMaxPage() {
             Personal finance guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to cancel HBO Max
+            How to cancel HBO Max subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            Thinking about ditching HBO Max after binge-watching your favorite series, or just trying to cut back on monthly expenses? Here's what you need to know before you cancel.
+            Thinking about ditching HBO Max? This guide explains how to cancel HBO Max, stop recurring charges, and handle provider-billed cases.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -82,6 +92,10 @@ export default function CancelHBOMaxPage() {
             </div>
           </section>
         </div>
+
+        <CancelRelatedGuides current="/cancel-hbo-max" />
+        <CancelPageFaq productName="HBO Max" />
+        <CancelPageJsonLd productName="HBO Max" url="https://www.subveris.com/cancel-hbo-max" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

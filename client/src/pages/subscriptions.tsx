@@ -5,6 +5,7 @@ import { useSubscription } from "@/lib/subscription-context";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
 import { useCurrency } from "@/lib/currency-context";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
+import { isSubscriptionDeleted } from "@/lib/utils";
 import { useQuery, useMutation, useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -363,10 +364,10 @@ export default function Subscriptions() {
     return matchesSearch && matchesCategory;
   });
 
-  const activeSubscriptions = filteredSubscriptions?.filter((s: Subscription) => s.status === "active") || [];
-  const unusedSubscriptions = filteredSubscriptions?.filter((s: Subscription) => s.status === "unused") || [];
-  const toCancelSubscriptions = filteredSubscriptions?.filter((s: Subscription) => s.status === "to-cancel") || [];
-  const deletedSubscriptions = filteredSubscriptions?.filter((s: Subscription) => s.status === "deleted") || [];
+  const activeSubscriptions = filteredSubscriptions?.filter((s: Subscription) => !isSubscriptionDeleted(s) && s.status === "active") || [];
+  const unusedSubscriptions = filteredSubscriptions?.filter((s: Subscription) => !isSubscriptionDeleted(s) && s.status === "unused") || [];
+  const toCancelSubscriptions = filteredSubscriptions?.filter((s: Subscription) => !isSubscriptionDeleted(s) && s.status === "to-cancel") || [];
+  const deletedSubscriptions = filteredSubscriptions?.filter((s: Subscription) => isSubscriptionDeleted(s)) || [];
 
   const categories: SubscriptionCategory[] = [
     "streaming", "software", "fitness", "cloud-storage", "news",

@@ -1,7 +1,7 @@
 {
-  "name": "Subveris - Smart Subscription Management",
+  "name": "Subveris - Smart Subscription Optimization",
   "short_name": "Subveris",
-  "description": "AI-powered subscription management platform",
+  "description": "AI-powered subscription optimization platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

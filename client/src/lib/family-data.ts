@@ -1,4 +1,5 @@
 import type { Subscription } from "@shared/schema";
+import { isSubscriptionDeleted } from "@/lib/utils";
 
 function normalizeId(value: any): string | undefined {
   if (!value && value !== 0) return undefined;
@@ -23,14 +24,25 @@ function isOwnerFromMembers(familyData: any, currentUserId?: string): boolean {
   });
 }
 
+function normalizeFamilySubscription(sub: any): Subscription {
+  if (!sub || typeof sub !== 'object') return sub;
+  if (sub.websiteDomain || sub.website_domain) {
+    return {
+      ...sub,
+      websiteDomain: sub.websiteDomain || sub.website_domain,
+    };
+  }
+  return sub;
+}
+
 function getSubscriptionCandidateFromShared(shared: any): Subscription | null {
   if (!shared) return null;
   if (shared.subscription && shared.subscription.id) {
-    return shared.subscription;
+    return normalizeFamilySubscription(shared.subscription);
   }
 
   if (shared.id && shared.name && shared.amount !== undefined) {
-    return shared as Subscription;
+    return normalizeFamilySubscription(shared as Subscription);
   }
 
   return null;
@@ -38,7 +50,7 @@ function getSubscriptionCandidateFromShared(shared: any): Subscription | null {
 
 export function getVisibleFamilySubscriptions(familyData: any, currentUserId?: string): Subscription[] {
   const sharedSubscriptions = Array.isArray(familyData?.sharedSubscriptions) ? familyData.sharedSubscriptions : [];
-  const subscriptions = Array.isArray(familyData?.subscriptions) ? familyData.subscriptions : [];
+  const subscriptions = Array.isArray(familyData?.subscriptions) ? familyData.subscriptions.map(normalizeFamilySubscription) : [];
   if (subscriptions.length === 0 && sharedSubscriptions.length === 0) return [];
 
   const allSubs: Subscription[] = [...subscriptions];
@@ -63,11 +75,15 @@ export function getVisibleFamilySubscriptions(familyData: any, currentUserId?: s
 
   if (!isOwner && currentUserId) {
     const visibleIds = new Set<string>();
+    const memberDeletedIds = new Set<string>();
 
     for (const sub of subscriptions) {
       const ownerId = normalizeSubscriptionOwnerId(sub);
       if (sub?.id && ownerId === currentUserId) {
         visibleIds.add(sub.id);
+        if (isSubscriptionDeleted(sub)) {
+          memberDeletedIds.add(sub.id);
+        }
       }
     }
 
@@ -76,7 +92,10 @@ export function getVisibleFamilySubscriptions(familyData: any, currentUserId?: s
       if (sharedId) visibleIds.add(sharedId);
     }
 
-    return Array.from(uniqueSubs.values()).filter((sub) => sub?.id && visibleIds.has(sub.id));
+    return Array.from(uniqueSubs.values()).filter((sub) => {
+      if (!sub?.id) return false;
+      return visibleIds.has(sub.id) || memberDeletedIds.has(sub.id);
+    });
   }
 
   return Array.from(uniqueSubs.values());

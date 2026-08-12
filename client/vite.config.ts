@@ -25,6 +25,29 @@ export default defineConfig({
   build: {
     outDir: path.resolve(workspaceRoot, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return;
+          }
+
+          // Keep most third-party dependencies together to avoid cross-vendor
+          // circular import/evaluation problems in production.
+          if (/\/node_modules\/@radix-ui\//.test(id) ||
+              /\/node_modules\/lucide-react\//.test(id) ||
+              /\/node_modules\/cmdk\//.test(id)) {
+            return "ui-vendor";
+          }
+
+          if (/\/node_modules\/recharts\//.test(id)) {
+            return "charts-vendor";
+          }
+
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     host: true,

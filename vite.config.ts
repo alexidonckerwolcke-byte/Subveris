@@ -16,9 +16,6 @@ const workspaceRoot = path.resolve(__dirname);
 const env = loadEnv('development', workspaceRoot);
 const clientRoot = path.resolve(workspaceRoot, "client");
 const srcRoot = path.resolve(clientRoot, "src");
-const apiTarget = env.VITE_API_URL && !env.VITE_API_URL.includes("supabase.co")
-  ? env.VITE_API_URL
-  : "http://127.0.0.1:5000";
 
 export default defineConfig({
   logLevel: 'info',
@@ -86,8 +83,9 @@ export default defineConfig({
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {
-        // Keep vendor chunking simple to avoid cross-chunk export/import mismatch
-        // that can surface as React internals being undefined at runtime.
+        // Keep a single shared vendor chunk for all node_modules to avoid
+        // circular evaluation order problems between React, React Query, and
+        // other shared third-party modules.
         manualChunks(id) {
           if (id.includes('node_modules')) {
             return 'vendor';
@@ -111,7 +109,7 @@ export default defineConfig({
     },
     proxy: {
       "/api": {
-        target: apiTarget,
+        target: env.VITE_API_URL || "http://127.0.0.1:3000",
         changeOrigin: true,
         rewrite: (path) => path,
         secure: false,

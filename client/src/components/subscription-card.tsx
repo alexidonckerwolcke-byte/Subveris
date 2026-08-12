@@ -27,7 +27,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PER_PAGE as PER_PAGE_CONST } from "@/lib/constants";
 import type { Subscription, SubscriptionStatus } from "@shared/schema";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
-import { getCategoryIcon, getStatusColor, formatDate } from "@/lib/utils";
+import { getCategoryIcon, getStatusColor, formatDate, isSubscriptionDeleted } from "@/lib/utils";
 import { useCurrency, type Currency } from "@/lib/currency-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -58,13 +58,21 @@ export function SubscriptionCard({
   isPremium = false,
 }: SubscriptionCardProps) {
   const { formatAmount } = useCurrency();
-  const { getToken } = useAuth();
+  const { user, getToken } = useAuth();
   const { toast } = useToast();
   const [usageModalOpen, setUsageModalOpen] = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [isSendingReminder, setIsSendingReminder] = useState(false);
   
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
+
+  const isOwnedByCurrentUser = Boolean(
+    user?.id &&
+    (subscription.userId === user.id || (subscription as any).user_id === user.id)
+  );
+
+  const isDeletedSubscription = isSubscriptionDeleted(subscription);
+  const effectiveStatus = isDeletedSubscription ? 'deleted' : subscription.status;
 
   const handleUsageUpdated = () => {
     invalidateAfterUsage(showFamilyData, familyGroupId);
@@ -158,75 +166,84 @@ export function SubscriptionCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {subscription.status !== 'deleted' && (
-                <DropdownMenuItem
-                  onClick={() => setUsageModalOpen(true)}
-                  data-testid={`action-log-usage-${subscription.id}`}
-                >
-                  <ActivitySquare className="mr-2 h-4 w-4" />
-                  Log Usage
-                </DropdownMenuItem>
-              )}
-              {subscription.status === 'deleted' && (
+              {isOwnedByCurrentUser ? (
+                <>
+                  {!isDeletedSubscription && (
+                    <DropdownMenuItem
+                      onClick={() => setUsageModalOpen(true)}
+                      data-testid={`action-log-usage-${subscription.id}`}
+                    >
+                      <ActivitySquare className="mr-2 h-4 w-4" />
+                      Log Usage
+                    </DropdownMenuItem>
+                  )}
+                  {isDeletedSubscription && (
+                    <DropdownMenuItem disabled>
+                      <ActivitySquare className="mr-2 h-4 w-4" />
+                      Log Usage (deleted)
+                    </DropdownMenuItem>
+                  )}
+                  {isPremium && !subscription.scheduledCancellationDate && (
+                    <DropdownMenuItem
+                      onClick={() => setScheduleModalOpen(true)}
+                      data-testid={`action-schedule-cancel-${subscription.id}`}
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      Schedule Cancellation
+                    </DropdownMenuItem>
+                  )}
+                  {subscription.scheduledCancellationDate && (
+                    <DropdownMenuItem
+                      onClick={handleSendReminder}
+                      disabled={isSendingReminder}
+                      data-testid={`action-send-reminder-${subscription.id}`}
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      {isSendingReminder ? "Sending..." : "Send Reminder Email"}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  {effectiveStatus !== "active" && (
+                    <DropdownMenuItem
+                      onClick={() => onStatusChange(subscription.id, "active")}
+                      data-testid={`action-activate-${subscription.id}`}
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      Mark as Active
+                    </DropdownMenuItem>
+                  )}
+                  {effectiveStatus !== "unused" && (
+                    <DropdownMenuItem
+                      onClick={() => onStatusChange(subscription.id, "unused")}
+                      data-testid={`action-unused-${subscription.id}`}
+                    >
+                      <Pause className="mr-2 h-4 w-4" />
+                      Mark as Unused
+                    </DropdownMenuItem>
+                  )}
+                  {effectiveStatus !== "to-cancel" && (
+                    <DropdownMenuItem
+                      onClick={() => onStatusChange(subscription.id, "to-cancel")}
+                      data-testid={`action-cancel-${subscription.id}`}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Mark to Cancel
+                    </DropdownMenuItem>
+                  )}
+                  {!isDeletedSubscription && (
+                    <DropdownMenuItem
+                      onClick={() => onStatusChange(subscription.id, "deleted")}
+                      data-testid={`action-mark-deleted-${subscription.id}`}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Mark as Deleted
+                    </DropdownMenuItem>
+                  )}
+                </>
+              ) : (
                 <DropdownMenuItem disabled>
-                  <ActivitySquare className="mr-2 h-4 w-4" />
-                  Log Usage (deleted)
-                </DropdownMenuItem>
-              )}
-              {isPremium && !subscription.scheduledCancellationDate && (
-                <DropdownMenuItem
-                  onClick={() => setScheduleModalOpen(true)}
-                  data-testid={`action-schedule-cancel-${subscription.id}`}
-                >
-                  <Clock className="mr-2 h-4 w-4" />
-                  Schedule Cancellation
-                </DropdownMenuItem>
-              )}
-              {subscription.scheduledCancellationDate && (
-                <DropdownMenuItem
-                  onClick={handleSendReminder}
-                  disabled={isSendingReminder}
-                  data-testid={`action-send-reminder-${subscription.id}`}
-                >
-                  <Mail className="mr-2 h-4 w-4" />
-                  {isSendingReminder ? "Sending..." : "Send Reminder Email"}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              {subscription.status !== "active" && (
-                <DropdownMenuItem
-                  onClick={() => onStatusChange(subscription.id, "active")}
-                  data-testid={`action-activate-${subscription.id}`}
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  Mark as Active
-                </DropdownMenuItem>
-              )}
-              {subscription.status !== "unused" && (
-                <DropdownMenuItem
-                  onClick={() => onStatusChange(subscription.id, "unused")}
-                  data-testid={`action-unused-${subscription.id}`}
-                >
-                  <Pause className="mr-2 h-4 w-4" />
-                  Mark as Unused
-                </DropdownMenuItem>
-              )}
-              {subscription.status !== "to-cancel" && (
-                <DropdownMenuItem
-                  onClick={() => onStatusChange(subscription.id, "to-cancel")}
-                  data-testid={`action-cancel-${subscription.id}`}
-                >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Mark to Cancel
-                </DropdownMenuItem>
-              )}
-              {subscription.status !== "deleted" && (
-                <DropdownMenuItem
-                  onClick={() => onStatusChange(subscription.id, "deleted")}
-                  data-testid={`action-mark-deleted-${subscription.id}`}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Mark as Deleted
+                  View only: only the subscription owner can update status
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -271,14 +288,14 @@ export function SubscriptionCard({
                 }
               </p>
             )}
-            {subscription.status === 'deleted' && (
+            {isDeletedSubscription && (
               <p className="text-xs text-muted-foreground mt-2">
                 This subscription is marked deleted and is automatically removed on the first day of the next month.
               </p>
             )}
           </div>
           <Badge className={statusColors}>
-            {subscription.status === "to-cancel" ? "To Cancel" : subscription.status === "deleted" ? "Deleted" : subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
+            {effectiveStatus === "to-cancel" ? "To Cancel" : effectiveStatus === "deleted" ? "Deleted" : effectiveStatus.charAt(0).toUpperCase() + effectiveStatus.slice(1)}
           </Badge>
         </div>
 

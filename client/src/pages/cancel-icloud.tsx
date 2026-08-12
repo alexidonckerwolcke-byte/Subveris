@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 const steps = [
   {
@@ -33,6 +35,14 @@ const afterCancellation = [
 ];
 
 export default function CancelICloudPage() {
+          usePageMeta({
+    title: "How to cancel iCloud subscription | Subveris",
+    description: "How to cancel iCloud subscription, stop recurring icloud charges, and avoid unexpected renewals.",
+    keywords: "how to cancel iCloud, cancel iCloud subscription, stop iCloud recurring payment, iCloud cancellation guide",
+    canonical: "https://www.subveris.com/cancel-icloud",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
@@ -44,10 +54,10 @@ export default function CancelICloudPage() {
             Personal finance guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to cancel iCloud Plus Storage in 3 simple steps
+            How to cancel iCloud subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            If you cleaned up your iPhone storage or want to move to a different cloud provider, downgrading or canceling iCloud+ is quick and easy from your Apple device.
+            If you cleaned up your storage or want to switch providers, canceling iCloud is simple. This guide shows how to cancel iCloud and keep your data safe.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -120,6 +130,10 @@ export default function CancelICloudPage() {
             </section>
           </aside>
         </div>
+
+        <CancelRelatedGuides current="/cancel-icloud" />
+        <CancelPageFaq productName="iCloud" />
+        <CancelPageJsonLd productName="iCloud" url="https://www.subveris.com/cancel-icloud" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop paying for forgotten subscriptions</h2>

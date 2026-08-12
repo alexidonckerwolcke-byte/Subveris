@@ -1,9 +1,19 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
+import { usePageMeta } from "@/lib/usePageMeta";
 import { AlertCircle } from "lucide-react";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 export default function CancelViaplayPage() {
+  usePageMeta({
+    title: "How to cancel Viaplay subscription | Subveris",
+    description: "How to cancel Viaplay subscription, stop recurring viaplay charges, and avoid unexpected renewals.",
+    keywords: "how to cancel Viaplay, cancel Viaplay subscription, stop Viaplay recurring payment, Viaplay cancellation guide",
+    canonical: "https://www.subveris.com/cancel-viaplay",
+    image: "https://www.subveris.com/assets/logo.png?v=3",
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
@@ -15,10 +25,10 @@ export default function CancelViaplayPage() {
             Personal finance guide
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            How to cancel Viaplay
+            Viaplay cancel subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            Whether the sports season is over or you're just tired of dealing with streaming lag, canceling Viaplay should be straightforward. But their billing setups can put up roadblocks.
+            Whether the sports season is over or you're tired of streaming costs, this guide shows how to cancel Viaplay, stop auto-renewal, and handle provider-billed subscriptions.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -64,6 +74,10 @@ export default function CancelViaplayPage() {
             </ol>
           </section>
         </div>
+
+        <CancelRelatedGuides current="/cancel-viaplay" />
+        <CancelPageFaq productName="Viaplay" />
+        <CancelPageJsonLd productName="Viaplay" url="https://www.subveris.com/cancel-viaplay" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

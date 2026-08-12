@@ -130,12 +130,12 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 py-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-4">
             {currencies.map((curr) => (
               <Button
                 key={curr.code}
                 variant="outline"
-                className="h-auto flex flex-col items-center justify-center p-3 hover:bg-primary hover:text-primary-foreground"
+                className="h-full w-full min-h-[110px] flex flex-col items-center justify-center p-4 text-center hover:bg-primary hover:text-primary-foreground"
                 onClick={() => handleCurrencySelect(curr.code)}
               >
                 <span className="text-2xl font-bold">{curr.symbol}</span>
