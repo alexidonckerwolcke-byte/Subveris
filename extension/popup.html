@@ -50,10 +50,31 @@
     <div id="tracking-status" class="status" style="margin-top: 10px; font-size: 12px;"></div>
     <div id="debug-info" style="margin-top: 12px; padding: 8px; background: #f0f0f0; border-radius: 4px; font-size: 11px; color: #555;"></div>
     <div id="discovery-section" style="display: none; margin-top: 15px; padding: 10px; background: #e7f3ff; border-radius: 4px; border-left: 3px solid #007bff;">
-      <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: bold;">Auto Discovery Methods</p>
-      <button id="authorize-gmail" style="background: #6c63ff; font-size: 12px; padding: 6px;">📧 Authorize Gmail</button>
-      <button id="open-downloads" style="background: #28a745; font-size: 12px; padding: 6px; margin-top: 5px;">📁 Open Downloads</button>
-      <p id="gmail-status" style="margin: 5px 0 0 0; font-size: 11px; color: #666;"></p>
+      <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: bold;">🔍 Auto Discovery Methods</p>
+      
+      <!-- Gmail Section -->
+      <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #b3d9ff;">
+        <p style="margin: 0 0 6px 0; font-size: 11px; color: #333;"><strong>Gmail Receipts</strong></p>
+        <p style="margin: 0 0 8px 0; font-size: 11px; color: #666;">Automatically scans your email inbox for subscription receipts and confirmations.</p>
+        <button id="authorize-gmail" style="background: #6c63ff; font-size: 12px; padding: 6px; width: 100%;">📧 Connect Gmail Account</button>
+        <p id="gmail-status" style="margin: 5px 0 0 0; font-size: 10px; color: #666; text-align: center;"></p>
+      </div>
+      
+      <!-- Downloads Section -->
+      <div>
+        <p style="margin: 0 0 6px 0; font-size: 11px; color: #333;"><strong>CSV Files</strong></p>
+        <p style="margin: 0 0 8px 0; font-size: 11px; color: #666;">Automatically detects subscription lists in your Downloads folder.</p>
+        <button id="open-downloads" style="background: #28a745; font-size: 12px; padding: 6px; width: 100%;">📁 Open Downloads Folder</button>
+      </div>
+      
+      <!-- Help info -->
+      <details style="margin-top: 10px; font-size: 11px; color: #666;">
+        <summary style="cursor: pointer; font-weight: bold; color: #007bff;">How it works</summary>
+        <div style="margin-top: 8px; padding: 8px; background: white; border-radius: 3px; line-height: 1.5;">
+          <strong>Gmail:</strong> Click "Connect Gmail Account" → You'll be asked to log into Google → Approve access to read receipts → Extension automatically scans every 5 minutes<br><br>
+          <strong>CSV:</strong> Download a subscriptions list (name, amount, etc.) → It's detected automatically from your Downloads folder
+        </div>
+      </details>
     </div>
     <button id="open-settings">Settings</button>
     <script src="popup.js"></script>

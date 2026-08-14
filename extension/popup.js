@@ -113,10 +113,12 @@ document.addEventListener('DOMContentLoaded', () => {
       discoverySection.style.display = 'block';
       
       if (result.gmailAuthToken) {
-        gmailStatus.textContent = '✅ Gmail authorized';
+        gmailStatus.textContent = '✅ Gmail authorized - Inbox scanned every 5 minutes';
         gmailStatus.style.color = '#28a745';
+        authorizeGmailBtn.textContent = '✅ Gmail Connected';
+        authorizeGmailBtn.disabled = true;
       } else {
-        gmailStatus.textContent = '⏳ Click to authorize';
+        gmailStatus.textContent = '⏳ Not yet connected - Click button to authorize';
         gmailStatus.style.color = '#ff9800';
       }
     }
@@ -126,7 +128,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (authorizeGmailBtn) {
     authorizeGmailBtn.addEventListener('click', async () => {
       authorizeGmailBtn.disabled = true;
-      authorizeGmailBtn.textContent = '🔄 Authorizing...';
+      authorizeGmailBtn.textContent = '🔄 Opening Google login...';
+      gmailStatus.textContent = '⏳ Waiting for your authorization...';
+      gmailStatus.style.color = '#ff9800';
       
       try {
         // Send message to background to initiate Gmail auth
@@ -134,21 +138,27 @@ document.addEventListener('DOMContentLoaded', () => {
           type: 'authorizeGmail'
         }, (response) => {
           if (response?.success) {
-            gmailStatus.textContent = '✅ Gmail authorized!';
+            gmailStatus.textContent = '✅ Gmail authorized! Scanning inbox starting in ~5 minutes';
             gmailStatus.style.color = '#28a745';
+            authorizeGmailBtn.textContent = '✅ Gmail Connected';
+            authorizeGmailBtn.disabled = true;
+            setTimeout(() => {
+              authorizeGmailBtn.disabled = false;
+              authorizeGmailBtn.textContent = '📧 Reauthorize Gmail';
+            }, 5000);
           } else {
-            gmailStatus.textContent = '❌ Authorization failed';
+            gmailStatus.textContent = '❌ Authorization failed. Try again?';
             gmailStatus.style.color = '#dc3545';
+            authorizeGmailBtn.disabled = false;
+            authorizeGmailBtn.textContent = '📧 Connect Gmail Account';
           }
-          authorizeGmailBtn.disabled = false;
-          authorizeGmailBtn.textContent = '📧 Authorize Gmail';
         });
       } catch (error) {
         console.error('[Popup] Gmail auth error:', error);
-        gmailStatus.textContent = '❌ Authorization error';
+        gmailStatus.textContent = '❌ Authorization error. Check your connection.';
         gmailStatus.style.color = '#dc3545';
         authorizeGmailBtn.disabled = false;
-        authorizeGmailBtn.textContent = '📧 Authorize Gmail';
+        authorizeGmailBtn.textContent = '📧 Connect Gmail Account';
       }
     });
   }
