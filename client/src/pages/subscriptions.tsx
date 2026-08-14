@@ -28,9 +28,6 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { SubscriptionCard } from "@/components/subscription-card";
-import { BulkImportDialog } from "@/components/bulk-import-dialog";
-import { EmailScanDialog } from "@/components/email-scan-dialog";
-import { TransactionAnalysisDialog } from "@/components/transaction-analysis-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PER_PAGE } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -322,43 +319,7 @@ export default function Subscriptions() {
     },
   });
 
-  const bulkImportMutation = useMutation({
-    mutationFn: async (subscriptions: Array<{ name: string; amount: number; frequency?: string; nextBillingDate?: string; category?: string; website_domain?: string }>) => {
-      if (!user?.id) {
-        throw new Error("User not authenticated");
-      }
-      const res = await apiRequest("POST", "/api/subscriptions/bulk-import", { subscriptions });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions", PER_PAGE] });
-      queryClient.invalidateQueries({ queryKey: ["/api/family-groups"] });
-      if (familyGroupId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/family-groups", familyGroupId, "family-data"] });
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/metrics"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/analysis/cost-per-use"] });
-      if (showFamilyData && familyGroupId) {
-        queryClient.invalidateQueries({ queryKey: [`/api/analysis/cost-per-use?familyGroupId=${familyGroupId}`] });
-      }
-      toast({
-        title: "Subscriptions imported",
-        description: "Your subscriptions have been imported successfully.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Import failed",
-        description: `Failed to import subscriptions: ${error instanceof Error ? error.message : "Unknown error"}`,
-        variant: "destructive",
-      });
-    },
-  });
 
-  const handleBulkImport = (subscriptions: Array<{ name: string; amount: number }>) => {
-    bulkImportMutation.mutate(subscriptions);
-  };
 
   const handleStatusChange = (id: string, status: SubscriptionStatus) => {
     updateStatusMutation.mutate({ id, status });
@@ -575,12 +536,6 @@ export default function Subscriptions() {
               </Form>
             </DialogContent>
           </Dialog>
-          <BulkImportDialog
-            onImport={handleBulkImport}
-            isLoading={bulkImportMutation.isPending}
-          />
-          <EmailScanDialog />
-          <TransactionAnalysisDialog />
         </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-border bg-background p-4">
