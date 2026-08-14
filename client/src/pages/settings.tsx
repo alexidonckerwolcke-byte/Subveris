@@ -15,6 +15,7 @@ import {
   Shield,
   User,
   Palette,
+  Zap,
 } from "lucide-react";
 import { CurrencySelector } from '@/components/currency-selector';
 import { useState, useRef, useEffect } from "react";
@@ -28,6 +29,8 @@ export default function Settings() {
   const [pushNotifications, setPushNotifications] = useState(true);
   const [weeklyDigest, setWeeklyDigest] = useState(true);
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailConnecting, setGmailConnecting] = useState(false);
   const { user } = useAuth();
   const userEmail = user?.email ?? "";
 
@@ -37,6 +40,22 @@ export default function Settings() {
       setTwoFAEnabled(true);
     }
   }, [user]);
+
+  // Check Gmail connection status
+  useEffect(() => {
+    const checkGmailStatus = async () => {
+      try {
+        const response = await apiFetch("/api/auth/gmail-status");
+        if (response.ok) {
+          const data = await response.json();
+          setGmailConnected(data.connected || false);
+        }
+      } catch (error) {
+        console.error("Failed to check Gmail status:", error);
+      }
+    };
+    checkGmailStatus();
+  }, []);
 
   // Refs for modal triggers
   const emailModalRef = useRef<any>(null);
@@ -69,6 +88,89 @@ export default function Settings() {
     const button = document.querySelector("[data-testid='open-delete-alert']") as HTMLButtonElement;
     button?.click();
   };
+
+  const handleConnectGmail = async () => {
+    setGmailConnecting(true);
+    try {
+      // Step 1: Get Gmail OAuth URL from backend
+      const urlResponse = await apiFetch("/api/auth/gmail-oauth-url", {
+        method: "POST",
+      });
+      if (!urlResponse.ok) throw new Error("Failed to get OAuth URL");
+
+      const { oauthUrl } = await urlResponse.json();
+
+      // Step 2: Open OAuth flow in new window
+      const width = 500;
+      const height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+
+      const authWindow = window.open(
+        oauthUrl,
+        "Gmail Authorization",
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+
+      // Step 3: Poll for authorization completion
+      const checkInterval = setInterval(async () => {
+        try {
+          const statusResponse = await apiFetch("/api/auth/gmail-status");
+          if (statusResponse.ok) {
+            const data = await statusResponse.json();
+            if (data.connected) {
+              setGmailConnected(true);
+              authWindow?.close();
+              clearInterval(checkInterval);
+              toast({
+                title: "Gmail connected!",
+                description:
+                  "Your inbox will be scanned for subscriptions every 5 minutes.",
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Failed to check Gmail status:", error);
+        }
+      }, 1000);
+
+      // Clear interval after 5 minutes
+      setTimeout(() => clearInterval(checkInterval), 5 * 60 * 1000);
+    } catch (error) {
+      toast({
+        title: "Connection failed",
+        description:
+          error instanceof Error ? error.message : "Failed to connect Gmail",
+        variant: "destructive",
+      });
+    } finally {
+      setGmailConnecting(false);
+    }
+  };
+
+  const handleDisconnectGmail = async () => {
+    try {
+      const response = await apiFetch("/api/auth/gmail-disconnect", {
+        method: "POST",
+      });
+      if (response.ok) {
+        setGmailConnected(false);
+        toast({
+          title: "Gmail disconnected",
+          description: "Your Gmail account has been disconnected.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Disconnection failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to disconnect Gmail",
+        variant: "destructive",
+      });
+    }
+  }
 
   const handleExportData = async () => {
     try {
@@ -131,6 +233,44 @@ export default function Settings() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                <Zap className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Connected Services</CardTitle>
+                <CardDescription>Auto-discover subscriptions from your accounts</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-4 rounded-lg border border-border">
+              <div>
+                <p className="font-medium">📧 Gmail</p>
+                <p className="text-sm text-muted-foreground">
+                  {gmailConnected
+                    ? "Connected - Inbox scanned every 5 minutes"
+                    : "Connect to auto-detect subscriptions from email receipts"}
+                </p>
+              </div>
+              <Button
+                variant={gmailConnected ? "destructive" : "default"}
+                size="sm"
+                onClick={gmailConnected ? handleDisconnectGmail : handleConnectGmail}
+                disabled={gmailConnecting}
+              >
+                {gmailConnecting
+                  ? "Connecting..."
+                  : gmailConnected
+                    ? "Disconnect"
+                    : "Connect"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

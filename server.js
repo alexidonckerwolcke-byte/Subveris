@@ -1692,6 +1692,67 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Check Gmail authorization status
+  if (urlPath === '/api/auth/gmail-status' && req.method === 'GET') {
+    const user = await getUser(req.headers.authorization);
+    if (!user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
+    try {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('user_oauth_tokens')
+          .select('access_token')
+          .eq('user_id', user.id)
+          .eq('provider', 'gmail')
+          .single();
+
+        const connected = !error && data?.access_token;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ connected }));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ connected: false }));
+      }
+    } catch (error) {
+      console.error('[Server] Gmail status check error:', error);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ connected: false }));
+    }
+    return;
+  }
+
+  // Disconnect Gmail
+  if (urlPath === '/api/auth/gmail-disconnect' && req.method === 'POST') {
+    const user = await getUser(req.headers.authorization);
+    if (!user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
+    try {
+      if (supabase) {
+        await supabase
+          .from('user_oauth_tokens')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('provider', 'gmail');
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      console.error('[Server] Gmail disconnect error:', error);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Disconnect failed' }));
+    }
+    return;
+  }
+
   // Static file serving
   if (urlPath === '/') urlPath = '/index.html';
 
