@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { useState } from "react";
 import { AuthModal } from "@/components/auth-modal";
 import { usePageMeta } from "@/lib/usePageMeta";
+import { pickMetaVariant, reportAbConversion } from "@/lib/abMeta";
 import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
 
 const steps = [
@@ -36,13 +37,19 @@ const reasons = [
 ];
 
 export default function CancelNetflixPage() {
-          usePageMeta({
-    title: "How to cancel Netflix subscription | Subveris",
-    description: "How to cancel Netflix subscription, stop recurring netflix charges, and avoid unexpected renewals.",
-    keywords: "how to cancel Netflix, cancel Netflix subscription, stop Netflix recurring payment, Netflix cancellation guide",
-    canonical: "https://www.subveris.com/cancel-netflix",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
-  });
+          const meta = pickMetaVariant("cancel-netflix", {
+            title: "How to cancel Netflix — stop charges & keep access | Subveris",
+            description:
+              "Step-by-step guide to cancel Netflix, avoid unexpected renewals, and stop recurring charges — keep access until your billing period ends. Quick, safe instructions.",
+            keywords: "how to cancel Netflix, cancel Netflix subscription, stop Netflix recurring payment, Netflix cancellation guide",
+            canonical: "https://www.subveris.com/cancel-netflix",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
+            author: "Subveris",
+            type: "guide",
+            publishedTime: "2024-01-01T00:00:00Z",
+            modifiedTime: new Date().toISOString(),
+          });
+          usePageMeta(meta);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
@@ -51,22 +58,21 @@ export default function CancelNetflixPage() {
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.14),_transparent_35%),linear-gradient(135deg,_#f8fffc_0%,_#f3f7f9_100%)] text-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_35%),linear-gradient(135deg,_#07140f_0%,_#0f172a_100%)] dark:text-slate-100">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
         <header className="rounded-[28px] border border-emerald-500/20 bg-white/80 p-8 shadow-[0_25px_80px_-30px_rgba(15,23,42,0.35)] backdrop-blur-xl dark:border-emerald-400/20 dark:bg-slate-900/70">
-          <div className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-            Personal finance guide
-          </div>
+          <div className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-300">{getProductBadge("Netflix")}</div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
             How to cancel Netflix subscription
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-            A few euros here, ten euros there. Before you know it, you are paying for subscriptions you barely use. Canceling Netflix is simple, and this guide shows you exactly how to do it.
+            {getProductIntro("Netflix")}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
               type="button"
               onClick={() => {
-                setAuthDefaultTab('signup');
-                setAuthModalOpen(true);
-              }}
+                  try { reportAbConversion('cancel-netflix', 'start-with-subveris'); } catch (e) {}
+                  setAuthDefaultTab('signup');
+                  setAuthModalOpen(true);
+                }}
               className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
             >
               Start with Subveris
@@ -100,7 +106,7 @@ export default function CancelNetflixPage() {
             <section className="rounded-[24px] border border-slate-200/80 bg-white/75 p-7 shadow-[0_15px_50px_-25px_rgba(15,23,42,0.28)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
               <h2 className="text-2xl font-semibold tracking-tight">Why do so many people cancel Netflix?</h2>
               <p className="mt-3 text-base leading-8 text-slate-600 dark:text-slate-300">
-                Netflix remains one of the most popular streaming services in Europe, but it is also one of the subscriptions that people cancel temporarily most often. Common reasons include:
+                {getProductWhyCopy("Netflix")}
               </p>
               <ul className="mt-5 space-y-3 pl-5 text-slate-600 dark:text-slate-300">
                 {reasons.map((reason) => (
@@ -132,7 +138,7 @@ export default function CancelNetflixPage() {
                 Keep your subscriptions under control
               </h2>
               <p className="mt-3 text-base leading-8 text-slate-600 dark:text-slate-300">
-                Many people think they know exactly which subscriptions they have. In practice, old streaming services, free trials, and software licenses often continue to run unnoticed.
+                {getProductSidebarCopy("Netflix")}
               </p>
             </section>
           </aside>
@@ -140,7 +146,7 @@ export default function CancelNetflixPage() {
 
         <CancelRelatedGuides current="/cancel-netflix" />
         <CancelPageFaq productName="Netflix" />
-        <CancelPageJsonLd productName="Netflix" url="https://www.subveris.com/cancel-netflix" />
+        <CancelPageJsonLd productName="Netflix" url="https://www.subveris.com/cancel-netflix" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Prevent paying for forgotten subscriptions ever again</h2>
@@ -150,6 +156,7 @@ export default function CancelNetflixPage() {
           <button
             type="button"
             onClick={() => {
+              try { reportAbConversion('cancel-netflix', 'create-account-hero'); } catch (e) {}
               setAuthDefaultTab('signup');
               setAuthModalOpen(true);
             }}

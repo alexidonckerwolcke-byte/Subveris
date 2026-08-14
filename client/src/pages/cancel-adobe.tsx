@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
 import { usePageMeta } from "@/lib/usePageMeta";
-import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
+import { pickMetaVariant, reportAbConversion } from "@/lib/abMeta";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd, getProductWhyCopy, getProductSidebarCopy, getProductIntro, getProductBadge } from "@/components/cancel-page-helpers";
 
 const steps = [
   {
@@ -40,21 +41,24 @@ export default function CancelAdobePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
   
-          usePageMeta({
+          const meta = pickMetaVariant("cancel-adobe", {
     title: "How to cancel Adobe subscription | Subveris",
     description: "How to cancel Adobe subscription, stop recurring adobe charges, and avoid unexpected renewals.",
     keywords: "how to cancel Adobe, cancel Adobe subscription, stop Adobe recurring payment, Adobe cancellation guide",
     canonical: "https://www.subveris.com/cancel-adobe",
     image: "https://www.subveris.com/assets/logo.png?v=3",
-  });
+            author: "Subveris",
+            type: "guide",
+            publishedTime: "2024-01-01T00:00:00Z",
+            modifiedTime: new Date().toISOString(),
+          });
+  usePageMeta(meta);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.14),_transparent_35%),linear-gradient(135deg,_#f8fffc_0%,_#f3f7f9_100%)] text-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_35%),linear-gradient(135deg,_#07140f_0%,_#0f172a_100%)] dark:text-slate-100">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
         <header className="rounded-[28px] border border-emerald-500/20 bg-white/80 p-8 shadow-[0_25px_80px_-30px_rgba(15,23,42,0.35)] backdrop-blur-xl dark:border-emerald-400/20 dark:bg-slate-900/70">
-          <div className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-            Smart subscription guide
-          </div>
+          <div className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-300">{getProductBadge("Adobe")}</div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
             How to cancel Adobe subscription
           </h1>
@@ -65,6 +69,7 @@ export default function CancelAdobePage() {
             <button
               type="button"
               onClick={() => {
+                try { reportAbConversion('cancel-adobe', 'start-with-subveris'); } catch (e) {}
                 setAuthDefaultTab('signup');
                 setAuthModalOpen(true);
               }}
@@ -101,7 +106,7 @@ export default function CancelAdobePage() {
             <section className="rounded-[24px] border border-slate-200/80 bg-white/75 p-7 shadow-[0_15px_50px_-25px_rgba(15,23,42,0.28)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
               <h2 className="text-2xl font-semibold tracking-tight">Why do so many people cancel Adobe?</h2>
               <p className="mt-3 text-base leading-8 text-slate-600 dark:text-slate-300">
-                Adobe Creative Cloud is a powerful toolset, but many users eventually cancel because the subscription no longer matches their needs.
+                {getProductWhyCopy("Adobe")}
               </p>
               <ul className="mt-5 space-y-3 pl-5 text-slate-600 dark:text-slate-300">
                 {reasons.map((reason) => (
@@ -130,7 +135,7 @@ export default function CancelAdobePage() {
                 Take control of your subscriptions
               </h2>
               <p className="mt-3 text-base leading-8 text-slate-600 dark:text-slate-300">
-                Software, streaming, cloud storage, and memberships can quietly cost far more than expected. Subveris helps you track them all in one place.
+                {getProductSidebarCopy("Adobe")}
               </p>
             </section>
           </aside>
@@ -138,7 +143,7 @@ export default function CancelAdobePage() {
 
         <CancelRelatedGuides current="/cancel-adobe" />
         <CancelPageFaq productName="Adobe" />
-        <CancelPageJsonLd productName="Adobe" url="https://www.subveris.com/cancel-adobe" />
+        <CancelPageJsonLd productName="Adobe" url="https://www.subveris.com/cancel-adobe" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Take control of your subscriptions</h2>
@@ -151,6 +156,7 @@ export default function CancelAdobePage() {
           <button
             type="button"
             onClick={() => {
+              try { reportAbConversion('cancel-adobe', 'create-account-hero'); } catch (e) {}
               setAuthDefaultTab('signup');
               setAuthModalOpen(true);
             }}

@@ -21,8 +21,8 @@ describe('Supabase spending date parsing', () => {
   it('adjusts ISO timestamps by the client offset for local time comparisons', () => {
     const renewalDate = toLocalDateTimeInOffset('2026-05-17T18:00:00Z', -240);
     expect(renewalDate).not.toBeNull();
-    expect(renewalDate?.getUTCFullYear()).toBe(2026);
-    expect(renewalDate?.getUTCMonth()).toBe(4);
-    expect(renewalDate?.getUTCDate()).toBe(17);
+    expect(renewalDate?.getFullYear()).toBe(2026);
+    expect(renewalDate?.getMonth()).toBe(4);
+    expect(renewalDate?.getDate()).toBe(17);
   });
 });

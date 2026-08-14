@@ -2,28 +2,32 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { AuthModal } from "@/components/auth-modal";
 import { usePageMeta } from "@/lib/usePageMeta";
+import { pickMetaVariant, reportAbConversion } from "@/lib/abMeta";
 import { AlertCircle } from "lucide-react";
-import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd, getProductWhyCopy, getProductSidebarCopy, getProductIntro, getProductBadge } from "@/components/cancel-page-helpers";
 
 export default function CancelTinderGoldPage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
-  usePageMeta({
+  const meta = pickMetaVariant("cancel-tinder-gold", {
     title: "How to cancel Tinder Gold subscription | Subveris",
     description: "How to cancel Tinder Gold subscription, stop recurring tinder gold charges, and avoid unexpected renewals.",
     keywords: "how to cancel Tinder Gold, cancel Tinder Gold subscription, stop Tinder Gold recurring payment, Tinder Gold cancellation guide",
     canonical: "https://www.subveris.com/cancel-tinder-gold",
     image: "https://www.subveris.com/assets/logo.png?v=3",
-  });
+            author: "Subveris",
+            type: "guide",
+            publishedTime: "2024-01-01T00:00:00Z",
+            modifiedTime: new Date().toISOString(),
+          });
+  usePageMeta(meta);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.14),_transparent_35%),linear-gradient(135deg,_#f8fffc_0%,_#f3f7f9_100%)] text-slate-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_35%),linear-gradient(135deg,_#07140f_0%,_#0f172a_100%)] dark:text-slate-100">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
         <header className="rounded-[28px] border border-emerald-500/20 bg-white/80 p-8 shadow-[0_25px_80px_-30px_rgba(15,23,42,0.35)] backdrop-blur-xl dark:border-emerald-400/20 dark:bg-slate-900/70">
-          <div className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-            Personal finance guide
-          </div>
+          <div className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-300">{getProductBadge("Tinder Gold")}</div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
             How to cancel Tinder Gold and Tinder Platinum
           </h1>
@@ -34,9 +38,10 @@ export default function CancelTinderGoldPage() {
             <button
               type="button"
               onClick={() => {
-                setAuthDefaultTab('signup');
-                setAuthModalOpen(true);
-              }}
+                  try { reportAbConversion('cancel-tinder-gold', 'start-with-subveris'); } catch (e) {}
+                  setAuthDefaultTab('signup');
+                  setAuthModalOpen(true);
+                }}
               className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
             >
               Start with Subveris
@@ -88,7 +93,7 @@ export default function CancelTinderGoldPage() {
 
         <CancelRelatedGuides current="/cancel-tinder-gold" />
         <CancelPageFaq productName="Tinder Gold" />
-        <CancelPageJsonLd productName="Tinder Gold" url="https://www.subveris.com/cancel-tinder-gold" />
+        <CancelPageJsonLd productName="Tinder Gold" url="https://www.subveris.com/cancel-tinder-gold" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>
@@ -98,6 +103,7 @@ export default function CancelTinderGoldPage() {
           <button
             type="button"
             onClick={() => {
+              try { reportAbConversion('cancel-tinder-gold', 'create-account-hero'); } catch (e) {}
               setAuthDefaultTab('signup');
               setAuthModalOpen(true);
             }}

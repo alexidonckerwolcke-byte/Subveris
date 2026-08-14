@@ -842,6 +842,50 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
+
+    // A/B experiment event logging endpoint
+    if (urlPath === '/api/ab-event' && req.method === 'POST') {
+      try {
+        const body = await parseBody(req);
+        const key = String(body.key || 'unknown');
+        const variantIndex = Number(body.variantIndex);
+        const eventType = String(body.eventType || 'impression');
+        const label = body.label || null;
+        const ts = new Date().toISOString();
+
+        // Append to local log file for lightweight analytics
+        try {
+          const logPath = path.join(__dirname, 'ab-events.log');
+          const entry = { ts, key, variantIndex: Number.isFinite(variantIndex) ? variantIndex : null, eventType, label };
+          fs.appendFileSync(logPath, JSON.stringify(entry) + '\n');
+        } catch (fileErr) {
+          console.warn('[AB] Failed to append ab-events.log:', fileErr && fileErr.message);
+        }
+
+        // If Supabase is configured, persist to a table `ab_experiments` (optional)
+        if (supabase) {
+          try {
+            await supabase.from('ab_experiments').insert({
+              experiment_key: key,
+              variant_index: Number.isFinite(variantIndex) ? variantIndex : null,
+              event_type: eventType,
+              label: label,
+              created_at: ts,
+            });
+          } catch (dbErr) {
+            console.warn('[AB] Supabase insert failed:', dbErr && dbErr.message);
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (error) {
+        console.error('[AB] Failed to handle /api/ab-event:', error && error.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'failed' }));
+      }
+      return;
+    }
     
     if (urlPath === '/api/insights/behavioral' && req.method === 'GET') {
       if (!supabase && REMOTE_API_BASE) {
@@ -911,6 +955,37 @@ const server = http.createServer(async (req, res) => {
           console.error('Error fetching family groups:', error);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify([]));
+        }
+      } else if (req.method === 'POST') {
+        try {
+          const body = await parseBody(req);
+          const { name } = body;
+          
+          if (!name) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing required field: name' }));
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from('family_groups')
+            .insert({ owner_id: user.id, name })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error creating family group:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to create family group' }));
+            return;
+          }
+
+          res.writeHead(201, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(data));
+        } catch (error) {
+          console.error('Error handling POST /api/family-groups:', error);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Internal server error' }));
         }
       }
       return;
