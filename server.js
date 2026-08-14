@@ -1592,6 +1592,106 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Gmail OAuth endpoints
+  if (urlPath === '/api/auth/gmail-oauth-url' && req.method === 'POST') {
+    const user = await getUser(req.headers.authorization);
+    if (!user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
+    const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
+    const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
+    const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
+
+    if (!googleClientId) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Gmail OAuth not configured' }));
+      return;
+    }
+
+    const scope = 'https://www.googleapis.com/auth/gmail.readonly';
+    const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ oauthUrl }));
+    return;
+  }
+
+  if (urlPath === '/api/auth/gmail-token' && req.method === 'POST') {
+    const user = await getUser(req.headers.authorization);
+    if (!user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
+    const body = await parseBody(req);
+    const { code } = body;
+
+    if (!code) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing authorization code' }));
+      return;
+    }
+
+    const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
+    const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
+    const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
+
+    if (!googleClientId || !googleClientSecret) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Gmail OAuth not configured' }));
+      return;
+    }
+
+    try {
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: googleClientId,
+          client_secret: googleClientSecret,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code'
+        })
+      });
+
+      const tokenData = await tokenResponse.json();
+
+      if (!tokenData.access_token) {
+        throw new Error('No access token received');
+      }
+
+      // Store in Supabase for future use
+      if (supabase) {
+        await supabase
+          .from('user_oauth_tokens')
+          .upsert({
+            user_id: user.id,
+            provider: 'gmail',
+            access_token: tokenData.access_token,
+            refresh_token: tokenData.refresh_token || null,
+            expires_at: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null,
+            updated_at: new Date()
+          }, { onConflict: 'user_id,provider' });
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        access_token: tokenData.access_token,
+        expires_in: tokenData.expires_in || 3600
+      }));
+    } catch (error) {
+      console.error('[Server] Gmail token exchange error:', error);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Token exchange failed' }));
+    }
+    return;
+  }
+
   // Static file serving
   if (urlPath === '/') urlPath = '/index.html';
 

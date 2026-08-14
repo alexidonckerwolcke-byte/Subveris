@@ -102,6 +102,64 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
   
+  // Show discovery section for connected users
+  const discoverySection = document.getElementById('discovery-section');
+  const authorizeGmailBtn = document.getElementById('authorize-gmail');
+  const openDownloadsBtn = document.getElementById('open-downloads');
+  const gmailStatus = document.getElementById('gmail-status');
+  
+  chrome.storage.local.get(['supabaseUserUUID', 'gmailAuthToken'], (result) => {
+    if (result.supabaseUserUUID && discoverySection) {
+      discoverySection.style.display = 'block';
+      
+      if (result.gmailAuthToken) {
+        gmailStatus.textContent = '✅ Gmail authorized';
+        gmailStatus.style.color = '#28a745';
+      } else {
+        gmailStatus.textContent = '⏳ Click to authorize';
+        gmailStatus.style.color = '#ff9800';
+      }
+    }
+  });
+  
+  // Gmail authorization
+  if (authorizeGmailBtn) {
+    authorizeGmailBtn.addEventListener('click', async () => {
+      authorizeGmailBtn.disabled = true;
+      authorizeGmailBtn.textContent = '🔄 Authorizing...';
+      
+      try {
+        // Send message to background to initiate Gmail auth
+        chrome.runtime.sendMessage({
+          type: 'authorizeGmail'
+        }, (response) => {
+          if (response?.success) {
+            gmailStatus.textContent = '✅ Gmail authorized!';
+            gmailStatus.style.color = '#28a745';
+          } else {
+            gmailStatus.textContent = '❌ Authorization failed';
+            gmailStatus.style.color = '#dc3545';
+          }
+          authorizeGmailBtn.disabled = false;
+          authorizeGmailBtn.textContent = '📧 Authorize Gmail';
+        });
+      } catch (error) {
+        console.error('[Popup] Gmail auth error:', error);
+        gmailStatus.textContent = '❌ Authorization error';
+        gmailStatus.style.color = '#dc3545';
+        authorizeGmailBtn.disabled = false;
+        authorizeGmailBtn.textContent = '📧 Authorize Gmail';
+      }
+    });
+  }
+  
+  // Open downloads folder
+  if (openDownloadsBtn) {
+    openDownloadsBtn.addEventListener('click', () => {
+      chrome.downloads.showDefaultFolder();
+    });
+  }
+  
   // Open settings button if exists
   const settingsBtn = document.getElementById('open-settings');
   if (settingsBtn) {

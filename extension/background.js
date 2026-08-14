@@ -517,13 +517,277 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === 'authorizeGmail') {
+    // Attempt Gmail authorization via backend OAuth endpoint
+    chrome.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
+      const token = result.authToken;
+      const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
+
+      if (!token) {
+        sendResponse({ success: false, error: 'Not authenticated' });
+        return;
+      }
+
+      // Request OAuth URL from backend
+      fetch(`${apiUrl}/api/auth/gmail-oauth-url`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          redirectUri: chrome.identity.getRedirectURL()
+        })
+      }).then(r => r.json()).then(data => {
+        if (!data.oauthUrl) {
+          throw new Error('No OAuth URL from backend');
+        }
+
+        // Open OAuth URL in a new window
+        chrome.identity.launchWebAuthFlow({
+          url: data.oauthUrl,
+          interactive: true
+        }, (redirectUrl) => {
+          if (!redirectUrl) {
+            sendResponse({ success: false, error: 'User cancelled' });
+            return;
+          }
+
+          // Extract authorization code from redirect URL
+          try {
+            const url = new URL(redirectUrl);
+            const code = url.searchParams.get('code');
+            
+            if (!code) {
+              sendResponse({ success: false, error: 'No auth code received' });
+              return;
+            }
+
+            // Exchange code for token via backend
+            fetch(`${apiUrl}/api/auth/gmail-token`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ code })
+            }).then(r => r.json()).then(tokenData => {
+              if (!tokenData.access_token) {
+                throw new Error('No access token received');
+              }
+
+              // Store Gmail token
+              chrome.storage.local.set({
+                gmailAuthToken: tokenData.access_token,
+                gmailTokenExpiry: Date.now() + (tokenData.expires_in * 1000)
+              }, () => {
+                console.log('[Background] ✅ Gmail authorized successfully');
+                sendResponse({ success: true });
+              });
+            }).catch(err => {
+              console.error('[Background] Token exchange failed:', err);
+              sendResponse({ success: false, error: err.message });
+            });
+          } catch (err) {
+            console.error('[Background] OAuth flow error:', err);
+            sendResponse({ success: false, error: err.message });
+          }
+        });
+      }).catch(err => {
+        console.error('[Background] OAuth URL request failed:', err);
+        sendResponse({ success: false, error: err.message });
+      });
+    });
+    return true;
+  }
+
   console.log('[Background] Unknown message type:', request.type);
 });
+
+// Email scanning: detect subscription receipts from Gmail
+function scanGmailForSubscriptions() {
+  chrome.storage.local.get(['gmailAuthToken', 'lastGmailScan'], (result) => {
+    const token = result.gmailAuthToken;
+    if (!token) {
+      console.log('[Background] Gmail not authorized, skipping email scan');
+      return;
+    }
+
+    // Only scan every 1 hour to avoid rate limits
+    const lastScan = result.lastGmailScan || 0;
+    if (Date.now() - lastScan < 60 * 60 * 1000) {
+      return;
+    }
+
+    const subscriptionPatterns = [
+      /(?:order|receipt|invoice|confirmation|renewal|billing|charge)/i,
+      /(netflix|spotify|adobe|microsoft|amazon|disney|hbo|youtube|hulu|canva|duolingo)/i
+    ];
+
+    fetch('https://www.googleapis.com/gmail/v1/users/me/messages?q=subject:(receipt OR invoice OR renewal OR confirmation) is:unread', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      }
+    }).then(response => response.json())
+      .then(data => {
+        if (!data.messages || data.messages.length === 0) {
+          console.log('[Background] No new emails matching subscription patterns');
+          return;
+        }
+
+        const detectedSubs = {};
+        let processedCount = 0;
+
+        data.messages.forEach(msg => {
+          fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json'
+            }
+          }).then(r => r.json())
+            .then(msgData => {
+              processedCount++;
+              const subject = msgData.payload?.headers?.find(h => h.name === 'Subject')?.value || '';
+              const body = msgData.payload?.parts?.find(p => p.mimeType === 'text/plain')?.body?.data || '';
+              
+              let decodedBody = '';
+              try {
+                decodedBody = atob(body);
+              } catch (e) {
+                decodedBody = body;
+              }
+
+              const fullText = (subject + ' ' + decodedBody).toLowerCase();
+
+              // Extract service name
+              const serviceMatch = fullText.match(/(netflix|spotify|adobe|microsoft|apple|amazon|disney|hbo|youtube|hulu|canva|duolingo|audible|xbox|playstation|nordvpn|linkedin)/i);
+              if (serviceMatch) {
+                const serviceName = serviceMatch[0].charAt(0).toUpperCase() + serviceMatch[0].slice(1);
+                const amountMatch = fullText.match(/(\$|€|£)?\s*(\d+\.?\d*)/);
+                const amount = amountMatch ? parseFloat(amountMatch[2]) : null;
+
+                detectedSubs[serviceName] = {
+                  serviceName,
+                  domain: null,
+                  detectedAt: Date.now(),
+                  lastSeen: Date.now(),
+                  source: 'gmail-receipt',
+                  amount
+                };
+                console.log('[Background] ✅ Detected from Gmail:', serviceName, amount ? `($${amount})` : '');
+              }
+
+              // If processed all messages, save and sync
+              if (processedCount === data.messages.length) {
+                chrome.storage.local.get(['detectedSubscriptions'], (existing) => {
+                  const merged = { ...existing.detectedSubscriptions || {}, ...detectedSubs };
+                  chrome.storage.local.set({
+                    detectedSubscriptions: merged,
+                    lastGmailScan: Date.now()
+                  }, () => {
+                    if (Object.keys(detectedSubs).length > 0) {
+                      syncDetectedSubscriptions(merged);
+                    }
+                  });
+                });
+              }
+            }).catch(err => console.error('[Background] Error fetching email:', err));
+        });
+      }).catch(err => console.log('[Background] Gmail API error (likely auth needed):', err.message));
+  });
+}
+
+// Monitor downloads folder for CSV files with subscriptions
+function monitorDownloadsForCSV() {
+  chrome.downloads.onChanged.addListener((delta) => {
+    if (delta.state?.current !== 'complete') {
+      return;
+    }
+
+    chrome.downloads.search({ id: delta.id }, (downloads) => {
+      if (!downloads.length) return;
+
+      const download = downloads[0];
+      const filename = download.filename || '';
+
+      // Check if it's a CSV file
+      if (!filename.endsWith('.csv')) {
+        return;
+      }
+
+      // Check if filename suggests it's a subscriptions list
+      if (!/(subscription|sub|service|bill|payment|recurring)/i.test(filename)) {
+        return;
+      }
+
+      console.log('[Background] Detected subscription CSV:', filename);
+
+      // Read the file and parse it
+      const reader = new FileReader();
+      fetch(download.filename.startsWith('file://') ? download.filename : 'file://' + download.filename)
+        .then(response => response.text())
+        .then(csvText => {
+          const lines = csvText.trim().split('\n').filter(l => l.trim());
+          if (lines.length < 2) return;
+
+          const detectedSubs = {};
+          let headerMap = {};
+          let isHeader = true;
+
+          lines.forEach((line, idx) => {
+            const cells = line.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+
+            if (isHeader) {
+              // Try to auto-detect columns
+              cells.forEach((cell, i) => {
+                const lower = cell.toLowerCase();
+                if (/(name|service|subscription)/.test(lower)) headerMap.name = i;
+                if (/(amount|price|cost|fee)/.test(lower)) headerMap.amount = i;
+                if (/(frequency|period|billing)/.test(lower)) headerMap.frequency = i;
+              });
+              isHeader = false;
+              return;
+            }
+
+            const name = cells[headerMap.name || 0]?.trim();
+            const amount = parseFloat(cells[headerMap.amount || 1]);
+            const frequency = cells[headerMap.frequency || 2];
+
+            if (name) {
+              detectedSubs[name] = {
+                serviceName: name,
+                domain: null,
+                detectedAt: Date.now(),
+                lastSeen: Date.now(),
+                source: 'csv-import',
+                amount: !isNaN(amount) ? amount : null,
+                frequency: frequency || 'monthly'
+              };
+              console.log('[Background] ✅ Parsed from CSV:', name, amount ? `($${amount})` : '');
+            }
+          });
+
+          if (Object.keys(detectedSubs).length > 0) {
+            chrome.storage.local.get(['detectedSubscriptions'], (existing) => {
+              const merged = { ...existing.detectedSubscriptions || {}, ...detectedSubs };
+              chrome.storage.local.set({ detectedSubscriptions: merged }, () => {
+                syncDetectedSubscriptions(merged);
+              });
+            });
+          }
+        }).catch(err => console.error('[Background] Error reading CSV:', err));
+    });
+  });
+}
 
 // Periodic sync: reload known subscriptions and sync detected ones every 5 minutes
 setInterval(() => {
   console.log('[Background] Running periodic sync...');
   loadKnownSubscriptions();
+  scanGmailForSubscriptions();
   
   chrome.storage.local.get(['detectedSubscriptions'], (result) => {
     const subs = result.detectedSubscriptions || {};
@@ -533,4 +797,7 @@ setInterval(() => {
   });
 }, 5 * 60 * 1000); // 5 minutes
 
-// Note: injected page messages are forwarded to background by the content script.
+// Initialize CSV monitoring on install
+chrome.runtime.onInstalled.addListener(() => {
+  monitorDownloadsForCSV();
+});
