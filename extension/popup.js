@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentUrl = currentTab.url || '';
     
     // Get stored user data
-    chrome.storage.local.get(['supabaseUserUUID', 'authToken', 'subscription_status', 'trackingPaused', 'upgradePrompt'], (result) => {
+    chrome.storage.local.get(['supabaseUserUUID', 'authToken', 'subscription_status', 'trackingPaused', 'upgradePrompt', 'detectedSubscriptions'], (result) => {
       console.log('[Popup] Storage check:', result);
       const subscriptionStatus = (result.subscription_status || 'free').toLowerCase();
       const isFreeTier = subscriptionStatus === 'free';
@@ -53,13 +53,33 @@ document.addEventListener('DOMContentLoaded', () => {
           trackingStatus.className = 'status connected';
         }
         
+        const detectedSubs = result.detectedSubscriptions || {};
+        const subEntries = Object.values(detectedSubs);
+        const knownFromAccount = subEntries.filter(sub => sub.source === 'api-subscriptions');
+        const newlyDetected = subEntries.filter(sub => !sub.source || sub.source !== 'api-subscriptions');
+
+        const knownList = knownFromAccount.map(sub => sub.serviceName).join(', ') || 'None';
+        const detectedList = newlyDetected.map(sub => sub.serviceName).join(', ') || 'None';
+        const totalCount = subEntries.length;
+        
         if (debugInfo) {
-          debugInfo.innerHTML = `
-            <strong>Debug Info:</strong><br>
-            User ID: ${result.supabaseUserUUID.slice(0, 8)}...<br>
-            Current Domain: ${domain}<br>
-            <small>The extension will track time spent on this site.</small>
-          `;
+          const accountNames = knownFromAccount.length
+            ? knownFromAccount.map(sub => sub.serviceName).join(', ')
+            : 'None';
+
+          const browserNames = newlyDetected.length
+            ? newlyDetected.map(sub => sub.serviceName).join(', ')
+            : 'None';
+
+          let subsHTML = `
+            <strong>Subscription summary</strong><br>
+            <span style="color: #10b981;">Known from account: ${knownFromAccount.length}</span><br>
+            ${accountNames}<br><br>
+            <span style="color: #f59e0b;">Detected in browser: ${newlyDetected.length}</span><br>
+            ${browserNames}<br><br>
+            <small>Current site: ${domain}</small>`;
+
+          debugInfo.innerHTML = subsHTML;
         }
       } else {
         statusDiv.textContent = '❌ Not connected';

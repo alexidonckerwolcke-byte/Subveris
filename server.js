@@ -429,6 +429,451 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
+
+    if (urlPath === '/api/extension/detected-subscriptions' && req.method === 'POST') {
+      if (!supabase) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Backend not configured for extension sync' }));
+        return;
+      }
+
+      const user = await getUser(req.headers.authorization);
+      if (!user) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+
+      try {
+        const body = await parseBody(req);
+        const items = Array.isArray(body.subscriptions) ? body.subscriptions : [];
+        const saved = [];
+
+        for (const item of items) {
+          const serviceName = String(item.serviceName || item.name || item.service_name || item.provider || item.title || '').trim();
+          const domainRaw = item.domain || item.website_domain || item.website || item.websiteDomain || item.domainName || '';
+          const normalizedDomain = String(domainRaw || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '').toLowerCase();
+          const name = serviceName || normalizedDomain || 'Unknown subscription';
+          const amountValue = Number(item.amount ?? item.detectedPrice ?? item.price ?? 0);
+          const currencyCode = String(item.currency || 'USD').toUpperCase();
+          const normalizedCurrency = /^[A-Z]{3}$/.test(currencyCode) ? currencyCode : 'USD';
+          const frequency = String(item.frequency || item.detectedBillingCycle || item.billingCycle || 'monthly').toLowerCase();
+          const status = String(item.status || 'active').toLowerCase();
+          const nextBillingAt = item.detectedRenewalDate || item.next_billing_at || item.nextBillingDate || item.renewal_date || null;
+
+          if (!serviceName && !normalizedDomain) continue;
+
+          const record = {
+            user_id: user.id,
+            name,
+            amount: Number.isFinite(amountValue) ? amountValue : 0,
+            currency: normalizedCurrency,
+            frequency,
+            status,
+            description: item.planName || item.plan_label || null,
+            website_domain: normalizedDomain || null,
+            is_detected: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            next_billing_at: nextBillingAt,
+          };
+
+          const { data: existingRows, error: lookupError } = await supabase
+            .from('subscriptions')
+            .select('id')
+            .eq('user_id', user.id)
+            .or(`name.ilike.${name},website_domain.ilike.${normalizedDomain || ''}`)
+            .limit(1);
+
+          if (lookupError) {
+            console.warn('[Extension Sync] lookup failed:', lookupError.message);
+          }
+
+          let resolved = null;
+          if (existingRows && existingRows.length > 0) {
+            const { data, error } = await supabase
+              .from('subscriptions')
+              .update(record)
+              .eq('id', existingRows[0].id)
+              .select();
+            if (error) {
+              console.warn('[Extension Sync] update failed:', error.message);
+            } else {
+              resolved = data?.[0] || null;
+            }
+          } else {
+            const { data, error } = await supabase
+              .from('subscriptions')
+              .insert(record)
+              .select();
+            if (error) {
+              console.warn('[Extension Sync] insert failed:', error.message);
+            } else {
+              resolved = data?.[0] || null;
+            }
+          }
+
+          if (resolved) saved.push(resolved);
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, saved: saved.length, subscriptions: saved }));
+      } catch (error) {
+        console.error('Error syncing detected subscriptions:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to sync detected subscriptions' }));
+      }
+      return;
+    }
+
+    if (urlPath === '/api/subscriptions/bulk-import' && req.method === 'POST') {
+      if (!supabase) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Backend not configured' }));
+        return;
+      }
+
+      const user = await getUser(req.headers.authorization);
+      if (!user) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+
+      try {
+        const body = await parseBody(req);
+        const items = Array.isArray(body.subscriptions) ? body.subscriptions : [];
+        const saved = [];
+        const errors = [];
+
+        for (let idx = 0; idx < items.length; idx++) {
+          const item = items[idx];
+          
+          // Validate required fields
+          const name = String(item.name || '').trim();
+          const amount = parseFloat(item.amount || '0');
+          const frequency = String(item.frequency || 'monthly').toLowerCase();
+          const category = String(item.category || 'other').toLowerCase();
+
+          if (!name) {
+            errors.push({ index: idx, reason: 'Name is required' });
+            continue;
+          }
+
+          if (!amount || amount <= 0) {
+            errors.push({ index: idx, reason: 'Valid amount is required' });
+            continue;
+          }
+
+          // Parse next billing date
+          let nextBillingDate = null;
+          if (item.nextBillingDate) {
+            const parsed = new Date(item.nextBillingDate);
+            if (!Number.isNaN(parsed.getTime())) {
+              nextBillingDate = parsed.toISOString();
+            }
+          }
+
+          const record = {
+            user_id: user.id,
+            name,
+            amount,
+            currency: 'USD',
+            frequency,
+            category,
+            status: 'active',
+            website_domain: item.websiteDomain || null,
+            is_detected: false,
+            usage_count: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            next_billing_at: nextBillingDate,
+          };
+
+          try {
+            const { data, error } = await supabase
+              .from('subscriptions')
+              .insert(record)
+              .select();
+
+            if (error) {
+              errors.push({ index: idx, name, reason: error.message });
+            } else if (data && data.length > 0) {
+              saved.push(data[0]);
+            }
+          } catch (err) {
+            errors.push({ index: idx, name, reason: err instanceof Error ? err.message : 'Unknown error' });
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          success: saved.length > 0, 
+          imported: saved.length, 
+          total: items.length,
+          errors: errors.length > 0 ? errors : undefined,
+          subscriptions: saved 
+        }));
+      } catch (error) {
+        console.error('Error bulk importing subscriptions:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to bulk import subscriptions' }));
+      }
+      return;
+    }
+
+    if (urlPath === '/api/subscriptions/scan-email' && req.method === 'POST') {
+      if (!supabase) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Backend not configured' }));
+        return;
+      }
+
+      const user = await getUser(req.headers.authorization);
+      if (!user) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+
+      try {
+        const body = await parseBody(req);
+        const emailText = String(body.emailText || body.content || '');
+        const emailSubject = String(body.emailSubject || body.subject || '');
+
+        if (!emailText && !emailSubject) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Email content required' }));
+          return;
+        }
+
+        // Common subscription keywords and patterns
+        const subscriptionKeywords = [
+          'subscription', 'renewal', 'renewal notice', 'billing', 'invoice',
+          'charge', 'payment', 'order confirmation', 'purchase', 'receipt',
+          'renewing', 'your membership', 'your account', 'continues', 'auto-renew'
+        ];
+
+        const servicePatterns = {
+          'Netflix': ['netflix', 'subscription charge'],
+          'Spotify': ['spotify', 'premium membership'],
+          'Amazon Prime': ['amazon prime', 'prime membership'],
+          'Disney+': ['disney', 'disneyplus', 'disney\\+'],
+          'YouTube': ['youtube premium'],
+          'HBO Max': ['hbo', 'hbomax'],
+          'Hulu': ['hulu'],
+          'Apple Music': ['apple music', 'itunes'],
+          'Microsoft 365': ['microsoft 365', 'office 365'],
+          'Adobe': ['adobe', 'creative cloud'],
+          'Dropbox': ['dropbox'],
+          'OneDrive': ['onedrive'],
+          'iCloud': ['icloud'],
+          'LinkedIn': ['linkedin premium'],
+          'Linkedin Premium': ['linkedin premium', 'linkedin plus'],
+          'Tinder': ['tinder', 'gold', 'plus'],
+          'Uber': ['uber', 'pass'],
+          'DoorDash': ['doordash'],
+          'Audible': ['audible', 'audiobook'],
+          'Coursera': ['coursera', 'plus'],
+          'MasterClass': ['masterclass'],
+          'Duolingo': ['duolingo', 'plus'],
+          'HelloFresh': ['hellofresh', 'meal plan'],
+          'Blue Apron': ['blue apron'],
+          'NordVPN': ['nordvpn'],
+          'ExpressVPN': ['expressvpn'],
+          'Grammarly': ['grammarly'],
+          'LastPass': ['lastpass'],
+          'Slack': ['slack'],
+          'Zoom': ['zoom'],
+          'Asana': ['asana'],
+          'Notion': ['notion'],
+          'Canva': ['canva', 'pro'],
+          'Figma': ['figma'],
+          'Discord': ['discord', 'nitro'],
+          'Twitch': ['twitch', 'prime'],
+          'PlayStation': ['playstation plus', 'ps plus'],
+          'Xbox': ['xbox game pass', 'xbox live'],
+          'Nintendo': ['nintendo switch online'],
+          'Calm': ['calm'],
+          'Headspace': ['headspace'],
+          'Peloton': ['peloton'],
+          'Fitbit': ['fitbit'],
+          'ClassPass': ['classpass'],
+          'Scribd': ['scribd'],
+          'Kindle': ['kindle unlimited']
+        };
+
+        // Check if email is subscription-related
+        const fullText = (emailText + ' ' + emailSubject).toLowerCase();
+        const isSubscriptionRelated = subscriptionKeywords.some(kw => fullText.includes(kw.toLowerCase()));
+
+        if (!isSubscriptionRelated) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ 
+            detected: false, 
+            message: 'Email does not appear to be subscription-related' 
+          }));
+          return;
+        }
+
+        // Extract service names
+        const detectedServices = [];
+        for (const [serviceName, patterns] of Object.entries(servicePatterns)) {
+          for (const pattern of patterns) {
+            const regex = new RegExp(pattern, 'gi');
+            if (regex.test(fullText)) {
+              if (!detectedServices.find(s => s.name === serviceName)) {
+                detectedServices.push({ name: serviceName });
+              }
+              break;
+            }
+          }
+        }
+
+        // Extract amounts (look for $ or other currency symbols)
+        const amountMatch = emailText.match(/[\$£€¥][\s]?(\d+(?:[.,]\d{2})?)/g);
+        const amounts = amountMatch ? amountMatch.map(amt => parseFloat(amt.replace(/[^\d.]/g, ''))) : [];
+
+        // Extract renewal date (common patterns)
+        const datePatterns = [
+          /(?:renew|expires?|next billing|billing date)[:\s]+(\d{1,2}\/\d{1,2}\/\d{2,4})/gi,
+          /(\d{1,2}\/\d{1,2}\/\d{2,4})/g,
+          /(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2}),?\s+(\d{4})/gi
+        ];
+
+        let nextBillingDate = null;
+        for (const pattern of datePatterns) {
+          const match = emailText.match(pattern);
+          if (match) {
+            try {
+              nextBillingDate = new Date(match[0]).toISOString().split('T')[0];
+              if (nextBillingDate) break;
+            } catch (e) {
+              // Continue to next pattern
+            }
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          detected: detectedServices.length > 0,
+          services: detectedServices,
+          amounts: amounts.slice(0, 3), // Top 3 amounts found
+          estimatedRenewalDate: nextBillingDate,
+          message: `Found ${detectedServices.length} potential subscription(s)`
+        }));
+      } catch (error) {
+        console.error('Error scanning email:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to scan email' }));
+      }
+      return;
+    }
+
+    if (urlPath === '/api/subscriptions/analyze-transactions' && req.method === 'POST') {
+      // Analyzes financial transactions to detect recurring subscription charges
+      // This endpoint can be used with Plaid data or manual transaction uploads
+      if (!supabase) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Backend not configured' }));
+        return;
+      }
+
+      const user = await getUser(req.headers.authorization);
+      if (!user) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+
+      try {
+        const body = await parseBody(req);
+        const transactions = Array.isArray(body.transactions) ? body.transactions : [];
+
+        if (transactions.length === 0) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Transactions array required' }));
+          return;
+        }
+
+        // Analyze transactions for recurring patterns
+        const recurringMap = {};
+
+        transactions.forEach((txn) => {
+          const merchant = String(txn.merchant || txn.name || '').toLowerCase().trim();
+          const amount = Math.abs(parseFloat(txn.amount || 0));
+          const date = new Date(txn.date || 0);
+
+          if (!merchant || amount <= 0) return;
+
+          if (!recurringMap[merchant]) {
+            recurringMap[merchant] = {
+              merchant,
+              transactions: [],
+              totalAmount: 0,
+              count: 0
+            };
+          }
+
+          recurringMap[merchant].transactions.push({ amount, date });
+          recurringMap[merchant].totalAmount += amount;
+          recurringMap[merchant].count++;
+        });
+
+        // Detect recurring charges (transactions with same amount on similar intervals)
+        const detected = [];
+
+        for (const [merchant, data] of Object.entries(recurringMap)) {
+          if (data.count < 2) continue; // Need at least 2 transactions
+
+          // Sort by date
+          const sorted = data.transactions.sort((a, b) => a.date - b.date);
+
+          // Check if amounts are consistent (within 5% variance)
+          const amounts = sorted.map(t => t.amount);
+          const avgAmount = amounts.reduce((a, b) => a + b) / amounts.length;
+          const variance = Math.max(...amounts) - Math.min(...amounts);
+          const isConsistentAmount = variance / avgAmount <= 0.05;
+
+          // Check if intervals are consistent (monthly, yearly, etc)
+          if (isConsistentAmount && sorted.length >= 2) {
+            const intervals = [];
+            for (let i = 1; i < sorted.length; i++) {
+              intervals.push(Math.round((sorted[i].date - sorted[i-1].date) / (1000 * 60 * 60 * 24)));
+            }
+
+            const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+            const intervalVariance = Math.max(...intervals) - Math.min(...intervals);
+
+            // If interval variance is small (consistent payments)
+            if (intervalVariance <= 5 || avgInterval <= 1) {
+              detected.push({
+                merchant: merchant.charAt(0).toUpperCase() + merchant.slice(1),
+                averageAmount: parseFloat(avgAmount.toFixed(2)),
+                estimatedFrequency: avgInterval <= 7 ? 'weekly' : avgInterval <= 35 ? 'monthly' : 'yearly',
+                transactionCount: data.count,
+                lastTransaction: sorted[sorted.length - 1].date,
+                confidence: isConsistentAmount ? 'high' : 'medium'
+              });
+            }
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          detected: detected,
+          totalAnalyzed: transactions.length,
+          foundRecurring: detected.length
+        }));
+      } catch (error) {
+        console.error('Error analyzing transactions:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to analyze transactions' }));
+      }
+      return;
+    }
     
     if (urlPath === '/api/recommendations' && req.method === 'GET') {
       if (!supabase && REMOTE_API_BASE) {

@@ -45,6 +45,11 @@ const mainNavItems = [
     icon: CreditCard,
   },
   {
+    title: "Detected",
+    url: "/detected-subscriptions",
+    icon: Sparkles,
+  },
+  {
     title: "Insights",
     url: "/insights",
     icon: Lightbulb,

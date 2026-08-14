@@ -155,6 +155,7 @@ export default function Dashboard() {
     ? yearlyProjection
     : Math.round(totalMonthlySpend * 12 * 100) / 100;
   const activeSubscriptions = (subscriptions || []).filter((sub) => sub?.status === "active").length;
+  const detectedSubscriptions = (subscriptions || []).filter((sub) => sub?.isDetected === true || (sub as any)?.is_detected === true).length;
   const potentialSavings = useMemo(
     () => calculatePotentialSavings(subscriptions || []),
     [subscriptions]
@@ -185,6 +186,13 @@ export default function Dashboard() {
       helper: "active",
       Icon: Clock,
       iconClass: "text-violet-500",
+    },
+    {
+      label: "Detected subscriptions",
+      value: `${detectedSubscriptions}`,
+      helper: "extension",
+      Icon: Sparkles,
+      iconClass: "text-amber-500",
     },
   ];
 
@@ -307,6 +315,16 @@ export default function Dashboard() {
                   >
                     Review AI recommendations
                   </Button>
+
+                  {detectedSubscriptions > 0 && (
+                    <Button
+                      type="button"
+                      className="w-full rounded-full border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/50"
+                      onClick={() => navigate("/detected-subscriptions")}
+                    >
+                      📡 View {detectedSubscriptions} detected
+                    </Button>
+                  )}
 
                   <Button
                     type="button"

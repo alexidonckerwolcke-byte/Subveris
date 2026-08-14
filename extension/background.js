@@ -1,8 +1,173 @@
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Subveris Usage Tracker Extension Installed');
+  loadKnownSubscriptions();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  console.log('Subveris Usage Tracker Extension started');
+  loadKnownSubscriptions();
 });
 
 const ZERO_USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Subscription domain mapping
+const SUBSCRIPTION_MAPPING = {
+  'netflix.com': 'Netflix',
+  'spotify.com': 'Spotify Premium',
+  'amazon.com': 'Amazon Prime',
+  'disneyplus.com': 'Disney Plus',
+  'youtube.com': 'YouTube Premium',
+  'hbomax.com': 'HBO Max',
+  'tinder.com': 'Tinder Gold',
+  'linkedin.com': 'LinkedIn Premium',
+  'hellofresh.com': 'HelloFresh',
+  'icloud.com': 'iCloud',
+  'canva.com': 'Canva Pro',
+  'microsoft.com': 'Microsoft 365',
+  'nordvpn.com': 'NordVPN',
+  'playstation.com': 'PlayStation Plus',
+  'xbox.com': 'Xbox Game Pass',
+  'audible.com': 'Audible',
+  'readly.com': 'Readly',
+  'duolingo.com': 'Duolingo Plus',
+  'viaplay.com': 'Viaplay',
+  'adobe.com': 'Adobe'
+};
+
+function getServiceNameFromDomain(domain) {
+  const normalized = domain.replace(/^www\./, '').toLowerCase();
+  for (const [domainKey, serviceName] of Object.entries(SUBSCRIPTION_MAPPING)) {
+    if (normalized.includes(domainKey.replace(/^www\./, ''))) {
+      return serviceName;
+    }
+  }
+  return null;
+}
+
+function loadKnownSubscriptions() {
+  chrome.storage.local.get(['authToken', 'subverisApiUrl', 'detectedSubscriptions'], (result) => {
+    const token = result.authToken;
+    const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
+    const existingSubs = result.detectedSubscriptions || {};
+
+    if (!token) {
+      console.log('[Background] No auth token available yet; skipping background subscription hydration.');
+      return;
+    }
+
+    fetch(`${apiUrl}/api/subscriptions`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      keepalive: true
+    }).then(async (response) => {
+      if (!response.ok) {
+        console.warn('[Background] Failed to fetch known subscriptions:', response.status, response.statusText);
+        return;
+      }
+
+      const subscriptions = await response.json();
+      if (!Array.isArray(subscriptions)) {
+        console.warn('[Background] Known subscriptions response was not an array:', subscriptions);
+        return;
+      }
+
+      const merged = { ...existingSubs };
+
+      subscriptions.forEach((sub) => {
+        const serviceName = sub.name || sub.service_name || sub.provider || sub.title;
+        if (!serviceName) {
+          return;
+        }
+
+        const domain = (sub.website_domain || sub.website || sub.domain || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').toLowerCase();
+        const key = serviceName;
+
+        merged[key] = {
+          serviceName: key,
+          domain: domain || existingSubs[key]?.domain || null,
+          detectedAt: existingSubs[key]?.detectedAt || Date.now(),
+          lastSeen: Date.now(),
+          source: 'api-subscriptions'
+        };
+      });
+
+      chrome.storage.local.set({ detectedSubscriptions: merged }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('[Background] Failed to store hydrated subscriptions:', chrome.runtime.lastError);
+          return;
+        }
+        console.log('[Background] ✅ Hydrated known subscriptions from backend:', Object.keys(merged).length);
+      });
+    }).catch((error) => {
+      console.error('[Background] Error hydrating known subscriptions from backend:', error);
+    });
+  });
+}
+
+function addDetectedSubscription(serviceName, domain) {
+  if (!serviceName) return;
+
+  chrome.storage.local.get(['detectedSubscriptions'], (result) => {
+    const subs = result.detectedSubscriptions || {};
+    if (!subs[serviceName]) {
+      subs[serviceName] = {
+        serviceName,
+        domain,
+        detectedAt: Date.now(),
+        lastSeen: Date.now()
+      };
+    } else {
+      subs[serviceName].lastSeen = Date.now();
+    }
+
+    chrome.storage.local.set({ detectedSubscriptions: subs }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Background] Failed to store detected subscription:', chrome.runtime.lastError);
+        return;
+      }
+      console.log('[Background] ✅ Added detected subscription:', serviceName);
+      syncDetectedSubscriptions(subs);
+    });
+  });
+}
+
+function syncDetectedSubscriptions(subscriptions) {
+  chrome.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
+    const token = result.authToken;
+    const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
+
+    if (!token) {
+      console.warn('[Background] No auth token available to sync detected subscriptions');
+      return;
+    }
+
+    const payload = JSON.stringify({
+      subscriptions: Object.values(subscriptions),
+      syncedAt: Date.now()
+    });
+
+    fetch(`${apiUrl}/api/extension/detected-subscriptions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: payload,
+      keepalive: true
+    }).then((response) => {
+      if (!response.ok) {
+        console.warn('[Background] Failed to sync subscriptions:', response.status);
+        return;
+      }
+      console.log('[Background] ✅ Subscriptions synced successfully');
+    }).catch((error) => {
+      console.error('[Background] Failed to sync subscriptions:', error);
+    });
+  });
+}
 
 function getSubscriptionStatus(callback) {
   chrome.storage.local.get(['subscription_status'], (result) => {
@@ -81,6 +246,7 @@ function runCookieSessionScan() {
 
     chrome.cookies.getAll({}, (cookies) => {
       const domains = [];
+      const detectedServices = {};
       const seenDomains = new Set();
       const keywordPattern = /(sess|auth|uid)/i;
 
@@ -97,12 +263,25 @@ function runCookieSessionScan() {
         if (domain && !seenDomains.has(domain)) {
           seenDomains.add(domain);
           domains.push(domain);
+
+          // Try to map this domain to a subscription service
+          const serviceName = getServiceNameFromDomain(domain);
+          if (serviceName) {
+            detectedServices[serviceName] = {
+              serviceName,
+              domain,
+              detectedAt: Date.now(),
+              lastSeen: Date.now()
+            };
+            console.log('[Background] Detected subscription from cookie:', serviceName, 'on', domain);
+          }
         }
       });
 
       chrome.storage.local.set({
         cookieScanCompleted: true,
-        lastCookieScanAt: Date.now()
+        lastCookieScanAt: Date.now(),
+        detectedSubscriptions: detectedServices
       }, () => {
         if (chrome.runtime.lastError) {
           console.error('[Background] Failed to persist cookie scan state:', chrome.runtime.lastError);
@@ -121,8 +300,10 @@ function runCookieSessionScan() {
           return;
         }
 
+        // Sync detected services instead of raw domains
         const payload = JSON.stringify({
           domains,
+          detectedSubscriptions: Object.values(detectedServices),
           source: 'cookie-session-scan',
           scannedAt: Date.now()
         });
@@ -255,6 +436,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } else {
         console.log('[Background] ✅ Stored auth token and API URL: User ID =', request.userId, 'apiUrl =', request.apiUrl);
         runCookieSessionScan();
+        loadKnownSubscriptions();
         sendResponse({ success: true, stored: true });
       }
     });
@@ -265,6 +447,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('[Background] TRACK_USAGE request for domain:', request.domain, 'timeSpent:', request.timeSpent);
     sendUsageTracking(request.domain, request.timeSpent);
     sendResponse({ success: true, queued: true });
+    return true;
+  }
+
+  if (request.type === 'DETECT_SUBSCRIPTION') {
+    const { serviceName, domain, detectedAt } = request;
+    console.log('[Background] DETECT_SUBSCRIPTION request for:', serviceName);
+    addDetectedSubscription(serviceName, domain);
+    sendResponse({ success: true, detected: serviceName });
     return true;
   }
 
@@ -329,5 +519,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   console.log('[Background] Unknown message type:', request.type);
 });
+
+// Periodic sync: reload known subscriptions and sync detected ones every 5 minutes
+setInterval(() => {
+  console.log('[Background] Running periodic sync...');
+  loadKnownSubscriptions();
+  
+  chrome.storage.local.get(['detectedSubscriptions'], (result) => {
+    const subs = result.detectedSubscriptions || {};
+    if (Object.keys(subs).length > 0) {
+      syncDetectedSubscriptions(subs);
+    }
+  });
+}, 5 * 60 * 1000); // 5 minutes
 
 // Note: injected page messages are forwarded to background by the content script.

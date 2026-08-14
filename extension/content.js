@@ -128,6 +128,65 @@ function sendUsageTracking(domain, timeSpent) {
   }
 }
 
+// Subscription service mapping
+const SUBSCRIPTION_MAPPING = {
+  'netflix.com': 'Netflix',
+  'spotify.com': 'Spotify Premium',
+  'amazon.com': 'Amazon Prime',
+  'disneyplus.com': 'Disney Plus',
+  'youtube.com': 'YouTube Premium',
+  'hbomax.com': 'HBO Max',
+  'tinder.com': 'Tinder Gold',
+  'linkedin.com': 'LinkedIn Premium',
+  'hellofresh.com': 'HelloFresh',
+  'icloud.com': 'iCloud',
+  'canva.com': 'Canva Pro',
+  'microsoft.com': 'Microsoft 365',
+  'nordvpn.com': 'NordVPN',
+  'playstation.com': 'PlayStation Plus',
+  'xbox.com': 'Xbox Game Pass',
+  'audible.com': 'Audible',
+  'readly.com': 'Readly',
+  'duolingo.com': 'Duolingo Plus',
+  'viaplay.com': 'Viaplay',
+  'adobe.com': 'Adobe'
+};
+
+function getServiceNameFromDomain(domain) {
+  const normalized = domain.replace(/^www\./, '').toLowerCase();
+  for (const [domainKey, serviceName] of Object.entries(SUBSCRIPTION_MAPPING)) {
+    if (normalized.includes(domainKey.replace(/^www\./, ''))) {
+      return serviceName;
+    }
+  }
+  return null;
+}
+
+function detectAndTrackSubscription() {
+  getSubscriptionStatus((status) => {
+    if (!isTierAllowed(status)) {
+      return;
+    }
+
+    const domain = window.location.hostname.replace(/^www\./i, '').toLowerCase();
+    const serviceName = getServiceNameFromDomain(domain);
+
+    if (serviceName) {
+      console.log('[Extension] Detected subscription service:', serviceName);
+      sendMessageToBackground({
+        type: 'DETECT_SUBSCRIPTION',
+        serviceName,
+        domain,
+        detectedAt: Date.now()
+      }, (response) => {
+        if (response) {
+          console.log('[Extension] ✅ Subscription detection sent:', serviceName);
+        }
+      });
+    }
+  });
+}
+
 function saveDiscoveredPrice(priceData) {
   if (!priceData) {
     return;
@@ -361,10 +420,12 @@ function trackUsageIfNeeded() {
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
+    detectAndTrackSubscription();
     scanForSubscriptionPricing();
     observePricingChanges();
   });
 } else {
+  detectAndTrackSubscription();
   scanForSubscriptionPricing();
   observePricingChanges();
 }

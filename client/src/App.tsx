@@ -29,6 +29,7 @@ import React from "react";
 const NotFound = lazy(() => import("./pages/not-found.js"));
 const Dashboard = lazy(() => import("./pages/dashboard.js"));
 const Subscriptions = lazy(() => import("./pages/subscriptions.js"));
+const DetectedSubscriptions = lazy(() => import("./pages/detected-subscriptions.js"));
 const Insights = lazy(() => import("./pages/insights.js"));
 const CostOptimizer = lazy(() => import("./pages/cost-optimizer.js"));
 const Savings = lazy(() => import("./pages/savings.js"));
@@ -75,6 +76,7 @@ function Router({ user }: { user: any }) {
     <Route key="dashboard" path="/" component={Dashboard} />,
     <Route key="dashboard-alt" path="/dashboard" component={Dashboard} />,
     <Route key="subscriptions" path="/subscriptions" component={Subscriptions} />,
+    <Route key="detected-subscriptions" path="/detected-subscriptions" component={DetectedSubscriptions} />,
     <Route key="insights" path="/insights" component={Insights} />,
     <Route key="cost-optimizer" path="/cost-optimizer" component={CostOptimizer} />,
     <Route key="savings" path="/savings" component={Savings} />,
