@@ -912,6 +912,37 @@ const server = http.createServer(async (req, res) => {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify([]));
         }
+      } else if (req.method === 'POST') {
+        try {
+          const body = await parseBody(req);
+          const { name } = body;
+          
+          if (!name) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing required field: name' }));
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from('family_groups')
+            .insert({ owner_id: user.id, name })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error creating family group:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to create family group' }));
+            return;
+          }
+
+          res.writeHead(201, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(data));
+        } catch (error) {
+          console.error('Error handling POST /api/family-groups:', error);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Internal server error' }));
+        }
       }
       return;
     }

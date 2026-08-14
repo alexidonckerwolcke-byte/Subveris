@@ -25,6 +25,15 @@ vi.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ user: { id: 'owner-1' } }),
 }));
 
+vi.mock('@/lib/subscription-context', () => ({
+  useSubscription: () => ({ isPremium: true, planType: 'premium' }),
+  SubscriptionProvider: ({ children }: any) => children,
+}));
+
+vi.mock('@/hooks/use-toast', () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}));
+
 import { FamilySharing } from '../client/src/components/family-sharing';
 
 describe('Accessibility', () => {
