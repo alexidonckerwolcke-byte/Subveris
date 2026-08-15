@@ -1,13 +1,35 @@
-# SubSave Usage Tracker Extension
+# Subveris Tracker Extension
 
-This Chrome extension tracks time spent on subscription websites (Netflix, Disney+, Hulu) and sends usage data to Supabase.
+A cross-browser extension that automatically tracks subscription services, scans emails for receipts, and detects payments to help you manage and optimize your subscriptions.
+
+**Now available on:** Chrome • Edge • Firefox • Safari (15+)
 
 ## Installation
 
+Choose your browser for detailed setup instructions:
+
+### 🌐 Chrome (Easiest)
 1. Open Chrome and go to `chrome://extensions`
 2. Enable "Developer mode" in the top right
 3. Click "Load unpacked"
 4. Select the `extension` folder from this repository
+
+### 🦊 Firefox
+See full guide: [INSTALL_FIREFOX.md](INSTALL_FIREFOX.md)
+- Simplest installation process
+- Recommended for new users
+- Full WebExtensions support
+
+### 🧭 Safari (macOS)
+See full guide: [INSTALL_SAFARI.md](INSTALL_SAFARI.md)
+- Requires macOS 11+ and Safari 15+
+- Uses native Xcode project
+- Full App Store integration ready
+
+### 🔷 Edge
+- Same as Chrome (Edge uses Chromium)
+- Go to `edge://extensions`
+- Load unpacked from the `extension` folder
 
 ## Setup
 

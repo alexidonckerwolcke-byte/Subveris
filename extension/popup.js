@@ -3,8 +3,43 @@
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
 const browser = globalThis.browser || globalThis.chrome;
 
+// Detect which browser is running
+function detectBrowser() {
+  const userAgent = navigator.userAgent;
+  let browserName = 'Unknown';
+  let browserNotes = '';
+  
+  if (userAgent.includes('Firefox')) {
+    browserName = 'Firefox 🦊';
+    browserNotes = 'Firefox fully supports all features. Visit <a href="https://addons.mozilla.org" target="_blank" style="color: #007bff; text-decoration: none;">Firefox Add-ons</a> to find the latest version.';
+  } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+    browserName = 'Safari 🧭';
+    browserNotes = 'Safari requires a native app wrapper. See <a href="https://github.com/subveris/extension/blob/main/INSTALL_SAFARI.md" target="_blank" style="color: #007bff; text-decoration: none;">Safari installation guide</a> for setup.';
+  } else if (userAgent.includes('Edg')) {
+    browserName = 'Microsoft Edge 🔷';
+    browserNotes = 'Edge uses Chromium engine - all Chrome features work identically.';
+  } else if (userAgent.includes('Chrome')) {
+    browserName = 'Chrome 🌐';
+    browserNotes = 'Chrome has the widest compatibility. All features work perfectly.';
+  }
+  
+  return { browserName, browserNotes };
+}
+
 // popup.js
 document.addEventListener('DOMContentLoaded', () => {
+  // Show browser info
+  const { browserName, browserNotes } = detectBrowser();
+  const browserNameEl = document.getElementById('browser-name');
+  const browserNotesEl = document.getElementById('browser-notes');
+  
+  if (browserNameEl) {
+    browserNameEl.textContent = browserName;
+  }
+  if (browserNotesEl) {
+    browserNotesEl.innerHTML = browserNotes;
+  }
+  
   const statusDiv = document.getElementById('status');
   const trackingStatus = document.getElementById('tracking-status');
   const debugInfo = document.getElementById('debug-info');

@@ -67,12 +67,20 @@
         <button id="open-downloads" style="background: #28a745; font-size: 12px; padding: 6px; width: 100%;">📁 Open Downloads Folder</button>
       </div>
       
+      <!-- Browser-specific notes -->
+      <div id="browser-info" style="margin-top: 10px; padding: 8px; background: white; border-radius: 3px; border-left: 3px solid #ffc107; font-size: 11px;">
+        <strong>Your Browser:</strong> <span id="browser-name">Detecting...</span>
+        <p id="browser-notes" style="margin: 5px 0 0 0; color: #666;"></p>
+      </div>
+      
       <!-- Help info -->
       <details style="margin-top: 10px; font-size: 11px; color: #666;">
         <summary style="cursor: pointer; font-weight: bold; color: #007bff;">How it works</summary>
         <div style="margin-top: 8px; padding: 8px; background: white; border-radius: 3px; line-height: 1.5;">
           <strong>Gmail:</strong> Click "Connect Gmail Account" → You'll be asked to log into Google → Approve access to read receipts → Extension automatically scans every 5 minutes<br><br>
-          <strong>CSV:</strong> Download a subscriptions list (name, amount, etc.) → It's detected automatically from your Downloads folder
+          <strong>CSV:</strong> Download a subscriptions list (name, amount, etc.) → It's detected automatically from your Downloads folder<br><br>
+          <strong>Website Visits:</strong> Visiting subscription sites (Netflix, Spotify, etc.) automatically logs them<br><br>
+          <strong>Cookie Scan:</strong> Extension scans auth cookies once at login to detect existing subscriptions
         </div>
       </details>
     </div>
