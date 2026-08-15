@@ -1,3 +1,8 @@
+// Cross-browser compatibility shim
+// Safari 15+, Firefox, and Edge use 'browser' global
+// Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
+const browser = globalThis.browser || globalThis.chrome;
+
 // popup.js
 document.addEventListener('DOMContentLoaded', () => {
   const statusDiv = document.getElementById('status');
@@ -6,13 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
   
   console.log('[Popup] Opening popup...');
   
-  // Check both chrome.storage and localStorage from tab
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  // Check both browser.storage and localStorage from tab
+  browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const currentTab = tabs[0] || {};
     const currentUrl = currentTab.url || '';
     
     // Get stored user data
-    chrome.storage.local.get(['supabaseUserUUID', 'authToken', 'subscription_status', 'trackingPaused', 'upgradePrompt', 'detectedSubscriptions'], (result) => {
+    browser.storage.local.get(['supabaseUserUUID', 'authToken', 'subscription_status', 'trackingPaused', 'upgradePrompt', 'detectedSubscriptions'], (result) => {
       console.log('[Popup] Storage check:', result);
       const subscriptionStatus = (result.subscription_status || 'free').toLowerCase();
       const isFreeTier = subscriptionStatus === 'free';
@@ -108,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const openDownloadsBtn = document.getElementById('open-downloads');
   const gmailStatus = document.getElementById('gmail-status');
   
-  chrome.storage.local.get(['supabaseUserUUID', 'gmailAuthToken'], (result) => {
+  browser.storage.local.get(['supabaseUserUUID', 'gmailAuthToken'], (result) => {
     if (result.supabaseUserUUID && discoverySection) {
       discoverySection.style.display = 'block';
       
@@ -134,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       try {
         // Send message to background to initiate Gmail auth
-        chrome.runtime.sendMessage({
+        browser.runtime.sendMessage({
           type: 'authorizeGmail'
         }, (response) => {
           if (response?.success) {
@@ -166,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Open downloads folder
   if (openDownloadsBtn) {
     openDownloadsBtn.addEventListener('click', () => {
-      chrome.downloads.showDefaultFolder();
+      browser.downloads.showDefaultFolder();
     });
   }
   
@@ -174,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingsBtn = document.getElementById('open-settings');
   if (settingsBtn) {
     settingsBtn.addEventListener('click', () => {
-      chrome.runtime.openOptionsPage();
+      browser.runtime.openOptionsPage();
     });
   }
 });

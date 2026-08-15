@@ -1,9 +1,14 @@
-chrome.runtime.onInstalled.addListener(() => {
+// Cross-browser compatibility shim
+// Safari 15+, Firefox, and Edge use 'browser' global
+// Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
+const browser = globalThis.browser || globalThis.chrome;
+
+browser.runtime.onInstalled.addListener(() => {
   console.log('Subveris Usage Tracker Extension Installed');
   loadKnownSubscriptions();
 });
 
-chrome.runtime.onStartup.addListener(() => {
+browser.runtime.onStartup.addListener(() => {
   console.log('Subveris Usage Tracker Extension started');
   loadKnownSubscriptions();
 });
@@ -45,7 +50,7 @@ function getServiceNameFromDomain(domain) {
 }
 
 function loadKnownSubscriptions() {
-  chrome.storage.local.get(['authToken', 'subverisApiUrl', 'detectedSubscriptions'], (result) => {
+  browser.storage.local.get(['authToken', 'subverisApiUrl', 'detectedSubscriptions'], (result) => {
     const token = result.authToken;
     const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
     const existingSubs = result.detectedSubscriptions || {};
@@ -94,8 +99,8 @@ function loadKnownSubscriptions() {
         };
       });
 
-      chrome.storage.local.set({ detectedSubscriptions: merged }, () => {
-        if (chrome.runtime.lastError) {
+      browser.storage.local.set({ detectedSubscriptions: merged }, () => {
+        if (browser.runtime.lastError) {
           console.error('[Background] Failed to store hydrated subscriptions:', chrome.runtime.lastError);
           return;
         }
@@ -110,7 +115,7 @@ function loadKnownSubscriptions() {
 function addDetectedSubscription(serviceName, domain) {
   if (!serviceName) return;
 
-  chrome.storage.local.get(['detectedSubscriptions'], (result) => {
+  browser.storage.local.get(['detectedSubscriptions'], (result) => {
     const subs = result.detectedSubscriptions || {};
     if (!subs[serviceName]) {
       subs[serviceName] = {
@@ -123,8 +128,8 @@ function addDetectedSubscription(serviceName, domain) {
       subs[serviceName].lastSeen = Date.now();
     }
 
-    chrome.storage.local.set({ detectedSubscriptions: subs }, () => {
-      if (chrome.runtime.lastError) {
+    browser.storage.local.set({ detectedSubscriptions: subs }, () => {
+      if (browser.runtime.lastError) {
         console.error('[Background] Failed to store detected subscription:', chrome.runtime.lastError);
         return;
       }
@@ -135,7 +140,7 @@ function addDetectedSubscription(serviceName, domain) {
 }
 
 function syncDetectedSubscriptions(subscriptions) {
-  chrome.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
+  browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
     const token = result.authToken;
     const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
 
@@ -170,7 +175,7 @@ function syncDetectedSubscriptions(subscriptions) {
 }
 
 function getSubscriptionStatus(callback) {
-  chrome.storage.local.get(['subscription_status'], (result) => {
+  browser.storage.local.get(['subscription_status'], (result) => {
     const status = (result.subscription_status || 'free').toLowerCase();
     callback(status);
   });
@@ -182,7 +187,7 @@ function isTierAllowed(status) {
 
 function updateUpgradePrompt(status) {
   const isFreeTier = !status || status === 'free';
-  chrome.storage.local.set({
+  browser.storage.local.set({
     trackingPaused: isFreeTier,
     upgradePrompt: isFreeTier
       ? 'Upgrade to Premium or Family to unlock full tracking, hidden subscription discovery, and zero-usage alerts.'
@@ -210,7 +215,7 @@ function ensureTierAccess(callback) {
 }
 
 function updateZeroUsageSignal(domain, timeSpent, callback) {
-  chrome.storage.local.get(['usageSignalHistory'], (result) => {
+  browser.storage.local.get(['usageSignalHistory'], (result) => {
     const history = result.usageSignalHistory || {};
     const domainHistory = Array.isArray(history[domain]) ? history[domain] : [];
     const now = Date.now();
@@ -221,8 +226,8 @@ function updateZeroUsageSignal(domain, timeSpent, callback) {
     const isZeroUsage = timeSpent === 0 && !hasPositiveUsage;
 
     history[domain] = recentEntries;
-    chrome.storage.local.set({ usageSignalHistory: history }, () => {
-      if (chrome.runtime.lastError) {
+    browser.storage.local.set({ usageSignalHistory: history }, () => {
+      if (browser.runtime.lastError) {
         console.error('[Background] Failed to persist zero-usage signal history:', chrome.runtime.lastError);
       }
       callback(Boolean(isZeroUsage));
@@ -231,7 +236,7 @@ function updateZeroUsageSignal(domain, timeSpent, callback) {
 }
 
 function runCookieSessionScan() {
-  chrome.storage.local.get(['authToken', 'subverisApiUrl', 'subscription_status', 'cookieScanCompleted'], (result) => {
+  browser.storage.local.get(['authToken', 'subverisApiUrl', 'subscription_status', 'cookieScanCompleted'], (result) => {
     const status = (result.subscription_status || 'free').toLowerCase();
 
     if (!isTierAllowed(status)) {
@@ -244,7 +249,7 @@ function runCookieSessionScan() {
       return;
     }
 
-    chrome.cookies.getAll({}, (cookies) => {
+    browser.cookies.getAll({}, (cookies) => {
       const domains = [];
       const detectedServices = {};
       const seenDomains = new Set();
@@ -278,12 +283,12 @@ function runCookieSessionScan() {
         }
       });
 
-      chrome.storage.local.set({
+      browser.storage.local.set({
         cookieScanCompleted: true,
         lastCookieScanAt: Date.now(),
         detectedSubscriptions: detectedServices
       }, () => {
-        if (chrome.runtime.lastError) {
+        if (browser.runtime.lastError) {
           console.error('[Background] Failed to persist cookie scan state:', chrome.runtime.lastError);
           return;
         }
@@ -412,11 +417,11 @@ function sendUsageTrackingFallback(domain, timeSpent, token, apiUrl) {
 }
 
 // Listen for messages from content script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('[Background] Received message:', request.type, 'from:', sender.url);
 
   if (request.type === 'GET_AUTH_TOKEN') {
-    chrome.storage.local.get(['authToken'], (result) => {
+    browser.storage.local.get(['authToken'], (result) => {
       console.log('[Background] Sending auth token:', result.authToken ? 'FOUND' : 'NOT FOUND');
       sendResponse({ token: result.authToken || null });
     });
@@ -425,13 +430,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'SUBVERIS_AUTH_TOKEN') {
     console.log('[Background] Storing auth token for user:', request.userId);
-    chrome.storage.local.set({
+    browser.storage.local.set({
       authToken: request.token,
       supabaseUserUUID: request.userId,
       subverisApiUrl: request.apiUrl || null,
     }, () => {
-      if (chrome.runtime.lastError) {
-        console.error('[Background] Storage error:', chrome.runtime.lastError);
+      if (browser.runtime.lastError) {
+        console.error('[Background] Storage error:', browser.runtime.lastError);
         sendResponse({ success: false, error: chrome.runtime.lastError });
       } else {
         console.log('[Background] ✅ Stored auth token and API URL: User ID =', request.userId, 'apiUrl =', request.apiUrl);
@@ -519,7 +524,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'authorizeGmail') {
     // Attempt Gmail authorization via backend OAuth endpoint
-    chrome.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
+    browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
       const token = result.authToken;
       const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
 
@@ -536,7 +541,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          redirectUri: chrome.identity.getRedirectURL()
+          redirectUri: browser.identity.getRedirectURL()
         })
       }).then(r => r.json()).then(data => {
         if (!data.oauthUrl) {
@@ -544,7 +549,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         // Open OAuth URL in a new window
-        chrome.identity.launchWebAuthFlow({
+        browser.identity.launchWebAuthFlow({
           url: data.oauthUrl,
           interactive: true
         }, (redirectUrl) => {
@@ -577,7 +582,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               }
 
               // Store Gmail token
-              chrome.storage.local.set({
+              browser.storage.local.set({
                 gmailAuthToken: tokenData.access_token,
                 gmailTokenExpiry: Date.now() + (tokenData.expires_in * 1000)
               }, () => {
@@ -606,7 +611,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Email scanning: detect subscription receipts from Gmail
 function scanGmailForSubscriptions() {
-  chrome.storage.local.get(['gmailAuthToken', 'lastGmailScan'], (result) => {
+  browser.storage.local.get(['gmailAuthToken', 'lastGmailScan'], (result) => {
     const token = result.gmailAuthToken;
     if (!token) {
       console.log('[Background] Gmail not authorized, skipping email scan');
@@ -682,9 +687,9 @@ function scanGmailForSubscriptions() {
 
               // If processed all messages, save and sync
               if (processedCount === data.messages.length) {
-                chrome.storage.local.get(['detectedSubscriptions'], (existing) => {
+                browser.storage.local.get(['detectedSubscriptions'], (existing) => {
                   const merged = { ...existing.detectedSubscriptions || {}, ...detectedSubs };
-                  chrome.storage.local.set({
+                  browser.storage.local.set({
                     detectedSubscriptions: merged,
                     lastGmailScan: Date.now()
                   }, () => {
@@ -702,12 +707,12 @@ function scanGmailForSubscriptions() {
 
 // Monitor downloads folder for CSV files with subscriptions
 function monitorDownloadsForCSV() {
-  chrome.downloads.onChanged.addListener((delta) => {
+  browser.downloads.onChanged.addListener((delta) => {
     if (delta.state?.current !== 'complete') {
       return;
     }
 
-    chrome.downloads.search({ id: delta.id }, (downloads) => {
+    browser.downloads.search({ id: delta.id }, (downloads) => {
       if (!downloads.length) return;
 
       const download = downloads[0];
@@ -771,9 +776,9 @@ function monitorDownloadsForCSV() {
           });
 
           if (Object.keys(detectedSubs).length > 0) {
-            chrome.storage.local.get(['detectedSubscriptions'], (existing) => {
+            browser.storage.local.get(['detectedSubscriptions'], (existing) => {
               const merged = { ...existing.detectedSubscriptions || {}, ...detectedSubs };
-              chrome.storage.local.set({ detectedSubscriptions: merged }, () => {
+              browser.storage.local.set({ detectedSubscriptions: merged }, () => {
                 syncDetectedSubscriptions(merged);
               });
             });
@@ -798,6 +803,6 @@ setInterval(() => {
 }, 5 * 60 * 1000); // 5 minutes
 
 // Initialize CSV monitoring on install
-chrome.runtime.onInstalled.addListener(() => {
+browser.runtime.onInstalled.addListener(() => {
   monitorDownloadsForCSV();
 });

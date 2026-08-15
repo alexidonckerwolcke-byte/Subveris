@@ -1,3 +1,8 @@
+// Cross-browser compatibility shim
+// Safari 15+, Firefox, and Edge use 'browser' global
+// Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
+const browser = globalThis.browser || globalThis.chrome;
+
 let startTime = Date.now();
 let cachedAuthToken = null;
 let pricingScanTimer = null;
@@ -10,12 +15,12 @@ function getRootDomain(hostname) {
 }
 
 function getSubscriptionStatus(callback) {
-  if (!window.chrome || !chrome.storage || !chrome.storage.local) {
+  if (!window.browser || !browser.storage || !browser.storage.local) {
     callback('free');
     return;
   }
 
-  chrome.storage.local.get(['subscription_status'], (result) => {
+  browser.storage.local.get(['subscription_status'], (result) => {
     const status = (result.subscription_status || 'free').toLowerCase();
     callback(status);
   });
@@ -27,28 +32,28 @@ function isTierAllowed(status) {
 
 // Inject script to capture auth token from page context
 const script = document.createElement('script');
-script.src = chrome.runtime.getURL('inject.js');
+script.src = browser.runtime.getURL('inject.js');
 script.onload = function() {
   this.remove();
 };
 (document.head || document.documentElement).appendChild(script);
 
 function sendMessageToBackground(message, callback) {
-  if (!window.chrome || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
-    console.warn('[Extension] chrome.runtime.sendMessage unavailable in this context:', {
-      chrome: typeof window.chrome,
-      chromeRuntime: typeof chrome?.runtime,
-      sendMessage: typeof chrome?.runtime?.sendMessage,
+  if (!window.browser || !browser.runtime || typeof browser.runtime.sendMessage !== 'function') {
+    console.warn('[Extension] browser.runtime.sendMessage unavailable in this context:', {
+      browser: typeof window.browser,
+      browserRuntime: typeof browser?.runtime,
+      sendMessage: typeof browser?.runtime?.sendMessage,
     });
     if (callback) callback(null);
     return false;
   }
 
   try {
-    chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError) {
-        console.warn('[Extension] Background message error:', chrome.runtime.lastError);
-        if (callback) callback(null, chrome.runtime.lastError);
+    browser.runtime.sendMessage(message, (response) => {
+      if (browser.runtime.lastError) {
+        console.warn('[Extension] Background message error:', browser.runtime.lastError);
+        if (callback) callback(null, browser.runtime.lastError);
         return;
       }
       if (callback) callback(response);
@@ -92,15 +97,15 @@ window.addEventListener('message', (event) => {
   }, 100);
 });
 
-// Get auth token from chrome storage (set by inject script via background)
+// Get auth token from browser storage (set by inject script via background)
 function getAuthToken() {
   return new Promise((resolve) => {
-    if (!window.chrome || !chrome.storage || !chrome.storage.local) {
-      console.warn('[Extension] chrome.storage.local unavailable in this context');
+    if (!window.browser || !browser.storage || !browser.storage.local) {
+      console.warn('[Extension] browser.storage.local unavailable in this context');
       return resolve(null);
     }
 
-    chrome.storage.local.get(['authToken'], (result) => {
+    browser.storage.local.get(['authToken'], (result) => {
       console.log('[Extension] Auth token check:', result.authToken ? 'FOUND' : 'NOT FOUND');
       if (result.authToken) cachedAuthToken = result.authToken;
       resolve(result.authToken);
@@ -208,12 +213,12 @@ function saveDiscoveredPrice(priceData) {
     isZeroUsage: false,
   };
 
-  chrome.storage.local.set({
+  browser.storage.local.set({
     detectedSubscription: payload,
     lastDetectedSubscriptionAt: Date.now()
   }, () => {
-    if (chrome.runtime.lastError) {
-      console.error('[Extension] Failed to store detected subscription:', chrome.runtime.lastError);
+    if (browser.runtime.lastError) {
+      console.error('[Extension] Failed to store detected subscription:', browser.runtime.lastError);
       return;
     }
     console.log('[Extension] Saved detected subscription payload:', payload);
