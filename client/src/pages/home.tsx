@@ -99,7 +99,7 @@ export default function HomePage() {
     {
       icon: Zap,
       title: "Browser Extension Optimization",
-      description: "Capture real usage signals with our browser extension so optimization recommendations are based on what you actually use.",
+      description: "Capture real usage signals with our cross-browser extension (Chrome, Edge, Firefox, Safari) so optimization recommendations are based on what you actually use.",
     },
     {
       icon: Brain,
@@ -138,7 +138,7 @@ export default function HomePage() {
     },
     {
       question: "Can I use it on mobile?",
-      answer: "The browser extension works on Chrome and Edge desktop. Mobile app is coming soon. Full optimization and insights are available on all devices right now.",
+      answer: "The browser extension works on Chrome, Edge, Firefox, and Safari. Mobile app is coming soon. Full optimization and insights are available on all devices right now.",
     },
     {
       question: "How accurate are the AI recommendations?",
