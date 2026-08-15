@@ -177,7 +177,7 @@ export default function Files() {
               <Alert className="bg-blue-50 border-blue-200">
                 <Chrome className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-blue-900">
-                  Our extension toolkit helps you install, configure, and manage the browser extension that captures subscription usage patterns for AI-powered insights and optimization recommendations.
+                  Our extension now works on all major browsers: <strong>Chrome, Edge, Firefox, and Safari</strong>. Install it to capture subscription usage patterns for AI-powered insights and optimization recommendations. Each browser has platform-specific installation steps below.
                 </AlertDescription>
               </Alert>
 
@@ -294,21 +294,150 @@ export default function Files() {
               {/* Firefox Installation */}
               <div className="space-y-4 pt-4 border-t">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <span className="bg-gradient-to-r from-orange-500 to-red-500 rounded-full w-6 h-6 flex items-center justify-center text-white text-sm font-bold">F</span>
-                  Firefox Installation (Coming Soon)
+                  <span className="bg-gradient-to-r from-orange-500 to-red-500 rounded-full w-6 h-6 flex items-center justify-center text-white text-sm font-bold">🦊</span>
+                  Firefox Installation
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Firefox support for the Subveris extension is coming soon. Stay tuned for updates!
+                  Firefox fully supports WebExtensions. Choose your preferred installation method:
                 </p>
+                <div className="space-y-3">
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                      1
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Download the Extension Pack</p>
+                      <p className="text-sm text-muted-foreground">
+                        Download the ZIP file below and extract it to get the extension files.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                      2
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Open Firefox Add-ons Debug Page</p>
+                      <p className="text-sm text-muted-foreground">
+                        Type <code className="bg-muted px-2 py-1 rounded text-xs">about:debugging</code> in the Firefox address bar and press Enter
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                      3
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Load the Extension</p>
+                      <p className="text-sm text-muted-foreground">
+                        Click "This Firefox" on the left, then click "Load Temporary Add-on", select the <code className="bg-muted px-2 py-1 rounded text-xs">manifest.json</code> file from your extracted folder
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                      4
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Permanent Installation (Optional)</p>
+                      <p className="text-sm text-muted-foreground">
+                        For permanent installation that persists after browser restart, visit <a href="https://addons.mozilla.org" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Firefox Add-ons</a> or see our <a href="https://github.com/subveris/extension/blob/main/INSTALL_FIREFOX.md" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">detailed Firefox guide</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Safari Installation */}
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <span className="bg-gradient-to-r from-gray-600 to-gray-800 rounded-full w-6 h-6 flex items-center justify-center text-white text-sm font-bold">🧭</span>
+                  Safari Installation (macOS)
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Requirements:</strong> macOS 11+ and Safari 15+. Safari requires a native app wrapper, which takes a few more steps.
+                </p>
+                <div className="space-y-3">
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                      1
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Install Xcode (Free)</p>
+                      <p className="text-sm text-muted-foreground">
+                        Safari requires Xcode to build extensions. Download from the App Store or run:
+                      </p>
+                      <p className="text-xs bg-muted px-2 py-1 rounded mt-1 font-mono">xcode-select --install</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                      2
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Convert to Safari Extension</p>
+                      <p className="text-sm text-muted-foreground">
+                        After downloading and extracting, run:
+                      </p>
+                      <p className="text-xs bg-muted px-2 py-1 rounded mt-1 font-mono">xcrun safari-web-extension-converter extension</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                      3
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Open in Xcode</p>
+                      <p className="text-sm text-muted-foreground">
+                        Xcode will create a project. Open it and click Product → Build (Cmd+B)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                      4
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Enable in Safari</p>
+                      <p className="text-sm text-muted-foreground">
+                        Go to Safari → Preferences → Extensions, find "Subveris", and check the box to enable it
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
+                    <p className="text-sm text-amber-900">
+                      Need more help? See our <a href="https://github.com/subveris/extension/blob/main/INSTALL_SAFARI.md" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">detailed Safari installation guide</a>
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Troubleshooting */}
               <div className="space-y-4 pt-4 border-t">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5" />
-                  Troubleshooting
+                  Troubleshooting & Additional Resources
                 </h3>
                 <div className="space-y-4">
+                  <div>
+                    <p className="font-semibold text-sm">Need more detailed help?</p>
+                    <p className="text-sm text-muted-foreground">
+                      We have comprehensive guides for each browser:
+                    </p>
+                    <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                      <li>• <a href="https://github.com/subveris/extension/blob/main/BROWSER_EXTENSION_GUIDE.md" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Master Installation Guide (All Browsers)</a></li>
+                      <li>• <a href="https://github.com/subveris/extension/blob/main/INSTALL_FIREFOX.md" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Detailed Firefox Guide</a></li>
+                      <li>• <a href="https://github.com/subveris/extension/blob/main/INSTALL_SAFARI.md" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Detailed Safari Guide</a></li>
+                    </ul>
+                  </div>
+
                   <div>
                     <p className="font-semibold text-sm">Extension not appearing in toolbar?</p>
                     <p className="text-sm text-muted-foreground">
@@ -316,9 +445,9 @@ export default function Files() {
                     </p>
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">Getting a "Manifest version not supported" error?</p>
+                    <p className="font-semibold text-sm">Browser version compatibility</p>
                     <p className="text-sm text-muted-foreground">
-                      Make sure you're using Chrome version 88 or later, or Edge version 88+. Update your browser if needed.
+                      <strong>Chrome:</strong> Version 88+ | <strong>Edge:</strong> Version 88+ | <strong>Firefox:</strong> Version 48+ | <strong>Safari:</strong> macOS 11+ with Safari 15+
                     </p>
                   </div>
                   <div>
@@ -367,7 +496,7 @@ export default function Files() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                Download the browser extension as a ZIP file. Extract and load it into your browser to start optimizing subscription usage.
+                Download the browser extension as a ZIP file. Works on Chrome, Edge, Firefox, and Safari. Extract and load it into your browser to start optimizing subscription usage. See the "Extension Setup" tab above for browser-specific installation instructions.
               </p>
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
