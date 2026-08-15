@@ -36,8 +36,8 @@ export default function Privacy() {
               <h2 className="text-lg font-semibold">Data We Collect</h2>
               <ul className="mt-3 space-y-2 text-muted-foreground list-disc pl-6">
                 <li>Account information such as name and email when you sign up.</li>
-                <li>Subscription details you enter and usage data from our browser extension.
-                </li>
+                <li>Subscription details you enter manually and automatically detected subscriptions from our browser extension (website visits, Gmail receipts, CSV imports, and authentication cookies).</li>
+                <li>Usage data from our browser extension including time spent on subscription service websites and zero-usage patterns.</li>
                 <li>Billing and payment information for Premium purchases processed through Stripe.</li>
                 <li>Usage analytics and product insights to improve the service.</li>
               </ul>
@@ -49,6 +49,28 @@ export default function Privacy() {
                 We use data to deliver and improve Subveris, provide insights, optimize recurring spend, and process payments.
                 We do not sell your personal data to third parties.
               </p>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold">Browser Extension Data Collection</h2>
+              <p className="mt-3 text-muted-foreground font-medium">What the Extension Collects</p>
+              <ul className="mt-2 space-y-2 text-muted-foreground list-disc pl-6">
+                <li><strong>Website Visits:</strong> We track when you visit subscription service websites (Netflix, Spotify, Adobe, etc.) and measure time spent on each site to understand your usage patterns.</li>
+                <li><strong>Authentication Cookies:</strong> On first login, the extension scans for authentication session cookies to identify which services you're logged into.</li>
+                <li><strong>Gmail Receipts:</strong> With your permission via OAuth, we scan your Gmail inbox for subscription-related emails (receipts, invoices, renewals) and extract service names and amounts. This scan runs periodically and we retain only the extracted subscription information, not the full email content.</li>
+                <li><strong>CSV Imports:</strong> The extension automatically detects subscription list CSV files in your Downloads folder and parses them to extract subscription data.</li>
+              </ul>
+              <p className="mt-4 text-muted-foreground font-medium">How We Use Extension Data</p>
+              <p className="mt-2 text-muted-foreground">
+                Extension data is used to: (1) automatically detect your subscriptions without manual entry, (2) track usage patterns across your subscription services, (3) identify unused or redundant subscriptions, and (4) provide recommendations for cost optimization. This data is synced to your Subveris account and subject to the same privacy protections as manually entered data.
+              </p>
+              <p className="mt-4 text-muted-foreground font-medium">Privacy & Control</p>
+              <ul className="mt-2 space-y-2 text-muted-foreground list-disc pl-6">
+                <li>Gmail scanning requires explicit OAuth authorization and can be disabled anytime in Settings → Connected Services.</li>
+                <li>All extension data is encrypted in transit and stored securely in your Supabase database.</li>
+                <li>The extension only collects and processes data for authenticated Premium or Family tier users. Free tier users will see a notice that full tracking is paused.</li>
+                <li>You can export or delete all your data at any time via your account settings.</li>
+              </ul>
             </div>
 
             <div>
