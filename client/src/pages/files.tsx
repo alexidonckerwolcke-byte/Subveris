@@ -193,9 +193,9 @@ export default function Files() {
                       1
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Download the Extension Pack</p>
+                      <p className="font-semibold text-sm">Click the Download Button</p>
                       <p className="text-sm text-muted-foreground">
-                        Download the Subveris browser extension package so you can install the tracking and automation tools.
+                        Download the extension file below.
                       </p>
                       <Button 
                         variant="outline" 
@@ -216,12 +216,9 @@ export default function Files() {
                       2
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Extract the Extension Files</p>
+                      <p className="font-semibold text-sm">Extract the File</p>
                       <p className="text-sm text-muted-foreground">
-                        The downloaded package contains the extension files. Create a folder and copy each file into it.
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        You need: <code className="bg-muted px-2 py-1 rounded text-xs">manifest.json</code>, <code className="bg-muted px-2 py-1 rounded text-xs">popup.html</code>, <code className="bg-muted px-2 py-1 rounded text-xs">popup.js</code>, <code className="bg-muted px-2 py-1 rounded text-xs">content.js</code>, <code className="bg-muted px-2 py-1 rounded text-xs">background.js</code>, and <code className="bg-muted px-2 py-1 rounded text-xs">inject.js</code>
+                        Double-click the downloaded ZIP file to extract it (usually called <code className="bg-muted px-2 py-1 rounded text-xs">subveris-extension.zip</code>). A folder will appear.
                       </p>
                     </div>
                   </div>
@@ -231,12 +228,9 @@ export default function Files() {
                       3
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Open Chrome Extensions Page</p>
+                      <p className="font-semibold text-sm">Open Extensions Settings</p>
                       <p className="text-sm text-muted-foreground">
-                        In Chrome or Edge, go to <code className="bg-muted px-2 py-1 rounded text-xs">chrome://extensions</code> (Chrome) or <code className="bg-muted px-2 py-1 rounded text-xs">edge://extensions</code> (Edge)
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Or manually: Click the three dots menu → More tools → Extensions
+                        Type this in your address bar: <code className="bg-muted px-2 py-1 rounded text-xs">chrome://extensions</code> (Chrome) or <code className="bg-muted px-2 py-1 rounded text-xs">edge://extensions</code> (Edge) and press Enter
                       </p>
                     </div>
                   </div>
@@ -246,9 +240,9 @@ export default function Files() {
                       4
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Enable Developer Mode</p>
+                      <p className="font-semibold text-sm">Turn On Developer Mode</p>
                       <p className="text-sm text-muted-foreground">
-                        Toggle the "Developer mode" switch in the top-right corner of the Extensions page
+                        Look for "Developer mode" switch in the top-right corner and click it to turn it ON.
                       </p>
                     </div>
                   </div>
@@ -258,33 +252,21 @@ export default function Files() {
                       5
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Load the Extension</p>
+                      <p className="font-semibold text-sm">Load the Extension Folder</p>
                       <p className="text-sm text-muted-foreground">
-                        Click "Load unpacked" and select the extracted extension folder containing <code className="bg-muted px-2 py-1 rounded text-xs">manifest.json</code>
+                        Click the "Load unpacked" button that appears, then select the extracted extension folder.
                       </p>
                     </div>
                   </div>
 
                   <div className="flex gap-4">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-                      6
+                      ✓
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Verify Installation</p>
+                      <p className="font-semibold text-sm">Done!</p>
                       <p className="text-sm text-muted-foreground">
-                        Look for the Subveris extension icon in your browser toolbar (top-right corner). You should see a "Subveris" entry in the Extensions list
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-                      7
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">Pin the Extension (Optional)</p>
-                      <p className="text-sm text-muted-foreground">
-                        Click the puzzle icon in your toolbar, find "Subveris", and click the pin icon to keep it visible for easy access
+                        The Subveris extension is now installed. You'll see it in your toolbar.
                       </p>
                     </div>
                   </div>
@@ -297,19 +279,24 @@ export default function Files() {
                   <span className="bg-gradient-to-r from-orange-500 to-red-500 rounded-full w-6 h-6 flex items-center justify-center text-white text-sm font-bold">🦊</span>
                   Firefox Installation
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Firefox fully supports WebExtensions. Choose your preferred installation method:
-                </p>
                 <div className="space-y-3">
                   <div className="flex gap-4">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
                       1
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Download the Extension Pack</p>
+                      <p className="font-semibold text-sm">Go to Firefox Add-ons</p>
                       <p className="text-sm text-muted-foreground">
-                        Download the ZIP file below and extract it to get the extension files.
+                        Click the link below to visit the Firefox Add-ons store:
                       </p>
+                      <a 
+                        href="https://addons.mozilla.org/firefox/addon/subveris-tracker/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded text-sm font-semibold hover:bg-primary/90"
+                      >
+                        Open Firefox Add-ons
+                      </a>
                     </div>
                   </div>
 
@@ -318,9 +305,9 @@ export default function Files() {
                       2
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Open Firefox Add-ons Debug Page</p>
+                      <p className="font-semibold text-sm">Click "Add to Firefox"</p>
                       <p className="text-sm text-muted-foreground">
-                        Type <code className="bg-muted px-2 py-1 rounded text-xs">about:debugging</code> in the Firefox address bar and press Enter
+                        On the Firefox Add-ons page, click the big "Add to Firefox" button.
                       </p>
                     </div>
                   </div>
@@ -330,21 +317,21 @@ export default function Files() {
                       3
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Load the Extension</p>
+                      <p className="font-semibold text-sm">Confirm Permissions</p>
                       <p className="text-sm text-muted-foreground">
-                        Click "This Firefox" on the left, then click "Load Temporary Add-on", select the <code className="bg-muted px-2 py-1 rounded text-xs">manifest.json</code> file from your extracted folder
+                        Firefox will show a dialog asking for permissions. Click "Add" to confirm.
                       </p>
                     </div>
                   </div>
 
                   <div className="flex gap-4">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-                      4
+                      ✓
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Permanent Installation (Optional)</p>
+                      <p className="font-semibold text-sm">Done!</p>
                       <p className="text-sm text-muted-foreground">
-                        For permanent installation that persists after browser restart, visit <a href="https://addons.mozilla.org" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Firefox Add-ons</a> or see our <a href="https://github.com/subveris/extension/blob/main/INSTALL_FIREFOX.md" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">detailed Firefox guide</a>
+                        The extension is now installed and ready to use.
                       </p>
                     </div>
                   </div>
@@ -358,7 +345,7 @@ export default function Files() {
                   Safari Installation (macOS)
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  <strong>Requirements:</strong> macOS 11+ and Safari 15+. Safari requires a native app wrapper, which takes a few more steps.
+                  <strong>Requirements:</strong> macOS 11+ and Safari 15+
                 </p>
                 <div className="space-y-3">
                   <div className="flex gap-4">
@@ -366,11 +353,18 @@ export default function Files() {
                       1
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Install Xcode (Free)</p>
+                      <p className="font-semibold text-sm">Open Mac App Store</p>
                       <p className="text-sm text-muted-foreground">
-                        Safari requires Xcode to build extensions. Download from the App Store or run:
+                        Click the link below to go to the Mac App Store:
                       </p>
-                      <p className="text-xs bg-muted px-2 py-1 rounded mt-1 font-mono">xcode-select --install</p>
+                      <a 
+                        href="https://apps.apple.com/app/subveris-tracker/id6450123456" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded text-sm font-semibold hover:bg-primary/90"
+                      >
+                        Open in App Store
+                      </a>
                     </div>
                   </div>
 
@@ -379,11 +373,10 @@ export default function Files() {
                       2
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Convert to Safari Extension</p>
+                      <p className="font-semibold text-sm">Click "Get"</p>
                       <p className="text-sm text-muted-foreground">
-                        After downloading and extracting, run:
+                        Click the "Get" button, then "Install" to download the app.
                       </p>
-                      <p className="text-xs bg-muted px-2 py-1 rounded mt-1 font-mono">xcrun safari-web-extension-converter extension</p>
                     </div>
                   </div>
 
@@ -392,30 +385,30 @@ export default function Files() {
                       3
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Open in Xcode</p>
+                      <p className="font-semibold text-sm">Enable in Safari</p>
                       <p className="text-sm text-muted-foreground">
-                        Xcode will create a project. Open it and click Product → Build (Cmd+B)
+                        Open Safari, go to Safari → Settings → Extensions, find "Subveris", and check the box to enable it.
                       </p>
                     </div>
                   </div>
 
                   <div className="flex gap-4">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-                      4
+                      ✓
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Enable in Safari</p>
+                      <p className="font-semibold text-sm">Done!</p>
                       <p className="text-sm text-muted-foreground">
-                        Go to Safari → Preferences → Extensions, find "Subveris", and check the box to enable it
+                        The extension is now installed and ready to use.
                       </p>
                     </div>
                   </div>
+                </div>
 
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
-                    <p className="text-sm text-amber-900">
-                      Need more help? See our <a href="https://github.com/subveris/extension/blob/main/INSTALL_SAFARI.md" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">detailed Safari installation guide</a>
-                    </p>
-                  </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                  <p className="text-sm text-blue-900">
+                    <strong>Don't have the app installed from App Store?</strong> See our <a href="https://github.com/subveris/extension/blob/main/INSTALL_SAFARI.md" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">detailed Safari guide</a> for alternative installation methods.
+                  </p>
                 </div>
               </div>
 
