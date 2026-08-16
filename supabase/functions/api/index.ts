@@ -10,6 +10,11 @@ const SUPABASE_URL = runtimeDeno?.env?.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = runtimeDeno?.env?.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SUPABASE_ANON_KEY = runtimeDeno?.env?.get("SUPABASE_ANON_KEY") ?? "";
 
+// Google OAuth credentials
+const GOOGLE_CLIENT_ID = runtimeDeno?.env?.get("GOOGLE_CLIENT_ID") ?? "";
+const GOOGLE_CLIENT_SECRET = runtimeDeno?.env?.get("GOOGLE_CLIENT_SECRET") ?? "";
+const GOOGLE_REDIRECT_URI = runtimeDeno?.env?.get("GOOGLE_REDIRECT_URI") ?? "https://www.subveris.com/auth/callback";
+
 // Client for auth verification
 let supabaseAuth: any = null;
 if (SUPABASE_URL && SUPABASE_ANON_KEY) {
@@ -1220,6 +1225,45 @@ function buildCalendarEvents(subscriptions: any[]) {
     .filter(Boolean) as any[];
 }
 
+// Gmail OAuth helpers
+function generateGmailOAuthUrl(userId: string): string {
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: GOOGLE_REDIRECT_URI,
+    response_type: "code",
+    scope: "https://www.googleapis.com/auth/gmail.readonly",
+    state: userId, // Use userId as state for validation
+    access_type: "offline",
+    prompt: "consent",
+  });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+async function exchangeGmailCodeForToken(code: string): Promise<any> {
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    client_secret: GOOGLE_CLIENT_SECRET,
+    code,
+    grant_type: "authorization_code",
+    redirect_uri: GOOGLE_REDIRECT_URI,
+  });
+
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    body: params.toString(),
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Gmail token exchange failed: ${error}`);
+  }
+
+  return response.json();
+}
+
 runtimeDeno?.serve?.(async (req: Request) => {
     const origin = req.headers.get("origin");
     const sendJson = (body: unknown, initOrOrigin?: ResponseInit | string | null, maybeInit?: ResponseInit) => {
@@ -1267,6 +1311,95 @@ runtimeDeno?.serve?.(async (req: Request) => {
     // Test route
     if (pathname === "/test" && req.method === "GET") {
       return sendJson({ message: "API is working!" });
+    }
+
+    // Gmail OAuth URL generation
+    if (pathname === "/auth/gmail-oauth-url" && req.method === "GET") {
+      const userId = extractUserId(req);
+      if (!userId) {
+        return sendJson(
+          { error: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+
+      if (!GOOGLE_CLIENT_ID) {
+        console.error("[Gmail] Google Client ID not configured");
+        return sendJson(
+          { error: "Gmail OAuth not configured" },
+          { status: 500 }
+        );
+      }
+
+      try {
+        const oauthUrl = generateGmailOAuthUrl(userId);
+        return sendJson({ oauthUrl });
+      } catch (err) {
+        console.error("[Gmail] Error generating OAuth URL:", err);
+        return sendJson(
+          { error: "Failed to generate OAuth URL" },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Gmail OAuth token exchange
+    if (pathname === "/auth/gmail-token" && req.method === "POST") {
+      const userId = extractUserId(req);
+      if (!userId) {
+        return sendJson(
+          { error: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+
+      try {
+        const body = await req.json() as { code: string };
+        const { code } = body;
+
+        if (!code) {
+          return sendJson(
+            { error: "Authorization code is required" },
+            { status: 400 }
+          );
+        }
+
+        if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+          console.error("[Gmail] Google OAuth credentials not configured");
+          return sendJson(
+            { error: "Gmail OAuth not configured" },
+            { status: 500 }
+          );
+        }
+
+        const tokenData = await exchangeGmailCodeForToken(code);
+
+        // Optionally store in database (users table or separate table)
+        if (supabase) {
+          await supabase
+            .from("users")
+            .update({
+              gmail_access_token: tokenData.access_token,
+              gmail_token_expiry: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
+              gmail_refresh_token: tokenData.refresh_token || null,
+            })
+            .eq("id", userId)
+            .throwOnError();
+        }
+
+        return sendJson({
+          access_token: tokenData.access_token,
+          expires_in: tokenData.expires_in,
+          success: true,
+        });
+      } catch (err) {
+        console.error("[Gmail] Token exchange error:", err);
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        return sendJson(
+          { error: "Failed to exchange authorization code", message: errorMessage },
+          { status: 500 }
+        );
+      }
     }
 
     if (pathname === "/extension/download" && req.method === "GET") {
