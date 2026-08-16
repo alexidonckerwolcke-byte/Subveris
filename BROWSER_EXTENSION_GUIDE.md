@@ -1,115 +1,137 @@
 # Browser Extension Installation Guide
 
-Subveris Tracker is now available on all major browsers! Choose your platform below for setup instructions.
+Subveris Tracker is now available on all major browsers! Choose your browser below for setup instructions.
 
 ## Quick Start by Browser
 
-| Browser | Status | Setup Time | Difficulty | Guide |
-|---------|--------|-----------|------------|-------|
-| **Chrome** | ✅ Best | 2 min | Easy | [Chrome Setup](#chrome--edge-setup) |
-| **Edge** | ✅ Full | 2 min | Easy | [Chrome Setup](#chrome--edge-setup) |
-| **Firefox** | ✅ Full | 3 min | Easy | [Firefox Setup](extension/INSTALL_FIREFOX.md) |
-| **Safari** | ✅ Full | 15 min | Medium | [Safari Setup](extension/INSTALL_SAFARI.md) |
+| Browser | Status | Setup Time | Installation |
+|---------|--------|-----------|---------------|
+| **Chrome** | ✅ Easiest | 2 min | Download ZIP + Load unpacked |
+| **Edge** | ✅ Easiest | 2 min | Same as Chrome |
+| **Firefox** | ✅ Easy | 1 min | Install from Firefox Add-ons |
+| **Safari** | ✅ Easy | 2-5 min | Install from Mac App Store or direct load |
 
 ---
 
-## Chrome & Edge Setup
+## Chrome Installation
 
-### 1. Download the Extension
+The easiest way to install on Chrome:
 
-```bash
-# Clone Subveris repository
-git clone https://github.com/subveris/extension.git
-cd extension
-```
+### Step 1: Download the Extension
 
-### 2. Open Extensions Page
+1. Go to the Files page in your Subveris dashboard
+2. Click the "Download Extension" button
+3. Extract the ZIP file to a folder
 
-**Chrome:**
-- Open Chrome and type `chrome://extensions` in the address bar
-- Or: Menu (⋯) → More tools → Extensions
+### Step 2: Open Chrome Extensions
 
-**Edge:**
-- Open Edge and type `edge://extensions` in the address bar
-- Or: Menu (⋯) → Extensions → Manage Extensions
+- Type `chrome://extensions` in the address bar, OR
+- Click Menu (⋯) → More tools → Extensions
 
-### 3. Enable Developer Mode
+### Step 3: Enable Developer Mode
 
-Look for the toggle in the **top right corner** and turn it on.
+Look for the **Developer mode** toggle in the top right corner and turn it on.
 
-### 4. Load Unpacked Extension
+### Step 4: Load the Extension
 
 1. Click **"Load unpacked"** button
-2. Navigate to and select the `extension` folder
+2. Select the extracted `extension` folder
 3. Click **"Open"**
 
-The extension will appear in your toolbar with a 📦 icon.
+✅ Extension appears in your toolbar! Done.
 
-### 5. First Time Setup
+### Step 5: First Time Setup
 
-1. **Open the Subveris app** in the browser
-2. **Log in** with your account
-3. **Go to Settings → Connected Services**
-4. **Click "Connect Gmail Account"**
-5. **Grant permissions** when prompted
-
-✅ Extension is now active!
+1. Open your Subveris app (subveris.app)
+2. Log in with your account
+3. Go to **Settings → Connected Services**
+4. Click **"Connect Gmail Account"** (optional)
+5. Grant permissions when prompted
 
 ---
 
-## Firefox Setup
+## Edge Installation
 
-For full instructions with troubleshooting, see [INSTALL_FIREFOX.md](extension/INSTALL_FIREFOX.md)
+Edge uses the same installation as Chrome:
 
-### Quick Version
+### Quick Steps
 
-```bash
-# Install web-ext build tool
-npm install -g web-ext
+1. Type `edge://extensions` in the address bar
+2. Turn on **Developer mode** (top right)
+3. Click **"Load unpacked"**
+4. Select the `extension` folder
+5. Done!
 
-# Navigate to extension
-cd extension
+All other steps are identical to Chrome above.
 
-# Build for Firefox
-web-ext build --filename=subveris.xpi
-```
+---
 
-Then:
+## Firefox Installation
+
+The easiest way to install on Firefox is from the Firefox Add-ons store:
+
+### Step 1: Go to Firefox Add-ons
+
 1. Open Firefox
-2. Go to `about:addons`
-3. Click ⚙️ → "Install Add-on From File"
-4. Select the built `subveris.xpi`
-5. Click "Add"
+2. Go to: https://addons.mozilla.org/firefox/addon/subveris-tracker/
+   - Or search for "Subveris Tracker" in Firefox Add-ons
+
+### Step 2: Install
+
+1. Click **"Add to Firefox"** button
+2. Review permissions and click **"Add"**
+3. Done! Extension appears in your toolbar
+
+You'll get automatic updates whenever new versions are released.
+
+### Step 3: First Time Setup
+
+1. Open your Subveris app (subveris.app)
+2. Log in with your account
+3. Go to **Settings → Connected Services**
+4. Click **"Connect Gmail Account"** (optional)
+5. Grant permissions when prompted
 
 ---
 
-## Safari Setup
+## Safari Installation
 
-For full instructions with Xcode integration, see [INSTALL_SAFARI.md](extension/INSTALL_SAFARI.md)
+Safari installation is quick on macOS 11+:
 
-### Requirements
+### Option 1: Mac App Store (Easiest)
 
-- **macOS 11+** (Big Sur or later)
-- **Safari 15+**
-- **Xcode** (free from App Store)
+1. Open **App Store** on your Mac
+2. Search for **"Subveris Tracker"**
+3. Click **"Get"**
+4. Open the app
+5. Go to **Safari → Settings → Extensions**
+6. Enable **"Subveris Tracker"**
 
-### Quick Version
+### Option 2: Direct Load (No App Store Needed)
 
-```bash
-# Install Xcode command line tools
-xcode-select --install
+For macOS Ventura (13) and later:
 
-# Convert to Safari extension
-xcrun safari-web-extension-converter extension
+1. **Enable Developer Mode in Safari:**
+   - Safari → Settings → Advanced
+   - Check "Show Develop menu in menu bar"
 
-# Open in Xcode
-open SubverisExtension.xcodeproj
-```
+2. **Load the Extension:**
+   - Safari → Develop → Allow Unsigned Extensions
+   - Safari → Settings → Extensions
+   - Click the **+** button
+   - Select the `extension` folder
+   - Click **"Add"**
 
-Then:
-1. Click **Product → Build** in Xcode
-2. Go to Safari Preferences → Extensions
-3. Enable "Subveris Tracker"
+3. **Grant Permissions:**
+   - Click "Allow" when Safari asks
+
+### Step 3: First Time Setup
+
+1. Open your Subveris app (subveris.app)
+2. Log in with your account
+3. Go to **Settings → Connected Services**
+4. Click **"Connect Gmail Account"** (optional)
+5. Grant permissions when prompted
 
 ---
 
