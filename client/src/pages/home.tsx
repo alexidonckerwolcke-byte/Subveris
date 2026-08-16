@@ -544,7 +544,7 @@ export default function HomePage() {
                   <span className="text-muted-foreground ml-2">/month</span>
                 </div>
                 <CardDescription className="mt-4 text-base font-medium">
-                  Unlimited subscriptions with extension tracking
+                  Unlimited subscriptions + Autopilot automation
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-1 pb-6">
@@ -574,8 +574,8 @@ export default function HomePage() {
                     <span className="text-sm font-medium">Savings projections</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Lock className="h-5 w-5 text-muted-foreground mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-muted-foreground">Autopilot automation</span>
+                    <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm font-medium">Autopilot task automation</span>
                   </li>
                 </ul>
               </CardContent>
@@ -607,7 +607,7 @@ export default function HomePage() {
                   <span className="text-muted-foreground ml-2">/month</span>
                 </div>
                 <CardDescription className="mt-4 text-base font-medium">
-                  Everything + Autopilot + family sharing
+                  Share subscriptions and automate with family
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-1 pb-6">
@@ -721,7 +721,7 @@ export default function HomePage() {
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">Autopilot Automation</td>
                     <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
-                    <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                     <td className="text-center py-4 px-6 bg-purple-500/5"><Check className="h-5 w-5 text-purple-600 mx-auto" /></td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">

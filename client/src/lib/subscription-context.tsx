@@ -49,7 +49,7 @@ const TIER_LIMITS = {
     hasBehavioralInsights: true,
     hasSavingsProjections: true,
     hasExportReports: true,
-    hasAutopilot: false,
+    hasAutopilot: true,
     hasExtensionTracking: true,
   },
   family: {
