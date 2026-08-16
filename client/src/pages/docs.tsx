@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useMemo, useCallback } from "react";
 const menuItems = [
   { label: "Getting Started", id: "getting-started" },
   { label: "User Guide", id: "user-guide" },
+  { label: "Browser Extension", id: "browser-extension" },
   { label: "How Subscription Optimization Works", id: "how-subscription-optimization-works" },
   { label: "AI & Accuracy", id: "ai-accuracy" },
   { label: "API Documentation", id: "api-documentation" },
@@ -129,6 +130,138 @@ const DocsPage: React.FC = () => {
         <li>Use the Calendar tab to view all renewal dates</li>
         <li>The system will notify you before important dates</li>
         <li>Adjust renewal dates directly in the calendar interface</li>
+      </ul>
+    </section>
+    </div>
+    <hr />
+    <div ref={sectionRefs["browser-extension"]} id="browser-extension">
+    <section>
+      <h2>Browser Extension</h2>
+      <p>The Subveris browser extension automatically discovers and tracks your subscriptions. It's available on Chrome, Edge, Firefox, and Safari.</p>
+      
+      <h3>What the Extension Does</h3>
+      <ul>
+        <li><b>Website Tracking:</b> Detects when you visit Netflix, Spotify, Disney+, and 20+ other subscription services</li>
+        <li><b>Gmail Receipt Scanning:</b> Scans your email inbox for subscription receipts and confirmations</li>
+        <li><b>CSV Detection:</b> Automatically finds subscription lists in your Downloads folder</li>
+        <li><b>Cookie Analysis:</b> Identifies subscriptions from authentication cookies on first login</li>
+      </ul>
+
+      <h3>Installation by Browser</h3>
+      <h4>Chrome & Edge</h4>
+      <ol>
+        <li>Go to <b>Files → Download Extension</b> in your dashboard</li>
+        <li>Extract the ZIP file</li>
+        <li>Open <code>chrome://extensions</code> (Chrome) or <code>edge://extensions</code> (Edge)</li>
+        <li>Enable "Developer mode" (top right toggle)</li>
+        <li>Click "Load unpacked" and select the extracted folder</li>
+      </ol>
+
+      <h4>Firefox</h4>
+      <ol>
+        <li>Open Firefox and go to: <a href="https://addons.mozilla.org/firefox/addon/subveris-tracker/" target="_blank" rel="noopener noreferrer">Firefox Add-ons Store</a></li>
+        <li>Click "Add to Firefox"</li>
+        <li>Review permissions and click "Add"</li>
+      </ol>
+
+      <h4>Safari (macOS)</h4>
+      <ol>
+        <li>Open the Mac App Store and search for "Subveris Tracker"</li>
+        <li>Click "Get" and open the app</li>
+        <li>Go to <b>Safari → Settings → Extensions</b></li>
+        <li>Enable "Subveris Tracker"</li>
+      </ol>
+
+      <h3>First Time Setup</h3>
+      <ol>
+        <li>After installation, open your Subveris dashboard</li>
+        <li>Log in with your account (the extension auto-detects your login)</li>
+        <li>Go to <b>Settings → Connected Services</b></li>
+        <li>Click <b>"Connect Gmail Account"</b> to enable email scanning (optional but recommended)</li>
+        <li>Grant permissions when prompted</li>
+      </ol>
+
+      <h3>How Gmail Integration Works</h3>
+      <ul>
+        <li><b>Privacy:</b> Uses OAuth - your account is logged in via Google's secure authentication</li>
+        <li><b>Read-only:</b> The extension can only read emails, never send or delete them</li>
+        <li><b>Automatic:</b> Scans your inbox every 5 minutes for new receipts and confirmations</li>
+        <li><b>Smart parsing:</b> Extracts service names, amounts, and billing frequencies from emails</li>
+        <li><b>Control:</b> You can disconnect Gmail anytime in Settings → Connected Services</li>
+      </ul>
+
+      <h3>Subscription Detection Methods</h3>
+      <ul>
+        <li><b>Website Visits:</b> Logs the site you visit and time spent (tracks usage patterns)</li>
+        <li><b>Gmail Receipts:</b> Finds confirmations for Netflix, Spotify, Adobe, etc.</li>
+        <li><b>CSV Files:</b> Parses subscription exports with flexible column detection</li>
+        <li><b>Auth Cookies:</b> Scans login cookies once to identify existing subscriptions</li>
+      </ul>
+
+      <h3>Troubleshooting</h3>
+      <p><b>Extension not visible in toolbar?</b></p>
+      <ul>
+        <li>Open your browser's extension settings</li>
+        <li>Find "Subveris Tracker" and check that it's enabled</li>
+        <li>Restart your browser</li>
+      </ul>
+
+      <p><b>Gmail connection failing?</b></p>
+      <ul>
+        <li>Make sure you're logged into your Google account in the same browser</li>
+        <li>Check that your browser allows pop-ups</li>
+        <li>Try clearing browser cookies for accounts.google.com and reconnecting</li>
+      </ul>
+
+      <p><b>Subscriptions not being detected?</b></p>
+      <ul>
+        <li>Verify the extension is enabled in your browser settings</li>
+        <li>Visit the subscription website and reload the page</li>
+        <li>Wait 5+ minutes for Gmail to scan (emails are scanned periodically)</li>
+      </ul>
+
+      <h3>Features by Browser</h3>
+      <table style={{width: '100%', borderCollapse: 'collapse'}}>
+        <thead>
+          <tr style={{borderBottom: '2px solid #ddd'}}>
+            <th style={{textAlign: 'left', padding: '8px'}}>Feature</th>
+            <th style={{textAlign: 'center', padding: '8px'}}>Chrome</th>
+            <th style={{textAlign: 'center', padding: '8px'}}>Edge</th>
+            <th style={{textAlign: 'center', padding: '8px'}}>Firefox</th>
+            <th style={{textAlign: 'center', padding: '8px'}}>Safari</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style={{borderBottom: '1px solid #eee'}}>
+            <td style={{padding: '8px'}}>Website tracking</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>✅</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>✅</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>✅</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>✅</td>
+          </tr>
+          <tr style={{borderBottom: '1px solid #eee'}}>
+            <td style={{padding: '8px'}}>Gmail scanning</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>✅</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>✅</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>✅</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>✅</td>
+          </tr>
+          <tr style={{borderBottom: '1px solid #eee'}}>
+            <td style={{padding: '8px'}}>CSV detection</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>✅</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>✅</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>✅</td>
+            <td style={{textAlign: 'center', padding: '8px'}}>⚠️ Limited</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Data & Privacy</h3>
+      <ul>
+        <li><b>Encrypted:</b> All data is encrypted in transit (HTTPS) and at rest</li>
+        <li><b>Not sold:</b> We never sell or share your data with third parties</li>
+        <li><b>Gmail OAuth:</b> Read-only access via standard Google OAuth</li>
+        <li><b>No tracking:</b> We only log subscriptions, not your general browsing</li>
       </ul>
     </section>
     </div>
