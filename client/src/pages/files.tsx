@@ -285,18 +285,21 @@ export default function Files() {
                       1
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Go to Firefox Add-ons</p>
+                      <p className="font-semibold text-sm">Click Download Button</p>
                       <p className="text-sm text-muted-foreground">
-                        Click the link below to visit the Firefox Add-ons store:
+                        Download the extension file below.
                       </p>
-                      <a 
-                        href="https://addons.mozilla.org/firefox/addon/subveris-tracker/" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded text-sm font-semibold hover:bg-primary/90"
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={handleDownloadExtension}
+                        disabled={downloadingExtension}
+                        type="button"
                       >
-                        Open Firefox Add-ons
-                      </a>
+                        <Download className="h-4 w-4 mr-2" />
+                        {downloadingExtension ? "Downloading..." : "Download Extension"}
+                      </Button>
                     </div>
                   </div>
 
@@ -305,9 +308,9 @@ export default function Files() {
                       2
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Click "Add to Firefox"</p>
+                      <p className="font-semibold text-sm">Extract the File</p>
                       <p className="text-sm text-muted-foreground">
-                        On the Firefox Add-ons page, click the big "Add to Firefox" button.
+                        Double-click the downloaded ZIP file to extract it.
                       </p>
                     </div>
                   </div>
@@ -317,9 +320,21 @@ export default function Files() {
                       3
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Confirm Permissions</p>
+                      <p className="font-semibold text-sm">Open Firefox Debug Page</p>
                       <p className="text-sm text-muted-foreground">
-                        Firefox will show a dialog asking for permissions. Click "Add" to confirm.
+                        Type <code className="bg-muted px-2 py-1 rounded text-xs">about:debugging</code> in the Firefox address bar and press Enter.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                      4
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Load the Extension</p>
+                      <p className="text-sm text-muted-foreground">
+                        Click "This Firefox" on the left, then "Load Temporary Add-on", and select the <code className="bg-muted px-2 py-1 rounded text-xs">manifest.json</code> file from the extracted folder.
                       </p>
                     </div>
                   </div>
@@ -353,18 +368,21 @@ export default function Files() {
                       1
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Open Mac App Store</p>
+                      <p className="font-semibold text-sm">Click Download Button</p>
                       <p className="text-sm text-muted-foreground">
-                        Click the link below to go to the Mac App Store:
+                        Download the extension file using the button below (same as Chrome).
                       </p>
-                      <a 
-                        href="https://apps.apple.com/app/subveris-tracker/id6450123456" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded text-sm font-semibold hover:bg-primary/90"
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={handleDownloadExtension}
+                        disabled={downloadingExtension}
+                        type="button"
                       >
-                        Open in App Store
-                      </a>
+                        <Download className="h-4 w-4 mr-2" />
+                        {downloadingExtension ? "Downloading..." : "Download Extension"}
+                      </Button>
                     </div>
                   </div>
 
@@ -373,9 +391,9 @@ export default function Files() {
                       2
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">Click "Get"</p>
+                      <p className="font-semibold text-sm">Extract and Rename Folder</p>
                       <p className="text-sm text-muted-foreground">
-                        Click the "Get" button, then "Install" to download the app.
+                        Double-click the ZIP to extract it. Rename the extracted folder to <code className="bg-muted px-2 py-1 rounded text-xs">subveris-tracker.safariextension</code>
                       </p>
                     </div>
                   </div>
@@ -383,6 +401,18 @@ export default function Files() {
                   <div className="flex gap-4">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
                       3
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Double-Click to Install</p>
+                      <p className="text-sm text-muted-foreground">
+                        Double-click the renamed folder. Safari will automatically prompt you to allow the extension.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                      4
                     </div>
                     <div>
                       <p className="font-semibold text-sm">Enable in Safari</p>
@@ -407,8 +437,7 @@ export default function Files() {
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
                   <p className="text-sm text-blue-900">
-                    <strong>Don't have the app installed from App Store?</strong> See our <a href="https://github.com/subveris/extension/blob/main/INSTALL_SAFARI.md" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">detailed Safari guide</a> for alternative installation methods.
-                  </p>
+                    <strong>Having issues?</strong> See our <a href="https://github.com/subveris/extension/blob/main/INSTALL_SAFARI.md" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">detailed Safari guide</a> for help.</p>
                 </div>
               </div>
 
