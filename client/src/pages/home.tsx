@@ -476,34 +476,42 @@ export default function HomePage() {
                   <span className="text-muted-foreground ml-2">/month</span>
                 </div>
                 <CardDescription className="mt-4 text-base">
-                  Perfect for getting started with subscription optimization
+                  Full power to optimize, up to 5 subscriptions
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-1 pb-6">
                 <ul className="space-y-4">
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Optimize up to 5 recurring services</span>
+                    <span className="text-sm font-medium">Manage up to 5 subscriptions</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Monthly spending overview</span>
+                    <span className="text-sm font-medium">Cost-per-use analytics</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Basic spending reports</span>
+                    <span className="text-sm font-medium">Behavioral insights & trends</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Manual subscription entry</span>
+                    <span className="text-sm font-medium">AI-powered recommendations</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Dashboard access</span>
+                    <span className="text-sm font-medium">Savings projections</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Email support</span>
+                    <span className="text-sm font-medium">Export reports</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Lock className="h-5 w-5 text-muted-foreground mr-2 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground">Extension tracking</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Lock className="h-5 w-5 text-muted-foreground mr-2 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground">Autopilot automation</span>
                   </li>
                 </ul>
               </CardContent>
@@ -536,7 +544,7 @@ export default function HomePage() {
                   <span className="text-muted-foreground ml-2">/month</span>
                 </div>
                 <CardDescription className="mt-4 text-base font-medium">
-                  Unlock powerful insights and automation
+                  Unlimited subscriptions with extension tracking
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-1 pb-6">
@@ -547,7 +555,7 @@ export default function HomePage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Browser extension optimization</span>
+                    <span className="text-sm font-medium">Browser extension tracking</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
@@ -559,15 +567,15 @@ export default function HomePage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Behavioral insights & trends</span>
+                    <span className="text-sm font-medium">Behavioral insights</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
                     <span className="text-sm font-medium">Savings projections</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Priority support</span>
+                    <Lock className="h-5 w-5 text-muted-foreground mr-2 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground">Autopilot automation</span>
                   </li>
                 </ul>
               </CardContent>
@@ -599,7 +607,7 @@ export default function HomePage() {
                   <span className="text-muted-foreground ml-2">/month</span>
                 </div>
                 <CardDescription className="mt-4 text-base font-medium">
-                  Share subscriptions with family members
+                  Everything + Autopilot + family sharing
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-1 pb-6">
@@ -607,6 +615,10 @@ export default function HomePage() {
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
                     <span className="text-sm font-medium">Everything in Premium</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm font-medium">Autopilot task automation</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
@@ -627,10 +639,6 @@ export default function HomePage() {
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
                     <span className="text-sm font-medium">Up to 5 family members</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">VIP family support</span>
                   </li>
                 </ul>
               </CardContent>
@@ -675,52 +683,46 @@ export default function HomePage() {
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Unlimited</td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
-                    <td className="py-4 px-6 font-medium">Browser Extension</td>
+                    <td className="py-4 px-6 font-medium">Browser Extension Tracking</td>
                     <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
                     <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                     <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">Cost Per Use Analytics</td>
-                    <td className="text-center py-4 px-6 text-muted-foreground">Up to 2 subscriptions</td>
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Yes, unlimited</td>
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Yes, unlimited</td>
-                  </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
-                    <td className="py-4 px-6 font-medium">Usage-based Optimization</td>
-                    <td className="text-center py-4 px-6 text-muted-foreground">Manual only</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Automatic</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Automatic</td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Yes, unlimited</td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">AI Recommendations</td>
-                    <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">Behavioral Insights</td>
-                    <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">Savings Projections</td>
-                    <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">Export Reports</td>
-                    <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
-                    <td className="py-4 px-6 font-medium">Support</td>
-                    <td className="text-center py-4 px-6 text-sm text-muted-foreground">Email</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Priority</td>
-                    <td className="text-center py-4 px-6 font-semibold text-purple-600 bg-purple-500/5">VIP</td>
+                    <td className="py-4 px-6 font-medium">Autopilot Automation</td>
+                    <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
+                    <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 bg-purple-500/5"><Check className="h-5 w-5 text-purple-600 mx-auto" /></td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
                     <td className="py-4 px-6 font-medium">Family Sharing</td>
