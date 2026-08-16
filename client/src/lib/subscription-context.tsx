@@ -16,6 +16,7 @@ interface SubscriptionContextType {
     hasSavingsProjections: boolean;
     hasExportReports: boolean;
     hasAutopilot: boolean;
+    hasExtensionTracking: boolean;
   };
   subscriptionStatus: {
     status: string;
@@ -31,13 +32,14 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 const TIER_LIMITS = {
   free: {
     maxSubscriptions: 5,
-    maxCostPerUseSubscriptions: 2,
-    hasAIRecommendations: false,
+    maxCostPerUseSubscriptions: Infinity,
+    hasAIRecommendations: true,
     hasCostPerUse: true,
-    hasBehavioralInsights: false,
-    hasSavingsProjections: false,
-    hasExportReports: false,
+    hasBehavioralInsights: true,
+    hasSavingsProjections: true,
+    hasExportReports: true,
     hasAutopilot: false,
+    hasExtensionTracking: false,
   },
   premium: {
     maxSubscriptions: Infinity,
@@ -47,6 +49,8 @@ const TIER_LIMITS = {
     hasBehavioralInsights: true,
     hasSavingsProjections: true,
     hasExportReports: true,
+    hasAutopilot: false,
+    hasExtensionTracking: true,
   },
   family: {
     maxSubscriptions: Infinity,
@@ -57,6 +61,7 @@ const TIER_LIMITS = {
     hasSavingsProjections: true,
     hasExportReports: true,
     hasAutopilot: true,
+    hasExtensionTracking: true,
   },
 };
 

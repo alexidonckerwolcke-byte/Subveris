@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/lib/currency-context";
 import { useAuth } from "@/lib/auth-context";
+import { useSubscription } from "@/lib/subscription-context";
+import { PremiumGate } from "@/components/premium-gate";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
 import { Sparkles, ExternalLink, Plus, ArrowRight } from "lucide-react";
@@ -14,6 +16,7 @@ import { useLocation } from "wouter";
 export default function DetectedSubscriptions() {
   const { formatAmount } = useCurrency();
   const { user } = useAuth();
+  const { limits } = useSubscription();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
   const [, navigate] = useLocation();
 
@@ -56,9 +59,10 @@ export default function DetectedSubscriptions() {
   };
 
   return (
-    <div className="flex-1 overflow-auto">
-      <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
-        <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6 text-slate-900 shadow-sm dark:border-slate-700 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 dark:text-white">
+    <PremiumGate feature="Extension Tracking" showBlurred={false}>
+      <div className="flex-1 overflow-auto">
+        <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+          <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6 text-slate-900 shadow-sm dark:border-slate-700 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 dark:text-white">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-600 dark:text-slate-300">
@@ -267,5 +271,6 @@ export default function DetectedSubscriptions() {
         </Card>
       </div>
     </div>
+    </PremiumGate>
   );
 }
