@@ -101,7 +101,7 @@ function loadKnownSubscriptions() {
 
       browser.storage.local.set({ detectedSubscriptions: merged }, () => {
         if (browser.runtime.lastError) {
-          console.error('[Background] Failed to store hydrated subscriptions:', chrome.runtime.lastError);
+          console.error('[Background] Failed to store hydrated subscriptions:', browser.runtime.lastError);
           return;
         }
         console.log('[Background] ✅ Hydrated known subscriptions from backend:', Object.keys(merged).length);
@@ -130,7 +130,7 @@ function addDetectedSubscription(serviceName, domain) {
 
     browser.storage.local.set({ detectedSubscriptions: subs }, () => {
       if (browser.runtime.lastError) {
-        console.error('[Background] Failed to store detected subscription:', chrome.runtime.lastError);
+        console.error('[Background] Failed to store detected subscription:', browser.runtime.lastError);
         return;
       }
       console.log('[Background] ✅ Added detected subscription:', serviceName);
@@ -193,8 +193,8 @@ function updateUpgradePrompt(status) {
       ? 'Upgrade to Premium or Family to unlock full tracking, hidden subscription discovery, and zero-usage alerts.'
       : 'Full tracking enabled.'
   }, () => {
-    if (chrome.runtime.lastError) {
-      console.error('[Background] Failed to update upgrade prompt state:', chrome.runtime.lastError);
+    if (browser.runtime.lastError) {
+      console.error('[Background] Failed to update upgrade prompt state:', browser.runtime.lastError);
     }
   });
 }
@@ -228,7 +228,7 @@ function updateZeroUsageSignal(domain, timeSpent, callback) {
     history[domain] = recentEntries;
     browser.storage.local.set({ usageSignalHistory: history }, () => {
       if (browser.runtime.lastError) {
-        console.error('[Background] Failed to persist zero-usage signal history:', chrome.runtime.lastError);
+        console.error('[Background] Failed to persist zero-usage signal history:', browser.runtime.lastError);
       }
       callback(Boolean(isZeroUsage));
     });
@@ -289,7 +289,7 @@ function runCookieSessionScan() {
         detectedSubscriptions: detectedServices
       }, () => {
         if (browser.runtime.lastError) {
-          console.error('[Background] Failed to persist cookie scan state:', chrome.runtime.lastError);
+          console.error('[Background] Failed to persist cookie scan state:', browser.runtime.lastError);
           return;
         }
 
@@ -343,7 +343,7 @@ function sendUsageTracking(domain, timeSpent) {
     }
 
     updateZeroUsageSignal(domain, timeSpent, (isZeroUsage) => {
-      chrome.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
+      browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
         const token = result.authToken;
         const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
 
@@ -437,7 +437,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }, () => {
       if (browser.runtime.lastError) {
         console.error('[Background] Storage error:', browser.runtime.lastError);
-        sendResponse({ success: false, error: chrome.runtime.lastError });
+        sendResponse({ success: false, error: browser.runtime.lastError });
       } else {
         console.log('[Background] ✅ Stored auth token and API URL: User ID =', request.userId, 'apiUrl =', request.apiUrl);
         runCookieSessionScan();
@@ -466,17 +466,17 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'PRICE_DISCOVERY') {
     const payload = request.payload || {};
 
-    chrome.storage.local.get(['authToken', 'subverisApiUrl', 'supabaseUserUUID'], (result) => {
+    browser.storage.local.get(['authToken', 'subverisApiUrl', 'supabaseUserUUID'], (result) => {
       const token = result.authToken;
       const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
 
-      chrome.storage.local.set({
+      browser.storage.local.set({
         detectedSubscription: payload,
         lastDetectedSubscriptionAt: Date.now()
       }, () => {
-        if (chrome.runtime.lastError) {
-          console.error('[Background] Failed to store detected subscription:', chrome.runtime.lastError);
-          sendResponse({ success: false, error: chrome.runtime.lastError });
+        if (browser.runtime.lastError) {
+          console.error('[Background] Failed to store detected subscription:', browser.runtime.lastError);
+          sendResponse({ success: false, error: browser.runtime.lastError });
           return;
         }
 
@@ -791,7 +791,7 @@ setInterval(() => {
   loadKnownSubscriptions();
   scanGmailForSubscriptions();
   
-  chrome.storage.local.get(['detectedSubscriptions'], (result) => {
+  browser.storage.local.get(['detectedSubscriptions'], (result) => {
     const subs = result.detectedSubscriptions || {};
     if (Object.keys(subs).length > 0) {
       syncDetectedSubscriptions(subs);

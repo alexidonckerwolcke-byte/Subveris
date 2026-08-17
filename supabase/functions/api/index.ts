@@ -1402,6 +1402,67 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
     }
 
+    // Extension detected subscriptions endpoint
+    if (pathname === "/extension/detected-subscriptions" && req.method === "POST") {
+      const userId = extractUserId(req);
+      if (!userId) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      try {
+        const body = await req.json() as { subscriptions?: any[]; syncedAt?: number };
+        const { subscriptions = [], syncedAt = Date.now() } = body;
+
+        if (!Array.isArray(subscriptions)) {
+          return sendJson({ error: "Subscriptions must be an array" }, { status: 400 });
+        }
+
+        console.log(`[Extension] Received ${subscriptions.length} detected subscriptions from browser`);
+        
+        // Just acknowledge receipt - subscriptions are stored in browser extension
+        // Backend doesn't need to persist these as they're available via GET /subscriptions
+        return sendJson({
+          success: true,
+          received: subscriptions.length,
+          message: "Detected subscriptions received"
+        });
+      } catch (err) {
+        console.error("[Extension] Error processing detected subscriptions:", err);
+        return sendJson(
+          { error: "Failed to process detected subscriptions" },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Extension session scan endpoint
+    if (pathname === "/extension/session-scan" && req.method === "POST") {
+      const userId = extractUserId(req);
+      if (!userId) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      try {
+        const body = await req.json() as { domains?: string[]; cookies?: any; scannedAt?: number };
+        const { domains = [], scannedAt = Date.now() } = body;
+
+        console.log(`[Extension] Session scan: found ${domains.length} authenticated domains`);
+
+        // Acknowledge session scan - actual subscription tracking happens via /extension/usage-sync
+        return sendJson({
+          success: true,
+          domainsProcessed: domains.length,
+          message: "Session scan data received"
+        });
+      } catch (err) {
+        console.error("[Extension] Error processing session scan:", err);
+        return sendJson(
+          { error: "Failed to process session scan" },
+          { status: 500 }
+        );
+      }
+    }
+
     if (pathname === "/extension/download" && req.method === "GET") {
       const zipUrl = Deno?.env?.get("EXTENSION_ZIP_URL")?.trim();
       if (zipUrl) {
