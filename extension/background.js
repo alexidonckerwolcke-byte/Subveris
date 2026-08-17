@@ -535,14 +535,11 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       // Request OAuth URL from backend
       fetch(`${apiUrl}/api/auth/gmail-oauth-url`, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          redirectUri: browser.identity.getRedirectURL()
-        })
+        }
       }).then(r => r.json()).then(data => {
         if (!data.oauthUrl) {
           throw new Error('No OAuth URL from backend');
