@@ -23,6 +23,7 @@ interface SubscriptionContextType {
     tier: SubscriptionTier;
     currentPeriodEnd?: string | null;
     cancelAtPeriodEnd?: boolean;
+    stripeSubscriptionId?: string | null;
   } | null;
   isLoading: boolean;
 }
@@ -75,6 +76,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     status: string;
     cancelAtPeriodEnd: boolean;
     currentPeriodEnd: string | null;
+    stripeSubscriptionId?: string | null;
   } | null>({
     queryKey: ["/api/user/premium-status"],
     queryFn: async () => {
@@ -100,6 +102,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       : "free",
     currentPeriodEnd: subscriptionData.currentPeriodEnd,
     cancelAtPeriodEnd: subscriptionData.cancelAtPeriodEnd,
+    stripeSubscriptionId: subscriptionData.stripeSubscriptionId ?? null,
   } : null;
 
   useEffect(() => {

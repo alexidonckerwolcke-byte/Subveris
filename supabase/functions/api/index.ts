@@ -1773,6 +1773,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             status: "active",
             cancelAtPeriodEnd: false,
             currentPeriodEnd: null,
+            stripeSubscriptionId: null,
           });
         }
 
@@ -1821,6 +1822,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           currency,
           cancelAtPeriodEnd: expiredScheduledCancellation ? false : (userData.cancel_at_period_end || false),
           currentPeriodEnd: userData.current_period_end,
+          stripeSubscriptionId: userData.stripe_subscription_id ?? null,
         });
       } catch (err) {
         console.error("Exception fetching premium status:", err);

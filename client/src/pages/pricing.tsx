@@ -182,6 +182,17 @@ export default function PricingPage() {
     },
     onError: (error) => {
       const errorMessage = error instanceof Error ? error.message : "Failed to schedule the plan downgrade.";
+      const noSubscription = /No Stripe subscription found|No active Stripe subscription/i.test(errorMessage);
+
+      if (noSubscription) {
+        toast({
+          title: "Resuming checkout",
+          description: "No active Stripe subscription was found, so we’re starting a fresh checkout flow.",
+        });
+        createCheckoutMutation.mutate("premium");
+        return;
+      }
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -255,6 +266,10 @@ export default function PricingPage() {
 
   const handleSelectPlan = (plan: Plan) => {
     if (plan.tier === currentTier) return;
+
+    const hasActiveStripeSubscription = Boolean(subscriptionStatus?.stripeSubscriptionId) && subscriptionStatus?.status === "active";
+    const isFamilyDowngrade = plan.tier === "premium" && currentTier === "family" && hasActiveStripeSubscription;
+
     // If downgrading from family and user has a family group, force them to delete it first
     if (
       currentTier === "family" &&
@@ -268,7 +283,7 @@ export default function PricingPage() {
       setLocation("/family-sharing");
       return;
     }
-    if (plan.tier === "premium" && currentTier === "family") {
+    if (isFamilyDowngrade) {
       schedulePlanChangeMutation.mutate();
     } else if (plan.tier === "premium" || plan.tier === "family") {
       // Upgrade to premium or family - use Stripe checkout
