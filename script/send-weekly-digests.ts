@@ -2,6 +2,10 @@ import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 
+// DEBUG: Check if secrets are already in process.env BEFORE loading .env
+console.log('[Weekly Digest] BEFORE dotenv - RESEND_API_KEY present:', !!process.env.RESEND_API_KEY);
+console.log('[Weekly Digest] BEFORE dotenv - SENDGRID_API_KEY present:', !!process.env.SENDGRID_API_KEY);
+
 // Load environment variables FIRST
 const envPathLocal = path.resolve(process.cwd(), '.env.local');
 const envPath = path.resolve(process.cwd(), '.env');
@@ -10,6 +14,10 @@ if (fs.existsSync(envPathLocal)) {
 } else {
   config({ path: envPath });
 }
+
+// DEBUG: Check after loading .env
+console.log('[Weekly Digest] AFTER dotenv - RESEND_API_KEY present:', !!process.env.RESEND_API_KEY);
+console.log('[Weekly Digest] AFTER dotenv - SENDGRID_API_KEY present:', !!process.env.SENDGRID_API_KEY);
 
 import { createClient } from '@supabase/supabase-js';
 import { emailService } from '../server/email.js';
