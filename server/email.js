@@ -140,6 +140,12 @@ function buildWelcomeEmailHtml(email) {
       <p style="font-size: 16px; margin-bottom: 12px;">
         <strong>Pro tip:</strong> Our browser extension auto-detects subscription services as you visit websites, making setup a breeze.
       </p>
+
+      <div style="background-color: #fef3cd; padding: 16px; border-radius: 8px; margin: 24px 0; border-left: 4px solid #ffc107;">
+        <p style="font-size: 14px; margin-top: 0; color: #333;">
+          <strong>🔒 Secure your account:</strong> We recommend enabling two-factor authentication (2FA) in your settings to protect your subscription data. You can set it up anytime in your account settings.
+        </p>
+      </div>
       
       <div style="background-color: #f5f5f5; padding: 16px; border-radius: 8px; margin: 24px 0;">
         <p style="font-size: 14px; margin: 0; color: #666;">
