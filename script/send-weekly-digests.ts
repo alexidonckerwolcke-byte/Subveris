@@ -31,6 +31,8 @@ const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
 const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const initialKey = serviceKey || anonKey;
+const testUserEmail = process.env.TEST_USER_EMAIL?.trim();
+const testRun = process.env.TEST_RUN === 'true';
 let usingServiceKey = Boolean(serviceKey);
 
 console.log('[Weekly Digest] Supabase URL loaded:', supabaseUrl ? 'YES' : 'NO');
@@ -94,8 +96,39 @@ async function getUserCurrency(userId: string): Promise<string> {
   }
 }
 
+async function sendSingleTestDigest() {
+  if (!testUserEmail) {
+    console.warn('[Weekly Digest] TEST_USER_EMAIL is not set; skipping test digest');
+    return;
+  }
+
+  console.log(`[Weekly Digest] TEST_RUN enabled. Sending digest directly to ${testUserEmail}`);
+
+  const digestData = {
+    totalSubscriptions: 0,
+    monthlySpending: 0,
+    weeklySavings: 0,
+    currency: 'USD',
+    topSubscriptions: [],
+  };
+
+  const result = await emailService.sendWeeklyDigest('manual-test', testUserEmail, digestData);
+
+  if (result.success) {
+    console.log(`[Weekly Digest] Sent test digest to ${testUserEmail}`);
+    return;
+  }
+
+  console.error(`[Weekly Digest] Failed to send test digest to ${testUserEmail}:`, result.error);
+}
+
 async function sendWeeklyDigests() {
   console.log('[Weekly Digest] Starting weekly digest email job');
+
+  if (testUserEmail) {
+    await sendSingleTestDigest();
+    return;
+  }
 
   try {
     // Get all users who have weekly digest enabled
