@@ -38,6 +38,8 @@ let usingServiceKey = Boolean(serviceKey);
 console.log('[Weekly Digest] TEST_USER_EMAIL raw:', JSON.stringify(process.env.TEST_USER_EMAIL));
 console.log('[Weekly Digest] TEST_USER_EMAIL trimmed:', JSON.stringify(testUserEmail));
 console.log('[Weekly Digest] TEST_RUN:', testRun);
+console.log('[Weekly Digest] RESEND_API_KEY length:', (process.env.RESEND_API_KEY || '').length);
+console.log('[Weekly Digest] SENDGRID_API_KEY length:', (process.env.SENDGRID_API_KEY || '').length);
 console.log('[Weekly Digest] Supabase URL loaded:', supabaseUrl ? 'YES' : 'NO');
 console.log('[Weekly Digest] Using service key:', usingServiceKey);
 console.log('[Weekly Digest] Has anon key:', !!anonKey);
