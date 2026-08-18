@@ -35,6 +35,9 @@ const testUserEmail = process.env.TEST_USER_EMAIL?.trim();
 const testRun = process.env.TEST_RUN === 'true';
 let usingServiceKey = Boolean(serviceKey);
 
+console.log('[Weekly Digest] TEST_USER_EMAIL raw:', JSON.stringify(process.env.TEST_USER_EMAIL));
+console.log('[Weekly Digest] TEST_USER_EMAIL trimmed:', JSON.stringify(testUserEmail));
+console.log('[Weekly Digest] TEST_RUN:', testRun);
 console.log('[Weekly Digest] Supabase URL loaded:', supabaseUrl ? 'YES' : 'NO');
 console.log('[Weekly Digest] Using service key:', usingServiceKey);
 console.log('[Weekly Digest] Has anon key:', !!anonKey);
@@ -97,7 +100,9 @@ async function getUserCurrency(userId: string): Promise<string> {
 }
 
 async function sendSingleTestDigest() {
-  if (!testUserEmail) {
+  console.log('[Weekly Digest] TEST_USER_EMAIL check: value=' + JSON.stringify(testUserEmail) + ', type=' + typeof testUserEmail + ', length=' + (testUserEmail?.length || 0));
+  
+  if (!testUserEmail || testUserEmail.length === 0) {
     console.warn('[Weekly Digest] TEST_USER_EMAIL is not set; skipping test digest');
     return;
   }
