@@ -12,7 +12,8 @@ async function sendWithResend({ to, subject, html }) {
     html,
   });
 
-  if (response?.id) {
+  if (response?.data?.id) {
+    console.log('[Email] Email sent successfully with ID:', response.data.id);
     return { success: true };
   }
   
