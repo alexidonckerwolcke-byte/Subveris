@@ -10,9 +10,8 @@ on:
         required: true
 
 jobs:
-  # Regular scheduled run (not manual dispatch)
+  # Regular scheduled run (Mondays at 08:00 UTC) + manual trigger for testing
   send:
-    if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
