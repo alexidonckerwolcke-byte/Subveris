@@ -12,7 +12,13 @@ async function sendWithResend({ to, subject, html }) {
     html,
   });
 
-  return response?.id ? { success: true } : { success: false, error: 'Resend email failed' };
+  if (response?.id) {
+    return { success: true };
+  }
+  
+  const errorMsg = response?.error?.message || JSON.stringify(response) || 'Resend email failed';
+  console.error('[Email] Resend error:', errorMsg);
+  return { success: false, error: `Resend email failed: ${errorMsg}` };
 }
 
 async function sendWithSendGrid({ to, subject, html }) {
