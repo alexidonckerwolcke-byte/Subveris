@@ -38,11 +38,11 @@ console.log('[Weekly Digest] Using service key:', usingServiceKey);
 console.log('[Weekly Digest] Has anon key:', !!anonKey);
 
 if (!supabaseUrl) {
-  throw new Error('SUPABASE_URL or VITE_SUPABASE_URL is required.');
+  throw new Error('Missing Supabase URL. Set SUPABASE_URL or VITE_SUPABASE_URL in the environment or GitHub secrets.');
 }
 
 if (!initialKey) {
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY, SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, or VITE_SUPABASE_ANON_KEY is required.');
+  throw new Error('Missing Supabase key. Set SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY in the environment or GitHub secrets.');
 }
 
 let supabase = createClient(supabaseUrl, initialKey);
