@@ -5,9 +5,39 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+.env.*.production
+.env.production
 /dist/
 /build/
 node_modules
 Subveris/
 .cache/
 node_modules/.cache/
+
+# Security: Never commit secrets or API keys
+*.key
+*.pem
+.secret*
+secrets/
+*.jks
+*.p12
+
+# Test files that might contain secrets
+test-token.ts
+test-direct-insert.ts
+*.test.secrets.ts
+*.test.keys.ts
+
+# Security: Never commit secrets or API keys
+*.key
+*.pem
+.secret*
+secrets/
+*.jks
+*.p12
+
+# Test files that might contain secrets
+test-token.ts
+test-direct-insert.ts
+*.test.secrets.ts
+*.test.keys.ts
