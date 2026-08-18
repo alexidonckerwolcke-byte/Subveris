@@ -2,10 +2,6 @@ import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 
-// DEBUG: Check if secrets are already in process.env BEFORE loading .env
-console.log('[Weekly Digest] BEFORE dotenv - RESEND_API_KEY present:', !!process.env.RESEND_API_KEY);
-console.log('[Weekly Digest] BEFORE dotenv - SENDGRID_API_KEY present:', !!process.env.SENDGRID_API_KEY);
-
 // Load environment variables FIRST
 const envPathLocal = path.resolve(process.cwd(), '.env.local');
 const envPath = path.resolve(process.cwd(), '.env');
@@ -14,10 +10,6 @@ if (fs.existsSync(envPathLocal)) {
 } else {
   config({ path: envPath });
 }
-
-// DEBUG: Check after loading .env
-console.log('[Weekly Digest] AFTER dotenv - RESEND_API_KEY present:', !!process.env.RESEND_API_KEY);
-console.log('[Weekly Digest] AFTER dotenv - SENDGRID_API_KEY present:', !!process.env.SENDGRID_API_KEY);
 
 import { createClient } from '@supabase/supabase-js';
 import { emailService } from '../server/email.js';
@@ -43,11 +35,6 @@ const testUserEmail = process.env.TEST_USER_EMAIL?.trim();
 const testRun = process.env.TEST_RUN === 'true';
 let usingServiceKey = Boolean(serviceKey);
 
-console.log('[Weekly Digest] TEST_USER_EMAIL raw:', JSON.stringify(process.env.TEST_USER_EMAIL));
-console.log('[Weekly Digest] TEST_USER_EMAIL trimmed:', JSON.stringify(testUserEmail));
-console.log('[Weekly Digest] TEST_RUN:', testRun);
-console.log('[Weekly Digest] RESEND_API_KEY length:', (process.env.RESEND_API_KEY || '').length);
-console.log('[Weekly Digest] SENDGRID_API_KEY length:', (process.env.SENDGRID_API_KEY || '').length);
 console.log('[Weekly Digest] Supabase URL loaded:', supabaseUrl ? 'YES' : 'NO');
 console.log('[Weekly Digest] Using service key:', usingServiceKey);
 console.log('[Weekly Digest] Has anon key:', !!anonKey);
@@ -110,8 +97,6 @@ async function getUserCurrency(userId: string): Promise<string> {
 }
 
 async function sendSingleTestDigest() {
-  console.log('[Weekly Digest] TEST_USER_EMAIL check: value=' + JSON.stringify(testUserEmail) + ', type=' + typeof testUserEmail + ', length=' + (testUserEmail?.length || 0));
-  
   if (!testUserEmail || testUserEmail.length === 0) {
     console.warn('[Weekly Digest] TEST_USER_EMAIL is not set; skipping test digest');
     return;

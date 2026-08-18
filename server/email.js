@@ -13,12 +13,10 @@ async function sendWithResend({ to, subject, html }) {
   });
 
   if (response?.data?.id) {
-    console.log('[Email] Email sent successfully with ID:', response.data.id);
     return { success: true };
   }
   
-  const errorMsg = response?.error?.message || JSON.stringify(response) || 'Resend email failed';
-  console.error('[Email] Resend error:', errorMsg);
+  const errorMsg = response?.error?.message || 'Unknown error';
   return { success: false, error: `Resend email failed: ${errorMsg}` };
 }
 
