@@ -117,7 +117,54 @@ async function sendCancellationReminder(userId, email, details) {
   return sendEmail({ to: email, subject, html });
 }
 
+function buildWelcomeEmailHtml(email) {
+  return `
+    <div style="font-family: Arial, sans-serif; color: #111; line-height: 1.6; max-width: 600px;">
+      <h1 style="font-size: 28px; margin-bottom: 16px; color: #000;">Welcome to Subveris! 🎉</h1>
+      
+      <p style="font-size: 16px; margin-bottom: 12px;">Hi there,</p>
+      
+      <p style="font-size: 16px; margin-bottom: 12px;">
+        Welcome aboard! We're thrilled to have you join Subveris, your personal subscription manager.
+      </p>
+      
+      <h2 style="font-size: 20px; margin-top: 24px; margin-bottom: 12px; color: #333;">What's next?</h2>
+      
+      <ol style="font-size: 16px; margin-bottom: 12px; line-height: 1.8;">
+        <li><strong>Install the browser extension</strong> - Track subscriptions as you browse</li>
+        <li><strong>Add your subscriptions</strong> - Manual entry or auto-detect from transactions</li>
+        <li><strong>Get insights</strong> - Understand your spending patterns and find savings</li>
+        <li><strong>Upgrade to Premium</strong> - Unlock AI-powered recommendations and family sharing</li>
+      </ol>
+      
+      <p style="font-size: 16px; margin-bottom: 12px;">
+        <strong>Pro tip:</strong> Our browser extension auto-detects subscription services as you visit websites, making setup a breeze.
+      </p>
+      
+      <div style="background-color: #f5f5f5; padding: 16px; border-radius: 8px; margin: 24px 0;">
+        <p style="font-size: 14px; margin: 0; color: #666;">
+          <strong>Questions?</strong> Check out our getting started guide or reply to this email. We're here to help!
+        </p>
+      </div>
+      
+      <p style="font-size: 16px; margin-bottom: 12px;">Happy tracking!</p>
+      
+      <p style="font-size: 14px; color: #666; margin-top: 32px;">
+        Best regards,<br>
+        The Subveris Team
+      </p>
+    </div>
+  `;
+}
+
+async function sendWelcomeEmail(userId, email) {
+  const subject = 'Welcome to Subveris – Let\'s track your subscriptions!';
+  const html = buildWelcomeEmailHtml(email);
+  return sendEmail({ to: email, subject, html });
+}
+
 export const emailService = {
   sendWeeklyDigest,
   sendCancellationReminder,
+  sendWelcomeEmail,
 };

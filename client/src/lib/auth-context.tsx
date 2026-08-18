@@ -283,6 +283,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data?.session?.user && isUserVerified(data.session.user) && isRecentlyCreatedAccount(data.session.user)) {
       setJustSignedUp(true);
       localStorage.setItem('justSignedUp', 'true');
+      
+      // Send welcome email in the background
+      try {
+        if (data.session?.access_token) {
+          await fetch('/api/send-welcome-email', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${data.session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+        }
+      } catch (emailError) {
+        // Log but don't break the flow - welcome email is non-critical
+        console.warn('[Auth] Failed to send welcome email:', emailError);
+      }
     }
 
     return { error };

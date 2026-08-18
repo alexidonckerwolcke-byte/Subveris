@@ -1,4 +1,5 @@
 import { getSupabaseClient } from './supabase.js';
+import { emailService } from './email.js';
 
 export function getPaginationParams(req) {
   const q = (req && req.query) || {};
@@ -171,6 +172,41 @@ export async function registerRoutes(server, app) {
       return res.status(200).json(data);
     } catch (error) {
       console.error('Error handling PUT /api/family-groups/:groupId/settings:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Send welcome email endpoint
+  app.post('/api/send-welcome-email', async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization || '';
+      const userId = extractUserIdFromToken(authHeader);
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      // Get user email from Supabase auth
+      const { data: { users }, error: userError } = await client.auth.admin.listUsers();
+      if (userError || !users) {
+        return res.status(500).json({ error: 'Failed to fetch user' });
+      }
+
+      const user = users.find(u => u.id === userId);
+      if (!user || !user.email) {
+        return res.status(400).json({ error: 'User email not found' });
+      }
+
+      // Send welcome email
+      const result = await emailService.sendWelcomeEmail(userId, user.email);
+      
+      if (!result.success) {
+        return res.status(500).json({ error: result.error });
+      }
+
+      return res.status(200).json({ success: true, message: 'Welcome email sent' });
+    } catch (error) {
+      console.error('Error handling POST /api/send-welcome-email:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   });
