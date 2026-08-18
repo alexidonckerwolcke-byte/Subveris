@@ -6,9 +6,8 @@ on:
   workflow_dispatch:
     inputs:
       test_user_email:
-        description: 'Optional: send a single test digest to this email'
-        required: false
-        default: ''
+        description: 'Email address to send test digest to (e.g., your@email.com)'
+        required: true
 
 jobs:
   # Regular scheduled run (not manual dispatch)
