@@ -9,3 +9,5 @@ __pycache__/
 /build/
 node_modules
 Subveris/
+.cache/
+node_modules/.cache/
