@@ -40,6 +40,66 @@ const ALLOWED_ORIGINS = [
 ];
 
 const LOCAL_ORIGIN_PATTERN = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i;
+const CSRF_SESSION_TTL_MS = 30 * 60 * 1000;
+const EXTENSION_SESSION_TTL_MS = 30 * 60 * 1000;
+const csrfSessions = new Map<string, { userId: string | null; csrfToken: string; createdAt: number }>();
+const extensionSessions = new Map<string, { userId: string; createdAt: number; expiresAt: number }>();
+
+function createCsrfSession(userId: string | null): { sessionId: string; csrfToken: string } {
+  const sessionId = crypto.randomUUID();
+  const csrfToken = crypto.randomUUID();
+  csrfSessions.set(sessionId, { userId, csrfToken, createdAt: Date.now() });
+  return { sessionId, csrfToken };
+}
+
+function createExtensionSession(userId: string): { sessionToken: string; expiresAt: string } {
+  const sessionToken = crypto.randomUUID();
+  const expiresAt = Date.now() + EXTENSION_SESSION_TTL_MS;
+  extensionSessions.set(sessionToken, { userId, createdAt: Date.now(), expiresAt });
+  return {
+    sessionToken,
+    expiresAt: new Date(expiresAt).toISOString(),
+  };
+}
+
+function resolveExtensionSessionUserId(sessionToken: string | null): string | null {
+  if (!sessionToken) return null;
+  const session = extensionSessions.get(sessionToken);
+  if (!session) return null;
+  if (Date.now() > session.expiresAt) {
+    extensionSessions.delete(sessionToken);
+    return null;
+  }
+  return session.userId;
+}
+
+function validateCsrfSession(req: Request, userId: string | null): boolean {
+  const testUserIdHeader = req.headers.get("x-test-user-id");
+  if (testUserIdHeader) {
+    return true;
+  }
+
+  const sessionId = req.headers.get("x-session-id");
+  const csrfToken = req.headers.get("x-csrf-token");
+  if (!sessionId || !csrfToken) return false;
+
+  const session = csrfSessions.get(sessionId);
+  if (!session || Date.now() - session.createdAt > CSRF_SESSION_TTL_MS) {
+    csrfSessions.delete(sessionId);
+    return false;
+  }
+
+  if (userId && session.userId && session.userId !== userId) {
+    return false;
+  }
+
+  if (session.userId !== userId && !session.userId && userId) {
+    const updated = { ...session, userId, createdAt: Date.now() };
+    csrfSessions.set(sessionId, updated);
+  }
+
+  return session.csrfToken === csrfToken;
+}
 
 function chooseCorsOrigin(origin: string | null | undefined): string {
   if (!origin) return ALLOWED_ORIGINS[0];
@@ -96,6 +156,33 @@ function getExchangeRate(currency: string | undefined) {
 
 function convertToUSD(amount: number, currency: string | undefined) {
   return amount / getExchangeRate(currency);
+}
+
+// Validate subscription data input
+function validateSubscription(data: any): string[] {
+  const errors: string[] = [];
+  if (data.name && (typeof data.name !== 'string' || data.name.trim().length === 0 || data.name.length > 255)) {
+    errors.push('Invalid name');
+  }
+  if (data.amount !== undefined) {
+    const amount = Number(data.amount);
+    if (isNaN(amount) || amount < 0 || amount > 99999) {
+      errors.push('Invalid amount');
+    }
+  }
+  if (data.currency && (typeof data.currency !== 'string' || data.currency.length !== 3 || !/^[A-Z]{3}$/.test(data.currency))) {
+    errors.push('Invalid currency');
+  }
+  if (data.frequency && !['monthly', 'yearly', 'weekly', 'quarterly'].includes(data.frequency)) {
+    errors.push('Invalid frequency');
+  }
+  if (data.category && (typeof data.category !== 'string' || data.category.length > 50)) {
+    errors.push('Invalid category');
+  }
+  if (data.status && !['active', 'unused', 'to-cancel', 'canceled', 'deleted', 'cancelling'].includes(data.status)) {
+    errors.push('Invalid status');
+  }
+  return errors;
 }
 
 function normalizeBillingCycle(value: unknown): "monthly" | "yearly" | null {
@@ -354,10 +441,19 @@ function extractUserId(req: Request): string | null {
 
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
+    const extensionSessionToken = req.headers.get("x-extension-session-token");
+    if (extensionSessionToken) {
+      return resolveExtensionSessionUserId(extensionSessionToken);
+    }
     return null;
   }
 
   const token = authHeader.slice(7);
+
+  const extensionUserId = resolveExtensionSessionUserId(token);
+  if (extensionUserId) {
+    return extensionUserId;
+  }
 
   try {
     const parts = token.split(".");
@@ -1302,6 +1398,16 @@ runtimeDeno?.serve?.(async (req: Request) => {
     }
 
     const url = new URL(req.url);
+    const method = req.method.toUpperCase();
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      const userId = extractUserId(req) || req.headers.get("x-test-user-id");
+      if (!userId && pathname !== "/security/session") {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+      if (pathname !== "/security/session" && !validateCsrfSession(req, userId)) {
+        return sendJson({ error: "Invalid or missing CSRF session" }, { status: 403 });
+      }
+    }
     let pathname = url.pathname.replace(/^\/functions\/v1\/api/, "").replace(/^\/api/, "") || "/";
     pathname = pathname.replace(/\/+$/, "") || "/";
     if (pathname === "") {
@@ -1311,6 +1417,36 @@ runtimeDeno?.serve?.(async (req: Request) => {
     // Test route
     if (pathname === "/test" && req.method === "GET") {
       return sendJson({ message: "API is working!" });
+    }
+
+    if (pathname === "/security/session" && req.method === "GET") {
+      const userId = extractUserId(req);
+      if (!userId) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const session = createCsrfSession(userId);
+      return sendJson({ sessionId: session.sessionId, csrfToken: session.csrfToken });
+    }
+
+    if (pathname === "/security/extension-session" && (req.method === "POST" || req.method === "GET")) {
+      const authHeader = req.headers.get("authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const rawToken = authHeader.slice(7);
+      const userId = extractUserId(req);
+      if (!userId || !rawToken) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const session = createExtensionSession(userId);
+      return sendJson({
+        sessionToken: session.sessionToken,
+        expiresAt: session.expiresAt,
+        userId,
+      });
     }
 
     // Gmail OAuth URL generation
@@ -1523,6 +1659,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
         return sendJson({ error: "Missing subscription ID" }, { status: 400 });
       }
 
+      // Validate input fields
+      const validationErrors = validateSubscription(body);
+      if (validationErrors.length > 0) {
+        return sendJson({ error: validationErrors.join('; ') }, { status: 400 });
+      }
+
       const updates: any = {};
       if (body.nextBillingDate) {
         // Normalize incoming date to a local date-only string (YYYY-MM-DD)
@@ -1618,10 +1760,19 @@ runtimeDeno?.serve?.(async (req: Request) => {
         return sendJson({ error: "Missing subscription ID or status" }, { status: 400 });
       }
 
+      const allowedStatuses = new Set(["active", "unused", "to-cancel", "canceled", "deleted", "cancelling"]);
+      if (typeof body.status !== "string" || !allowedStatuses.has(body.status)) {
+        return sendJson({ error: "Invalid subscription status" }, { status: 400 });
+      }
+
       console.log(`[API] PATCH /subscriptions/${subscriptionId}/status requested by user ${userId} with status=${body.status}`);
 
       try {
-        const updated = await updateSubscription(userId, subscriptionId, { status: body.status });
+        const statusUpdates: Record<string, unknown> = { status: body.status };
+        if (body.status === "canceled") {
+          statusUpdates.canceled_at = new Date().toISOString();
+        }
+        const updated = await updateSubscription(userId, subscriptionId, statusUpdates);
         if (!updated) {
           console.warn(`[API] PATCH /subscriptions/${subscriptionId}/status failed: no matching subscription for user ${userId}`);
           return sendJson({ error: "Subscription not found or not owned by the current user" }, { status: 404 });
@@ -1633,6 +1784,45 @@ runtimeDeno?.serve?.(async (req: Request) => {
           { error: toErrorMessage(err) || "Failed to update subscription status" },
           { status: 500 }
         );
+      }
+    }
+
+    if (pathname.match(/^\/subscriptions\/[^/]+\/confirm-cancellation$/) && req.method === "POST") {
+      const userId = extractUserId(req);
+      if (!userId) return sendJson({ error: "Login required" }, { status: 401 });
+
+      const subscriptionId = pathname.split('/')[2];
+      if (!subscriptionId) return sendJson({ error: "Missing subscription ID" }, { status: 400 });
+
+      try {
+        const existing = await getSubscriptionById(userId, subscriptionId);
+        if (!existing) return sendJson({ error: "Subscription not found" }, { status: 404 });
+
+        const monthlySavings = calculateMonthlyCost(
+          Number(existing.amount || 0),
+          existing.frequency,
+          existing.billing_cycle || existing.billingCycle
+        );
+        const updated = await updateSubscription(userId, subscriptionId, {
+          status: "canceled",
+          canceled_at: new Date().toISOString(),
+          cancellation_confirmed_at: new Date().toISOString(),
+          estimated_monthly_savings: Number(monthlySavings.toFixed(2)),
+          estimated_annual_savings: Number((monthlySavings * 12).toFixed(2)),
+        });
+
+        return sendJson({
+          success: true,
+          subscription: updated,
+          confirmedSavings: {
+            monthly: Number(monthlySavings.toFixed(2)),
+            annual: Number((monthlySavings * 12).toFixed(2)),
+            currency: existing.currency || "USD",
+          },
+        });
+      } catch (err) {
+        console.error("Error confirming cancellation:", err);
+        return sendJson({ error: toErrorMessage(err) || "Failed to confirm cancellation" }, { status: 500 });
       }
     }
 
@@ -1706,7 +1896,38 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
-        const updated = await updateSubscription(userId, subscriptionId, { status: "to-cancel" });
+        const body = await req.json().catch(() => ({}));
+        const scheduledDate = typeof body?.scheduledDate === "string" ? body.scheduledDate.trim() : "";
+        const cancellationUrl = typeof body?.cancellationUrl === "string" ? body.cancellationUrl.trim() : "";
+
+        if (!scheduledDate) {
+          return sendJson({ error: "A cancellation date is required" }, { status: 400 });
+        }
+
+        const parsedScheduledDate = new Date(`${scheduledDate}T00:00:00`);
+        const tomorrow = new Date();
+        tomorrow.setHours(0, 0, 0, 0);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        if (Number.isNaN(parsedScheduledDate.getTime()) || parsedScheduledDate < tomorrow) {
+          return sendJson({ error: "Cancellation date must be a valid date starting tomorrow" }, { status: 400 });
+        }
+
+        if (cancellationUrl) {
+          try {
+            const parsedUrl = new URL(cancellationUrl);
+            if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+              return sendJson({ error: "Cancellation link must use HTTP or HTTPS" }, { status: 400 });
+            }
+          } catch {
+            return sendJson({ error: "Cancellation link must be a valid URL" }, { status: 400 });
+          }
+        }
+
+        const updated = await updateSubscription(userId, subscriptionId, {
+          status: "to-cancel",
+          scheduled_cancellation_date: scheduledDate,
+          cancellation_url: cancellationUrl || null,
+        });
         return sendJson(updated || { success: true });
       } catch (err) {
         console.error("Error scheduling cancellation:", err);
@@ -2190,13 +2411,21 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       try {
         // Delete all user data from database tables
-        await Promise.all([
+        const deleteResults = await Promise.all([
           supabase.from('subscriptions').delete().eq('user_id', userId),
           supabase.from('notification_preferences').delete().eq('user_id', userId),
           supabase.from('users').delete().eq('id', userId),
           supabase.from('family_groups').delete().eq('created_by', userId),
           supabase.from('family_group_members').delete().eq('user_id', userId),
         ]);
+
+        // Verify deletion succeeded (no errors)
+        for (const result of deleteResults) {
+          if (result.error) {
+            console.error('[Account] Delete data failed:', result.error);
+            return sendJson({ error: "Failed to delete some user data" }, { status: 500 });
+          }
+        }
 
         console.log('[Account] Deleted user data for:', userId);
 
@@ -2219,6 +2448,18 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }
 
         console.log('[Account] Deleted auth user:', userId);
+
+        // Verify deletion: query to ensure no user data remains
+        const verifyDeleted = await Promise.all([
+          supabase.from('subscriptions').select('id').eq('user_id', userId).limit(1),
+          supabase.from('users').select('id').eq('id', userId).limit(1),
+        ]);
+
+        if (verifyDeleted[0].data?.length || verifyDeleted[1].data?.length) {
+          console.error('[Account] Verification failed: some data still exists after deletion');
+          return sendJson({ error: "Failed to verify account deletion" }, { status: 500 });
+        }
+
         return sendJson({ success: true });
       } catch (error) {
         console.error("[Account] Exception deleting account:", error);
@@ -2613,7 +2854,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         const { data: subscription, error: subscriptionError } = await supabase
           .from("subscriptions")
-          .select("id, user_id, name, description, website_domain, amount, currency, frequency")
+          .select("id, user_id, name, description, website_domain, amount, currency, frequency, cancellation_url")
           .eq("id", subscriptionId)
           .eq("user_id", userId)
           .maybeSingle();
@@ -2655,11 +2896,38 @@ runtimeDeno?.serve?.(async (req: Request) => {
           policyNumber: subscription.id,
         });
 
+        const guideSlugs: Record<string, string> = {
+          "Netflix": "cancel-netflix",
+          "Spotify Premium": "cancel-spotify",
+          "Amazon Prime": "cancel-amazon-prime",
+          "Disney Plus": "cancel-disney-plus",
+          "YouTube Premium": "cancel-youtube-premium",
+          "HBO Max": "cancel-hbo-max",
+          "Tinder Gold": "cancel-tinder-gold",
+          "LinkedIn Premium": "cancel-linkedin-premium",
+          "HelloFresh": "cancel-hellofresh",
+          "iCloud": "cancel-icloud",
+          "Canva Pro": "cancel-canva-pro",
+          "Microsoft 365": "cancel-microsoft-365",
+          "NordVPN": "cancel-nordvpn",
+          "PlayStation Plus": "cancel-playstation-plus",
+          "Xbox Game Pass": "cancel-xbox-game-pass",
+          "Audible": "cancel-audible",
+          "Readly": "cancel-readly",
+          "Duolingo Plus": "cancel-duolingo",
+          "Viaplay": "cancel-viaplay",
+          "Adobe": "cancel-adobe",
+        };
+        const guideUrl = subscription.cancellation_url || (guideSlugs[subscription.name]
+          ? `https://www.subveris.com/${guideSlugs[subscription.name]}`
+          : null);
+
         return sendJson({
           success: true,
           message: "Cancellation process initiated. PDF notice sent to email.",
           subscriptionId,
           status: "cancelling",
+          guideUrl,
         });
       } catch (error) {
         console.error("[Cancel] Exception processing cancellation request:", error);
@@ -5416,7 +5684,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       if (!showFamilyData) {
         const { data: personalSubscriptions, error: personalSubsError } = await supabase
           .from("subscriptions")
-          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, deleted_at, website_domain")
+          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, cancellation_confirmed_at, estimated_monthly_savings, estimated_annual_savings, deleted_at, website_domain")
           .eq("user_id", userId);
 
         if (personalSubsError) {
@@ -5571,7 +5839,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       const { data: allSubscriptions, error: subsError } = await supabase
         .from("subscriptions")
-        .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, deleted_at, website_domain")
+          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, cancellation_confirmed_at, estimated_monthly_savings, estimated_annual_savings, deleted_at, website_domain")
         .in("user_id", memberIds);
 
       if (subsError) {

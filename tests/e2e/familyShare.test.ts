@@ -7,10 +7,13 @@ import { registerRoutes } from "../../server/routes";
 import { createClient } from '@supabase/supabase-js';
 
 // Uses same env vars as the server; must point at a testable Supabase project.
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const testSupabaseUrl = process.env.TEST_SUPABASE_URL;
+const testSupabaseServiceRoleKey = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY;
+const supabase = testSupabaseUrl && testSupabaseServiceRoleKey
+  ? createClient(testSupabaseUrl, testSupabaseServiceRoleKey)
+  : null;
+
+const describeE2E = testSupabaseUrl && testSupabaseServiceRoleKey ? describe : describe.skip;
 
 // tiny utility to mimic extractUserIdFromToken used in server
 function makeToken(userId: string): string {
@@ -20,7 +23,7 @@ function makeToken(userId: string): string {
   return `a.${header}.${payload}.`;
 }
 
-describe('E2E family sharing & cost-per-use', () => {
+describeE2E('E2E family sharing & cost-per-use', () => {
   let app: express.Express;
 
   beforeAll(async () => {
@@ -34,6 +37,7 @@ describe('E2E family sharing & cost-per-use', () => {
   });
 
   it('owner and member see correct cost-per-use results with toggle', async () => {
+    if (!supabase) throw new Error('Test Supabase is not configured');
     // create unique ids to avoid collisions
     const ownerId = randomUUID();
     const memberId = randomUUID();

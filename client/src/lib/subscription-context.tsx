@@ -33,12 +33,12 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 const TIER_LIMITS = {
   free: {
     maxSubscriptions: 5,
-    maxCostPerUseSubscriptions: Infinity,
+    maxCostPerUseSubscriptions: 2,
     hasAIRecommendations: true,
     hasCostPerUse: true,
-    hasBehavioralInsights: true,
-    hasSavingsProjections: true,
-    hasExportReports: true,
+    hasBehavioralInsights: false,
+    hasSavingsProjections: false,
+    hasExportReports: false,
     hasAutopilot: false,
     hasExtensionTracking: false,
   },

@@ -39,6 +39,42 @@ const SUBSCRIPTION_MAPPING = {
   'adobe.com': 'Adobe'
 };
 
+const MONTHLY_PRICES = {
+  'Spotify Premium': 12.99,
+  'Netflix': 15.99,
+  'YouTube Premium': 11.99,
+  'Adobe': 54.99,
+  'Audible': 9.95,
+  'Disney Plus': 10.99,
+  'HBO Max': 15.99,
+  'Canva Pro': 14.99,
+  'Microsoft 365': 9.99,
+  'NordVPN': 12.99
+};
+
+const CANCELLATION_GUIDES = {
+  'Netflix': 'cancel-netflix',
+  'Spotify Premium': 'cancel-spotify',
+  'Amazon Prime': 'cancel-amazon-prime',
+  'Disney Plus': 'cancel-disney-plus',
+  'YouTube Premium': 'cancel-youtube-premium',
+  'HBO Max': 'cancel-hbo-max',
+  'Tinder Gold': 'cancel-tinder-gold',
+  'LinkedIn Premium': 'cancel-linkedin-premium',
+  'HelloFresh': 'cancel-hellofresh',
+  'iCloud': 'cancel-icloud',
+  'Canva Pro': 'cancel-canva-pro',
+  'Microsoft 365': 'cancel-microsoft-365',
+  'NordVPN': 'cancel-nordvpn',
+  'PlayStation Plus': 'cancel-playstation-plus',
+  'Xbox Game Pass': 'cancel-xbox-game-pass',
+  'Audible': 'cancel-audible',
+  'Readly': 'cancel-readly',
+  'Duolingo Plus': 'cancel-duolingo',
+  'Viaplay': 'cancel-viaplay',
+  'Adobe': 'cancel-adobe'
+};
+
 function getServiceNameFromDomain(domain) {
   const normalized = domain.replace(/^www\./, '').toLowerCase();
   for (const [domainKey, serviceName] of Object.entries(SUBSCRIPTION_MAPPING)) {
@@ -92,6 +128,7 @@ function loadKnownSubscriptions() {
 
         merged[key] = {
           serviceName: key,
+          subscriptionId: sub.id || existingSubs[key]?.subscriptionId || null,
           domain: domain || existingSubs[key]?.domain || null,
           detectedAt: existingSubs[key]?.detectedAt || Date.now(),
           lastSeen: Date.now(),
@@ -117,15 +154,25 @@ function addDetectedSubscription(serviceName, domain) {
 
   browser.storage.local.get(['detectedSubscriptions'], (result) => {
     const subs = result.detectedSubscriptions || {};
+    const now = Date.now();
+    const existing = subs[serviceName];
     if (!subs[serviceName]) {
       subs[serviceName] = {
         serviceName,
         domain,
-        detectedAt: Date.now(),
-        lastSeen: Date.now()
+        detectedAt: now,
+        lastSeen: now,
+        lastVisit: now,
+        visitCount: 1,
+        monthlyPrice: MONTHLY_PRICES[serviceName] || null
       };
     } else {
-      subs[serviceName].lastSeen = Date.now();
+      subs[serviceName].lastSeen = now;
+      subs[serviceName].lastVisit = now;
+      subs[serviceName].visitCount = (existing.visitCount || 0) + 1;
+      if (!subs[serviceName].monthlyPrice && MONTHLY_PRICES[serviceName]) {
+        subs[serviceName].monthlyPrice = MONTHLY_PRICES[serviceName];
+      }
     }
 
     browser.storage.local.set({ detectedSubscriptions: subs }, () => {
@@ -170,6 +217,45 @@ function syncDetectedSubscriptions(subscriptions) {
       console.log('[Background] ✅ Subscriptions synced successfully');
     }).catch((error) => {
       console.error('[Background] Failed to sync subscriptions:', error);
+    });
+  });
+}
+
+function requestGuidedCancellation(subscription) {
+  return new Promise((resolve) => {
+    browser.storage.local.get(['authToken', 'subverisApiUrl'], async (result) => {
+      const token = result.authToken;
+      const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
+      if (!token || !subscription?.subscriptionId) {
+        resolve({ success: false, error: 'Connect your Subveris account first.' });
+        return;
+      }
+
+      try {
+        const response = await fetch(`${apiUrl}/api/subscriptions/cancel`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ subscriptionId: subscription.subscriptionId })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          resolve({ success: false, error: data.error || 'Cancellation request failed.' });
+          return;
+        }
+
+        resolve({
+          success: true,
+          ...data,
+          guideUrl: data.guideUrl || (CANCELLATION_GUIDES[subscription.serviceName]
+            ? `https://www.subveris.com/${CANCELLATION_GUIDES[subscription.serviceName]}`
+            : null)
+        });
+      } catch (error) {
+        resolve({ success: false, error: error.message || 'Cancellation request failed.' });
+      }
     });
   });
 }
@@ -429,21 +515,55 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'SUBVERIS_AUTH_TOKEN') {
-    console.log('[Background] Storing auth token for user:', request.userId);
-    browser.storage.local.set({
-      authToken: request.token,
-      supabaseUserUUID: request.userId,
-      subverisApiUrl: request.apiUrl || null,
-    }, () => {
-      if (browser.runtime.lastError) {
-        console.error('[Background] Storage error:', browser.runtime.lastError);
-        sendResponse({ success: false, error: browser.runtime.lastError });
-      } else {
-        console.log('[Background] ✅ Stored auth token and API URL: User ID =', request.userId, 'apiUrl =', request.apiUrl);
-        runCookieSessionScan();
-        loadKnownSubscriptions();
-        sendResponse({ success: true, stored: true });
+    console.log('[Background] Exchanging raw extension auth token for an opaque session for user:', request.userId);
+    const apiUrl = request.apiUrl || 'http://localhost:5000';
+    const rawToken = request.token;
+
+    if (!rawToken || !request.userId) {
+      sendResponse({ success: false, error: 'Missing auth token or user ID' });
+      return false;
+    }
+
+    const exchangeUrl = `${apiUrl}/api/security/extension-session`;
+    fetch(exchangeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${rawToken}`,
+      },
+      body: JSON.stringify({ userId: request.userId }),
+      keepalive: true,
+    }).then(async (response) => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to exchange extension session');
       }
+
+      const sessionId = crypto.randomUUID();
+      const csrfToken = crypto.randomUUID();
+      const opaqueToken = data.sessionToken || null;
+
+      browser.storage.local.set({
+        authToken: opaqueToken,
+        authSessionId: sessionId,
+        authCsrfToken: csrfToken,
+        supabaseUserUUID: request.userId,
+        subverisApiUrl: request.apiUrl || null,
+        extensionSessionExpiresAt: data.expiresAt || null,
+      }, () => {
+        if (browser.runtime.lastError) {
+          console.error('[Background] Storage error:', browser.runtime.lastError);
+          sendResponse({ success: false, error: browser.runtime.lastError });
+        } else {
+          console.log('[Background] ✅ Stored opaque extension session token and API URL: User ID =', request.userId, 'apiUrl =', request.apiUrl);
+          runCookieSessionScan();
+          loadKnownSubscriptions();
+          sendResponse({ success: true, stored: true, sessionId, csrfToken, sessionToken: opaqueToken });
+        }
+      });
+    }).catch((error) => {
+      console.error('[Background] Failed to exchange raw token for opaque session:', error);
+      sendResponse({ success: false, error: error.message || 'Failed to exchange session' });
     });
     return true;
   }
@@ -460,6 +580,11 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('[Background] DETECT_SUBSCRIPTION request for:', serviceName);
     addDetectedSubscription(serviceName, domain);
     sendResponse({ success: true, detected: serviceName });
+    return true;
+  }
+
+  if (request.type === 'REQUEST_GUIDED_CANCELLATION') {
+    requestGuidedCancellation(request.subscription).then(sendResponse);
     return true;
   }
 

@@ -38,10 +38,9 @@ const reasons = [
 
 export default function CancelNetflixPage() {
           const meta = pickMetaVariant("cancel-netflix", {
-            title: "How to cancel Netflix — stop charges & keep access | Subveris",
-            description:
-              "Step-by-step guide to cancel Netflix, avoid unexpected renewals, and stop recurring charges — keep access until your billing period ends. Quick, safe instructions.",
-            keywords: "how to cancel Netflix, cancel Netflix subscription, stop Netflix recurring payment, Netflix cancellation guide",
+            title: "How to cancel Netflix subscription: stop recurring charges | Subveris",
+            description: "Follow our step-by-step guide to cancel Netflix, avoid surprise renewals, and keep access until your current billing period ends.",
+            keywords: "how to cancel Netflix, cancel Netflix subscription, stop Netflix recurring payment, Netflix cancellation guide, cancel Netflix premium",
             canonical: "https://www.subveris.com/cancel-netflix",
             image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",

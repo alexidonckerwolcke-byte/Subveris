@@ -59,6 +59,51 @@ const parseRawBody = (req) => {
   });
 };
 
+// Simple in-memory rate limiter (IP-based)
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 100; // per IP per minute
+
+const checkRateLimit = (ip) => {
+  const key = ip || 'unknown';
+  const now = Date.now();
+  const data = rateLimitMap.get(key) || { count: 0, resetAt: now + RATE_LIMIT_WINDOW };
+  
+  if (now > data.resetAt) {
+    data.count = 0;
+    data.resetAt = now + RATE_LIMIT_WINDOW;
+  }
+  
+  data.count++;
+  rateLimitMap.set(key, data);
+  
+  if (data.count > RATE_LIMIT_MAX_REQUESTS) {
+    return false;
+  }
+  return true;
+};
+
+// Validate subscription input fields
+const validateSubscriptionData = (data) => {
+  const errors = [];
+  if (data.name && (typeof data.name !== 'string' || data.name.length > 255)) {
+    errors.push('Invalid name');
+  }
+  if (data.amount !== undefined && (typeof data.amount !== 'number' || data.amount < 0 || data.amount > 99999)) {
+    errors.push('Invalid amount');
+  }
+  if (data.currency && (typeof data.currency !== 'string' || data.currency.length !== 3)) {
+    errors.push('Invalid currency');
+  }
+  if (data.frequency && !['monthly', 'yearly', 'weekly', 'quarterly'].includes(data.frequency)) {
+    errors.push('Invalid frequency');
+  }
+  if (data.category && (typeof data.category !== 'string' || data.category.length > 50)) {
+    errors.push('Invalid category');
+  }
+  return errors;
+};
+
 // Helper to extract and verify JWT token
 const getUser = async (authHeader) => {
   if (!supabase) return null;
@@ -220,8 +265,25 @@ const server = http.createServer(async (req, res) => {
   // Remove query strings and hash
   let urlPath = req.url.split('?')[0].split('#')[0];
   
-  // Debug logging for ALL requests
-  console.log(`[${new Date().toISOString()}] [${req.method}] ${req.url} → urlPath="${urlPath}"`);
+  // Keep request logs free of query strings, which may contain sensitive values.
+  console.log(`[${new Date().toISOString()}] [${req.method}] ${urlPath}`);
+
+  // Apply rate limiting
+  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  if (!checkRateLimit(clientIp)) {
+    console.warn(`[Rate Limit] Blocking IP: ${clientIp}`);
+    res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+    res.end(JSON.stringify({ error: 'Too many requests' }));
+    return;
+  }
+
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
   
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');

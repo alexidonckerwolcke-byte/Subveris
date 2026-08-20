@@ -42,11 +42,11 @@ export default function CancelAdobePage() {
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
   
           const meta = pickMetaVariant("cancel-adobe", {
-    title: "How to cancel Adobe subscription | Subveris",
-    description: "How to cancel Adobe subscription, stop recurring adobe charges, and avoid unexpected renewals.",
-    keywords: "how to cancel Adobe, cancel Adobe subscription, stop Adobe recurring payment, Adobe cancellation guide",
-    canonical: "https://www.subveris.com/cancel-adobe",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel Adobe subscription: stop recurring charges | Subveris",
+            description: "Cancel Adobe and stop recurring fees with this step-by-step guide. Keep access until the end of your current billing period and avoid surprise renewals.",
+            keywords: "how to cancel Adobe, cancel Adobe subscription, stop Adobe recurring payment, Adobe cancellation guide",
+            canonical: "https://www.subveris.com/cancel-adobe",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

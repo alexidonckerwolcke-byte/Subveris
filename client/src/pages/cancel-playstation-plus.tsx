@@ -37,11 +37,11 @@ const afterCancellation = [
 
 export default function CancelPlayStationPlusPage() {
           const meta = pickMetaVariant("cancel-playstation-plus", {
-    title: "How to cancel PlayStation Plus subscription | Subveris",
-    description: "How to cancel PlayStation Plus subscription, stop recurring playstation plus charges, and avoid unexpected renewals.",
-    keywords: "how to cancel PlayStation Plus, cancel PlayStation Plus subscription, stop PlayStation Plus recurring payment, PlayStation Plus cancellation guide",
-    canonical: "https://www.subveris.com/cancel-playstation-plus",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel PlayStation Plus subscription: stop renewal | Subveris",
+            description: "Learn how to cancel PlayStation Plus, stop the recurring charge, and keep your current access until the end of the billing period.",
+            keywords: "how to cancel PlayStation Plus, cancel PlayStation Plus subscription, stop PlayStation Plus recurring payment, PlayStation Plus cancellation guide",
+            canonical: "https://www.subveris.com/cancel-playstation-plus",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

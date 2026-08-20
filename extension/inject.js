@@ -37,14 +37,14 @@ function sendAuthToken(force = false) {
     }
     lastSentToken = token;
     lastSentUserId = userId;
-    console.log('[Inject] ✅ Found auth token + userId, sending to extension');
+    console.log('[Inject] Found authenticated session, sending limited session data to extension');
     window.postMessage({
       type: 'SUBVERIS_AUTH_TOKEN',
       token: token,
       userId: userId
     }, '*');
   } else {
-    console.log('[Inject] ⚠️ Missing auth data. Token:', !!token, 'UserID:', !!userId);
+    console.log('[Inject] No authenticated session found');
   }
 }
 
@@ -63,7 +63,7 @@ const originalSetItem = Storage.prototype.setItem;
 Storage.prototype.setItem = function(key, value) {
   originalSetItem.call(this, key, value);
   if (key === 'supabase.auth.token' || key === 'supabase_auth_token' || key === 'supabaseUserUUID') {
-    console.log('[Inject] Auth token updated, resending');
+    console.log('[Inject] Auth state updated, resending');
     sendAuthToken();
   }
 };

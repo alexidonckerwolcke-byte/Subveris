@@ -8,11 +8,11 @@ import { AlertCircle } from "lucide-react";
 
 export default function CancelDuolingoPage() {
           const meta = pickMetaVariant("cancel-duolingo", {
-    title: "How to cancel Duolingo subscription | Subveris",
-    description: "How to cancel Duolingo subscription, stop recurring duolingo charges, and avoid unexpected renewals.",
-    keywords: "how to cancel Duolingo, cancel Duolingo subscription, stop Duolingo recurring payment, Duolingo cancellation guide",
-    canonical: "https://www.subveris.com/cancel-duolingo",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel Duolingo subscription: stop the monthly charge | Subveris",
+            description: "Follow this Duolingo cancellation guide to stop recurring charges, cancel your subscription, and avoid unexpected billing.",
+            keywords: "how to cancel Duolingo, cancel Duolingo subscription, stop Duolingo recurring payment, Duolingo cancellation guide",
+            canonical: "https://www.subveris.com/cancel-duolingo",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

@@ -8,8 +8,8 @@ import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd, getProductWhyCopy
 
 export default function CancelNordVPNPage() {
           const meta = pickMetaVariant("cancel-nordvpn", {
-            title: "How to cancel NordVPN subscription | Subveris",
-            description: "How to cancel NordVPN subscription, stop recurring nordvpn charges, and avoid unexpected renewals.",
+            title: "How to cancel NordVPN subscription: stop recurring charges | Subveris",
+            description: "Cancel NordVPN step by step, avoid repeat charges, and keep your current access until the current billing cycle ends.",
             keywords: "how to cancel NordVPN, cancel NordVPN subscription, stop NordVPN recurring payment, NordVPN cancellation guide",
             canonical: "https://www.subveris.com/cancel-nordvpn",
             image: "https://www.subveris.com/assets/logo.png?v=3",

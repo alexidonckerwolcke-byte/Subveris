@@ -79,10 +79,11 @@ window.addEventListener('message', (event) => {
     cachedAuthToken = token;
   }
 
+  const csrfToken = crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   const apiUrl = localStorage.getItem('subverisApiUrl') || null;
 
   setTimeout(() => {
-    const success = sendMessageToBackground({ type: 'SUBVERIS_AUTH_TOKEN', token, userId, apiUrl }, (response, err) => {
+    const success = sendMessageToBackground({ type: 'SUBVERIS_AUTH_TOKEN', token, userId, apiUrl, csrfToken }, (response, err) => {
       if (err) {
         console.error('[Extension] ❌ SUBVERIS_AUTH_TOKEN message failed:', err.message);
         console.log('[Extension] 💡 Reload the page after reloading the extension.');

@@ -15,7 +15,10 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   description TEXT,
   is_detected BOOLEAN NOT NULL DEFAULT true,
   scheduled_cancellation_date TEXT,
-  cancellation_url TEXT
+  cancellation_url TEXT,
+  cancellation_confirmed_at TIMESTAMPTZ,
+  estimated_monthly_savings REAL,
+  estimated_annual_savings REAL
 );
 
 
@@ -103,6 +106,7 @@ CREATE POLICY "Users can view own subscriptions" ON user_subscriptions FOR SELEC
 CREATE POLICY "Users can insert own subscriptions" ON user_subscriptions FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own subscriptions" ON user_subscriptions FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own subscriptions" ON user_subscriptions FOR DELETE USING (auth.uid() = user_id);
+
 
 CREATE TABLE IF NOT EXISTS usage_logs (
   id VARCHAR(36) PRIMARY KEY,

@@ -37,11 +37,11 @@ const afterCancellation = [
 
 export default function CancelYouTubePremiumPage() {
   const meta = pickMetaVariant("cancel-youtube-premium", {
-    title: "How to cancel YouTube Premium subscription | Subveris",
-    description: "How to cancel YouTube Premium subscription, stop recurring youtube premium charges, and avoid unexpected renewals.",
-    keywords: "how to cancel YouTube Premium, cancel YouTube Premium subscription, stop YouTube Premium recurring payment, YouTube Premium cancellation guide",
-    canonical: "https://www.subveris.com/cancel-youtube-premium",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel YouTube Premium: stop monthly charges | Subveris",
+            description: "Cancel YouTube Premium in minutes, avoid unwanted renewal fees, and confirm your plan ends at the correct billing date.",
+            keywords: "how to cancel YouTube Premium, cancel YouTube Premium subscription, stop YouTube Premium recurring payment, YouTube Premium cancellation guide",
+            canonical: "https://www.subveris.com/cancel-youtube-premium",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

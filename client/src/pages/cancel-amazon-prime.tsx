@@ -40,10 +40,9 @@ const reasons = [
 
 export default function CancelAmazonPrimePage() {
           const meta = pickMetaVariant("cancel-amazon-prime", {
-            title: "Cancel Amazon Prime membership — stop auto‑renewals & refunds | Subveris",
-            description:
-              "Clear, fast steps to cancel Amazon Prime, stop auto‑renewals, and check refund eligibility — includes guidance for provider‑billed accounts.",
-            keywords: "how to cancel Amazon Prime, cancel Amazon Prime subscription, stop Amazon Prime recurring payment, Amazon Prime cancellation guide",
+            title: "How to cancel Amazon Prime membership: stop renewals | Subveris",
+            description: "Cancel Amazon Prime membership step by step, keep your benefits until renewal, and stop surprise Prime charges before the next billing date.",
+            keywords: "how to cancel Amazon Prime, cancel Amazon Prime membership, stop Amazon Prime recurring payment, Amazon Prime cancellation guide",
             canonical: "https://www.subveris.com/cancel-amazon-prime",
             image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",

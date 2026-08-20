@@ -8,9 +8,8 @@ import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd, getProductWhyCopy
 
 export default function CancelHBOMaxPage() {
           const meta = pickMetaVariant("cancel-hbo-max", {
-            title: "Cancel HBO Max — how to stop charges (provider tips) | Subveris",
-            description:
-              "How to cancel HBO Max and stop recurring charges, including steps for accounts billed through TV/internet providers, plus desktop and mobile instructions.",
+            title: "How to cancel HBO Max subscription: stop recurring charges | Subveris",
+            description: "Cancel HBO Max the easy way, stop recurring billing, and keep access until your current plan period ends.",
             keywords: "how to cancel HBO Max, cancel HBO Max subscription, stop HBO Max recurring payment, HBO Max cancellation guide",
             canonical: "https://www.subveris.com/cancel-hbo-max",
             image: "https://www.subveris.com/assets/logo.png?v=3",

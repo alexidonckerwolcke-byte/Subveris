@@ -8,11 +8,11 @@ import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd, getProductWhyCopy
 
 export default function CancelLinkedInPremiumPage() {
           const meta = pickMetaVariant("cancel-linkedin-premium", {
-    title: "How to cancel Linkedin Premium subscription | Subveris",
-    description: "How to cancel Linkedin Premium subscription, stop recurring linkedin premium charges, and avoid unexpected renewals.",
-    keywords: "how to cancel Linkedin Premium, cancel Linkedin Premium subscription, stop Linkedin Premium recurring payment, Linkedin Premium cancellation guide",
-    canonical: "https://www.subveris.com/cancel-linkedin-premium",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel LinkedIn Premium: stop recurring fees | Subveris",
+            description: "Learn how to cancel LinkedIn Premium, stop future renewals, and keep your access until your current billing period ends.",
+            keywords: "how to cancel LinkedIn Premium, cancel LinkedIn Premium subscription, stop LinkedIn Premium recurring payment, LinkedIn Premium cancellation guide",
+            canonical: "https://www.subveris.com/cancel-linkedin-premium",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

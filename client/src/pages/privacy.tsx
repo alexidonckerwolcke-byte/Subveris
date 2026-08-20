@@ -8,11 +8,11 @@ export default function Privacy() {
         <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Privacy Policy</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white">How Subveris protects your data</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
-          We design our service to keep your information secure, encrypted, and used only in ways that help you optimize recurring spending.
-          This page explains what we collect, why we collect it, and how we safeguard it.
+          We use your information to identify subscription waste and provide optimization recommendations.
+          This page explains what we collect, why we collect it, and the controls available to you.
         </p>
         <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5 text-sm text-slate-300 shadow-lg shadow-slate-950/20">
-          Effective date: December 25, 2025
+          Effective date: August 20, 2026
         </div>
       </div>
 
@@ -47,7 +47,8 @@ export default function Privacy() {
               <h2 className="text-lg font-semibold">How We Use Your Data</h2>
               <p className="mt-3 text-muted-foreground">
                 We use data to deliver and improve Subveris, provide insights, optimize recurring spend, and process payments.
-                We do not sell your personal data to third parties.
+                We do not sell your personal data. We may share the minimum data needed with service providers that operate Subveris,
+                such as Supabase for database and authentication services and Stripe for payment processing.
               </p>
             </div>
 
@@ -67,8 +68,8 @@ export default function Privacy() {
               <p className="mt-4 text-muted-foreground font-medium">Privacy & Control</p>
               <ul className="mt-2 space-y-2 text-muted-foreground list-disc pl-6">
                 <li>Gmail scanning requires explicit OAuth authorization and can be disabled anytime in Settings → Connected Services.</li>
-                <li>All extension data is encrypted in transit and stored securely in your Supabase database.</li>
-                <li>The extension only collects and processes data for authenticated Premium or Family tier users. Free tier users will see a notice that full tracking is paused.</li>
+                <li>Deployed API requests use HTTPS. Database protection, backups, and encryption at rest depend on the Supabase project configuration and provider controls.</li>
+                <li>Full extension tracking is enabled for authenticated Premium or Household tier users. Free tier users see a notice that full tracking is paused, although previously synced account data may remain until deleted.</li>
                 <li>You can export or delete all your data at any time via your account settings.</li>
               </ul>
             </div>
@@ -76,23 +77,27 @@ export default function Privacy() {
             <div>
               <h2 className="text-lg font-semibold">Third-Party Services</h2>
               <p className="mt-3 text-muted-foreground">
-                We use Stripe to process payments and Supabase to store your content. Our browser extension captures usage anonymously,
-                and third-party services operate under their own privacy terms.
+                We use Stripe to process payments and Supabase for authentication, database storage, and hosted API functions.
+                Extension usage records are associated with your Subveris account rather than being anonymous. These providers process data
+                under their own privacy terms.
               </p>
             </div>
 
             <div>
               <h2 className="text-lg font-semibold">How We Store Data</h2>
               <p className="mt-3 text-muted-foreground">
-                Your data is stored in Supabase (Postgres). Sensitive credentials are kept in server-side environment variables and
-                never exposed to the browser. Access is restricted to authorized systems only.
+                Your data is stored in Supabase Postgres. Stripe secret keys and Supabase service-role credentials are intended to remain
+                in server-side environment variables and are not required by the browser. The extension stores its session token in browser
+                extension storage so it can sync data, and that local storage should be protected by the browser account and device security.
               </p>
             </div>
 
             <div>
               <h2 className="text-lg font-semibold">Security</h2>
               <p className="mt-3 text-muted-foreground">
-                We use TLS for data in transit and encryption best practices for stored data. We follow least-privilege access policies internally.
+                We use HTTPS for deployed web and API traffic and rely on Supabase and Stripe security controls for hosted infrastructure.
+                We use row-level security policies for user-owned database records where configured. No security system is infallible, so keep
+                your account credentials private and report suspected unauthorized access promptly.
               </p>
             </div>
 

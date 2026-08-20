@@ -474,8 +474,8 @@ const DocsPage: React.FC = () => {
       <h2>Privacy & Data</h2>
       <h3>Data Handling</h3>
       <ul>
-        <li>All user data is encrypted at rest and in transit</li>
-        <li>We do not share or sell your data</li>
+        <li>Deployed web and API traffic uses HTTPS</li>
+        <li>We do not sell your data; Supabase and Stripe process data needed to operate the service</li>
         <li>Payment information is handled securely via Stripe</li>
       </ul>
       <h3>Data Usage</h3>
@@ -495,7 +495,7 @@ const DocsPage: React.FC = () => {
         <li>Refund Policy</li>
       </ul>
       <h3>Privacy Policy</h3>
-      <p>We respect your privacy. All data is encrypted and never shared with third parties. See the full Privacy Policy for details.</p>
+      <p>We explain the data we collect, how we use it, and which service providers process it in the full Privacy Policy.</p>
       <h3>Terms of Service</h3>
       <p>By using Subveris, you agree to our terms.</p>
       <h3>Refund Policy</h3>

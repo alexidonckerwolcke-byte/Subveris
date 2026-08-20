@@ -8,11 +8,11 @@ import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd, getProductWhyCopy
 
 export default function CancelMicrosoft365Page() {
           const meta = pickMetaVariant("cancel-microsoft-365", {
-    title: "How to cancel Microsoft 365 subscription | Subveris",
-    description: "How to cancel Microsoft 365 subscription, stop recurring microsoft 365 charges, and avoid unexpected renewals.",
-    keywords: "how to cancel Microsoft 365, cancel Microsoft 365 subscription, stop Microsoft 365 recurring payment, Microsoft 365 cancellation guide",
-    canonical: "https://www.subveris.com/cancel-microsoft-365",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel Microsoft 365 subscription: stop renewals | Subveris",
+            description: "Cancel Microsoft 365 and stop recurring charges with this clear guide. See exactly how to end the plan and confirm the renewal date.",
+            keywords: "how to cancel Microsoft 365, cancel Microsoft 365 subscription, stop Microsoft 365 recurring payment, Microsoft 365 cancellation guide",
+            canonical: "https://www.subveris.com/cancel-microsoft-365",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

@@ -8,11 +8,11 @@ import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd, getProductWhyCopy
 
 export default function CancelViaplayPage() {
   const meta = pickMetaVariant("cancel-viaplay", {
-    title: "How to cancel Viaplay subscription | Subveris",
-    description: "How to cancel Viaplay subscription, stop recurring viaplay charges, and avoid unexpected renewals.",
-    keywords: "how to cancel Viaplay, cancel Viaplay subscription, stop Viaplay recurring payment, Viaplay cancellation guide",
-    canonical: "https://www.subveris.com/cancel-viaplay",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel Viaplay subscription: stop recurring charges | Subveris",
+            description: "Cancel Viaplay with this step-by-step guide, stop the recurring fee, and confirm when your access ends.",
+            keywords: "how to cancel Viaplay, cancel Viaplay subscription, stop Viaplay recurring payment, Viaplay cancellation guide",
+            canonical: "https://www.subveris.com/cancel-viaplay",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

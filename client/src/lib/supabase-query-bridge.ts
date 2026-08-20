@@ -250,22 +250,6 @@ async function handleCategorySpending(method: string, params: URLSearchParams) {
     return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
   }
 }
-    const totalAmount = Object.values(categoryObj).reduce((sum, cat) => sum + cat.amount, 0);
-
-    // Convert to array format with percentages
-    const categorySpending = Object.entries(categoryObj).map(([category, data]) => ({
-      category: category as any,
-      amount: Math.round(data.amount * 100) / 100,
-      percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100) : 0,
-      count: data.count,
-    })).sort((a, b) => b.amount - a.amount);
-
-    return new Response(JSON.stringify(categorySpending), { status: 200 });
-  } catch (error) {
-    console.error('Error calculating category spending:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
-  }
-}
 
 async function handleFamilyGroups(method: string, params: URLSearchParams) {
   try {

@@ -43,6 +43,91 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusDiv = document.getElementById('status');
   const trackingStatus = document.getElementById('tracking-status');
   const debugInfo = document.getElementById('debug-info');
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  const cancellationGuides = {
+    'Netflix': 'cancel-netflix',
+    'Spotify Premium': 'cancel-spotify',
+    'Amazon Prime': 'cancel-amazon-prime',
+    'Disney Plus': 'cancel-disney-plus',
+    'YouTube Premium': 'cancel-youtube-premium',
+    'HBO Max': 'cancel-hbo-max',
+    'Tinder Gold': 'cancel-tinder-gold',
+    'LinkedIn Premium': 'cancel-linkedin-premium',
+    'HelloFresh': 'cancel-hellofresh',
+    'iCloud': 'cancel-icloud',
+    'Canva Pro': 'cancel-canva-pro',
+    'Microsoft 365': 'cancel-microsoft-365',
+    'NordVPN': 'cancel-nordvpn',
+    'PlayStation Plus': 'cancel-playstation-plus',
+    'Xbox Game Pass': 'cancel-xbox-game-pass',
+    'Audible': 'cancel-audible',
+    'Readly': 'cancel-readly',
+    'Duolingo Plus': 'cancel-duolingo',
+    'Viaplay': 'cancel-viaplay',
+    'Adobe': 'cancel-adobe'
+  };
+
+  function renderDashboard(detectedSubscriptions) {
+    const dashboard = document.getElementById('dashboard');
+    const list = document.getElementById('subscription-list');
+    if (!dashboard || !list) return;
+
+    const subscriptions = Object.values(detectedSubscriptions || {})
+      .filter((subscription) => subscription && subscription.serviceName)
+      .sort((left, right) => (right.lastVisit || 0) - (left.lastVisit || 0));
+    const now = Date.now();
+    const withUsage = subscriptions.map((subscription) => ({
+      ...subscription,
+      daysUnused: subscription.lastVisit
+        ? Math.max(0, Math.floor((now - subscription.lastVisit) / 86400000))
+        : null
+    }));
+    const needsReview = withUsage.filter((subscription) => subscription.daysUnused === null || subscription.daysUnused >= 30);
+    const annualCost = needsReview.reduce((total, subscription) => total + ((subscription.monthlyPrice || 0) * 12), 0);
+
+    document.getElementById('total-subs').textContent = String(subscriptions.length);
+    document.getElementById('unused-subs').textContent = String(needsReview.length);
+    document.getElementById('annual-waste').textContent = `€${annualCost.toFixed(0)}`;
+    list.innerHTML = '';
+
+    if (!withUsage.length) {
+      list.innerHTML = '<div class="empty">Visit a subscription service to start building your usage picture.</div>';
+    } else {
+      withUsage.forEach((subscription) => {
+        const days = subscription.daysUnused;
+        const risk = days === null || days >= 60 ? 'high' : days >= 30 ? 'medium' : 'low';
+        const lastOpened = days === null ? 'No visit recorded' : days === 0 ? 'Opened today' : `Last opened ${days}d ago`;
+        const price = subscription.monthlyPrice ? `€${subscription.monthlyPrice.toFixed(2)}/mo` : 'Price unknown';
+        const guideSlug = cancellationGuides[subscription.serviceName];
+        const guideButton = guideSlug
+          ? `<button class="guide-button" type="button" data-guide-slug="${guideSlug}">Open cancellation guide</button>`
+          : '';
+        list.insertAdjacentHTML('beforeend', `<article class="subscription"><div class="subscription-top"><div><div class="subscription-name">${escapeHtml(subscription.serviceName)}</div><div class="subscription-meta">${escapeHtml(price)} · ${escapeHtml(lastOpened)} · ${subscription.visitCount || 1} visit${(subscription.visitCount || 1) === 1 ? '' : 's'}</div>${guideButton}</div><span class="risk risk-${risk}">${risk === 'low' ? 'active' : risk === 'medium' ? 'review' : 'unused'}</span></div></article>`);
+      });
+    }
+    list.querySelectorAll('[data-guide-slug]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const slug = button.getAttribute('data-guide-slug');
+        if (!slug) return;
+        const serviceName = button.closest('.subscription')?.querySelector('.subscription-name')?.textContent || '';
+        const subscription = subscriptions.find((item) => item.serviceName === serviceName);
+        browser.runtime.sendMessage({ type: 'REQUEST_GUIDED_CANCELLATION', subscription }, (response) => {
+          const guideUrl = response?.guideUrl || `https://www.subveris.com/${slug}`;
+          browser.tabs.create({ url: guideUrl });
+        });
+      });
+    });
+    dashboard.style.display = 'block';
+  }
   
   console.log('[Popup] Opening popup...');
   
@@ -53,9 +138,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Get stored user data
     browser.storage.local.get(['supabaseUserUUID', 'authToken', 'subscription_status', 'trackingPaused', 'upgradePrompt', 'detectedSubscriptions'], (result) => {
-      console.log('[Popup] Storage check:', result);
+      console.log('[Popup] Storage state:', {
+        connected: Boolean(result.supabaseUserUUID && result.authToken),
+        subscriptionStatus: result.subscription_status || 'free',
+        detectedSubscriptionCount: Object.keys(result.detectedSubscriptions || {}).length,
+      });
       const subscriptionStatus = (result.subscription_status || 'free').toLowerCase();
       const isFreeTier = subscriptionStatus === 'free';
+      renderDashboard(result.detectedSubscriptions || {});
       
       if (result.supabaseUserUUID && result.authToken) {
         statusDiv.textContent = '✅ Connected to Subveris';

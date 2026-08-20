@@ -29,7 +29,7 @@ export function PremiumGate({ children, feature, showBlurred = true }: PremiumGa
         </div>
         <h3 className="text-lg font-semibold mb-2">Premium Feature</h3>
         <p className="text-muted-foreground mb-4 max-w-sm">
-          {feature} is available on the Premium and Family plans. Upgrade to unlock this feature.
+          {feature} is available on the Premium and Household plans. Upgrade to unlock this feature.
         </p>
         <Link href="/pricing">
           <Button>

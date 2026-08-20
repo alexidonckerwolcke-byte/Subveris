@@ -11,11 +11,11 @@ export default function CancelReadlyPage() {
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
           const meta = pickMetaVariant("cancel-readly", {
-    title: "How to cancel Readly subscription | Subveris",
-    description: "How to cancel Readly subscription, stop recurring readly charges, and avoid unexpected renewals.",
-    keywords: "how to cancel Readly, cancel Readly subscription, stop Readly recurring payment, Readly cancellation guide",
-    canonical: "https://www.subveris.com/cancel-readly",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel Readly subscription: stop recurring billing | Subveris",
+            description: "Cancel Readly quickly and avoid another monthly charge. Check the billing settings and confirm the plan ends at your current renewal date.",
+            keywords: "how to cancel Readly, cancel Readly subscription, stop Readly recurring payment, Readly cancellation guide",
+            canonical: "https://www.subveris.com/cancel-readly",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

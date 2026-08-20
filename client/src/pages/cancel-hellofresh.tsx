@@ -39,11 +39,11 @@ const outcomes = [
 
 export default function CancelHelloFreshPage() {
           const meta = pickMetaVariant("cancel-hellofresh", {
-    title: "How to cancel HelloFresh subscription | Subveris",
-    description: "How to cancel HelloFresh subscription, stop recurring hellofresh charges, and avoid unexpected renewals.",
-    keywords: "how to cancel HelloFresh, cancel HelloFresh subscription, stop HelloFresh recurring payment, HelloFresh cancellation guide",
-    canonical: "https://www.subveris.com/cancel-hellofresh",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel HelloFresh subscription: stop recurring charges | Subveris",
+            description: "Cancel HelloFresh easily, avoid surprise recurring charges, and confirm the meal plan ends before the next delivery or renewal date.",
+            keywords: "how to cancel HelloFresh, cancel HelloFresh subscription, stop HelloFresh recurring payment, HelloFresh cancellation guide",
+            canonical: "https://www.subveris.com/cancel-hellofresh",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

@@ -38,12 +38,11 @@ const afterCancellation = [
 
 export default function CancelDisneyPlusPage() {
           const meta = pickMetaVariant("cancel-disney-plus", {
-    title: "Cancel Disney Plus — quick guide to stop renewals | Subveris",
-    description:
-      "Step‑by‑step Disney Plus cancellation instructions to stop recurring charges and confirm your expiration date — includes bundle/provider notes.",
-    keywords: "how to cancel Disney Plus, cancel Disney Plus subscription, stop Disney Plus recurring payment, Disney Plus cancellation guide",
-    canonical: "https://www.subveris.com/cancel-disney-plus",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel Disney Plus subscription: stop recurring charges | Subveris",
+            description: "Follow this Disney Plus cancellation guide to stop the recurring fee, avoid surprise renewals, and keep access until the end of your billing cycle.",
+            keywords: "how to cancel Disney Plus, cancel Disney Plus subscription, stop Disney Plus recurring payment, Disney Plus cancellation guide",
+            canonical: "https://www.subveris.com/cancel-disney-plus",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

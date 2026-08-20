@@ -11,11 +11,11 @@ export default function CancelTinderGoldPage() {
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
 
   const meta = pickMetaVariant("cancel-tinder-gold", {
-    title: "How to cancel Tinder Gold subscription | Subveris",
-    description: "How to cancel Tinder Gold subscription, stop recurring tinder gold charges, and avoid unexpected renewals.",
-    keywords: "how to cancel Tinder Gold, cancel Tinder Gold subscription, stop Tinder Gold recurring payment, Tinder Gold cancellation guide",
-    canonical: "https://www.subveris.com/cancel-tinder-gold",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel Tinder Gold subscription: stop recurring charges | Subveris",
+            description: "Cancel Tinder Gold before the next renewal, avoid surprise charges, and confirm the billing cycle ends without extra fees.",
+            keywords: "how to cancel Tinder Gold, cancel Tinder Gold subscription, stop Tinder Gold recurring payment, Tinder Gold cancellation guide",
+            canonical: "https://www.subveris.com/cancel-tinder-gold",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

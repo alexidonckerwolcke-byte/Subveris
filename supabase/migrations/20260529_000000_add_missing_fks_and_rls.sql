@@ -37,10 +37,14 @@ ALTER TABLE public.subscription_calendar_events ENABLE ROW LEVEL SECURITY;
 -- Drop existing policies if they exist
 DROP POLICY IF EXISTS "Users can view their own family groups" ON public.family_groups;
 DROP POLICY IF EXISTS "Users can update their own family groups" ON public.family_groups;
+DROP POLICY IF EXISTS "Users can insert their own family groups" ON public.family_groups;
 DROP POLICY IF EXISTS "Users can view family group members" ON public.family_group_members;
+DROP POLICY IF EXISTS "Users can insert family group members" ON public.family_group_members;
 DROP POLICY IF EXISTS "Users can view shared subscriptions in their groups" ON public.shared_subscriptions;
+DROP POLICY IF EXISTS "Users can insert shared subscriptions in their groups" ON public.shared_subscriptions;
 DROP POLICY IF EXISTS "Users can view cost splits for their subscriptions" ON public.cost_splits;
 DROP POLICY IF EXISTS "Users can view their subscription calendar events" ON public.subscription_calendar_events;
+DROP POLICY IF EXISTS "Users can insert their own subscription calendar events" ON public.subscription_calendar_events;
 
 -- RLS policies for family_groups
 CREATE POLICY "Users can view their own family groups" ON public.family_groups

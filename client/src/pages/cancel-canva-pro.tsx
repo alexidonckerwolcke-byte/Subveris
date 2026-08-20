@@ -8,11 +8,11 @@ import { AlertCircle } from "lucide-react";
 
 export default function CancelCanvaProPage() {
           const meta = pickMetaVariant("cancel-canva-pro", {
-    title: "How to cancel Canva Pro subscription | Subveris",
-    description: "How to cancel Canva Pro subscription, stop recurring canva pro charges, and avoid unexpected renewals.",
-    keywords: "how to cancel Canva Pro, cancel Canva Pro subscription, stop Canva Pro recurring payment, Canva Pro cancellation guide",
-    canonical: "https://www.subveris.com/cancel-canva-pro",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel Canva Pro subscription: stop recurring costs | Subveris",
+            description: "Cancel Canva Pro before the next renewal, keep your current plan until the billing cycle ends, and stop surprise recurring charges.",
+            keywords: "how to cancel Canva Pro, cancel Canva Pro subscription, stop Canva Pro recurring payment, Canva Pro cancellation guide",
+            canonical: "https://www.subveris.com/cancel-canva-pro",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

@@ -40,10 +40,9 @@ const reasons = [
 
 export default function CancelSpotifyPage() {
           const meta = pickMetaVariant("cancel-spotify", {
-            title: "Cancel Spotify Premium — stop charges, keep your playlists | Subveris",
-            description:
-              "Learn how to cancel Spotify Premium and prevent recurring charges. Follow simple web, iOS, and Android steps — keep playlists until your billing cycle ends.",
-            keywords: "how to cancel Spotify, cancel Spotify subscription, stop Spotify recurring payment, Spotify cancellation guide",
+            title: "How to cancel Spotify Premium: stop recurring charges | Subveris",
+            description: "Learn how to cancel Spotify Premium, keep your playlists, and avoid Spotify renewals before the end of your current billing cycle.",
+            keywords: "how to cancel Spotify, cancel Spotify subscription, stop Spotify recurring payment, Spotify Premium cancellation, cancel Spotify Premium",
             canonical: "https://www.subveris.com/cancel-spotify",
             image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",

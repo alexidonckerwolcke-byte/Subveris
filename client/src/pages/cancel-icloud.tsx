@@ -37,11 +37,11 @@ const afterCancellation = [
 
 export default function CancelICloudPage() {
           const meta = pickMetaVariant("cancel-icloud", {
-    title: "How to cancel iCloud subscription | Subveris",
-    description: "How to cancel iCloud subscription, stop recurring icloud charges, and avoid unexpected renewals.",
-    keywords: "how to cancel iCloud, cancel iCloud subscription, stop iCloud recurring payment, iCloud cancellation guide",
-    canonical: "https://www.subveris.com/cancel-icloud",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel iCloud+ subscription: stop storage charges | Subveris",
+            description: "Learn how to cancel iCloud+ storage, stop recurring charges, and decide whether you still need the upgraded storage plan.",
+            keywords: "how to cancel iCloud, cancel iCloud subscription, stop iCloud recurring payment, iCloud plus cancellation guide",
+            canonical: "https://www.subveris.com/cancel-icloud",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

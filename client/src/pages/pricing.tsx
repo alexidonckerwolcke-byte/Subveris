@@ -45,6 +45,7 @@ export default function PricingPage() {
         "Basic spending overview",
         "Monthly spending reports",
         "Manual subscription entry",
+        "Free cancellation guides and links",
         "Email support",
       ],
       popular: false,
@@ -54,7 +55,7 @@ export default function PricingPage() {
       tier: "premium",
       price: "9,99 €",
       period: "per month",
-      description: "Unlock powerful insights and automation features",
+      description: "Continuous optimization for individual spending",
       features: [
         "Unlimited subscriptions",
         "AI-powered recommendations",
@@ -62,17 +63,20 @@ export default function PricingPage() {
         "Cost-per-use analytics",
         "Behavioral insights",
         "Savings projections",
+        "Renewal-risk alerts",
+        "Gmail receipt discovery",
+        "Cancellation assistance included",
         "Priority support",
         "Export reports (CSV/PDF)",
       ],
       popular: false,
     },
     {
-      name: "Family",
+      name: "Household",
       tier: "family",
       price: "14,99 €",
       period: "per month",
-      description: "Share subscriptions and optimize family spending together",
+      description: "Optimize shared household spending together",
       features: [
         "All Premium Features",
         "Unlimited subscriptions",
@@ -81,10 +85,10 @@ export default function PricingPage() {
         "Cost-per-use analytics",
         "Behavioral insights",
         "Savings projections",
-        "Family spending insights",
-        "Share subscriptions with family",
-        "Split costs with family members",
-        "Family spending overview",
+        "Household spending insights",
+        "Share subscriptions with household members",
+        "Split costs across the household",
+        "Household optimization overview",
         "Priority support",
         "Export reports (CSV/PDF)",
       ],
@@ -311,7 +315,7 @@ export default function PricingPage() {
       if (plan.tier === "premium" && currentTier === "family") {
         return schedulePlanChangeMutation.isPending ? "Scheduling..." : "Schedule Premium Downgrade";
       }
-      return createCheckoutMutation.isPending ? "Redirecting..." : plan.tier === "family" ? "Upgrade to Family" : "Upgrade to Premium";
+      return createCheckoutMutation.isPending ? "Redirecting..." : plan.tier === "family" ? "Upgrade to Household" : "Upgrade to Premium";
     }
     
     if (plan.tier === "free" && (currentTier === "premium" || currentTier === "family")) {
@@ -434,8 +438,8 @@ export default function PricingPage() {
             <Badge className="inline-block px-6 py-2 text-base font-semibold bg-gradient-to-r from-purple-600 to-pink-600">
               <Sparkles className="h-4 w-4 mr-2 fill-white" />
               {subscriptionStatus?.cancelAtPeriodEnd 
-                ? "Family (Ending Soon)" 
-                : "Family Plan Active"
+                ? "Household (Ending Soon)"
+                : "Household Plan Active"
               }
             </Badge>
           )}

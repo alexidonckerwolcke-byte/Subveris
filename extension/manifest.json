@@ -1,17 +1,68 @@
 {
   "manifest_version": 3,
-  "name": "Subveris Usage Tracker",
-  "version": "1.1",
-  "description": "Tracks website usage time for subscription insights",
+  "name": "Subveris - Find Unused Subscriptions",
+  "version": "1.2.0",
+  "description": "Track subscription usage and find recurring services you no longer use.",
   "permissions": ["storage", "tabs", "cookies", "downloads", "identity"],
-  "host_permissions": ["<all_urls>", "https://www.googleapis.com/*", "https://gmail.googleapis.com/*"],
+  "host_permissions": [
+    "https://subveris.com/*",
+    "https://www.subveris.com/*",
+    "https://*.netflix.com/*",
+    "https://*.spotify.com/*",
+    "https://*.amazon.com/*",
+    "https://*.disneyplus.com/*",
+    "https://*.youtube.com/*",
+    "https://*.hbomax.com/*",
+    "https://*.tinder.com/*",
+    "https://*.linkedin.com/*",
+    "https://*.hellofresh.com/*",
+    "https://*.icloud.com/*",
+    "https://*.canva.com/*",
+    "https://*.microsoft.com/*",
+    "https://*.nordvpn.com/*",
+    "https://*.playstation.com/*",
+    "https://*.xbox.com/*",
+    "https://*.audible.com/*",
+    "https://*.readly.com/*",
+    "https://*.duolingo.com/*",
+    "https://*.viaplay.com/*",
+    "https://*.adobe.com/*",
+    "https://*.supabase.co/*",
+    "http://localhost:3000/*",
+    "http://localhost:5000/*",
+    "https://www.googleapis.com/*",
+    "https://gmail.googleapis.com/*"
+  ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Subveris Usage Tracker"
+    "default_title": "Subveris - Find Unused Subscriptions"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "https://subveris.com/*",
+        "https://www.subveris.com/*",
+        "https://*.netflix.com/*",
+        "https://*.spotify.com/*",
+        "https://*.amazon.com/*",
+        "https://*.disneyplus.com/*",
+        "https://*.youtube.com/*",
+        "https://*.hbomax.com/*",
+        "https://*.tinder.com/*",
+        "https://*.linkedin.com/*",
+        "https://*.hellofresh.com/*",
+        "https://*.icloud.com/*",
+        "https://*.canva.com/*",
+        "https://*.microsoft.com/*",
+        "https://*.nordvpn.com/*",
+        "https://*.playstation.com/*",
+        "https://*.xbox.com/*",
+        "https://*.audible.com/*",
+        "https://*.readly.com/*",
+        "https://*.duolingo.com/*",
+        "https://*.viaplay.com/*",
+        "https://*.adobe.com/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_end"
     }
@@ -22,7 +73,30 @@
   "web_accessible_resources": [
     {
       "resources": ["inject.js"],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "https://subveris.com/*",
+        "https://www.subveris.com/*",
+        "https://*.netflix.com/*",
+        "https://*.spotify.com/*",
+        "https://*.amazon.com/*",
+        "https://*.disneyplus.com/*",
+        "https://*.youtube.com/*",
+        "https://*.hbomax.com/*",
+        "https://*.tinder.com/*",
+        "https://*.linkedin.com/*",
+        "https://*.hellofresh.com/*",
+        "https://*.icloud.com/*",
+        "https://*.canva.com/*",
+        "https://*.microsoft.com/*",
+        "https://*.nordvpn.com/*",
+        "https://*.playstation.com/*",
+        "https://*.xbox.com/*",
+        "https://*.audible.com/*",
+        "https://*.readly.com/*",
+        "https://*.duolingo.com/*",
+        "https://*.viaplay.com/*",
+        "https://*.adobe.com/*"
+      ]
     }
   ]
 }

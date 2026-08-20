@@ -11,11 +11,11 @@ export default function CancelAudiblePage() {
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
   
           const meta = pickMetaVariant("cancel-audible", {
-    title: "How to cancel Audible subscription | Subveris",
-    description: "How to cancel Audible subscription, stop recurring audible charges, and avoid unexpected renewals.",
-    keywords: "how to cancel Audible, cancel Audible subscription, stop Audible recurring payment, Audible cancellation guide",
-    canonical: "https://www.subveris.com/cancel-audible",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel Audible subscription: stop recurring charges | Subveris",
+            description: "Cancel Audible membership and stop recurring billing with this simple guide. Keep your account active until the current billing cycle ends.",
+            keywords: "how to cancel Audible, cancel Audible subscription, stop Audible recurring payment, Audible cancellation guide",
+            canonical: "https://www.subveris.com/cancel-audible",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

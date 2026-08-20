@@ -20,6 +20,7 @@ import {
   ActivitySquare,
   Clock,
   Mail,
+  CheckCircle2,
 } from "lucide-react";
 import { UsageLoggerModal } from "@/components/usage-logger-modal";
 import { ScheduleCancellationReminderModal } from "@/components/schedule-cancellation-modal";
@@ -63,6 +64,7 @@ export function SubscriptionCard({
   const [usageModalOpen, setUsageModalOpen] = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const [isConfirmingCancellation, setIsConfirmingCancellation] = useState(false);
   
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
 
@@ -115,6 +117,39 @@ export function SubscriptionCard({
       });
     } finally {
       setIsSendingReminder(false);
+    }
+  };
+
+  const handleConfirmCancellation = async () => {
+    setIsConfirmingCancellation(true);
+    try {
+      const token = await getToken();
+      const response = await fetch(`/api/subscriptions/${subscription.id}/confirm-cancellation`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Failed to confirm cancellation");
+
+      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/insights"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/monthly-savings"], exact: false });
+      toast({
+        title: "Cancellation recorded",
+        description: `Estimated savings: ${formatAmount(data.confirmedSavings?.annual || 0, subscription.currency as Currency)} per year.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Could not confirm cancellation",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsConfirmingCancellation(false);
     }
   };
 
@@ -200,6 +235,16 @@ export function SubscriptionCard({
                     >
                       <Mail className="mr-2 h-4 w-4" />
                       {isSendingReminder ? "Sending..." : "Send Reminder Email"}
+                    </DropdownMenuItem>
+                  )}
+                  {isOwnedByCurrentUser && (effectiveStatus === "to-cancel" || effectiveStatus === "cancelling") && (
+                    <DropdownMenuItem
+                      onClick={handleConfirmCancellation}
+                      disabled={isConfirmingCancellation}
+                      data-testid={`action-confirm-cancellation-${subscription.id}`}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      {isConfirmingCancellation ? "Recording..." : "Confirm Cancellation Complete"}
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />

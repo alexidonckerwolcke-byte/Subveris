@@ -37,11 +37,11 @@ const afterCancellation = [
 
 export default function CancelXboxGamePassPage() {
   const meta = pickMetaVariant("cancel-xbox-game-pass", {
-    title: "How to cancel Xbox Game Pass subscription | Subveris",
-    description: "How to cancel Xbox Game Pass subscription, stop recurring xbox game pass charges, and avoid unexpected renewals.",
-    keywords: "how to cancel Xbox Game Pass, cancel Xbox Game Pass subscription, stop Xbox Game Pass recurring payment, Xbox Game Pass cancellation guide",
-    canonical: "https://www.subveris.com/cancel-xbox-game-pass",
-    image: "https://www.subveris.com/assets/logo.png?v=3",
+            title: "How to cancel Xbox Game Pass subscription: stop renewal | Subveris",
+            description: "Cancel Xbox Game Pass before the next renewal, keep the plan until the current period ends, and avoid unwanted recurring charges.",
+            keywords: "how to cancel Xbox Game Pass, cancel Xbox Game Pass subscription, stop Xbox Game Pass recurring payment, Xbox Game Pass cancellation guide",
+            canonical: "https://www.subveris.com/cancel-xbox-game-pass",
+            image: "https://www.subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

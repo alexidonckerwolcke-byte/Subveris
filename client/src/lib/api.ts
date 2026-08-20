@@ -13,6 +13,50 @@ const apiBaseUrl = remoteApiBase || localDevApiBase;
 const localFallbackBase = "";
 let hasWarnedNoApiUrl = false;
 
+function getOrCreateSessionToken() {
+  const sessionKey = "subveris.session.id";
+  const csrfKey = "subveris.csrf.token";
+
+  let sessionId = sessionStorage.getItem(sessionKey);
+  let csrfToken = sessionStorage.getItem(csrfKey);
+
+  if (!sessionId || !csrfToken) {
+    sessionId = crypto.randomUUID();
+    csrfToken = crypto.randomUUID();
+    sessionStorage.setItem(sessionKey, sessionId);
+    sessionStorage.setItem(csrfKey, csrfToken);
+  }
+
+  return { sessionId, csrfToken };
+}
+
+async function ensureCsrfSession() {
+  const existing = getOrCreateSessionToken();
+  try {
+    const response = await fetch(resolveApiUrl("/api/security/session"), {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.sessionId && data?.csrfToken) {
+        sessionStorage.setItem("subveris.session.id", data.sessionId);
+        sessionStorage.setItem("subveris.csrf.token", data.csrfToken);
+        return { sessionId: data.sessionId, csrfToken: data.csrfToken };
+      }
+    }
+  } catch {
+    // Fall back to the locally generated values if the server cannot issue one.
+  }
+
+  return existing;
+}
+
 async function resolveAuthToken(forceRefresh = false) {
   const tokenStr = localStorage.getItem("supabase.auth.token");
   if (!forceRefresh && tokenStr) {
@@ -167,12 +211,22 @@ export async function apiFetch(input: string, init?: RequestInit) {
   }
   const effectiveToken = token || supabaseAnonKey;
   const primaryUrl = resolveApiUrl(input);
+  const mutationMethod = (init?.method || "GET").toUpperCase();
+  const csrfHeaders: Record<string, string> = {};
+
+  if (mutationMethod !== "GET" && mutationMethod !== "HEAD") {
+    const session = await ensureCsrfSession();
+    csrfHeaders["X-Session-Id"] = session.sessionId;
+    csrfHeaders["X-CSRF-Token"] = session.csrfToken;
+  }
+
   if (import.meta.env.DEV) {
     console.debug("[apiFetch] resolved URL", {
       input,
       primaryUrl,
       hasToken: Boolean(token),
       usingAnonKey: Boolean(!token && effectiveToken),
+      csrfRequired: mutationMethod !== "GET" && mutationMethod !== "HEAD",
     });
   }
   const buildRequest = (authToken: string | null): RequestInit => ({
@@ -183,6 +237,7 @@ export async function apiFetch(input: string, init?: RequestInit) {
     headers: {
       ...(init?.headers as Record<string, string> | undefined),
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...csrfHeaders,
     },
   });
 

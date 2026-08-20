@@ -43,7 +43,7 @@ import {
 export default function HomePage() {
   usePageMeta({
     title: "Subveris | Subscription Optimization to Save Money on Recurring Payments",
-    description: "Subveris helps you discover subscription waste, optimize recurring payments, and save money with AI-powered subscription optimization.",
+    description: "Subveris helps you understand recurring spending, compare subscription value by usage, and review services that may no longer fit your budget.",
     keywords: "subscription optimization, recurring payments, save money, cancel subscriptions, subscription savings, subscription tracker",
     canonical: "https://www.subveris.com/",
   });
@@ -56,37 +56,30 @@ export default function HomePage() {
     document.documentElement.classList.remove("dark");
   }, []);
 
-  // Comparison data for "Why We're Different"
   const comparison = [
     {
-      feature: "Bank connection required",
-      others: "Yes",
-      us: "No",
+      feature: "Bank connection",
+      details: "Not required. You can add subscriptions manually.",
     },
     {
-      feature: "Browser extension tracking",
-      others: "No",
-      us: "Yes",
+      feature: "Usage signals",
+      details: "Recorded usage and supported browser-extension signals can inform your overview.",
     },
     {
-      feature: "Autopilot optimization",
-      others: "No",
-      us: "Yes",
+      feature: "Value analysis",
+      details: "Monthly cost is compared with activity, frequency, recency, and cost per use.",
     },
     {
-      feature: "Cost per use analytics",
-      others: "No",
-      us: "Yes",
+      feature: "Recommendations",
+      details: "The app highlights services that may be unused, underused, or poor value for you to review.",
     },
     {
-      feature: "Privacy-focused",
-      others: "Medium",
-      us: "High",
+      feature: "Cancellation",
+      details: "Cancellation guides and provider links help you complete the action yourself.",
     },
     {
-      feature: "AI recommendations",
-      others: "Limited",
-      us: "Advanced",
+      feature: "Your decision",
+      details: "Subveris surfaces evidence; you decide whether to keep, downgrade, or cancel.",
     },
   ];
 
@@ -103,8 +96,8 @@ export default function HomePage() {
     },
     {
       icon: Brain,
-      title: "Autopilot AI Optimization",
-      description: "Let Subveris automatically highlight savings, smartly prioritize renewals, and recommend the best actions for your subscriptions.",
+      title: "Usage-Based Recommendations",
+      description: "Subveris highlights possible savings using the subscription costs, usage frequency, recent activity, and cost per use recorded in your account.",
     },
   ];
 
@@ -129,20 +122,20 @@ export default function HomePage() {
 
   const faqs = [
     {
-      question: "How does Subveris understand my subscription value?",
-      answer: "Our browser extension captures the services you use most, and our Autopilot engine turns that signal into savings recommendations. We never connect to your bank, don't sell your data, and only use this information to optimize recurring spend.",
+      question: "How much am I actually spending on subscriptions?",
+      answer: "Add your recurring services to Subveris and the dashboard calculates your monthly subscription spend, spending by category, recent spending history, and a yearly projection. The totals are based on the subscription details in your account, so they become more complete as you add or update services.",
     },
     {
-      question: "Is my data safe?",
-      answer: "Yes. Bank-level encryption (256-bit SSL), SOC 2 certified, and we never share your data. Your financial information stays yours.",
+      question: "Which subscriptions are actually worth keeping?",
+      answer: "Subveris does not make that decision for you. It compares the cost of a service with the usage you record, including sessions per month, time since last use, and cost per use. It then highlights services that look unused, underused, or poor value so you can decide what to keep, downgrade, or cancel.",
     },
     {
-      question: "Can I use it on mobile?",
-      answer: "The browser extension works on Chrome, Edge, Firefox, and Safari. Mobile app is coming soon. Full optimization and insights are available on all devices right now.",
+      question: "Is there a free subscription tracking app?",
+      answer: "Yes. Subveris has a free plan with manual subscription entry, a basic spending overview, monthly spending reports, free cancellation guides, and support for up to five recurring services. Cost-per-use analytics on the free plan is available for up to two subscriptions; unlimited tracking and additional optimization features are part of paid plans.",
     },
     {
-      question: "How accurate are the AI recommendations?",
-      answer: "Our AI analyzes your actual usage patterns. Subscriptions are ranked as Active, Minimal Use, or Unused. You can always override and customize thresholds.",
+      question: "How are the recommendations made?",
+      answer: "Recommendations use the subscription details and usage data in your account, including cost per use, sessions per month, usage frequency, and time since last use. They are decision support, not a guarantee that you should cancel a service, so you can review the details and choose the action yourself.",
     },
   ];
 
@@ -196,15 +189,15 @@ export default function HomePage() {
           </Badge>
           
           <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-8 leading-tight">
-            Smart subscription optimization to stop
+            Find the subscriptions you don't use
             <br />
-            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">wasting money on recurring payments.</span>
+            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">before they renew again.</span>
           </h1>
           
           <p className="text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed font-light">
-            Subveris helps you discover subscription waste, track recurring payments, and keep only the services you really use.
+            See your recurring spend, understand what each service costs per use, and review the subscriptions that may no longer earn their place in your budget.
             <br />
-            <span className="font-semibold text-foreground">Save money on subscriptions today.</span>
+            <span className="font-semibold text-foreground">Start with the services you already pay for.</span>
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
@@ -221,7 +214,7 @@ export default function HomePage() {
             </div>
             <div className="flex items-center gap-2">
               <Lock className="h-4 w-4 text-blue-500" />
-              <span>Private by design</span>
+              <span>Session-protected access</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
@@ -229,7 +222,46 @@ export default function HomePage() {
             </div>
             <div className="flex items-center gap-2">
               <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-              <span>Fast to set up</span>
+              <span>Simple setup</span>
+            </div>
+          </div>
+
+          <div className="mt-16 grid gap-5 md:grid-cols-4 text-left">
+            <div className="rounded-3xl border border-border/40 bg-white/85 p-6 shadow-lg">
+              <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                <Shield className="h-5 w-5" />
+              </div>
+              <h3 className="mb-2 text-lg font-semibold">No bank data required</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Subveris does not require bank credentials, payment details, or account linking to help you track and optimize recurring services.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-border/40 bg-white/85 p-6 shadow-lg">
+              <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                <Lock className="h-5 w-5" />
+              </div>
+              <h3 className="mb-2 text-lg font-semibold">Protected access</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Sensitive actions use authenticated sessions and CSRF checks so your account and billing-related requests are not treated as anonymous.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-border/40 bg-white/85 p-6 shadow-lg">
+              <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
+                <Eye className="h-5 w-5" />
+              </div>
+              <h3 className="mb-2 text-lg font-semibold">You control the data</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                The product is built around the subscriptions you add and the usage signals you intentionally share, rather than hidden financial data collection.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-border/40 bg-white/85 p-6 shadow-lg">
+              <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <TargetIcon className="h-5 w-5" />
+              </div>
+              <h3 className="mb-2 text-lg font-semibold">Usage-based recommendations</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Recommendations are grounded in the subscriptions you maintain and the usage patterns you track, so decisions are based on real behavior.
+              </p>
             </div>
           </div>
 
@@ -273,7 +305,7 @@ export default function HomePage() {
               Subscriptions are designed to be forgotten.
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Companies spend millions making it easy to sign up and impossible to track value. We're leveling the playing field.
+              Recurring charges are easy to start and easy to overlook. Subveris gives you one place to review what you pay for and how often you use it.
             </p>
           </div>
 
@@ -296,7 +328,7 @@ export default function HomePage() {
           <Badge variant="outline" className="mb-6 border-primary text-primary px-4 py-1">Premium Features</Badge>
           <h2 className="text-5xl font-bold mb-8 tracking-tight">Features designed for high-value spenders.</h2>
           <p className="text-xl text-muted-foreground max-w-3xl mb-12">
-            Subveris combines elegant design, trusted privacy, and powerful analytics so you can turn recurring spending into a competitive advantage.
+            Subveris combines clear data handling with practical analytics so you can make better decisions about recurring spending.
           </p>
           <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-border/30 bg-slate-50 shadow-2xl shadow-slate-200/50 mb-12">
             <div className="bg-white p-4 sm:p-6">
@@ -312,7 +344,6 @@ export default function HomePage() {
                     alt="Subveris dashboard screenshot"
                     width={1200}
                     height={682}
-                    loading="lazy"
                     decoding="async"
                     className="w-full rounded-[1.75rem] object-cover"
                   />
@@ -341,9 +372,9 @@ export default function HomePage() {
       <section id="comparison" className="bg-muted/30 py-28">
         <div className="container mx-auto px-4">
           <div className="text-center mb-20">
-            <h2 className="text-5xl font-bold mb-6 tracking-tight">Why Subveris?</h2>
+            <h2 className="text-5xl font-bold mb-6 tracking-tight">What Subveris shows you</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Most subscription services only list your bills. We analyze value, cost-per-use, and renewal risk so you can cut waste, optimize spend, and keep the services that truly matter.
+              A clear view of the information Subveris uses to help you review recurring spending.
             </p>
           </div>
 
@@ -351,17 +382,15 @@ export default function HomePage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-950/5 border-b border-slate-200/70">
-                  <th className="p-8 text-lg font-bold text-slate-900">Feature</th>
-                  <th className="p-8 text-lg font-bold text-slate-500 text-center">Others</th>
-                  <th className="p-8 text-lg font-bold text-slate-900 text-center bg-primary/5">Subveris</th>
+                  <th className="p-8 text-lg font-bold text-slate-900">Capability</th>
+                  <th className="p-8 text-lg font-bold text-slate-900 text-center bg-primary/5">How it works</th>
                 </tr>
               </thead>
               <tbody>
                 {comparison.map((item, index) => (
                   <tr key={index} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                     <td className="p-8 font-medium">{item.feature}</td>
-                    <td className="p-8 text-center text-muted-foreground">{item.others}</td>
-                    <td className="p-8 text-center font-bold text-primary bg-primary/5">{item.us}</td>
+                    <td colSpan={1} className="p-8 text-center text-muted-foreground bg-primary/5">{item.details}</td>
                   </tr>
                 ))}
               </tbody>
@@ -370,50 +399,48 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 5️⃣ TESTIMONIALS SECTION */}
+      {/* 5️⃣ PRODUCT PROOF SECTION */}
       <section className="container mx-auto px-4 py-28">
         <div className="text-center mb-20">
-          <h2 className="text-5xl font-bold mb-6 tracking-tight">Loved by 50,000 users</h2>
+          <h2 className="text-5xl font-bold mb-6 tracking-tight">See what Subveris actually does</h2>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            No invented reviews or inflated numbers. These are the product capabilities you can try and verify for yourself.
+          </p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
-          {[
-            {
-              name: "Sarah Jenkins",
-              role: "Freelance Designer",
-              quote: "Subveris showed me I was paying for three different stock photo sites but only using one. Saved me $45/month instantly.",
-              saving: "$540/year"
-            },
-            {
-              name: "Michael Chen",
-              role: "Software Engineer",
-              quote: "The cost-per-use feature is a game changer. It made me realize my 'cheap' $10 streaming service was costing me $5 per movie.",
-              saving: "$210/year"
-            },
-            {
-              name: "Emma Rodriguez",
-              role: "Marketing Manager",
-              quote: "I love the privacy focus. No bank connection needed, just real insights into my digital spending habits.",
-              saving: "$380/year"
-            }
-          ].map((testimonial, index) => (
-            <Card key={index} className="border-border/50 shadow-md hover:shadow-xl transition-all bg-white/80 dark:bg-slate-900/70">
-              <CardContent className="pt-8">
-                <div className="flex gap-1 mb-6">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                <p className="text-base text-muted-foreground mb-6 italic leading-relaxed">
-                  "{testimonial.quote}"
-                </p>
-                <div className="border-t border-border/50 pt-4">
-                  <div className="font-semibold text-foreground">{testimonial.name}</div>
-                  <div className="text-sm text-muted-foreground mb-2">{testimonial.role}</div>
-                  <div className="text-sm font-bold text-primary">Saves {testimonial.saving}</div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          <Card className="border-border/50 shadow-md hover:shadow-xl transition-all bg-white/80 dark:bg-slate-900/70">
+            <CardContent className="pt-8">
+              <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                <BarChart3 className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="mb-3 text-xl font-semibold">Start with your real spend</h3>
+              <p className="text-base leading-relaxed text-muted-foreground">
+                Add recurring services manually and see monthly totals, category spending, recent history, and a yearly projection based on your entries.
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50 shadow-md hover:shadow-xl transition-all bg-white/80 dark:bg-slate-900/70">
+            <CardContent className="pt-8">
+              <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10">
+                <DollarSign className="h-6 w-6 text-blue-600" />
+              </div>
+              <h3 className="mb-3 text-xl font-semibold">Measure value by usage</h3>
+              <p className="text-base leading-relaxed text-muted-foreground">
+                Record how often you use a service and compare its monthly cost with sessions, recent activity, and cost per use.
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50 shadow-md hover:shadow-xl transition-all bg-white/80 dark:bg-slate-900/70">
+            <CardContent className="pt-8">
+              <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10">
+                <CheckCircle className="h-6 w-6 text-emerald-600" />
+              </div>
+              <h3 className="mb-3 text-xl font-semibold">Choose the next action</h3>
+              <p className="text-base leading-relaxed text-muted-foreground">
+                Review recommendations and use the included cancellation guides when a service no longer earns its place in your budget.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -438,18 +465,18 @@ export default function HomePage() {
       <section className="bg-muted/30 py-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h3 className="text-2xl font-bold mb-4">Trusted by Industry Leaders</h3>
+            <h3 className="text-2xl font-bold mb-4">Built for trust and clarity</h3>
             <p className="text-muted-foreground">
-              Join thousands of companies and individuals optimizing their subscriptions
+              People use Subveris because it keeps recurring spend understandable and under their control.
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center items-center gap-12 opacity-60">
-            <div className="text-lg font-semibold text-muted-foreground">TechCrunch</div>
-            <div className="text-lg font-semibold text-muted-foreground">Product Hunt</div>
-            <div className="text-lg font-semibold text-muted-foreground">Forbes</div>
-            <div className="text-lg font-semibold text-muted-foreground">Wired</div>
-            <div className="text-lg font-semibold text-muted-foreground">Business Insider</div>
+          <div className="grid gap-4 md:grid-cols-5 text-center">
+            <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-5 shadow-sm"><div className="text-sm text-muted-foreground">No bank link required</div></div>
+            <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-5 shadow-sm"><div className="text-sm text-muted-foreground">Usage-based insights</div></div>
+            <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-5 shadow-sm"><div className="text-sm text-muted-foreground">Account-level protection</div></div>
+            <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-5 shadow-sm"><div className="text-sm text-muted-foreground">Clear renewal visibility</div></div>
+            <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-5 shadow-sm"><div className="text-sm text-muted-foreground">Built around user control</div></div>
           </div>
         </div>
       </section>
@@ -459,10 +486,10 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">
-              Pricing for professionals who want real savings.
+              Pricing for people who want better subscription decisions.
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Start free. Upgrade anytime. Cancel anytime. No contracts, no surprises — just premium subscription intelligence.
+              Start free. Upgrade anytime. Cancel anytime. Cancellation guides are included for everyone.
             </p>
           </div>
 
@@ -495,7 +522,7 @@ export default function HomePage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">AI-powered recommendations</span>
+                    <span className="text-sm font-medium">Usage-based recommendations</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
@@ -544,7 +571,7 @@ export default function HomePage() {
                   <span className="text-muted-foreground ml-2">/month</span>
                 </div>
                 <CardDescription className="mt-4 text-base font-medium">
-                  Unlimited subscriptions + Autopilot automation
+                  Unlimited subscriptions + optimization workflows
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-1 pb-6">
@@ -563,7 +590,7 @@ export default function HomePage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">AI-powered recommendations</span>
+                    <span className="text-sm font-medium">Usage-based recommendations</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
@@ -575,7 +602,7 @@ export default function HomePage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Autopilot task automation</span>
+                    <span className="text-sm font-medium">Optimization workflows</span>
                   </li>
                 </ul>
               </CardContent>
@@ -618,7 +645,7 @@ export default function HomePage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">Autopilot task automation</span>
+                    <span className="text-sm font-medium">Optimization workflows</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-purple-600 mr-2 flex-shrink-0 mt-0.5" />
@@ -695,7 +722,7 @@ export default function HomePage() {
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Yes, unlimited</td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
-                    <td className="py-4 px-6 font-medium">AI Recommendations</td>
+                    <td className="py-4 px-6 font-medium">Usage-Based Recommendations</td>
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
@@ -719,7 +746,7 @@ export default function HomePage() {
                     <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
                   <tr className="hover:bg-muted/30 transition-colors">
-                    <td className="py-4 px-6 font-medium">Autopilot Automation</td>
+                    <td className="py-4 px-6 font-medium">Optimization Workflows</td>
                     <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
                     <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                     <td className="text-center py-4 px-6 bg-purple-500/5"><Check className="h-5 w-5 text-purple-600 mx-auto" /></td>

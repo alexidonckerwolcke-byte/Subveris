@@ -48,6 +48,9 @@ export const subscriptions = pgTable("subscriptions", {
   websiteDomain: text("website_domain"), // e.g., "netflix.com", "spotify.com"
   scheduledCancellationDate: text("scheduled_cancellation_date"), // ISO 8601 date string for scheduled cancellation
   cancellationUrl: text("cancellation_url"), // URL to cancel the subscription
+  cancellationConfirmedAt: timestamp("cancellation_confirmed_at", { withTimezone: true }),
+  estimatedMonthlySavings: real("estimated_monthly_savings"),
+  estimatedAnnualSavings: real("estimated_annual_savings"),
   monthlyUsageCount: integer("monthly_usage_count").notNull().default(0),
   usageMonth: text("usage_month"),
   billingMonth: text("billing_month"), // YYYY-MM format, tracks which month subscription is billed for (persists until end of month)
