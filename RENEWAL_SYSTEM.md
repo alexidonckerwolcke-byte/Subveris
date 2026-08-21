@@ -37,8 +37,9 @@ Result: next_billing_at updated to 2026-03-15
 ### Email Reminders
 
 **When it triggers:**
-- Every 6 hours (configurable)
-- Once on server startup (after 30 seconds)
+- Once per day through `.github/workflows/renewal-reminders.yml`
+- The scheduled job calls the deployed Supabase API at 08:00 UTC
+- Can also be manually triggered from GitHub Actions with `workflow_dispatch`
 - Can be manually triggered via API
 
 **What it sends:**
@@ -77,13 +78,14 @@ SMTP_PASS=...
 
 ### Renewal Check Intervals
 
-Edit [server/index.ts](server/index.ts) to change intervals:
+The GitHub Actions schedule is defined in `.github/workflows/renewal-reminders.yml`.
+The API checks subscriptions exactly five days before their renewal date, so the workflow runs daily.
 
-```typescript
-// Currently runs every 6 hours
-setInterval(async () => {
-  await sendRenewalReminders();
-}, 6 * 60 * 60 * 1000); // Change this value
+Configure these secrets in the repository's `production` environment:
+
+```text
+SUPABASE_URL
+ADMIN_API_KEY
 ```
 
 ## APIs
