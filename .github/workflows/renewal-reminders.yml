@@ -48,3 +48,21 @@ jobs:
             echo "Renewal reminder check failed with HTTP ${status_code}."
             exit 1
           fi
+
+          if [ -n "${TEST_EMAIL}" ]; then
+            if ! python3 - "${response_file}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as response_file:
+              payload = json.load(response_file)
+
+          if payload.get("test") is not True or payload.get("success") is not True:
+              print("The deployed function did not confirm a successful test email.")
+              print("Deploy supabase/functions/api, then verify RESEND_API_KEY or SENDGRID_API_KEY and EMAIL_FROM in Supabase secrets.")
+              raise SystemExit(1)
+          PY
+            then
+              exit 1
+            fi
+          fi

@@ -89,6 +89,8 @@ SUPABASE_URL
 ADMIN_API_KEY
 ```
 
+The deployed Supabase Edge Function also needs an email provider secret. The weekly digest's GitHub secret is not automatically available inside Supabase. Add `RESEND_API_KEY` or `SENDGRID_API_KEY` under **Supabase → Edge Functions → Secrets**, and set `EMAIL_FROM` to a verified sender such as `noreply@subveris.com`.
+
 To test delivery, open **Actions → Renewal Reminders → Run workflow**, enter your email in the optional `test_email` field, and run it. Leave that field blank for a normal renewal scan.
 
 ## APIs
