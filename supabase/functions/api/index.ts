@@ -1399,19 +1399,22 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
     const url = new URL(req.url);
     const method = req.method.toUpperCase();
-    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
-      const userId = extractUserId(req) || req.headers.get("x-test-user-id");
-      if (!userId && pathname !== "/security/session") {
-        return sendJson({ error: "Unauthorized" }, { status: 401 });
-      }
-      if (pathname !== "/security/session" && !validateCsrfSession(req, userId)) {
-        return sendJson({ error: "Invalid or missing CSRF session" }, { status: 403 });
-      }
-    }
     let pathname = url.pathname.replace(/^\/functions\/v1\/api/, "").replace(/^\/api/, "") || "/";
     pathname = pathname.replace(/\/+$/, "") || "/";
     if (pathname === "") {
       pathname = "/";
+    }
+
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      const userId = extractUserId(req) || req.headers.get("x-test-user-id");
+      const isPublicSecurityRoute = pathname === "/security/session";
+      const isAdminRenewalRoute = pathname === "/admin/renewal-checks";
+      if (!userId && !isPublicSecurityRoute && !isAdminRenewalRoute) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+      if (!isPublicSecurityRoute && !isAdminRenewalRoute && !validateCsrfSession(req, userId)) {
+        return sendJson({ error: "Invalid or missing CSRF session" }, { status: 403 });
+      }
     }
 
     // Test route
