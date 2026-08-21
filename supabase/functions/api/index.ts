@@ -6316,6 +6316,31 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
+        const testEmail = url.searchParams.get("test_email")?.trim() || "";
+        if (testEmail) {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail)) {
+            return sendJson({ error: "Invalid test email address" }, { status: 400 });
+          }
+
+          const testRenewalDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+          const testResult = await sendRenewalReminderEmail(testEmail, [{
+            name: "Sample subscription (test)",
+            amount: 9.99,
+            currency: "USD",
+            frequency: "monthly",
+            next_billing_at: testRenewalDate,
+          }]);
+
+          return sendJson({
+            success: testResult.success,
+            sent: testResult.success ? 1 : 0,
+            skipped: 0,
+            failures: testResult.success ? [] : [{ email: testEmail, error: testResult.error || "Test email failed" }],
+            test: true,
+            message: testResult.success ? "Test renewal reminder sent" : "Test renewal reminder failed",
+          }, { status: testResult.success ? 200 : 502 });
+        }
+
         const result = await sendRenewalReminders(5);
         return sendJson({
           success: result.success,

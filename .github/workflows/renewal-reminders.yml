@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 8 * * *' # Every day at 08:00 UTC; the API selects renewals exactly 5 days away
   workflow_dispatch:
+    inputs:
+      test_email:
+        description: 'Optional email address for a sample renewal reminder (leave blank for a real scan)'
+        required: false
+        type: string
 
 jobs:
   send:
@@ -15,6 +20,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          TEST_EMAIL: ${{ github.event.inputs.test_email }}
         run: |
           set -euo pipefail
 
@@ -24,12 +30,17 @@ jobs:
           fi
 
           response_file="$(mktemp)"
+          endpoint="${SUPABASE_URL}/functions/v1/api/admin/renewal-checks"
+          if [ -n "${TEST_EMAIL}" ]; then
+            endpoint="${endpoint}?test_email=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "${TEST_EMAIL}")"
+          fi
+
           status_code="$(curl --silent --show-error --output "${response_file}" --write-out '%{http_code}' \
             --request POST \
             --header "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
             --header "apikey: ${SUPABASE_ANON_KEY}" \
             --header "x-api-key: ${ADMIN_API_KEY}" \
-            "${SUPABASE_URL}/functions/v1/api/admin/renewal-checks")"
+            "${endpoint}")"
 
           cat "${response_file}"
 

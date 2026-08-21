@@ -40,6 +40,7 @@ Result: next_billing_at updated to 2026-03-15
 - Once per day through `.github/workflows/renewal-reminders.yml`
 - The scheduled job calls the deployed Supabase API at 08:00 UTC
 - Can also be manually triggered from GitHub Actions with `workflow_dispatch`
+- A manual run can include `test_email` to send one sample reminder without requiring a matching subscription
 - Can be manually triggered via API
 
 **What it sends:**
@@ -87,6 +88,8 @@ Configure these secrets in the repository's `production` environment:
 SUPABASE_URL
 ADMIN_API_KEY
 ```
+
+To test delivery, open **Actions → Renewal Reminders → Run workflow**, enter your email in the optional `test_email` field, and run it. Leave that field blank for a normal renewal scan.
 
 ## APIs
 
