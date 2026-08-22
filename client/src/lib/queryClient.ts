@@ -74,11 +74,13 @@ export async function apiRequest(
     headers["Content-Type"] = "application/json";
   }
 
-  return apiFetch(url, {
+  const response = await apiFetch(url, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
   });
+  await throwIfResNotOk(response);
+  return response;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

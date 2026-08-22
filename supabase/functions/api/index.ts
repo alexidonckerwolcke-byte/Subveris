@@ -79,6 +79,13 @@ function validateCsrfSession(req: Request, userId: string | null): boolean {
     return true;
   }
 
+  // Bearer tokens are not attached automatically by browsers, so cross-site
+  // requests cannot forge the authenticated mutation. Do not depend on the
+  // instance-local CSRF map for these requests in the Edge Function runtime.
+  if (req.headers.get("authorization")?.startsWith("Bearer ")) {
+    return true;
+  }
+
   const sessionId = req.headers.get("x-session-id");
   const csrfToken = req.headers.get("x-csrf-token");
   if (!sessionId || !csrfToken) return false;

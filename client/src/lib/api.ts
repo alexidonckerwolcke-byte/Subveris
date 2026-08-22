@@ -30,7 +30,7 @@ function getOrCreateSessionToken() {
   return { sessionId, csrfToken };
 }
 
-async function ensureCsrfSession() {
+async function ensureCsrfSession(authToken: string | null) {
   const existing = getOrCreateSessionToken();
   try {
     const response = await fetch(resolveApiUrl("/api/security/session"), {
@@ -39,6 +39,7 @@ async function ensureCsrfSession() {
       cache: "no-store",
       headers: {
         Accept: "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       },
     });
 
@@ -215,7 +216,7 @@ export async function apiFetch(input: string, init?: RequestInit) {
   const csrfHeaders: Record<string, string> = {};
 
   if (mutationMethod !== "GET" && mutationMethod !== "HEAD") {
-    const session = await ensureCsrfSession();
+    const session = await ensureCsrfSession(effectiveToken);
     csrfHeaders["X-Session-Id"] = session.sessionId;
     csrfHeaders["X-CSRF-Token"] = session.csrfToken;
   }
