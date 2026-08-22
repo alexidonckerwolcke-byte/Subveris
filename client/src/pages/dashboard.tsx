@@ -29,14 +29,6 @@ function formatShortDate(date?: string | Date | null) {
   });
 }
 
-function getCurrentMonthAmount(monthlyData: MonthlySpending[] | undefined) {
-  if (!monthlyData || monthlyData.length === 0) return 0;
-  const now = new Date();
-  const currentMonthLabel = now.toLocaleString("en-US", { month: "short", year: "numeric" });
-  const entry = monthlyData.find((item) => item.month === currentMonthLabel);
-  return entry ? entry.amount : 0;
-}
-
 function getUpcomingRenewals(subscriptions: Subscription[] = []) {
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -137,23 +129,8 @@ export default function Dashboard() {
 
   const normalizedMonthlySpending = normalizeMonthlySpendingSeries(monthlySpendingData, 6);
 
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth();
-  const currentMonthAmount = getCurrentMonthAmount(normalizedMonthlySpending);
-
-  const yearToDateSpend = normalizedMonthlySpending.reduce((sum, entry) => {
-    const parsed = new Date(`${entry.month} 1`);
-    if (Number.isNaN(parsed.getTime()) || parsed.getFullYear() !== currentYear) return sum;
-    return sum + entry.amount;
-  }, 0);
-
-  const remainingMonthsInYear = Math.max(0, 11 - currentMonth);
-  const yearlyProjection = Math.round((yearToDateSpend + currentMonthAmount * remainingMonthsInYear) * 100) / 100;
-
   const totalMonthlySpend = metrics?.totalMonthlySpend ?? 0;
-  const annualProjection = Number.isFinite(yearlyProjection) && yearlyProjection > 0
-    ? yearlyProjection
-    : Math.round(totalMonthlySpend * 12 * 100) / 100;
+  const annualProjection = Math.round(totalMonthlySpend * 12 * 100) / 100;
   const activeSubscriptions = (subscriptions || []).filter((sub) => sub?.status === "active").length;
   const detectedSubscriptions = (subscriptions || []).filter((sub) => sub?.isDetected === true || (sub as any)?.is_detected === true).length;
   const potentialSavings = useMemo(
