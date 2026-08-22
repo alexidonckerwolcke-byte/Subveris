@@ -39,7 +39,7 @@ pages.forEach((pageName) => {
   if (!content.includes('author: "Subveris"')) {
     content = content.replace(
       /image: "https:\/\/www\.subveris\.com\/assets\/logo\.png\?v=3",\s*\}\);/,
-      `image: "https://www.subveris.com/assets/logo.png?v=3",
+      `image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",

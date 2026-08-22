@@ -49,7 +49,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
       features: [
         "Unlimited subscriptions",
         "AI-powered recommendations",
-        "Browser extension optimization",
+        "Optional browser usage signals",
         "Cost-per-use analytics",
       ],
       popular: true,

@@ -13,7 +13,7 @@ const SUPABASE_ANON_KEY = runtimeDeno?.env?.get("SUPABASE_ANON_KEY") ?? "";
 // Google OAuth credentials
 const GOOGLE_CLIENT_ID = runtimeDeno?.env?.get("GOOGLE_CLIENT_ID") ?? "";
 const GOOGLE_CLIENT_SECRET = runtimeDeno?.env?.get("GOOGLE_CLIENT_SECRET") ?? "";
-const GOOGLE_REDIRECT_URI = runtimeDeno?.env?.get("GOOGLE_REDIRECT_URI") ?? "https://www.subveris.com/auth/callback";
+const GOOGLE_REDIRECT_URI = runtimeDeno?.env?.get("GOOGLE_REDIRECT_URI") ?? "https://subveris.com/auth/callback";
 
 // Client for auth verification
 let supabaseAuth: any = null;
@@ -32,7 +32,7 @@ if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
 }
 
 const ALLOWED_ORIGINS = [
-  "https://www.subveris.com",
+  "https://subveris.com",
   "https://subveris.com",
   "http://localhost:5173",
   "http://localhost:5174",
@@ -114,7 +114,7 @@ function buildCorsHeaders(origin: string | null | undefined): Record<string, str
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization,Content-Type,x-test-user-id",
+    "Access-Control-Allow-Headers": "Authorization,Content-Type,x-test-user-id,X-Session-Id,X-CSRF-Token",
     "Access-Control-Expose-Headers": "x-total-count",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
@@ -259,6 +259,83 @@ function normalizeDomain(input: string | null | undefined): string | null {
   const trimmed = input.trim().toLowerCase();
   if (!trimmed) return null;
   return trimmed.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0].replace(/:\d+$/, "");
+}
+
+function isPublicHttpUrl(value: string): URL | null {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname.endsWith(".local")) return null;
+    if (/^(10|127)\./.test(hostname) || /^192\.168\./.test(hostname) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function extractPublicLinks(html: string, pageUrl: URL) {
+  const links: Array<{ url: string; label: string; score: number }> = [];
+  const anchorPattern = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  const keywordPattern = /(cancel|billing|account|membership|subscription|manage|plan|renew|help|support)/i;
+  let match: RegExpExecArray | null;
+  while ((match = anchorPattern.exec(html)) && links.length < 100) {
+    const label = match[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+    const rawHref = match[1].trim();
+    if (!rawHref || rawHref.startsWith("#") || rawHref.startsWith("mailto:") || rawHref.startsWith("javascript:")) continue;
+    try {
+      const url = new URL(rawHref, pageUrl);
+      if (url.hostname !== pageUrl.hostname || !isPublicHttpUrl(url.toString())) continue;
+      const haystack = `${url.pathname} ${url.search} ${label}`;
+      if (!keywordPattern.test(haystack)) continue;
+      const score = /(cancel|billing|subscription|membership)/i.test(haystack) ? 3 : /(account|manage|plan)/i.test(haystack) ? 2 : 1;
+      if (!links.some((item) => item.url === url.toString())) links.push({ url: url.toString(), label: label || url.pathname, score });
+    } catch {
+      // Ignore malformed or external links.
+    }
+  }
+  return links.sort((left, right) => right.score - left.score).slice(0, 12);
+}
+
+async function scanProviderWebsite(websiteUrl: string) {
+  const startUrl = isPublicHttpUrl(websiteUrl);
+  if (!startUrl) throw new Error("Provider website must be a public HTTP or HTTPS URL.");
+
+  const maxPages = 25;
+  const pages = [startUrl.toString()];
+  const visited = new Set<string>();
+  const candidates: Array<{ url: string; label: string; score: number; sourcePage: string; pageTitle: string }> = [];
+  while (pages.length && visited.size < maxPages) {
+    const page = pages.shift()!;
+    if (visited.has(page)) continue;
+    visited.add(page);
+    const response = await fetch(page, {
+      headers: { "User-Agent": "Subveris-Cancellation-Guide/1.0" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) continue;
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("text/html")) continue;
+    const html = (await response.text()).slice(0, 750_000);
+    const pageTitle = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "Provider page")
+      .replace(/\s+/g, " ").trim().slice(0, 160);
+    const links = extractPublicLinks(html, new URL(page)).map((link) => ({ ...link, sourcePage: page, pageTitle }));
+    candidates.push(...links);
+    links.filter((link) => link.score >= 2).slice(0, 3).forEach((link) => {
+      if (!visited.has(link.url) && pages.length < 30) pages.push(link.url);
+    });
+  }
+  const unique = candidates.filter((item, index, all) => all.findIndex((candidate) => candidate.url === item.url) === index);
+  const ranked = unique.slice(0, 12);
+  const guideSteps = [
+    { title: `Open ${startUrl.hostname}`, description: `Start at the official ${startUrl.hostname} website and sign in to the account that owns ${startUrl.hostname}.` },
+    ...(ranked.length > 0
+      ? [{ title: `Open ${ranked[0].label || "the provider account page"}`, description: `Subveris found this likely account or billing route on the provider site: ${ranked[0].pageTitle}.` }]
+      : [{ title: "Find account or billing settings", description: "Look for Account, Billing, Membership, Subscription, Manage plan, or Help on the provider website." }]),
+    { title: "Complete the provider's cancellation steps", description: "Follow the provider's own prompts until it shows a confirmation or an end date. Subveris cannot inspect or submit private account forms." },
+    { title: "Save the confirmation", description: "Keep the provider confirmation email or final status screen, then return to Subveris and mark the subscription as cancelled." },
+  ];
+  return { startUrl: startUrl.toString(), scannedPages: [...visited], candidates: ranked, guideSteps };
 }
 
 function toIsoDateString(value: Date): string {
@@ -998,6 +1075,7 @@ function normalizeSubscriptionRow(sub: any) {
     logoUrl: sub.logo_url,
     isDetected: sub.is_detected,
     websiteDomain: sub.website_domain,
+    websiteUrl: sub.website_url,
     scheduledCancellationDate: sub.scheduled_cancellation_date,
     cancellationUrl: sub.cancellation_url,
     nextBillingDate: (() => {
@@ -1624,6 +1702,23 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }
       }
       return sendJson({ error: "Extension download unavailable" }, { status: 404 });
+    }
+
+    if (pathname === "/cancellation-guides/scan" && req.method === "POST") {
+      const userId = extractUserId(req);
+      if (!userId) return sendJson({ error: "Login required" }, { status: 401 });
+      const body = await req.json().catch(() => ({}));
+      const websiteUrl = typeof body?.websiteUrl === "string" ? body.websiteUrl.trim() : "";
+      if (!websiteUrl) return sendJson({ error: "Provider website URL is required" }, { status: 400 });
+      try {
+        const result = await scanProviderWebsite(websiteUrl);
+        return sendJson({
+          ...result,
+          note: "Only public pages were scanned. The user must sign in and complete cancellation with the provider.",
+        });
+      } catch (error) {
+        return sendJson({ error: error instanceof Error ? error.message : "Unable to scan provider website" }, { status: 400 });
+      }
     }
 
     // Get subscriptions
@@ -2791,8 +2886,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
     }
 
-    // One-click cancellation request for extension-triggered alerts
+    // Subveris never cancels subscriptions or sends cancellation notices.
     if (pathname === "/subscriptions/cancel" && req.method === "POST") {
+      return sendJson({
+        error: "Subveris does not cancel subscriptions. Open the provider's official cancellation page and complete it yourself."
+      }, { status: 410 });
+
       const body = await req.json().catch(() => null);
       if (!body || typeof body !== "object") {
         return sendJson({ error: "Invalid request body" }, { status: 400 });
@@ -2922,7 +3021,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           "Adobe": "cancel-adobe",
         };
         const guideUrl = subscription.cancellation_url || (guideSlugs[subscription.name]
-          ? `https://www.subveris.com/${guideSlugs[subscription.name]}`
+          ? `https://subveris.com/${guideSlugs[subscription.name]}`
           : null);
 
         return sendJson({
@@ -2956,6 +3055,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
         currency = "USD",
         frequency = "monthly",
         nextBillingDate,
+        websiteDomain,
+        websiteUrl,
       } = body;
 
       if (!name || amount === undefined) {
@@ -3039,6 +3140,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
             status: 'active',
             usage_count: 0,
             is_detected: false,
+            website_domain: typeof websiteDomain === "string" ? websiteDomain.trim() || null : null,
+            website_url: typeof websiteUrl === "string" ? websiteUrl.trim() || null : null,
             billing_month: billingMonth,
           }),
         });

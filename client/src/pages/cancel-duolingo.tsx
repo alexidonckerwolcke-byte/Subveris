@@ -11,8 +11,8 @@ export default function CancelDuolingoPage() {
             title: "How to cancel Duolingo subscription: stop the monthly charge | Subveris",
             description: "Follow this Duolingo cancellation guide to stop recurring charges, cancel your subscription, and avoid unexpected billing.",
             keywords: "how to cancel Duolingo, cancel Duolingo subscription, stop Duolingo recurring payment, Duolingo cancellation guide",
-            canonical: "https://www.subveris.com/cancel-duolingo",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-duolingo",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -88,7 +88,7 @@ export default function CancelDuolingoPage() {
 
         <CancelRelatedGuides current="/cancel-duolingo" />
         <CancelPageFaq productName="Duolingo Plus" />
-        <CancelPageJsonLd productName="Duolingo Plus" url="https://www.subveris.com/cancel-duolingo" steps={steps} />
+        <CancelPageJsonLd productName="Duolingo Plus" url="https://subveris.com/cancel-duolingo" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

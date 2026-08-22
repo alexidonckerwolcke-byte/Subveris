@@ -1,6 +1,6 @@
 # Browser Extension Installation Guide
 
-Subveris Tracker is now available on all major browsers! Choose your browser below for setup instructions.
+Subveris Tracker is currently available on Chrome, Edge, and Firefox. Safari support is coming soon.
 
 ## Quick Start by Browser
 
@@ -9,7 +9,7 @@ Subveris Tracker is now available on all major browsers! Choose your browser bel
 | **Chrome** | ✅ Easiest | 2 min | Download ZIP + Load unpacked |
 | **Edge** | ✅ Easiest | 2 min | Same as Chrome |
 | **Firefox** | ✅ Easy | 1 min | Install from Firefox Add-ons |
-| **Safari** | ✅ Easy | 2-5 min | Install from Mac App Store or direct load |
+| **Safari** | Coming soon | — | Not available yet |
 
 ---
 
@@ -94,44 +94,9 @@ You'll get automatic updates whenever new versions are released.
 
 ---
 
-## Safari Installation
+## Safari
 
-Safari installation is quick on macOS 11+:
-
-### Option 1: Mac App Store (Easiest)
-
-1. Open **App Store** on your Mac
-2. Search for **"Subveris Tracker"**
-3. Click **"Get"**
-4. Open the app
-5. Go to **Safari → Settings → Extensions**
-6. Enable **"Subveris Tracker"**
-
-### Option 2: Direct Load (No App Store Needed)
-
-For macOS Ventura (13) and later:
-
-1. **Enable Developer Mode in Safari:**
-   - Safari → Settings → Advanced
-   - Check "Show Develop menu in menu bar"
-
-2. **Load the Extension:**
-   - Safari → Develop → Allow Unsigned Extensions
-   - Safari → Settings → Extensions
-   - Click the **+** button
-   - Select the `extension` folder
-   - Click **"Add"**
-
-3. **Grant Permissions:**
-   - Click "Allow" when Safari asks
-
-### Step 3: First Time Setup
-
-1. Open your Subveris app (subveris.app)
-2. Log in with your account
-3. Go to **Settings → Connected Services**
-4. Click **"Connect Gmail Account"** (optional)
-5. Grant permissions when prompted
+Safari support is coming soon. The extension is not currently available for Safari, so no Safari installation is required.
 
 ---
 
@@ -183,17 +148,9 @@ Sign in with your account. The extension will automatically detect your login.
 - ✅ Real-time sync
 - ✅ Complete WebExtensions support
 
-### Safari (15+)
-- ✅ Website visit tracking
-- ✅ Gmail receipt scanning
-- ⚠️ CSV auto-detection (limited by sandbox)
-- ✅ Auth cookie scanning
-- ✅ Usage time measurement
-- ✅ Real-time sync
-
 ### Note on Differences
 
-All browsers share the same backend, so subscriptions detected in one appear everywhere. Minor API limitations on Safari are handled gracefully - all core features work.
+Chrome, Edge, and Firefox share the same backend, so subscriptions detected in one appear everywhere.
 
 ---
 
@@ -321,12 +278,10 @@ Each browser may ask for:
 1. **Read the browser-specific guide:**
    - Chrome/Edge: Above
    - Firefox: [INSTALL_FIREFOX.md](extension/INSTALL_FIREFOX.md)
-   - Safari: [INSTALL_SAFARI.md](extension/INSTALL_SAFARI.md)
 
 2. **Check browser console for errors:**
    - Chrome: F12 → Console tab
    - Firefox: Ctrl+Shift+K
-   - Safari: Develop → Show Error Console
    - Look for [Extension] messages
 
 3. **Try the extension in a new browser profile:**

@@ -25,6 +25,7 @@ exports.subscriptions = (0, pg_core_1.pgTable)("subscriptions", {
     description: (0, pg_core_1.text)("description"),
     isDetected: (0, pg_core_1.boolean)("is_detected").notNull().default(true),
     websiteDomain: (0, pg_core_1.text)("website_domain"), // e.g., "netflix.com", "spotify.com"
+    websiteUrl: (0, pg_core_1.text)("website_url"), // public provider homepage used for guide discovery
     scheduledCancellationDate: (0, pg_core_1.text)("scheduled_cancellation_date"), // ISO 8601 date string for scheduled cancellation
     cancellationUrl: (0, pg_core_1.text)("cancellation_url"), // URL to cancel the subscription
     monthlyUsageCount: (0, pg_core_1.integer)("monthly_usage_count").notNull().default(0),

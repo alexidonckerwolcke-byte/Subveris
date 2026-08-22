@@ -46,6 +46,7 @@ export const subscriptions = pgTable("subscriptions", {
   description: text("description"),
   isDetected: boolean("is_detected").notNull().default(true),
   websiteDomain: text("website_domain"), // e.g., "netflix.com", "spotify.com"
+  websiteUrl: text("website_url"), // public provider homepage used for guide discovery
   scheduledCancellationDate: text("scheduled_cancellation_date"), // ISO 8601 date string for scheduled cancellation
   cancellationUrl: text("cancellation_url"), // URL to cancel the subscription
   cancellationConfirmedAt: timestamp("cancellation_confirmed_at", { withTimezone: true }),

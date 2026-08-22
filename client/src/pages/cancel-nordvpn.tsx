@@ -11,8 +11,8 @@ export default function CancelNordVPNPage() {
             title: "How to cancel NordVPN subscription: stop recurring charges | Subveris",
             description: "Cancel NordVPN step by step, avoid repeat charges, and keep your current access until the current billing cycle ends.",
             keywords: "how to cancel NordVPN, cancel NordVPN subscription, stop NordVPN recurring payment, NordVPN cancellation guide",
-            canonical: "https://www.subveris.com/cancel-nordvpn",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-nordvpn",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -82,7 +82,7 @@ export default function CancelNordVPNPage() {
 
         <CancelRelatedGuides current="/cancel-nordvpn" />
         <CancelPageFaq productName="NordVPN" />
-        <CancelPageJsonLd productName="NordVPN" url="https://www.subveris.com/cancel-nordvpn" steps={steps} />
+        <CancelPageJsonLd productName="NordVPN" url="https://subveris.com/cancel-nordvpn" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

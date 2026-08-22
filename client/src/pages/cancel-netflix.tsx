@@ -41,8 +41,8 @@ export default function CancelNetflixPage() {
             title: "How to cancel Netflix subscription: stop recurring charges | Subveris",
             description: "Follow our step-by-step guide to cancel Netflix, avoid surprise renewals, and keep access until your current billing period ends.",
             keywords: "how to cancel Netflix, cancel Netflix subscription, stop Netflix recurring payment, Netflix cancellation guide, cancel Netflix premium",
-            canonical: "https://www.subveris.com/cancel-netflix",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-netflix",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -145,7 +145,7 @@ export default function CancelNetflixPage() {
 
         <CancelRelatedGuides current="/cancel-netflix" />
         <CancelPageFaq productName="Netflix" />
-        <CancelPageJsonLd productName="Netflix" url="https://www.subveris.com/cancel-netflix" steps={steps} />
+        <CancelPageJsonLd productName="Netflix" url="https://subveris.com/cancel-netflix" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Prevent paying for forgotten subscriptions ever again</h2>

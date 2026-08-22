@@ -45,7 +45,7 @@ export default function HomePage() {
     title: "Subveris | Subscription Optimization to Save Money on Recurring Payments",
     description: "Subveris helps you understand recurring spending, compare subscription value by usage, and review services that may no longer fit your budget.",
     keywords: "subscription optimization, recurring payments, save money, cancel subscriptions, subscription savings, subscription tracker",
-    canonical: "https://www.subveris.com/",
+    canonical: "https://subveris.com/",
   });
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -91,8 +91,8 @@ export default function HomePage() {
     },
     {
       icon: Zap,
-      title: "Browser Extension Optimization",
-      description: "Capture real usage signals with our cross-browser extension (Chrome, Edge, Firefox, Safari) so optimization recommendations are based on what you actually use.",
+      title: "Optional Browser Signals",
+      description: "Add the optional cross-browser extension (Chrome, Edge, Firefox, Safari) when you want richer usage signals in your subscription overview.",
     },
     {
       icon: Brain,

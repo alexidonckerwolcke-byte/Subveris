@@ -286,7 +286,7 @@ export function SubscriptionManager() {
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Unlimited subscription optimization</li>
                 <li>• AI-powered recommendations</li>
-                <li>• Browser extension optimization</li>
+                <li>• Optional browser usage signals</li>
                 <li>• Cost-per-use analysis</li>
                 <li>• Behavioral insights</li>
                 <li>• Savings projections</li>

@@ -39,6 +39,29 @@ interface SubscriptionCardProps {
   isPremium?: boolean;
 }
 
+const cancellationGuideSlugs: Record<string, string> = {
+  Netflix: "cancel-netflix",
+  "Spotify Premium": "cancel-spotify",
+  "Amazon Prime": "cancel-amazon-prime",
+  "Disney Plus": "cancel-disney-plus",
+  "YouTube Premium": "cancel-youtube-premium",
+  "HBO Max": "cancel-hbo-max",
+  "Tinder Gold": "cancel-tinder-gold",
+  "LinkedIn Premium": "cancel-linkedin-premium",
+  HelloFresh: "cancel-hellofresh",
+  iCloud: "cancel-icloud",
+  "Canva Pro": "cancel-canva-pro",
+  "Microsoft 365": "cancel-microsoft-365",
+  NordVPN: "cancel-nordvpn",
+  "PlayStation Plus": "cancel-playstation-plus",
+  "Xbox Game Pass": "cancel-xbox-game-pass",
+  Audible: "cancel-audible",
+  Readly: "cancel-readly",
+  "Duolingo Plus": "cancel-duolingo",
+  Viaplay: "cancel-viaplay",
+  Adobe: "cancel-adobe",
+};
+
 
 export function invalidateAfterUsage(showFamilyData: boolean, familyGroupId?: string) {
   queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
@@ -75,6 +98,11 @@ export function SubscriptionCard({
 
   const isDeletedSubscription = isSubscriptionDeleted(subscription);
   const effectiveStatus = isDeletedSubscription ? 'deleted' : subscription.status;
+  const cancellationGuideSlug = cancellationGuideSlugs[subscription.name];
+  const providerWebsiteUrl = subscription.websiteUrl || (subscription as any).website_url;
+  const guideUrl = cancellationGuideSlug
+    ? `/${cancellationGuideSlug}`
+    : `/cancel-custom?name=${encodeURIComponent(subscription.name)}${providerWebsiteUrl ? `&url=${encodeURIComponent(providerWebsiteUrl)}` : ""}`;
 
   const handleUsageUpdated = () => {
     invalidateAfterUsage(showFamilyData, familyGroupId);
@@ -201,6 +229,15 @@ export function SubscriptionCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {guideUrl && !isDeletedSubscription && (
+                <DropdownMenuItem
+                  onClick={() => window.open(guideUrl, "_blank", "noopener,noreferrer")}
+                  data-testid={`action-view-cancellation-guide-${subscription.id}`}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  View Cancellation Guide
+                </DropdownMenuItem>
+              )}
               {isOwnedByCurrentUser ? (
                 <>
                   {!isDeletedSubscription && (

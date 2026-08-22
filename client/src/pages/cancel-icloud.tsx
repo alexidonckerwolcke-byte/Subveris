@@ -40,8 +40,8 @@ export default function CancelICloudPage() {
             title: "How to cancel iCloud+ subscription: stop storage charges | Subveris",
             description: "Learn how to cancel iCloud+ storage, stop recurring charges, and decide whether you still need the upgraded storage plan.",
             keywords: "how to cancel iCloud, cancel iCloud subscription, stop iCloud recurring payment, iCloud plus cancellation guide",
-            canonical: "https://www.subveris.com/cancel-icloud",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-icloud",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -138,7 +138,7 @@ export default function CancelICloudPage() {
 
         <CancelRelatedGuides current="/cancel-icloud" />
         <CancelPageFaq productName="iCloud" />
-        <CancelPageJsonLd productName="iCloud" url="https://www.subveris.com/cancel-icloud" steps={steps} />
+        <CancelPageJsonLd productName="iCloud" url="https://subveris.com/cancel-icloud" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop paying for forgotten subscriptions</h2>

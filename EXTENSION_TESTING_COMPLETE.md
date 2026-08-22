@@ -194,7 +194,7 @@ Storage structures initialized and persisted.
    ```env
    GOOGLE_CLIENT_ID = <from Google Cloud Console>
    GOOGLE_CLIENT_SECRET = <from Google Cloud Console>
-   GOOGLE_REDIRECT_URI = https://www.subveris.com/auth/callback
+   GOOGLE_REDIRECT_URI = https://subveris.com/auth/callback
    ```
 
 2. **Database Migration:**

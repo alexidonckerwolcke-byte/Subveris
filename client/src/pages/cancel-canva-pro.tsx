@@ -11,8 +11,8 @@ export default function CancelCanvaProPage() {
             title: "How to cancel Canva Pro subscription: stop recurring costs | Subveris",
             description: "Cancel Canva Pro before the next renewal, keep your current plan until the billing cycle ends, and stop surprise recurring charges.",
             keywords: "how to cancel Canva Pro, cancel Canva Pro subscription, stop Canva Pro recurring payment, Canva Pro cancellation guide",
-            canonical: "https://www.subveris.com/cancel-canva-pro",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-canva-pro",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -82,7 +82,7 @@ export default function CancelCanvaProPage() {
 
         <CancelRelatedGuides current="/cancel-canva-pro" />
         <CancelPageFaq productName="Canva Pro" />
-        <CancelPageJsonLd productName="Canva Pro" url="https://www.subveris.com/cancel-canva-pro" steps={steps} />
+        <CancelPageJsonLd productName="Canva Pro" url="https://subveris.com/cancel-canva-pro" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

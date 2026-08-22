@@ -11,8 +11,8 @@ export default function CancelLinkedInPremiumPage() {
             title: "How to cancel LinkedIn Premium: stop recurring fees | Subveris",
             description: "Learn how to cancel LinkedIn Premium, stop future renewals, and keep your access until your current billing period ends.",
             keywords: "how to cancel LinkedIn Premium, cancel LinkedIn Premium subscription, stop LinkedIn Premium recurring payment, LinkedIn Premium cancellation guide",
-            canonical: "https://www.subveris.com/cancel-linkedin-premium",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-linkedin-premium",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -86,7 +86,7 @@ export default function CancelLinkedInPremiumPage() {
 
         <CancelRelatedGuides current="/cancel-linkedin-premium" />
         <CancelPageFaq productName="LinkedIn Premium" />
-        <CancelPageJsonLd productName="LinkedIn Premium" url="https://www.subveris.com/cancel-linkedin-premium" steps={steps} />
+        <CancelPageJsonLd productName="LinkedIn Premium" url="https://subveris.com/cancel-linkedin-premium" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

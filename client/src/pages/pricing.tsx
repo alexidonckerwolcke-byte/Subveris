@@ -59,7 +59,7 @@ export default function PricingPage() {
       features: [
         "Unlimited subscriptions",
         "AI-powered recommendations",
-        "Browser extension optimization",
+        "Optional browser usage signals",
         "Cost-per-use analytics",
         "Behavioral insights",
         "Savings projections",
@@ -81,7 +81,7 @@ export default function PricingPage() {
         "All Premium Features",
         "Unlimited subscriptions",
         "AI-powered recommendations",
-        "Browser extension optimization",
+        "Optional browser usage signals",
         "Cost-per-use analytics",
         "Behavioral insights",
         "Savings projections",

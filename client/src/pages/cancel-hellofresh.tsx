@@ -42,8 +42,8 @@ export default function CancelHelloFreshPage() {
             title: "How to cancel HelloFresh subscription: stop recurring charges | Subveris",
             description: "Cancel HelloFresh easily, avoid surprise recurring charges, and confirm the meal plan ends before the next delivery or renewal date.",
             keywords: "how to cancel HelloFresh, cancel HelloFresh subscription, stop HelloFresh recurring payment, HelloFresh cancellation guide",
-            canonical: "https://www.subveris.com/cancel-hellofresh",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-hellofresh",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -143,7 +143,7 @@ export default function CancelHelloFreshPage() {
 
         <CancelRelatedGuides current="/cancel-hellofresh" />
         <CancelPageFaq productName="HelloFresh" />
-        <CancelPageJsonLd productName="HelloFresh" url="https://www.subveris.com/cancel-hellofresh" steps={steps} />
+        <CancelPageJsonLd productName="HelloFresh" url="https://subveris.com/cancel-hellofresh" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Keep track of weekly and monthly subscriptions</h2>

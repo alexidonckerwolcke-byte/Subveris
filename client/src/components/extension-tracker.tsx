@@ -21,10 +21,10 @@ export function ExtensionTracker({ subscriptions }: ExtensionTrackerProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" />
-            Browser Extension Optimization
+            Optional Browser Extension
           </CardTitle>
           <CardDescription>
-            Set website domains for your subscriptions to enable automated usage-based optimization
+            Connect the optional extension to add browser usage signals to your subscription overview
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -34,7 +34,7 @@ export function ExtensionTracker({ subscriptions }: ExtensionTrackerProps) {
               No subscriptions have website domains configured yet.
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              Edit your subscriptions and add a website domain (for example, spotify.com) to enable browser extension optimization.
+              Edit your subscriptions and add a website domain (for example, spotify.com) to connect optional browser usage signals.
             </p>
           </div>
         </CardContent>
@@ -47,10 +47,10 @@ export function ExtensionTracker({ subscriptions }: ExtensionTrackerProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Activity className="h-5 w-5" />
-          Browser Extension Optimization
+          Optional Browser Signals
         </CardTitle>
         <CardDescription>
-          Subscriptions being captured for usage-based optimization
+            Optional browser signals connected to your subscriptions
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -84,7 +84,7 @@ export function ExtensionTracker({ subscriptions }: ExtensionTrackerProps) {
         <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-900 border border-blue-200">
           <p className="font-medium mb-1">💡 How it works:</p>
           <ul className="list-disc list-inside space-y-1 text-xs">
-            <li>Install the Subveris browser extension from your browser's app store</li>
+              <li>Install the optional Subveris browser extension from your browser's app store</li>
             <li>Log in on Subveris to sync your account</li>
             <li>The extension automatically monitors time spent on linked subscription domains</li>
             <li>Usage counts update in real-time as you use these services</li>

@@ -1,35 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { fetchWithRemoteFallback, resolveApiUrl } from "./api";
-import { supabase } from "./supabase";
-
-async function resolveAuthToken(forceRefresh = false) {
-  const tokenStr = localStorage.getItem('supabase.auth.token');
-  if (!forceRefresh && tokenStr) {
-    try {
-      const tokenObj = JSON.parse(tokenStr);
-      if (tokenObj?.access_token) return tokenObj.access_token;
-      if (typeof tokenObj === 'string') return tokenObj;
-    } catch {
-      return tokenStr;
-    }
-  }
-
-  if (supabase) {
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession();
-    if (!error && session?.access_token) {
-      localStorage.setItem('supabase.auth.token', JSON.stringify({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      }));
-      return session.access_token;
-    }
-  }
-
-  return null;
-}
+import { apiFetch } from "./api";
 
 function buildQueryPath(queryKey: unknown[]) {
   const pathSegments = queryKey
@@ -99,84 +69,16 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Always use the backend API instead of client-side Supabase bridge
-  // The bridge has issues with RLS policies and malformed queries
-  
   const headers: Record<string, string> = {};
-  
   if (data) {
     headers["Content-Type"] = "application/json";
   }
-  
-  // Add authorization header if token exists.
-  // If our custom localStorage token isn't set yet, try restoring the Supabase session.
-  let token: string | null = null;
-  const tokenStr = localStorage.getItem('supabase.auth.token');
-  if (tokenStr) {
-    try {
-      const tokenObj = JSON.parse(tokenStr);
-      if (tokenObj.access_token) {
-        token = tokenObj.access_token;
-      } else if (typeof tokenObj === 'string') {
-        token = tokenObj;
-      }
-    } catch (e) {
-      console.warn('[apiRequest] Failed to parse token from localStorage:', e);
-    }
-  }
 
-  if (!token) {
-    token = await resolveAuthToken(true);
-  }
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  } else {
-    console.warn('[apiRequest] No token found for url:', url);
-  }
-
-  const fetchUrl = resolveApiUrl(url);
-  console.debug('[apiRequest] Fetching', method, fetchUrl, 'headers:', headers, 'body:', data ? data : undefined);
-
-  let res = await fetchWithRemoteFallback(fetchUrl, {
+  return apiFetch(url, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
   });
-
-  if (!res.ok && res.status === 401) {
-    const refreshedToken = await resolveAuthToken(true);
-    if (refreshedToken && refreshedToken !== token) {
-      headers["Authorization"] = `Bearer ${refreshedToken}`;
-      res = await fetchWithRemoteFallback(fetchUrl, {
-        method,
-        headers,
-        body: data ? JSON.stringify(data) : undefined,
-      });
-    }
-  }
-
-  if (!res.ok) {
-    let errorMessage = res.statusText || `HTTP ${res.status}`;
-    try {
-      const text = await res.text();
-      console.warn('[apiRequest] Non-OK response', res.status, url, text);
-      if (text) {
-        try {
-          const json = JSON.parse(text);
-          errorMessage = json.error || json.message || text;
-        } catch {
-          errorMessage = text;
-        }
-      }
-    } catch (e) {
-      console.warn('[apiRequest] Non-OK response', res.status, url, '(could not read body)');
-      errorMessage = `Request failed with status ${res.status}`;
-    }
-    throw new Error(errorMessage);
-  }
-
-  return res;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

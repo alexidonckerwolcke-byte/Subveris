@@ -40,8 +40,8 @@ export default function CancelXboxGamePassPage() {
             title: "How to cancel Xbox Game Pass subscription: stop renewal | Subveris",
             description: "Cancel Xbox Game Pass before the next renewal, keep the plan until the current period ends, and avoid unwanted recurring charges.",
             keywords: "how to cancel Xbox Game Pass, cancel Xbox Game Pass subscription, stop Xbox Game Pass recurring payment, Xbox Game Pass cancellation guide",
-            canonical: "https://www.subveris.com/cancel-xbox-game-pass",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-xbox-game-pass",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -138,7 +138,7 @@ export default function CancelXboxGamePassPage() {
 
         <CancelRelatedGuides current="/cancel-xbox-game-pass" />
         <CancelPageFaq productName="Xbox Game Pass" />
-        <CancelPageJsonLd productName="Xbox Game Pass" url="https://www.subveris.com/cancel-xbox-game-pass" steps={steps} />
+        <CancelPageJsonLd productName="Xbox Game Pass" url="https://subveris.com/cancel-xbox-game-pass" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Protect your bank account from automated renewals</h2>

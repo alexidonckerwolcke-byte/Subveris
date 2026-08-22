@@ -40,8 +40,8 @@ export default function CancelYouTubePremiumPage() {
             title: "How to cancel YouTube Premium: stop monthly charges | Subveris",
             description: "Cancel YouTube Premium in minutes, avoid unwanted renewal fees, and confirm your plan ends at the correct billing date.",
             keywords: "how to cancel YouTube Premium, cancel YouTube Premium subscription, stop YouTube Premium recurring payment, YouTube Premium cancellation guide",
-            canonical: "https://www.subveris.com/cancel-youtube-premium",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-youtube-premium",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -138,7 +138,7 @@ export default function CancelYouTubePremiumPage() {
 
         <CancelRelatedGuides current="/cancel-youtube-premium" />
         <CancelPageFaq productName="YouTube Premium" />
-        <CancelPageJsonLd productName="YouTube Premium" url="https://www.subveris.com/cancel-youtube-premium" steps={steps} />
+        <CancelPageJsonLd productName="YouTube Premium" url="https://subveris.com/cancel-youtube-premium" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop wasting money on forgotten subscriptions</h2>

@@ -1,52 +1,41 @@
-import { AlertTriangle, Sparkles, Shield, ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { AlertTriangle, ExternalLink } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Subscription } from '@shared/schema';
 
 interface AutomationAlertsProps {
-  isFreeTier: boolean;
   zeroUsageSubscriptions: Subscription[];
-  onCancelSubscription: (subscriptionId: string) => void;
-  isCancelling: boolean;
-  cancellingSubscriptionId: string | null;
 }
 
+const guideSlugs: Record<string, string> = {
+  Netflix: 'cancel-netflix',
+  'Spotify Premium': 'cancel-spotify',
+  'Amazon Prime': 'cancel-amazon-prime',
+  'Disney Plus': 'cancel-disney-plus',
+  'YouTube Premium': 'cancel-youtube-premium',
+  'HBO Max': 'cancel-hbo-max',
+  'Tinder Gold': 'cancel-tinder-gold',
+  'LinkedIn Premium': 'cancel-linkedin-premium',
+  HelloFresh: 'cancel-hellofresh',
+  iCloud: 'cancel-icloud',
+  'Canva Pro': 'cancel-canva-pro',
+  'Microsoft 365': 'cancel-microsoft-365',
+  NordVPN: 'cancel-nordvpn',
+  'PlayStation Plus': 'cancel-playstation-plus',
+  'Xbox Game Pass': 'cancel-xbox-game-pass',
+  Audible: 'cancel-audible',
+  Readly: 'cancel-readly',
+  'Duolingo Plus': 'cancel-duolingo',
+  Viaplay: 'cancel-viaplay',
+  Adobe: 'cancel-adobe',
+};
+
 export function AutomationAlerts({
-  isFreeTier,
   zeroUsageSubscriptions,
-  onCancelSubscription,
-  isCancelling,
-  cancellingSubscriptionId,
 }: AutomationAlertsProps) {
   const hasZeroUsage = zeroUsageSubscriptions.length > 0;
 
   return (
     <div className="space-y-4">
-      {isFreeTier && (
-        <Card className="border-primary/30 bg-gradient-to-r from-primary/10 via-background to-background">
-          <CardContent className="p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="flex gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                  <Shield className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Autopilot locked</p>
-                  <h3 className="mt-1 text-xl font-semibold">Your automation engine is ready, but the free plan keeps it on standby.</h3>
-                  <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                    Upgrade to Premium to turn on hands-off subscription cleanup, zero-usage alerts, and one-click cancellation workflows.
-                  </p>
-                </div>
-              </div>
-              <Button variant="outline" className="shrink-0">
-                <Sparkles className="mr-2 h-4 w-4" />
-                Upgrade to Premium
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {hasZeroUsage && (
         <Card className="border-amber-500/30 bg-amber-500/10">
           <CardContent className="p-6">
@@ -59,7 +48,7 @@ export function AutomationAlerts({
                   <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">Zero-usage alert</p>
                   <h3 className="mt-1 text-xl font-semibold">We noticed subscriptions you haven’t used in a while.</h3>
                   <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                    These services appear inactive. Cancel them in one click to stop paying for what you no longer use.
+                    These services appear inactive. Open the Subveris guide and complete any cancellation directly with the provider.
                   </p>
                 </div>
               </div>
@@ -70,19 +59,17 @@ export function AutomationAlerts({
                       <p className="font-medium">{sub.name}</p>
                       <p className="text-xs text-muted-foreground">No recent usage detected</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onCancelSubscription(sub.id)}
-                        disabled={isCancelling && cancellingSubscriptionId === sub.id}
+                    {guideSlugs[sub.name] ? (
+                      <a
+                        href={`/${guideSlugs[sub.name]}`}
+                        className="inline-flex items-center gap-2 rounded-md border border-amber-500/30 px-3 py-2 text-sm font-medium hover:bg-amber-500/10"
                       >
-                        {isCancelling && cancellingSubscriptionId === sub.id ? 'Cancelling...' : 'Cancel'}
-                      </Button>
-                      <Button size="sm" variant="ghost" className="px-2">
+                        View guide
                         <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Guide coming soon</span>
+                    )}
                   </div>
                 ))}
               </div>

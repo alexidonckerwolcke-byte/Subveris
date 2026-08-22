@@ -33,6 +33,7 @@ const CancelLinkedInPremiumPage = lazy(() => import("./pages/cancel-linkedin-pre
 const CancelNordVPNPage = lazy(() => import("./pages/cancel-nordvpn.js"));
 const CancelAudiblePage = lazy(() => import("./pages/cancel-audible.js"));
 const CancelReadlyPage = lazy(() => import("./pages/cancel-readly.js"));
+const CancelCustomPage = lazy(() => import("./pages/cancel-custom.js"));
 const Terms = lazy(() => import("./pages/terms.js"));
 const Security = lazy(() => import("./pages/security.js"));
 const AuthCallback = lazy(() => import("./pages/auth-callback.js"));
@@ -93,6 +94,7 @@ export function Router({ user }: { user: any }) {
             <Route path="/cancel-nordvpn" component={CancelNordVPNPage} />
             <Route path="/cancel-audible" component={CancelAudiblePage} />
             <Route path="/cancel-readly" component={CancelReadlyPage} />
+            <Route path="/cancel-custom" component={CancelCustomPage} />
             <Route path="/auth/callback" component={AuthCallback} />
             <Route path="/auth/callback/" component={AuthCallback} />
             <Route component={NotFound} />
@@ -125,6 +127,7 @@ export function Router({ user }: { user: any }) {
             <Route path="/cancel-nordvpn" component={CancelNordVPNPage} />
             <Route path="/cancel-audible" component={CancelAudiblePage} />
             <Route path="/cancel-readly" component={CancelReadlyPage} />
+            <Route path="/cancel-custom" component={CancelCustomPage} />
             <Route path="/auth/callback" component={AuthCallback} />
             <Route path="/auth/callback/" component={AuthCallback} />
             <Route component={NotFound} />

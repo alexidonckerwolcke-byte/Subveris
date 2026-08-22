@@ -177,7 +177,7 @@ export default function Files() {
               <Alert className="bg-blue-50 border-blue-200">
                 <Chrome className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-blue-900">
-                  Our extension now works on all major browsers: <strong>Chrome, Edge, Firefox, and Safari</strong>. Install it to capture subscription usage patterns for AI-powered insights and optimization recommendations. Each browser has platform-specific installation steps below.
+                  Our extension currently works on <strong>Chrome, Edge, and Firefox</strong>. Install it to capture subscription usage patterns for AI-powered insights and optimization recommendations.
                 </AlertDescription>
               </Alert>
 
@@ -353,92 +353,12 @@ export default function Files() {
                 </div>
               </div>
 
-              {/* Safari Installation */}
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <span className="bg-gradient-to-r from-gray-600 to-gray-800 rounded-full w-6 h-6 flex items-center justify-center text-white text-sm font-bold">🧭</span>
-                  Safari Installation (macOS)
-                </h3>
+              {/* Safari availability */}
+              <div className="space-y-2 pt-4 border-t">
+                <h3 className="text-lg font-semibold">Safari</h3>
                 <p className="text-sm text-muted-foreground">
-                  <strong>Requirements:</strong> macOS 11+ and Safari 15+
+                  Safari support is coming soon. The extension is currently available for Chrome, Edge, and Firefox.
                 </p>
-                <div className="space-y-3">
-                  <div className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-                      1
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">Click Download Button</p>
-                      <p className="text-sm text-muted-foreground">
-                        Download the extension file using the button below (same as Chrome).
-                      </p>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-2"
-                        onClick={handleDownloadExtension}
-                        disabled={downloadingExtension}
-                        type="button"
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        {downloadingExtension ? "Downloading..." : "Download Extension"}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-                      2
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">Extract and Rename Folder</p>
-                      <p className="text-sm text-muted-foreground">
-                        Double-click the ZIP to extract it. Rename the extracted folder to <code className="bg-muted px-2 py-1 rounded text-xs">subveris-tracker.safariextension</code>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-                      3
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">Double-Click to Install</p>
-                      <p className="text-sm text-muted-foreground">
-                        Double-click the renamed folder. Safari will automatically prompt you to allow the extension.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-                      4
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">Enable in Safari</p>
-                      <p className="text-sm text-muted-foreground">
-                        Open Safari, go to Safari → Settings → Extensions, find "Subveris", and check the box to enable it.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-                      ✓
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">Done!</p>
-                      <p className="text-sm text-muted-foreground">
-                        The extension is now installed and ready to use.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
-                  <p className="text-sm text-blue-900">
-                    <strong>Having issues?</strong> See our <a href="https://github.com/subveris/extension/blob/main/INSTALL_SAFARI.md" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">detailed Safari guide</a> for help.</p>
-                </div>
               </div>
 
               {/* Troubleshooting */}
@@ -456,7 +376,6 @@ export default function Files() {
                     <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                       <li>• <a href="https://github.com/subveris/extension/blob/main/BROWSER_EXTENSION_GUIDE.md" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Master Installation Guide (All Browsers)</a></li>
                       <li>• <a href="https://github.com/subveris/extension/blob/main/INSTALL_FIREFOX.md" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Detailed Firefox Guide</a></li>
-                      <li>• <a href="https://github.com/subveris/extension/blob/main/INSTALL_SAFARI.md" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Detailed Safari Guide</a></li>
                     </ul>
                   </div>
 
@@ -469,7 +388,7 @@ export default function Files() {
                   <div>
                     <p className="font-semibold text-sm">Browser version compatibility</p>
                     <p className="text-sm text-muted-foreground">
-                      <strong>Chrome:</strong> Version 88+ | <strong>Edge:</strong> Version 88+ | <strong>Firefox:</strong> Version 48+ | <strong>Safari:</strong> macOS 11+ with Safari 15+
+                      <strong>Chrome:</strong> Version 88+ | <strong>Edge:</strong> Version 88+ | <strong>Firefox:</strong> Version 48+
                     </p>
                   </div>
                   <div>
@@ -518,7 +437,7 @@ export default function Files() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                Download the browser extension as a ZIP file. Works on Chrome, Edge, Firefox, and Safari. Extract and load it into your browser to start optimizing subscription usage. See the "Extension Setup" tab above for browser-specific installation instructions.
+                Download the browser extension as a ZIP file. Works on Chrome, Edge, and Firefox. Safari support is coming soon. Extract and load it into your browser to start optimizing subscription usage. See the "Extension Setup" tab above for browser-specific installation instructions.
               </p>
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">

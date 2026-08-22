@@ -7,7 +7,7 @@ A cross-browser extension that automatically discovers and tracks your subscript
 ✅ **CSV import detection** - Auto-detects subscription lists you download  
 ✅ **Auth cookie scanning** - Identifies subscriptions from login cookies  
 
-**Now available on:** Chrome • Edge • Firefox • Safari (15+)
+**Now available on:** Chrome • Edge • Firefox
 
 ## Quick Installation
 
@@ -25,14 +25,10 @@ A cross-browser extension that automatically discovers and tracks your subscript
 3. Click "Add to Firefox"
 ✅ Done!
 
-### 🧭 Safari (2-5 minutes)
-1. Open Mac App Store and search "Subveris Tracker"
-2. Click "Get" and open the app
-3. Go to Safari → Settings → Extensions
-4. Enable "Subveris Tracker"
-✅ Done!
+### Safari
+Safari support is coming soon. The extension is currently available for Chrome, Edge, and Firefox.
 
-For detailed guides, see: [INSTALL_FIREFOX.md](INSTALL_FIREFOX.md) and [INSTALL_SAFARI.md](INSTALL_SAFARI.md)
+For detailed guides, see: [INSTALL_FIREFOX.md](INSTALL_FIREFOX.md)
 
 ## First Time Setup
 
@@ -96,12 +92,12 @@ extension/
 
 ## Browser Compatibility
 
-| Feature | Chrome | Edge | Firefox | Safari |
-|---------|--------|------|---------|--------|
-| Website tracking | ✅ | ✅ | ✅ | ✅ |
-| Gmail scanning | ✅ | ✅ | ✅ | ✅ |
-| CSV detection | ✅ | ✅ | ✅ | ⚠️ Limited |
-| Cookie scanning | ✅ | ✅ | ✅ | ✅ |
+| Feature | Chrome | Edge | Firefox |
+|---------|--------|------|---------|
+| Website tracking | ✅ | ✅ | ✅ |
+| Gmail scanning | ✅ | ✅ | ✅ |
+| CSV detection | ✅ | ✅ | ✅ |
+| Cookie scanning | ✅ | ✅ | ✅ |
 
 ## Troubleshooting
 

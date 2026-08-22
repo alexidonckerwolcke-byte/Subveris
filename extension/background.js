@@ -223,39 +223,38 @@ function syncDetectedSubscriptions(subscriptions) {
 
 function requestGuidedCancellation(subscription) {
   return new Promise((resolve) => {
-    browser.storage.local.get(['authToken', 'subverisApiUrl'], async (result) => {
-      const token = result.authToken;
-      const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
-      if (!token || !subscription?.subscriptionId) {
-        resolve({ success: false, error: 'Connect your Subveris account first.' });
-        return;
-      }
+    const guideSlug = CANCELLATION_GUIDES[subscription?.serviceName];
+    resolve({
+      success: Boolean(guideSlug),
+      guideUrl: guideSlug ? `https://subveris.com/${guideSlug}` : null,
+      error: guideSlug ? null : 'No cancellation guide is available for this service yet.'
+    });
+  });
+}
 
-      try {
-        const response = await fetch(`${apiUrl}/api/subscriptions/cancel`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ subscriptionId: subscription.subscriptionId })
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          resolve({ success: false, error: data.error || 'Cancellation request failed.' });
-          return;
-        }
+function markSubscriptionCancelled(subscriptionId, callback) {
+  browser.storage.local.get(['detectedSubscriptions'], (result) => {
+    const subscriptions = result.detectedSubscriptions || {};
+    const subscription = Object.values(subscriptions).find((item) =>
+      item.serviceName === subscriptionId || item.subscriptionId === subscriptionId
+    );
 
-        resolve({
-          success: true,
-          ...data,
-          guideUrl: data.guideUrl || (CANCELLATION_GUIDES[subscription.serviceName]
-            ? `https://www.subveris.com/${CANCELLATION_GUIDES[subscription.serviceName]}`
-            : null)
-        });
-      } catch (error) {
-        resolve({ success: false, error: error.message || 'Cancellation request failed.' });
-      }
+    if (!subscription) {
+      callback({ success: false, error: 'Subscription not found.' });
+      return;
+    }
+
+    const key = subscription.serviceName;
+    subscriptions[key] = {
+      ...subscriptions[key],
+      markedCancelled: true,
+      markedCancelledAt: Date.now()
+    };
+
+    browser.storage.local.set({ detectedSubscriptions: subscriptions }, () => {
+      callback(browser.runtime.lastError
+        ? { success: false, error: browser.runtime.lastError.message }
+        : { success: true, markedCancelledAt: subscriptions[key].markedCancelledAt });
     });
   });
 }
@@ -276,8 +275,8 @@ function updateUpgradePrompt(status) {
   browser.storage.local.set({
     trackingPaused: isFreeTier,
     upgradePrompt: isFreeTier
-      ? 'Upgrade to Premium or Family to unlock full tracking, hidden subscription discovery, and zero-usage alerts.'
-      : 'Full tracking enabled.'
+      ? 'Upgrade to Premium or Family to unlock browser extension tracking and private-page scanning.'
+      : 'Browser extension tracking enabled.'
   }, () => {
     if (browser.runtime.lastError) {
       console.error('[Background] Failed to update upgrade prompt state:', browser.runtime.lastError);
@@ -424,7 +423,7 @@ function runCookieSessionScan() {
 function sendUsageTracking(domain, timeSpent) {
   ensureTierAccess((allowed) => {
     if (!allowed) {
-      console.log('[Background] Usage tracking skipped because the tier is not premium or family.');
+      console.log('[Background] Usage tracking skipped because the extension is not included in the current plan.');
       return;
     }
 
@@ -585,6 +584,11 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'REQUEST_GUIDED_CANCELLATION') {
     requestGuidedCancellation(request.subscription).then(sendResponse);
+    return true;
+  }
+
+  if (request.type === 'MARK_SUBSCRIPTION_CANCELLED') {
+    markSubscriptionCancelled(request.subscriptionId, sendResponse);
     return true;
   }
 

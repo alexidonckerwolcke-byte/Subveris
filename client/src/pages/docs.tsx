@@ -137,7 +137,7 @@ const DocsPage: React.FC = () => {
     <div ref={sectionRefs["browser-extension"]} id="browser-extension">
     <section>
       <h2>Browser Extension</h2>
-      <p>The Subveris browser extension automatically discovers and tracks your subscriptions. It's available on Chrome, Edge, Firefox, and Safari.</p>
+      <p>The Subveris browser extension automatically discovers and tracks your subscriptions. It's currently available on Chrome, Edge, and Firefox. Safari support is coming soon.</p>
       
       <h3>What the Extension Does</h3>
       <ul>

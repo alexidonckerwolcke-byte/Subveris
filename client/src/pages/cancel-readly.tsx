@@ -14,8 +14,8 @@ export default function CancelReadlyPage() {
             title: "How to cancel Readly subscription: stop recurring billing | Subveris",
             description: "Cancel Readly quickly and avoid another monthly charge. Check the billing settings and confirm the plan ends at your current renewal date.",
             keywords: "how to cancel Readly, cancel Readly subscription, stop Readly recurring payment, Readly cancellation guide",
-            canonical: "https://www.subveris.com/cancel-readly",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-readly",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -80,7 +80,7 @@ export default function CancelReadlyPage() {
 
         <CancelRelatedGuides current="/cancel-readly" />
         <CancelPageFaq productName="Readly" />
-        <CancelPageJsonLd productName="Readly" url="https://www.subveris.com/cancel-readly" steps={steps} />
+        <CancelPageJsonLd productName="Readly" url="https://subveris.com/cancel-readly" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

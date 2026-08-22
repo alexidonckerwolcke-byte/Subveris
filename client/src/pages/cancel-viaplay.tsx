@@ -11,8 +11,8 @@ export default function CancelViaplayPage() {
             title: "How to cancel Viaplay subscription: stop recurring charges | Subveris",
             description: "Cancel Viaplay with this step-by-step guide, stop the recurring fee, and confirm when your access ends.",
             keywords: "how to cancel Viaplay, cancel Viaplay subscription, stop Viaplay recurring payment, Viaplay cancellation guide",
-            canonical: "https://www.subveris.com/cancel-viaplay",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-viaplay",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -82,7 +82,7 @@ export default function CancelViaplayPage() {
 
         <CancelRelatedGuides current="/cancel-viaplay" />
         <CancelPageFaq productName="Viaplay" />
-        <CancelPageJsonLd productName="Viaplay" url="https://www.subveris.com/cancel-viaplay" steps={steps} />
+        <CancelPageJsonLd productName="Viaplay" url="https://subveris.com/cancel-viaplay" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

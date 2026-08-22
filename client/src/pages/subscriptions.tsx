@@ -52,6 +52,7 @@ const addSubscriptionSchema = z.object({
   frequency: z.string().min(1, "Frequency is required"),
   nextBillingDate: z.string().min(1, "Next billing date is required"),
   websiteDomain: z.string().optional(), // e.g., "netflix.com", "spotify.com"
+  websiteUrl: z.string().url("Enter a valid URL").optional().or(z.literal("")),
 });
 
 type AddSubscriptionForm = z.infer<typeof addSubscriptionSchema>;
@@ -82,6 +83,7 @@ export default function Subscriptions() {
       amount: "" as any,
       frequency: "monthly",
       nextBillingDate: new Date().toISOString().split("T")[0],
+      websiteUrl: "",
     },
   });
 
@@ -515,6 +517,22 @@ export default function Subscriptions() {
                         <div className="text-xs text-muted-foreground">
                           Add the site domain here to power browser extension usage optimization for this subscription.
                           Leave blank if you prefer to keep this subscription in manual optimization mode.
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="websiteUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Provider Website URL</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://example.com" {...field} data-testid="input-website-url" />
+                        </FormControl>
+                        <div className="text-xs text-muted-foreground">
+                          Subveris scans public pages on this site to find likely account and cancellation links. It never signs in or cancels for you.
                         </div>
                         <FormMessage />
                       </FormItem>

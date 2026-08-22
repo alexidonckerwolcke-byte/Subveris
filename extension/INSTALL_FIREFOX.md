@@ -122,7 +122,7 @@ Check the extension is tracking by:
 
 All your browsers sync to the same account:
 
-- ✅ Install on Chrome, Edge, Firefox, and Safari
+- ✅ Install on Chrome, Edge, and Firefox
 - ✅ All detected subscriptions appear on your dashboard
 - ✅ Gmail connection works across all browsers
 - ✅ Settings sync instantly

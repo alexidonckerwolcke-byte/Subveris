@@ -259,13 +259,13 @@ export function CancelPageJsonLd({ productName, url, steps }: { productName: str
         "@type": "ListItem",
         position: 1,
         name: "Home",
-        item: "https://www.subveris.com",
+        item: "https://subveris.com",
       },
       {
         "@type": "ListItem",
         position: 2,
         name: "Cancel Subscriptions",
-        item: "https://www.subveris.com/cancel",
+        item: "https://subveris.com/cancel",
       },
       {
         "@type": "ListItem",
@@ -281,8 +281,8 @@ export function CancelPageJsonLd({ productName, url, steps }: { productName: str
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "Subveris",
-    url: "https://www.subveris.com",
-    logo: "https://www.subveris.com/assets/logo.png?v=3",
+    url: "https://subveris.com",
+    logo: "https://subveris.com/assets/logo.png?v=3",
     description: "Track, manage, and optimize your subscriptions with Subveris",
     sameAs: [
       "https://twitter.com/subveris",

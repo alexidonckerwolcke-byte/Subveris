@@ -59,6 +59,7 @@ const CancelLinkedInPremiumPage = lazy(() => import("./pages/cancel-linkedin-pre
 const CancelNordVPNPage = lazy(() => import("./pages/cancel-nordvpn.js"));
 const CancelAudiblePage = lazy(() => import("./pages/cancel-audible.js"));
 const CancelReadlyPage = lazy(() => import("./pages/cancel-readly.js"));
+const CancelCustomPage = lazy(() => import("./pages/cancel-custom.js"));
 const Terms = lazy(() => import("./pages/terms.js"));
 const Security = lazy(() => import("./pages/security.js"));
 const AuthCallback = lazy(() => import("./pages/auth-callback.js"));
@@ -110,6 +111,7 @@ function Router({ user }: { user: any }) {
     <Route key="cancel-nordvpn" path="/cancel-nordvpn" component={CancelNordVPNPage} />,
     <Route key="cancel-audible" path="/cancel-audible" component={CancelAudiblePage} />,
     <Route key="cancel-readly" path="/cancel-readly" component={CancelReadlyPage} />,
+    <Route key="cancel-custom" path="/cancel-custom" component={CancelCustomPage} />,
     <Route key="support" path="/support" component={Support} />,
     <Route key="files" path="/files" component={Files} />,
     <Route key="auth-callback" path="/auth/callback" component={AuthCallback} />,
@@ -144,6 +146,7 @@ function Router({ user }: { user: any }) {
     <Route key="cancel-nordvpn" path="/cancel-nordvpn" component={CancelNordVPNPage} />,
     <Route key="cancel-audible" path="/cancel-audible" component={CancelAudiblePage} />,
     <Route key="cancel-readly" path="/cancel-readly" component={CancelReadlyPage} />,
+    <Route key="cancel-custom" path="/cancel-custom" component={CancelCustomPage} />,
     <Route key="auth-callback" path="/auth/callback" component={AuthCallback} />,
     <Route key="auth-callback-trailing" path="/auth/callback/" component={AuthCallback} />,
     <Route key="not-found" path="*" component={NotFound} />,

@@ -29,7 +29,7 @@ for (const url of urls) {
   else if (url.startsWith("/cancel-")) priority = "0.7";
 
   lines.push("  <url>");
-  lines.push(`    <loc>https://www.subveris.com${url}</loc>`);
+  lines.push(`    <loc>https://subveris.com${url}</loc>`);
   lines.push(`    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>`);
   lines.push("    <changefreq>monthly</changefreq>");
   lines.push(`    <priority>${priority}</priority>`);

@@ -43,8 +43,8 @@ export default function CancelSpotifyPage() {
             title: "How to cancel Spotify Premium: stop recurring charges | Subveris",
             description: "Learn how to cancel Spotify Premium, keep your playlists, and avoid Spotify renewals before the end of your current billing cycle.",
             keywords: "how to cancel Spotify, cancel Spotify subscription, stop Spotify recurring payment, Spotify Premium cancellation, cancel Spotify Premium",
-            canonical: "https://www.subveris.com/cancel-spotify",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-spotify",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -147,7 +147,7 @@ export default function CancelSpotifyPage() {
 
         <CancelRelatedGuides current="/cancel-spotify" />
         <CancelPageFaq productName="Spotify Premium" />
-        <CancelPageJsonLd productName="Spotify Premium" url="https://www.subveris.com/cancel-spotify" steps={steps} />
+        <CancelPageJsonLd productName="Spotify Premium" url="https://subveris.com/cancel-spotify" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Keep track of all your subscriptions</h2>

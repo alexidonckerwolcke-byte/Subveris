@@ -61,7 +61,7 @@
 1. Go to Google Cloud Console
 2. Enable Gmail API
 3. Create OAuth 2.0 credentials (Web application)
-4. Add redirect URI: `https://www.subveris.com/auth/callback`
+4. Add redirect URI: `https://subveris.com/auth/callback`
 5. Copy Client ID and Client Secret
 
 **Checklist:**
@@ -84,7 +84,7 @@
 2. Add 3 variables:
    - GOOGLE_CLIENT_ID (from Google Cloud)
    - GOOGLE_CLIENT_SECRET (from Google Cloud)
-   - GOOGLE_REDIRECT_URI (https://www.subveris.com/auth/callback)
+   - GOOGLE_REDIRECT_URI (https://subveris.com/auth/callback)
 3. Redeploy Edge Functions
 
 **Checklist:**

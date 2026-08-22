@@ -40,8 +40,8 @@ export default function CancelPlayStationPlusPage() {
             title: "How to cancel PlayStation Plus subscription: stop renewal | Subveris",
             description: "Learn how to cancel PlayStation Plus, stop the recurring charge, and keep your current access until the end of the billing period.",
             keywords: "how to cancel PlayStation Plus, cancel PlayStation Plus subscription, stop PlayStation Plus recurring payment, PlayStation Plus cancellation guide",
-            canonical: "https://www.subveris.com/cancel-playstation-plus",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-playstation-plus",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -138,7 +138,7 @@ export default function CancelPlayStationPlusPage() {
 
         <CancelRelatedGuides current="/cancel-playstation-plus" />
         <CancelPageFaq productName="PlayStation Plus" />
-        <CancelPageJsonLd productName="PlayStation Plus" url="https://www.subveris.com/cancel-playstation-plus" steps={steps} />
+        <CancelPageJsonLd productName="PlayStation Plus" url="https://subveris.com/cancel-playstation-plus" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Take control of your subscriptions</h2>

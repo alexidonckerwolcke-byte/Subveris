@@ -41,8 +41,8 @@ export default function CancelDisneyPlusPage() {
             title: "How to cancel Disney Plus subscription: stop recurring charges | Subveris",
             description: "Follow this Disney Plus cancellation guide to stop the recurring fee, avoid surprise renewals, and keep access until the end of your billing cycle.",
             keywords: "how to cancel Disney Plus, cancel Disney Plus subscription, stop Disney Plus recurring payment, Disney Plus cancellation guide",
-            canonical: "https://www.subveris.com/cancel-disney-plus",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-disney-plus",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -141,7 +141,7 @@ export default function CancelDisneyPlusPage() {
 
         <CancelRelatedGuides current="/cancel-disney-plus" />
         <CancelPageFaq productName="Disney Plus" />
-        <CancelPageJsonLd productName="Disney Plus" url="https://www.subveris.com/cancel-disney-plus" steps={steps} />
+        <CancelPageJsonLd productName="Disney Plus" url="https://subveris.com/cancel-disney-plus" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop paying for subscriptions you no longer use</h2>

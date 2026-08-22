@@ -131,7 +131,7 @@
 ```
 GOOGLE_CLIENT_ID          → Set in Supabase
 GOOGLE_CLIENT_SECRET      → Set in Supabase  
-GOOGLE_REDIRECT_URI       → https://www.subveris.com/auth/callback
+GOOGLE_REDIRECT_URI       → https://subveris.com/auth/callback
 ```
 
 ---
@@ -271,7 +271,7 @@ GOOGLE_REDIRECT_URI       → https://www.subveris.com/auth/callback
    ```
    GOOGLE_CLIENT_ID = your-client-id
    GOOGLE_CLIENT_SECRET = your-client-secret
-   GOOGLE_REDIRECT_URI = https://www.subveris.com/auth/callback
+   GOOGLE_REDIRECT_URI = https://subveris.com/auth/callback
    ```
 
 2. **Database Migration:**

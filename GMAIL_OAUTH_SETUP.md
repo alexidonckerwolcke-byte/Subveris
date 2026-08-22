@@ -31,7 +31,7 @@ Three environment secrets:
 4. Choose application type: **Web application**
 5. Set Authorized redirect URIs:
    ```
-   https://www.subveris.com/auth/callback
+   https://subveris.com/auth/callback
    ```
    (Or use localhost:5000/auth/callback for local testing)
 
@@ -70,7 +70,7 @@ Click "New variable" for each:
 
 3. **Add GOOGLE_REDIRECT_URI**
    - Name: `GOOGLE_REDIRECT_URI`
-   - Value: `https://www.subveris.com/auth/callback`
+   - Value: `https://subveris.com/auth/callback`
    - Click "Add"
 
 ### 2d. Redeploy Edge Functions
@@ -116,7 +116,7 @@ After adding variables:
 
 ### Issue: "Redirect URI mismatch"
 - ✓ Must exactly match in both Google Console AND Supabase
-- ✓ For production: `https://www.subveris.com/auth/callback`
+- ✓ For production: `https://subveris.com/auth/callback`
 - ✓ For local testing: `http://localhost:5000/auth/callback`
 
 ### Issue: "Refresh token missing"

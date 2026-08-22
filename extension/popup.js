@@ -1,5 +1,5 @@
 // Cross-browser compatibility shim
-// Safari 15+, Firefox, and Edge use 'browser' global
+// Firefox and Edge use 'browser' global
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
 const browser = globalThis.browser || globalThis.chrome;
 
@@ -14,7 +14,7 @@ function detectBrowser() {
     browserNotes = 'Firefox fully supports all features. Visit <a href="https://addons.mozilla.org" target="_blank" style="color: #007bff; text-decoration: none;">Firefox Add-ons</a> to find the latest version.';
   } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
     browserName = 'Safari 🧭';
-    browserNotes = 'Safari requires a native app wrapper. See <a href="https://github.com/subveris/extension/blob/main/INSTALL_SAFARI.md" target="_blank" style="color: #007bff; text-decoration: none;">Safari installation guide</a> for setup.';
+    browserNotes = 'Safari support is coming soon. The extension is currently available for Chrome, Edge, and Firefox.';
   } else if (userAgent.includes('Edg')) {
     browserName = 'Microsoft Edge 🔷';
     browserNotes = 'Edge uses Chromium engine - all Chrome features work identically.';
@@ -109,9 +109,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const price = subscription.monthlyPrice ? `€${subscription.monthlyPrice.toFixed(2)}/mo` : 'Price unknown';
         const guideSlug = cancellationGuides[subscription.serviceName];
         const guideButton = guideSlug
-          ? `<button class="guide-button" type="button" data-guide-slug="${guideSlug}">Open cancellation guide</button>`
+          ? `<button class="guide-button" type="button" data-guide-slug="${guideSlug}">View guide in Subveris</button>`
           : '';
-        list.insertAdjacentHTML('beforeend', `<article class="subscription"><div class="subscription-top"><div><div class="subscription-name">${escapeHtml(subscription.serviceName)}</div><div class="subscription-meta">${escapeHtml(price)} · ${escapeHtml(lastOpened)} · ${subscription.visitCount || 1} visit${(subscription.visitCount || 1) === 1 ? '' : 's'}</div>${guideButton}</div><span class="risk risk-${risk}">${risk === 'low' ? 'active' : risk === 'medium' ? 'review' : 'unused'}</span></div></article>`);
+        const cancelledLabel = subscription.markedCancelled
+          ? `<span class="muted">Marked cancelled by you</span>`
+          : `<button class="guide-button mark-button" type="button" data-mark-cancelled="${escapeHtml(subscription.serviceName)}">Mark as cancelled</button>`;
+        list.insertAdjacentHTML('beforeend', `<article class="subscription"><div class="subscription-top"><div><div class="subscription-name">${escapeHtml(subscription.serviceName)}</div><div class="subscription-meta">${escapeHtml(price)} · ${escapeHtml(lastOpened)} · ${subscription.visitCount || 1} visit${(subscription.visitCount || 1) === 1 ? '' : 's'}</div>${guideButton} ${cancelledLabel}</div><span class="risk risk-${risk}">${risk === 'low' ? 'active' : risk === 'medium' ? 'review' : 'unused'}</span></div></article>`);
       });
     }
     list.querySelectorAll('[data-guide-slug]').forEach((button) => {
@@ -121,8 +124,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const serviceName = button.closest('.subscription')?.querySelector('.subscription-name')?.textContent || '';
         const subscription = subscriptions.find((item) => item.serviceName === serviceName);
         browser.runtime.sendMessage({ type: 'REQUEST_GUIDED_CANCELLATION', subscription }, (response) => {
-          const guideUrl = response?.guideUrl || `https://www.subveris.com/${slug}`;
+          const guideUrl = response?.guideUrl || `https://subveris.com/${slug}`;
           browser.tabs.create({ url: guideUrl });
+        });
+      });
+    });
+    list.querySelectorAll('[data-mark-cancelled]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const subscriptionId = button.getAttribute('data-mark-cancelled');
+        browser.runtime.sendMessage({ type: 'MARK_SUBSCRIPTION_CANCELLED', subscriptionId }, (response) => {
+          if (response?.success) {
+            button.outerHTML = '<span class="muted">Marked cancelled by you</span>';
+          }
         });
       });
     });
@@ -143,9 +156,8 @@ document.addEventListener('DOMContentLoaded', () => {
         subscriptionStatus: result.subscription_status || 'free',
         detectedSubscriptionCount: Object.keys(result.detectedSubscriptions || {}).length,
       });
-      const subscriptionStatus = (result.subscription_status || 'free').toLowerCase();
-      const isFreeTier = subscriptionStatus === 'free';
       renderDashboard(result.detectedSubscriptions || {});
+      const isFreeTier = subscriptionStatus === 'free';
       
       if (result.supabaseUserUUID && result.authToken) {
         statusDiv.textContent = '✅ Connected to Subveris';
@@ -163,21 +175,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isFreeTier || result.trackingPaused) {
           if (trackingStatus) {
-            trackingStatus.textContent = `⚠️ Upgrade required for ${domain}: ${result.upgradePrompt || 'Unlock full tracking and discovery features.'}`;
+            trackingStatus.textContent = `⚠️ Browser extension tracking requires Premium or Family.`;
             trackingStatus.className = 'status disconnected';
           }
-          
           if (debugInfo) {
             debugInfo.innerHTML = `
-              <strong>Upgrade Required:</strong><br>
-              Your current plan is ${subscriptionStatus}.<br>
-              Premium or Family unlocks full usage tracking, onboarding discovery, and zero-usage alerts.<br>
-              <small style="color: #999;">Tracking is currently paused for this extension.</small>
+              <strong>Browser extension not included:</strong><br>
+              Upgrade to Premium or Family for browser usage tracking and private-page scanning.<br>
+              <small style="color: #999;">The Subveris web app and cancellation guides remain available without the extension.</small>
             `;
           }
           return;
         }
-        
+
         if (trackingStatus) {
           trackingStatus.textContent = `📊 Tracking enabled for: ${domain}`;
           trackingStatus.className = 'status connected';

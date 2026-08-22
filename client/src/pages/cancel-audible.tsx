@@ -14,8 +14,8 @@ export default function CancelAudiblePage() {
             title: "How to cancel Audible subscription: stop recurring charges | Subveris",
             description: "Cancel Audible membership and stop recurring billing with this simple guide. Keep your account active until the current billing cycle ends.",
             keywords: "how to cancel Audible, cancel Audible subscription, stop Audible recurring payment, Audible cancellation guide",
-            canonical: "https://www.subveris.com/cancel-audible",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-audible",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -81,7 +81,7 @@ export default function CancelAudiblePage() {
 
         <CancelRelatedGuides current="/cancel-audible" />
         <CancelPageFaq productName="Audible" />
-        <CancelPageJsonLd productName="Audible" url="https://www.subveris.com/cancel-audible" steps={steps} />
+        <CancelPageJsonLd productName="Audible" url="https://subveris.com/cancel-audible" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

@@ -11,8 +11,8 @@ export default function CancelMicrosoft365Page() {
             title: "How to cancel Microsoft 365 subscription: stop renewals | Subveris",
             description: "Cancel Microsoft 365 and stop recurring charges with this clear guide. See exactly how to end the plan and confirm the renewal date.",
             keywords: "how to cancel Microsoft 365, cancel Microsoft 365 subscription, stop Microsoft 365 recurring payment, Microsoft 365 cancellation guide",
-            canonical: "https://www.subveris.com/cancel-microsoft-365",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-microsoft-365",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -82,7 +82,7 @@ export default function CancelMicrosoft365Page() {
 
         <CancelRelatedGuides current="/cancel-microsoft-365" />
         <CancelPageFaq productName="Microsoft 365" />
-        <CancelPageJsonLd productName="Microsoft 365" url="https://www.subveris.com/cancel-microsoft-365" steps={steps} />
+        <CancelPageJsonLd productName="Microsoft 365" url="https://subveris.com/cancel-microsoft-365" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>

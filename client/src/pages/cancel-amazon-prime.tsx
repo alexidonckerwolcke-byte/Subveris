@@ -43,8 +43,8 @@ export default function CancelAmazonPrimePage() {
             title: "How to cancel Amazon Prime membership: stop renewals | Subveris",
             description: "Cancel Amazon Prime membership step by step, keep your benefits until renewal, and stop surprise Prime charges before the next billing date.",
             keywords: "how to cancel Amazon Prime, cancel Amazon Prime membership, stop Amazon Prime recurring payment, Amazon Prime cancellation guide",
-            canonical: "https://www.subveris.com/cancel-amazon-prime",
-            image: "https://www.subveris.com/assets/logo.png?v=3",
+            canonical: "https://subveris.com/cancel-amazon-prime",
+            image: "https://subveris.com/assets/logo.png?v=3",
             author: "Subveris",
             type: "guide",
             publishedTime: "2024-01-01T00:00:00Z",
@@ -147,7 +147,7 @@ export default function CancelAmazonPrimePage() {
 
         <CancelRelatedGuides current="/cancel-amazon-prime" />
         <CancelPageFaq productName="Amazon Prime" />
-        <CancelPageJsonLd productName="Amazon Prime" url="https://www.subveris.com/cancel-amazon-prime" steps={steps} />
+        <CancelPageJsonLd productName="Amazon Prime" url="https://subveris.com/cancel-amazon-prime" steps={steps} />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop wasting money on forgotten subscriptions</h2>

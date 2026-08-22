@@ -39,8 +39,8 @@ for (const f of files) {
   const title = `How to cancel ${product} subscription | Subveris`;
   const description = `How to cancel ${product} subscription, stop recurring ${productLower} charges, and avoid unexpected renewals.`;
   const keywords = `how to cancel ${product}, cancel ${product} subscription, stop ${product} recurring payment, ${product} cancellation guide`;
-  const canonical = `https://www.subveris.com/${slug}`;
-  const image = `https://www.subveris.com/assets/logo.png?v=3`;
+  const canonical = `https://subveris.com/${slug}`;
+  const image = `https://subveris.com/assets/logo.png?v=3`;
 
   const metaBlock = `usePageMeta({\n    title: "${title}",\n    description: "${description}",\n    keywords: "${keywords}",\n    canonical: "${canonical}",\n    image: "${image}",\n  });`;
 

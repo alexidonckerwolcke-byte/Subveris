@@ -6,7 +6,7 @@
   "permissions": ["storage", "tabs", "cookies", "downloads", "identity"],
   "host_permissions": [
     "https://subveris.com/*",
-    "https://www.subveris.com/*",
+    "https://subveris.com/*",
     "https://*.netflix.com/*",
     "https://*.spotify.com/*",
     "https://*.amazon.com/*",
@@ -41,7 +41,7 @@
     {
       "matches": [
         "https://subveris.com/*",
-        "https://www.subveris.com/*",
+        "https://subveris.com/*",
         "https://*.netflix.com/*",
         "https://*.spotify.com/*",
         "https://*.amazon.com/*",
@@ -75,7 +75,7 @@
       "resources": ["inject.js"],
       "matches": [
         "https://subveris.com/*",
-        "https://www.subveris.com/*",
+        "https://subveris.com/*",
         "https://*.netflix.com/*",
         "https://*.spotify.com/*",
         "https://*.amazon.com/*",
