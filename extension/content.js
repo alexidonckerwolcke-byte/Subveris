@@ -203,6 +203,7 @@ function saveDiscoveredPrice(priceData) {
   const payload = {
     domain,
     discoveredDomains: [domain],
+    serviceName: getServiceNameFromDomain(domain),
     detectedPrice: typeof priceData.price === 'number' ? priceData.price : null,
     detectedPlanName: priceData.planLabel || null,
     detectedBillingCycle: priceData.detectedBillingCycle || null,

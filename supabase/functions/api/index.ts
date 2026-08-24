@@ -2772,9 +2772,18 @@ runtimeDeno?.serve?.(async (req: Request) => {
             const detectedPlanName = typeof body.detectedPlanName === "string" && body.detectedPlanName.trim()
               ? body.detectedPlanName.trim()
               : null;
+            const detectedServiceName = typeof body.serviceName === "string" && body.serviceName.trim()
+              ? body.serviceName.trim()
+              : null;
+            const combinedDetectedName = detectedPlanName && detectedServiceName &&
+              !detectedPlanName.toLowerCase().includes(detectedServiceName.toLowerCase())
+              ? detectedServiceName.toLowerCase().includes(detectedPlanName.toLowerCase())
+                ? detectedServiceName
+                : `${detectedServiceName} ${detectedPlanName}`
+              : detectedPlanName || detectedServiceName;
             const existingName = String(existingDiscovery.name || "").toLowerCase().trim();
             const shouldUseDetectedName = Boolean(
-              detectedPlanName &&
+              combinedDetectedName &&
               (existingDiscovery.is_detected || existingName === normalizedDiscoveredDomain || !existingName)
             );
             const existingUpdate: Record<string, string> = {};
@@ -2782,7 +2791,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
               existingUpdate.website_domain = normalizedDiscoveredDomain;
             }
             if (shouldUseDetectedName) {
-              existingUpdate.name = detectedPlanName;
+              existingUpdate.name = combinedDetectedName;
             }
             if (Object.keys(existingUpdate).length > 0) {
               const { error: existingUpdateError } = await supabase
@@ -2809,13 +2818,19 @@ runtimeDeno?.serve?.(async (req: Request) => {
           const detectedServiceName = typeof body.serviceName === "string" && body.serviceName.trim()
             ? body.serviceName.trim()
             : null;
+          const displayName = detectedPlanName && detectedServiceName &&
+            !detectedPlanName.toLowerCase().includes(detectedServiceName.toLowerCase())
+            ? detectedServiceName.toLowerCase().includes(detectedPlanName.toLowerCase())
+              ? detectedServiceName
+              : `${detectedServiceName} ${detectedPlanName}`
+            : detectedPlanName || detectedServiceName || normalizedDiscoveredDomain;
           const detectedCurrency = typeof body.currency === "string" && body.currency.trim()
             ? body.currency.trim().toUpperCase()
             : "USD";
           const insertedSubscription = {
             id: generateId(),
             user_id: userId,
-            name: detectedPlanName || detectedServiceName || normalizedDiscoveredDomain,
+            name: displayName,
             category: "other",
             amount: detectedPrice ?? 0,
             currency: detectedCurrency,
