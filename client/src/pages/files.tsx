@@ -181,6 +181,13 @@ export default function Files() {
                 </AlertDescription>
               </Alert>
 
+              <Alert className="bg-amber-50 border-amber-200">
+                <Shield className="h-4 w-4 text-amber-700" />
+                <AlertDescription className="text-amber-900">
+                  <strong>Authenticate before using the extension:</strong> After installing, click the Subveris extension icon and log in with your Subveris email and password. Tracking is available only with an active Premium or Family plan. You do not need to keep the Subveris website open. If you normally sign in with Google, set a password in your Subveris account first, then use that email and password in the extension popup.
+                </AlertDescription>
+              </Alert>
+
               {/* Chrome Installation */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -406,6 +413,10 @@ export default function Files() {
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex gap-2">
                     <span className="text-primary font-bold">•</span>
+                    Open the extension popup, enter your Subveris email and password, and complete plan verification before browsing
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-primary font-bold">•</span>
                     The extension will automatically monitor your visits to linked subscription websites
                   </li>
                   <li className="flex gap-2">
@@ -439,6 +450,13 @@ export default function Files() {
               <p className="text-muted-foreground">
                 Download the browser extension as a ZIP file. Works on Chrome, Edge, and Firefox. Safari support is coming soon. Extract and load it into your browser to start optimizing subscription usage. See the "Extension Setup" tab above for browser-specific installation instructions.
               </p>
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-semibold">Authentication required</p>
+                <p className="mt-1">
+                  After installation, open the extension popup and log in with your Subveris email and password. The extension works only for active Premium or Family accounts, and the Subveris tab does not need to stay open. Google-only accounts must set a password in Subveris before using extension login.
+                </p>
+              </div>
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <div className="flex">
