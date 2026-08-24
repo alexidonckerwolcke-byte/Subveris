@@ -2737,19 +2737,44 @@ runtimeDeno?.serve?.(async (req: Request) => {
             continue;
           }
 
-          const { data: existingDiscovery, error: discoveryLookupError } = await supabase
+          const { data: existingDiscoveries, error: discoveryLookupError } = await supabase
             .from("subscriptions")
-            .select("id")
+            .select("id, name, website_domain, status")
             .eq("user_id", userId)
-            .eq("website_domain", normalizedDiscoveredDomain)
-            .maybeSingle();
+            .neq("status", "deleted");
 
           if (discoveryLookupError) {
             console.warn("[Extension Sync] Failed to lookup discovered domain:", discoveryLookupError);
             continue;
           }
 
+          const normalizedDiscoveredName = normalizedDiscoveredDomain
+            .split(".")[0]
+            .replace(/[-_]/g, " ")
+            .trim();
+          const existingDiscovery = (existingDiscoveries || []).find((subscription: any) => {
+            const existingDomain = normalizeDomain(subscription.website_domain);
+            const existingName = String(subscription.name || "")
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, " ")
+              .trim();
+            return existingDomain === normalizedDiscoveredDomain ||
+              existingName === normalizedDiscoveredName ||
+              existingName.includes(normalizedDiscoveredName) ||
+              normalizedDiscoveredName.includes(existingName);
+          });
+
           if (existingDiscovery) {
+            if (normalizeDomain(existingDiscovery.website_domain) !== normalizedDiscoveredDomain) {
+              const { error: domainUpdateError } = await supabase
+                .from("subscriptions")
+                .update({ website_domain: normalizedDiscoveredDomain })
+                .eq("id", existingDiscovery.id)
+                .eq("user_id", userId);
+              if (domainUpdateError) {
+                console.warn("[Extension Sync] Failed to link existing subscription to domain:", domainUpdateError);
+              }
+            }
             continue;
           }
 
