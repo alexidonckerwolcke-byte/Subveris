@@ -282,31 +282,42 @@ function isTierAllowed(status) {
 function refreshSubscriptionStatus(callback = () => {}) {
   browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
     const token = result.authToken;
-    const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
+    const configuredApiUrl = result.subverisApiUrl || DEFAULT_API_URL;
+    const apiUrls = configuredApiUrl === DEFAULT_API_URL
+      ? [DEFAULT_API_URL]
+      : [configuredApiUrl, DEFAULT_API_URL];
     if (!token) {
       browser.storage.local.set({ subscription_status: 'free', trackingPaused: true }, () => callback('free'));
       return;
     }
 
-    fetch(`${apiUrl}/api/user/premium-status`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    }).then(async (response) => {
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Failed to check subscription plan');
-      const planType = String(data.planType || data.plan_type || 'free').toLowerCase();
-      const status = String(data.status || 'free').toLowerCase();
-      const allowed = (planType === 'premium' || planType === 'family') &&
-        (status === 'active' || status === 'trialing');
-      const storedStatus = allowed ? planType : 'free';
-      browser.storage.local.set({ subscription_status: storedStatus }, () => {
-        updateUpgradePrompt(storedStatus);
-        callback(storedStatus);
+    const tryUrl = (index) => {
+      fetch(`${apiUrls[index]}/api/user/premium-status`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      }).then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Failed to check subscription plan');
+        const planType = String(data.planType || data.plan_type || 'free').toLowerCase();
+        const status = String(data.status || 'free').toLowerCase();
+        const allowed = (planType === 'premium' || planType === 'family') &&
+          (status === 'active' || status === 'trialing');
+        const storedStatus = allowed ? planType : 'free';
+        browser.storage.local.set({ subscription_status: storedStatus, subverisApiUrl: apiUrls[index] }, () => {
+          updateUpgradePrompt(storedStatus);
+          callback(storedStatus);
+        });
+      }).catch((error) => {
+        if (index + 1 < apiUrls.length) {
+          tryUrl(index + 1);
+          return;
+        }
+        console.warn('[Background] Failed to refresh subscription status:', error);
+        callback(null, error);
       });
-    }).catch((error) => {
-      console.warn('[Background] Failed to refresh subscription status:', error);
-      callback(null, error);
-    });
+    };
+
+    tryUrl(0);
   });
 }
 
