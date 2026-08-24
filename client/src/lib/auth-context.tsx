@@ -23,6 +23,8 @@ interface AuthContextType {
   completeTutorial: () => void;
   clearSignUpFlag: () => void;
   getToken: () => Promise<string>;
+  hasPassword: boolean;
+  markPasswordConfigured: () => void;
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
@@ -48,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [pendingMfaFactors, setPendingMfaFactors] = useState<any[]>([]);
   const [pendingMfaSession, setPendingMfaSession] = useState<any>(null);
   const [justSignedUp, setJustSignedUp] = useState(false);
+  const [hasPassword, setHasPassword] = useState(false);
 
   const NEW_USER_THRESHOLD_MS = 5 * 60 * 1000;
 
@@ -126,8 +129,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (user) {
       checkUserSubscriptions(user.id);
+      const passwordKey = `subveris.password-configured:${user.id}`;
+      setHasPassword(
+        Boolean(user.identities?.some((identity) => identity.provider === 'email')) ||
+        localStorage.getItem(passwordKey) === 'true'
+      );
+    } else {
+      setHasPassword(false);
     }
   }, [user]);
+
+  const markPasswordConfigured = () => {
+    if (!user) return;
+    localStorage.setItem(`subveris.password-configured:${user.id}`, 'true');
+    setHasPassword(true);
+  };
 
   useEffect(() => {
     if (!supabase) {
@@ -484,6 +500,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     cancelAtPeriodEnd,
     currentPeriodEnd,
     getToken,
+    hasPassword,
+    markPasswordConfigured,
     signUp,
     signIn,
     signInWithGoogle,

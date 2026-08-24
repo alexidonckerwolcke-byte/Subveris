@@ -42,6 +42,7 @@ export const AccountSettingsModals = forwardRef<
   ) {
   const { toast } = useToast();
   const auth = useAuth();
+  const { hasPassword } = auth;
 
   // Email change state
   const [emailModalOpen, setEmailModalOpen] = useState(false);
@@ -127,7 +128,7 @@ export const AccountSettingsModals = forwardRef<
   };
 
   const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    if ((hasPassword && !currentPassword) || !newPassword || !confirmPassword) {
       toast({
         title: "Error",
         description: "Please fill in all password fields",
@@ -161,7 +162,6 @@ export const AccountSettingsModals = forwardRef<
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
-          currentPassword,
           newPassword,
         }),
       });
@@ -176,6 +176,7 @@ export const AccountSettingsModals = forwardRef<
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      auth.markPasswordConfigured();
 
       // After changing password, sign the user out so they must re-authenticate
       try { await auth.signOut(); } catch (e) { /* ignore */ }
@@ -416,23 +417,27 @@ export const AccountSettingsModals = forwardRef<
       <Dialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen}>
         <DialogContent aria-describedby="change-password-desc">
           <DialogHeader>
-            <DialogTitle>Change Password</DialogTitle>
+            <DialogTitle>{hasPassword ? "Change Password" : "Set Password"}</DialogTitle>
             <DialogDescription id="change-password-desc">
-              Enter your current password and then your new password.
+              {hasPassword
+                ? "Enter your current password and then your new password."
+                : "Create a password for your Subveris account. You can use your Google email address to sign in with it."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
-              <Input
-                id="current-password"
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="••••••••"
-                data-testid="input-current-password"
-              />
-            </div>
+            {hasPassword && (
+              <div className="space-y-2">
+                <Label htmlFor="current-password">Current Password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="••••••••"
+                  data-testid="input-current-password"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
               <Input
@@ -469,7 +474,7 @@ export const AccountSettingsModals = forwardRef<
               disabled={passwordLoading}
               data-testid="button-confirm-password-change"
             >
-              {passwordLoading ? "Updating..." : "Update Password"}
+              {passwordLoading ? "Updating..." : hasPassword ? "Change Password" : "Set Password"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -31,7 +31,7 @@ export default function Settings() {
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailConnecting, setGmailConnecting] = useState(false);
-  const { user } = useAuth();
+  const { user, hasPassword } = useAuth();
   const userEmail = user?.email ?? "";
 
   // Check if 2FA is enabled when user data loads
@@ -374,10 +374,14 @@ export default function Settings() {
             <div className="flex items-center justify-between p-4 rounded-lg border border-border">
               <div>
                 <p className="font-medium">Password</p>
-                <p className="text-sm text-muted-foreground">Last changed 30 days ago</p>
+                <p className="text-sm text-muted-foreground">
+                  {hasPassword
+                    ? "Manage your website password"
+                    : "Set a password to sign in without Google"}
+                </p>
               </div>
               <Button variant="outline" size="sm" onClick={openPasswordModal} data-testid="button-change-password">
-                Change
+                {hasPassword ? "Change" : "Set Password"}
               </Button>
             </div>
           </CardContent>
