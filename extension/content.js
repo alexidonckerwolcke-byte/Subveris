@@ -404,6 +404,8 @@ getAuthToken().then((token) => {
 });
 
 function trackUsageIfNeeded() {
+  if (window.__subverisUsageSent) return;
+
   const endTime = Date.now();
   const timeSpent = Math.round((endTime - startTime) / 1000);
 
@@ -414,16 +416,11 @@ function trackUsageIfNeeded() {
     return;
   }
 
-  getSubscriptionStatus((status) => {
-    if (!isTierAllowed(status)) {
-      console.log('[Extension] Tracking paused because the tier is not premium or family.');
-      return;
-    }
-
-    const domain = getRootDomain(window.location.hostname);
-    console.log(`[Extension] 📊 Tracking usage for domain: ${domain}`);
-    sendUsageTracking(domain, timeSpent);
-  });
+  window.__subverisUsageSent = true;
+  const domain = getRootDomain(window.location.hostname);
+  console.log(`[Extension] 📊 Tracking usage for domain: ${domain}`);
+  // The background worker performs the authoritative plan check and can refresh stale status.
+  sendUsageTracking(domain, timeSpent);
 }
 
 if (document.readyState === 'loading') {
