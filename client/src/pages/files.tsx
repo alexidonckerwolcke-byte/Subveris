@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Download, AlertTriangle, Chrome, BookOpen, Settings } from "lucide-react";
+import { Download, AlertTriangle, Chrome, BookOpen, Settings, Shield } from "lucide-react";
 import { PremiumGate } from "@/components/premium-gate";
 import { useSubscription } from "@/lib/subscription-context";
 import { useQuery } from "@tanstack/react-query";
