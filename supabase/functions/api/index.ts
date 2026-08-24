@@ -2806,13 +2806,16 @@ runtimeDeno?.serve?.(async (req: Request) => {
           const detectedPlanName = typeof body.detectedPlanName === "string" && body.detectedPlanName.trim()
             ? body.detectedPlanName.trim()
             : null;
+          const detectedServiceName = typeof body.serviceName === "string" && body.serviceName.trim()
+            ? body.serviceName.trim()
+            : null;
           const detectedCurrency = typeof body.currency === "string" && body.currency.trim()
             ? body.currency.trim().toUpperCase()
             : "USD";
           const insertedSubscription = {
             id: generateId(),
             user_id: userId,
-            name: detectedPlanName || normalizedDiscoveredDomain,
+            name: detectedPlanName || detectedServiceName || normalizedDiscoveredDomain,
             category: "other",
             amount: detectedPrice ?? 0,
             currency: detectedCurrency,
@@ -2828,7 +2831,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
             is_detected: true,
             website_domain: normalizedDiscoveredDomain,
             billing_month: getBillingMonth(now),
-            description: detectedPlanName ? `Auto-discovered from extension scan: ${detectedPlanName}` : "Auto-discovered from extension scan",
+            description: detectedPlanName
+              ? `Auto-discovered from extension scan: ${detectedPlanName}`
+              : detectedServiceName
+                ? `Auto-discovered from extension scan: ${detectedServiceName}`
+                : "Auto-discovered from extension scan",
           };
 
           const { error: insertError } = await supabase.from("subscriptions").insert(insertedSubscription);

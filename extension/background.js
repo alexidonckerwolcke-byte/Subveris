@@ -427,7 +427,7 @@ function runCookieSessionScan() {
   });
 }
 
-function sendUsageTracking(domain, timeSpent) {
+function sendUsageTracking(domain, timeSpent, serviceName) {
   ensureTierAccess((allowed) => {
     if (!allowed) {
       console.log('[Background] Usage tracking skipped because the extension is not included in the current plan.');
@@ -446,6 +446,7 @@ function sendUsageTracking(domain, timeSpent) {
 
         const payload = JSON.stringify({
           domain,
+          serviceName,
           timeSpent,
           isZeroUsage,
           rollingWindowDays: 30
@@ -465,23 +466,24 @@ function sendUsageTracking(domain, timeSpent) {
           console.log('[Background] TRACK_USAGE_FOR_ALL_MEMBERS response status:', response.status);
           if (!response.ok) {
             console.error('[Background] TRACK_USAGE_FOR_ALL_MEMBERS request failed:', response.status, response.statusText);
-            return sendUsageTrackingFallback(domain, timeSpent, token, apiUrl);
+            return sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName);
           }
 
           console.log('[Background] ✅ TRACK_USAGE_FOR_ALL_MEMBERS successful for:', domain);
           return response.json();
         }).catch((error) => {
           console.error('[Background] Failed TRACK_USAGE_FOR_ALL_MEMBERS fetch:', error);
-          return sendUsageTrackingFallback(domain, timeSpent, token, apiUrl);
+          return sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName);
         });
       });
     });
   });
 }
 
-function sendUsageTrackingFallback(domain, timeSpent, token, apiUrl) {
+function sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName) {
   const payload = JSON.stringify({
     domain,
+    serviceName,
     timeSpent,
     isZeroUsage: false,
     rollingWindowDays: 30
@@ -576,7 +578,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'TRACK_USAGE') {
     console.log('[Background] TRACK_USAGE request for domain:', request.domain, 'timeSpent:', request.timeSpent);
-    sendUsageTracking(request.domain, request.timeSpent);
+    sendUsageTracking(request.domain, request.timeSpent, request.serviceName);
     sendResponse({ success: true, queued: true });
     return true;
   }

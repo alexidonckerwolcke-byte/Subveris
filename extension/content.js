@@ -115,7 +115,8 @@ function getAuthToken() {
 }
 
 function sendUsageTracking(domain, timeSpent) {
-  const success = sendMessageToBackground({ type: 'TRACK_USAGE', domain, timeSpent }, (response, err) => {
+  const serviceName = getServiceNameFromDomain(domain);
+  const success = sendMessageToBackground({ type: 'TRACK_USAGE', domain, serviceName, timeSpent }, (response, err) => {
     if (err) {
       console.error('[Extension] ❌ TRACK_USAGE message failed:', err.message);
       console.log('[Extension] 💡 If this error persists, reload the page after reloading the extension.');
