@@ -282,7 +282,11 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.access_token || !data.user?.id) {
-        throw new Error(data.error_description || data.msg || data.error || 'Invalid email or password');
+        const authError = data.error_code || data.error || '';
+        if (authError === 'invalid_credentials' || response.status === 400) {
+          throw new Error('Email/password login failed. If you normally use Google, set a password in Subveris first, then use that password here.');
+        }
+        throw new Error(data.error_description || data.msg || data.error || 'Login failed');
       }
 
       browser.runtime.sendMessage({
