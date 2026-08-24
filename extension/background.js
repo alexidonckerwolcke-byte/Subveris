@@ -2,6 +2,7 @@
 // Safari 15+, Firefox, and Edge use 'browser' global
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
 const browser = globalThis.browser || globalThis.chrome;
+const DEFAULT_API_URL = 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1/api';
 
 browser.runtime.onInstalled.addListener(() => {
   console.log('Subveris Usage Tracker Extension Installed');
@@ -86,9 +87,10 @@ function getServiceNameFromDomain(domain) {
 }
 
 function loadKnownSubscriptions() {
+  refreshSubscriptionStatus();
   browser.storage.local.get(['authToken', 'subverisApiUrl', 'detectedSubscriptions'], (result) => {
     const token = result.authToken;
-    const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
+    const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
     const existingSubs = result.detectedSubscriptions || {};
 
     if (!token) {
@@ -196,7 +198,7 @@ function addDetectedSubscription(serviceName, domain) {
 function syncDetectedSubscriptions(subscriptions) {
   browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
     const token = result.authToken;
-    const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
+    const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
 
     if (!token) {
       console.warn('[Background] No auth token available to sync detected subscriptions');
@@ -277,6 +279,37 @@ function isTierAllowed(status) {
   return status === 'premium' || status === 'family';
 }
 
+function refreshSubscriptionStatus(callback = () => {}) {
+  browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
+    const token = result.authToken;
+    const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
+    if (!token) {
+      browser.storage.local.set({ subscription_status: 'free', trackingPaused: true }, () => callback('free'));
+      return;
+    }
+
+    fetch(`${apiUrl}/api/user/premium-status`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    }).then(async (response) => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Failed to check subscription plan');
+      const planType = String(data.planType || data.plan_type || 'free').toLowerCase();
+      const status = String(data.status || 'free').toLowerCase();
+      const allowed = (planType === 'premium' || planType === 'family') &&
+        (status === 'active' || status === 'trialing');
+      const storedStatus = allowed ? planType : 'free';
+      browser.storage.local.set({ subscription_status: storedStatus }, () => {
+        updateUpgradePrompt(storedStatus);
+        callback(storedStatus);
+      });
+    }).catch((error) => {
+      console.warn('[Background] Failed to refresh subscription status:', error);
+      callback(null, error);
+    });
+  });
+}
+
 function updateUpgradePrompt(status) {
   const isFreeTier = !status || status === 'free';
   browser.storage.local.set({
@@ -292,7 +325,7 @@ function updateUpgradePrompt(status) {
 }
 
 function ensureTierAccess(callback) {
-  getSubscriptionStatus((status) => {
+  refreshSubscriptionStatus((status) => {
     const allowed = isTierAllowed(status);
     updateUpgradePrompt(status);
 
@@ -391,7 +424,7 @@ function runCookieSessionScan() {
         }
 
         const token = result.authToken;
-        const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
+        const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
         if (!token) {
           console.warn('[Background] No auth token available to sync cookie scan domains.');
           return;
@@ -437,7 +470,7 @@ function sendUsageTracking(domain, timeSpent, serviceName) {
     updateZeroUsageSignal(domain, timeSpent, (isZeroUsage) => {
       browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
         const token = result.authToken;
-        const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
+        const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
 
         if (!token) {
           console.error('[Background] ❌ No auth token found for TRACK_USAGE');
@@ -524,7 +557,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'SUBVERIS_AUTH_TOKEN') {
     console.log('[Background] Exchanging raw extension auth token for an opaque session for user:', request.userId);
-    const apiUrl = request.apiUrl || 'http://localhost:5000';
+    const apiUrl = request.apiUrl || DEFAULT_API_URL;
     const rawToken = request.token;
 
     if (!rawToken || !request.userId) {
@@ -564,9 +597,19 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: false, error: browser.runtime.lastError });
         } else {
           console.log('[Background] ✅ Stored opaque extension session token and API URL: User ID =', request.userId, 'apiUrl =', request.apiUrl);
-          runCookieSessionScan();
-          loadKnownSubscriptions();
-          sendResponse({ success: true, stored: true, sessionId, csrfToken, sessionToken: opaqueToken });
+          refreshSubscriptionStatus((status, statusError) => {
+            if (statusError) {
+              sendResponse({ success: false, error: 'Could not verify your Subveris plan.' });
+              return;
+            }
+            if (!isTierAllowed(status)) {
+              sendResponse({ success: false, error: 'An active Premium or Family plan is required.' });
+              return;
+            }
+            runCookieSessionScan();
+            loadKnownSubscriptions();
+            sendResponse({ success: true, stored: true, sessionId, csrfToken, sessionToken: opaqueToken, status });
+          });
         }
       });
     }).catch((error) => {
@@ -586,8 +629,14 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'DETECT_SUBSCRIPTION') {
     const { serviceName, domain, detectedAt } = request;
     console.log('[Background] DETECT_SUBSCRIPTION request for:', serviceName);
-    addDetectedSubscription(serviceName, domain);
-    sendResponse({ success: true, detected: serviceName });
+    ensureTierAccess((allowed, status) => {
+      if (!allowed) {
+        sendResponse({ success: false, error: `Extension requires an active Premium or Family plan (current: ${status || 'unknown'}).` });
+        return;
+      }
+      addDetectedSubscription(serviceName, domain);
+      sendResponse({ success: true, detected: serviceName });
+    });
     return true;
   }
 
@@ -606,7 +655,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     browser.storage.local.get(['authToken', 'subverisApiUrl', 'supabaseUserUUID'], (result) => {
       const token = result.authToken;
-      const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
+      const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
 
       browser.storage.local.set({
         detectedSubscription: payload,
@@ -664,7 +713,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Attempt Gmail authorization via backend OAuth endpoint
     browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
       const token = result.authToken;
-      const apiUrl = result.subverisApiUrl || 'http://localhost:5000';
+      const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
 
       if (!token) {
         sendResponse({ success: false, error: 'Not authenticated' });

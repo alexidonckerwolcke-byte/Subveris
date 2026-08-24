@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusDiv = document.getElementById('status');
   const trackingStatus = document.getElementById('tracking-status');
   const debugInfo = document.getElementById('debug-info');
+  const loginButton = document.getElementById('login-button');
 
   function escapeHtml(value) {
     return String(value)
@@ -157,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         detectedSubscriptionCount: Object.keys(result.detectedSubscriptions || {}).length,
       });
       renderDashboard(result.detectedSubscriptions || {});
-      const isFreeTier = subscriptionStatus === 'free';
+      const isFreeTier = !['premium', 'family'].includes((result.subscription_status || 'free').toLowerCase());
       
       if (result.supabaseUserUUID && result.authToken) {
         statusDiv.textContent = '✅ Connected to Subveris';
@@ -184,6 +185,11 @@ document.addEventListener('DOMContentLoaded', () => {
               Upgrade to Premium or Family for browser usage tracking and private-page scanning.<br>
               <small style="color: #999;">The Subveris web app and cancellation guides remain available without the extension.</small>
             `;
+          }
+          if (loginButton) {
+            loginButton.style.display = 'block';
+            loginButton.textContent = 'Log in to Subveris';
+            loginButton.onclick = () => browser.tabs.create({ url: 'https://subveris.com/login' });
           }
           return;
         }
@@ -238,6 +244,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <small style="color: #999;">Waiting for authentication...</small>
           `;
         }
+        if (loginButton) {
+          loginButton.style.display = 'block';
+          loginButton.textContent = 'Log in to Subveris';
+          loginButton.onclick = () => browser.tabs.create({ url: 'https://subveris.com/login' });
+        }
       }
     });
   });
@@ -249,7 +260,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const gmailStatus = document.getElementById('gmail-status');
   
   browser.storage.local.get(['supabaseUserUUID', 'gmailAuthToken'], (result) => {
-    if (result.supabaseUserUUID && discoverySection) {
+    if (result.supabaseUserUUID && !['premium', 'family'].includes((result.subscription_status || 'free').toLowerCase()) && discoverySection) {
+      discoverySection.style.display = 'none';
+    } else if (result.supabaseUserUUID && discoverySection) {
       discoverySection.style.display = 'block';
       
       if (result.gmailAuthToken) {
