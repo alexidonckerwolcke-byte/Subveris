@@ -26,6 +26,15 @@ export default function Privacy() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
+              <h2 className="text-lg font-semibold">Data Controller</h2>
+              <p className="mt-3 text-muted-foreground">
+                The data controller is <strong>[INSERT YOUR LEGAL NAME OR COMPANY NAME]</strong>, trading as Subveris.
+                Our contact email is <a href="mailto:help.subveris@gmail.com" className="font-medium text-primary underline">help.subveris@gmail.com</a>.
+                Our registered address is <strong>[INSERT YOUR REGISTERED BUSINESS ADDRESS]</strong>. Replace the bracketed details before publishing this policy.
+              </p>
+            </div>
+
+            <div>
               <h2 className="text-lg font-semibold">Introduction</h2>
               <p className="mt-3 text-muted-foreground">
                 Subveris values your privacy. This policy explains what information we collect, how we use it, and how we store it safely.
@@ -39,7 +48,19 @@ export default function Privacy() {
                 <li>Subscription details you enter manually and automatically detected subscriptions from our browser extension (website visits, Gmail receipts, CSV imports, and authentication cookies).</li>
                 <li>Usage data from our browser extension including time spent on subscription service websites and zero-usage patterns.</li>
                 <li>Billing and payment information for Premium purchases processed through Stripe.</li>
+                <li>Technical and security data such as IP address, request timestamps, browser type, device information, approximate location inferred from IP where available, error logs, and authentication/session identifiers.</li>
+                <li>Cookies and similar technologies used for authentication, security, preferences, and service operation.</li>
                 <li>Usage analytics and product insights to improve the service.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold">Legal Bases</h2>
+              <ul className="mt-3 space-y-2 text-muted-foreground list-disc pl-6">
+                <li><strong>Contract performance:</strong> to create and maintain your account, provide subscription tracking and analytics, synchronize extension data, and deliver features you request.</li>
+                <li><strong>Consent:</strong> to scan Gmail, send optional marketing or product communications, and use any optional non-essential analytics or cookies. You can withdraw consent at any time without affecting earlier lawful processing.</li>
+                <li><strong>Legitimate interests:</strong> to secure the service, prevent abuse, troubleshoot errors, understand feature performance, and improve Subveris, balanced against your privacy rights.</li>
+                <li><strong>Legal obligation:</strong> to retain or disclose information where required by tax, accounting, fraud-prevention, court, or other applicable legal requirements.</li>
               </ul>
             </div>
 
@@ -84,11 +105,42 @@ export default function Privacy() {
             </div>
 
             <div>
+              <h2 className="text-lg font-semibold">Who Receives Your Data</h2>
+              <ul className="mt-3 space-y-2 text-muted-foreground list-disc pl-6">
+                <li>Subveris personnel and contractors only where access is necessary to operate, support, secure, or improve the service.</li>
+                <li><strong>Supabase:</strong> authentication, database hosting, backups, and hosted API infrastructure.</li>
+                <li><strong>Stripe:</strong> payment processing, customer records, invoices, and subscription billing. Stripe receives the payment and billing information required to process your purchase.</li>
+                <li><strong>Google:</strong> Gmail API access only when you authorize Gmail scanning through OAuth.</li>
+                <li>Other service providers may process data only under written instructions and confidentiality obligations. We do not sell personal data.</li>
+              </ul>
+            </div>
+
+            <div>
               <h2 className="text-lg font-semibold">How We Store Data</h2>
               <p className="mt-3 text-muted-foreground">
                 Your data is stored in Supabase Postgres. Stripe secret keys and Supabase service-role credentials are intended to remain
                 in server-side environment variables and are not required by the browser. The extension stores its session token in browser
                 extension storage so it can sync data, and that local storage should be protected by the browser account and device security.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold">Retention</h2>
+              <ul className="mt-3 space-y-2 text-muted-foreground list-disc pl-6">
+                <li>Account and subscription information is kept while your account is active and deleted within 30 days after account deletion, except where a longer period is required by law or needed to resolve disputes.</li>
+                <li>Browser-extension usage records are kept while your account is active and deleted with your account unless you request earlier deletion.</li>
+                <li>Gmail OAuth tokens are kept only while Gmail scanning is enabled and are deleted when you disconnect Gmail or delete your account. Extracted subscription details follow the account retention period; full email content is not retained by Subveris.</li>
+                <li>Security and server logs, including IP addresses, are retained for up to 30 days unless needed longer to investigate a security incident or comply with law.</li>
+                <li>Encrypted backups may retain deleted data for up to 90 days before automatic overwrite. Stripe and Google may retain information under their own policies and legal obligations.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold">International Transfers</h2>
+              <p className="mt-3 text-muted-foreground">
+                Supabase, Stripe, Google, and other providers may process data outside the European Economic Area, including in the United States.
+                Where required, we use an adequacy decision, the European Commission&apos;s Standard Contractual Clauses, or another lawful transfer mechanism,
+                together with appropriate technical and contractual safeguards. You can request more information about applicable safeguards by contacting us.
               </p>
             </div>
 
@@ -103,8 +155,42 @@ export default function Privacy() {
 
             <div>
               <h2 className="text-lg font-semibold">Your Rights</h2>
-                <p className="mt-3 text-muted-foreground">
-                You can request access, correction, or deletion of your personal data by contacting us at <a href="mailto:help.subveris@gmail.com" className="font-medium text-primary underline">help.subveris@gmail.com</a>.
+              <p className="mt-3 text-muted-foreground">
+                Depending on applicable law, you may have the right to access your personal data, correct inaccurate data, request deletion,
+                restrict processing, receive a portable copy, object to processing based on legitimate interests, and withdraw consent.
+                You may also object to direct marketing at any time.
+              </p>
+              <p className="mt-3 text-muted-foreground">
+                To exercise a right, email <a href="mailto:help.subveris@gmail.com" className="font-medium text-primary underline">help.subveris@gmail.com</a>
+                from the address associated with your account and describe your request. We may ask for information needed to verify your identity.
+                We will respond without undue delay and normally within one month. This period may be extended by up to two additional months for complex requests,
+                and we will explain any extension. You can also export or delete available account data through account settings.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold">Cookies and Similar Technologies</h2>
+              <p className="mt-3 text-muted-foreground">
+                Subveris uses strictly necessary cookies or browser storage for authentication, session security, CSRF protection, preferences, and keeping you signed in.
+                The browser extension uses extension storage for its session token, plan status, and tracking queue. We may use optional analytics technologies only after obtaining consent where required.
+                You can control cookies through your browser settings, but disabling necessary storage may prevent login or core features from working.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold">Complaints</h2>
+              <p className="mt-3 text-muted-foreground">
+                Contact us first so we can try to resolve your concern. You also have the right to lodge a complaint with the Belgian Data Protection Authority (GBA/APD):
+                <a href="https://www.dataprotectionauthority.be" target="_blank" rel="noopener noreferrer" className="ml-1 font-medium text-primary underline">www.dataprotectionauthority.be</a>,
+                Rue de la Presse 35, 1000 Brussels, Belgium, <a href="mailto:contact@apd-gba.be" className="ml-1 font-medium text-primary underline">contact@apd-gba.be</a>, +32 (0)2 274 48 00.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold">Changes to This Policy</h2>
+              <p className="mt-3 text-muted-foreground">
+                We may update this policy to reflect changes in the service, law, or our data practices. We will publish the revised policy here,
+                update the effective date, and provide additional notice through the service or email when a change materially affects your rights.
               </p>
             </div>
 
