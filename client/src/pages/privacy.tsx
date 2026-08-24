@@ -91,7 +91,8 @@ export default function Privacy() {
                 <li>Gmail scanning requires explicit OAuth authorization and can be disabled anytime in Settings → Connected Services.</li>
                 <li>Deployed API requests use HTTPS. Database protection, backups, and encryption at rest depend on the Supabase project configuration and provider controls.</li>
                 <li>Full extension tracking is enabled for authenticated Premium or Family plan users. Free tier users see a notice that full tracking is paused, although previously synced account data may remain until deleted.</li>
-                <li>You can start an account export or deletion from account settings. The current export endpoint includes subscription data and may not include every data category; contact us for a complete access or deletion request.</li>
+                <li>You can start an account export or deletion from account settings. The automated export currently includes your account fields, subscriptions, transactions, insights, plan record, notification preferences, family memberships, and calendar events. It does not include provider-held records or credentials.</li>
+                <li>The account-deletion action removes application records for subscriptions, transactions, insights, billing-plan data, push subscriptions, notification preferences, family memberships, family-plan backups, family settings, owned family groups, and the public user record before deleting the Supabase Auth account. Contact us for records not covered by the automated action.</li>
               </ul>
             </div>
 
@@ -129,7 +130,7 @@ export default function Privacy() {
               <ul className="mt-3 space-y-2 text-muted-foreground list-disc pl-6">
                 <li>Account, subscription, and extension usage records are retained while your account is active. The account-deletion action removes the application-controlled records immediately; any temporary application copy under Subveris control is removed within 30 days, except where retention is required by law or necessary to resolve disputes.</li>
                 <li>Gmail OAuth tokens are stored for Gmail scanning and are deleted when you disconnect Gmail or delete your account. Extracted subscription details remain subject to the account retention period; full email content is not intentionally stored by the current Gmail integration.</li>
-                <li>Application-owned local logs are pruned to retain no more than 30 days of entries. Supabase, hosting, and other provider-managed logs may have separate retention periods under their policies.</li>
+                <li>Application-owned local cron logs and A/B event logs are pruned to retain no more than 30 days of entries. Supabase, hosting, and other provider-managed logs may have separate retention periods under their policies.</li>
                 <li>Supabase, Stripe, and Google may retain information under their own policies and legal obligations. This policy does not claim a 30-day deletion period for provider-managed backups or logs.</li>
               </ul>
             </div>
