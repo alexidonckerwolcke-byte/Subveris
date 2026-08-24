@@ -127,10 +127,10 @@ export default function Privacy() {
             <div>
               <h2 className="text-lg font-semibold">Retention</h2>
               <ul className="mt-3 space-y-2 text-muted-foreground list-disc pl-6">
-                <li>Account, subscription, and extension usage records are retained while your account is active. The exact deletion period after account closure must be confirmed and published here: <strong>[INSERT VERIFIED ACCOUNT-DELETION RETENTION PERIOD]</strong>.</li>
+                <li>Account, subscription, and extension usage records are retained while your account is active. The account-deletion action removes the application-controlled records immediately; any temporary application copy under Subveris control is removed within 30 days, except where retention is required by law or necessary to resolve disputes.</li>
                 <li>Gmail OAuth tokens are stored for Gmail scanning and are deleted when you disconnect Gmail or delete your account. Extracted subscription details remain subject to the account retention period; full email content is not intentionally stored by the current Gmail integration.</li>
-                <li>Server and security log retention, including IP addresses, must be confirmed from the hosting and logging configuration: <strong>[INSERT VERIFIED LOG RETENTION PERIOD]</strong>.</li>
-                <li>Supabase, Stripe, and Google may retain information under their own policies and legal obligations. We will not claim a backup deletion period until the configured backup policy has been verified.</li>
+                <li>Application-owned local logs are pruned to retain no more than 30 days of entries. Supabase, hosting, and other provider-managed logs may have separate retention periods under their policies.</li>
+                <li>Supabase, Stripe, and Google may retain information under their own policies and legal obligations. This policy does not claim a 30-day deletion period for provider-managed backups or logs.</li>
               </ul>
             </div>
 

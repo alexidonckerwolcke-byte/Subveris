@@ -18,5 +18,8 @@ fi
 # Run the weekly digest script
 npm run cron:weekly-digest
 
+# Keep this application-owned log within the 30-day retention period.
+node scripts/prune-local-logs.mjs logs/cron-weekly-digest.log
+
 # Log the execution
 echo "$(date): Weekly digest emails sent" >> logs/cron-weekly-digest.log

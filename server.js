@@ -22,6 +22,31 @@ if (!fs.existsSync(DIST_PATH)) {
 
 console.log('[Startup] Static assets path:', DIST_PATH);
 
+function pruneLocalLogs() {
+  try {
+    const logPath = path.join(__dirname, 'ab-events.log');
+    if (fs.existsSync(logPath)) {
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const retainedLines = fs.readFileSync(logPath, 'utf8')
+        .split('\n')
+        .filter((line) => {
+          if (!line.trim()) return false;
+          try {
+            const timestamp = JSON.parse(line).ts;
+            return !timestamp || Date.parse(timestamp) >= cutoff;
+          } catch {
+            return false;
+          }
+        });
+      fs.writeFileSync(logPath, retainedLines.length ? `${retainedLines.join('\n')}\n` : '');
+    }
+  } catch (error) {
+    console.warn('[Logs] Failed to prune local logs:', error.message);
+  }
+}
+
+pruneLocalLogs();
+
 // Initialize Supabase
 const supabaseUrl = process.env.SUPABASE_URL || 'https://xuilgccacufwinvkocfl.supabase.co';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
@@ -1363,6 +1388,7 @@ const server = http.createServer(async (req, res) => {
         // Append to local log file for lightweight analytics
         try {
           const logPath = path.join(__dirname, 'ab-events.log');
+          pruneLocalLogs();
           const entry = { ts, key, variantIndex: Number.isFinite(variantIndex) ? variantIndex : null, eventType, label };
           fs.appendFileSync(logPath, JSON.stringify(entry) + '\n');
         } catch (fileErr) {
