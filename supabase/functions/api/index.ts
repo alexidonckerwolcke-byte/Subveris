@@ -2401,20 +2401,33 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
-        // Get user's subscriptions
-        const subscriptions = await loadAllSubscriptions(userId);
+        const [userResult, subscriptions, transactionsResult, insightsResult, planResult, notificationResult, familyMembershipResult, calendarResult] = await Promise.all([
+          supabase.from("users").select("id, email, currency").eq("id", userId).maybeSingle(),
+          loadAllSubscriptions(userId),
+          supabase.from("transactions").select("*").eq("user_id", userId),
+          supabase.from("insights").select("*").eq("user_id", userId),
+          supabase.from("user_subscriptions").select("*").eq("user_id", userId).maybeSingle(),
+          supabase.from("notification_preferences").select("*").eq("user_id", userId).maybeSingle(),
+          supabase.from("family_group_members").select("*").eq("user_id", userId),
+          supabase.from("subscription_calendar_events").select("*").eq("user_id", userId),
+        ]);
 
-        // Get insights (we'll use a simplified version since we don't have the full insights system)
-        const insights = [];
-
-        // Get transactions (we'll use a simplified version since we don't have the full transaction system)
-        const transactions = [];
+        const queryResults = [userResult, transactionsResult, insightsResult, planResult, notificationResult, familyMembershipResult, calendarResult];
+        const failedResult = queryResults.find((result: any) => result.error);
+        if (failedResult) {
+          throw failedResult.error;
+        }
 
         const exportData = {
           exportDate: new Date().toISOString(),
+          user: userResult.data,
           subscriptions,
-          transactions,
-          insights,
+          transactions: transactionsResult.data || [],
+          insights: insightsResult.data || [],
+          userSubscription: planResult.data,
+          notificationPreferences: notificationResult.data,
+          familyGroupMemberships: familyMembershipResult.data || [],
+          calendarEvents: calendarResult.data || [],
         };
 
         return sendJson(exportData, {
@@ -2541,13 +2554,22 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
-        // Delete all user data from database tables
+        // Delete child records before their referenced subscriptions and groups.
         const deleteResults = await Promise.all([
+          supabase.from('subscription_calendar_events').delete().eq('user_id', userId),
+          supabase.from('cost_splits').delete().eq('user_id', userId),
+          supabase.from('shared_subscriptions').delete().eq('shared_by_user_id', userId),
+          supabase.from('family_group_members').delete().eq('user_id', userId),
+          supabase.from('insights').delete().eq('user_id', userId),
+          supabase.from('transactions').delete().eq('user_id', userId),
+          supabase.from('user_subscriptions').delete().eq('user_id', userId),
+          supabase.from('push_subscriptions').delete().eq('user_id', userId),
+          supabase.from('family_group_plan_backups').delete().eq('user_id', userId),
+          supabase.from('family_group_settings').delete().eq('owner_id', userId),
           supabase.from('subscriptions').delete().eq('user_id', userId),
           supabase.from('notification_preferences').delete().eq('user_id', userId),
           supabase.from('users').delete().eq('id', userId),
-          supabase.from('family_groups').delete().eq('created_by', userId),
-          supabase.from('family_group_members').delete().eq('user_id', userId),
+          supabase.from('family_groups').delete().eq('owner_id', userId),
         ]);
 
         // Verify deletion succeeded (no errors)
