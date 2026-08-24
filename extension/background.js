@@ -118,6 +118,13 @@ function loadKnownSubscriptions() {
       const merged = { ...existingSubs };
 
       subscriptions.forEach((sub) => {
+        const isStripeBillingSubscription =
+          sub?.name?.toLowerCase?.().includes('(stripe)') ||
+          sub?.description?.toLowerCase?.().includes('stripe');
+        if (isStripeBillingSubscription) {
+          return;
+        }
+
         const serviceName = sub.name || sub.service_name || sub.provider || sub.title;
         if (!serviceName) {
           return;

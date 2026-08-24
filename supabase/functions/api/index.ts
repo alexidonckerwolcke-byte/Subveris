@@ -2739,7 +2739,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
           const { data: existingDiscoveries, error: discoveryLookupError } = await supabase
             .from("subscriptions")
-            .select("id, name, website_domain, status")
+            .select("id, name, website_domain, status, is_detected")
             .eq("user_id", userId)
             .neq("status", "deleted");
 
@@ -2758,6 +2758,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, " ")
               .trim();
+            const isStripeBillingSubscription =
+              existingName.includes("stripe") ||
+              existingName.endsWith(" plan") && existingName.includes("premium");
+            if (isStripeBillingSubscription) return false;
             return existingDomain === normalizedDiscoveredDomain ||
               existingName === normalizedDiscoveredName ||
               existingName.includes(normalizedDiscoveredName) ||
@@ -2765,14 +2769,29 @@ runtimeDeno?.serve?.(async (req: Request) => {
           });
 
           if (existingDiscovery) {
+            const detectedPlanName = typeof body.detectedPlanName === "string" && body.detectedPlanName.trim()
+              ? body.detectedPlanName.trim()
+              : null;
+            const existingName = String(existingDiscovery.name || "").toLowerCase().trim();
+            const shouldUseDetectedName = Boolean(
+              detectedPlanName &&
+              (existingDiscovery.is_detected || existingName === normalizedDiscoveredDomain || !existingName)
+            );
+            const existingUpdate: Record<string, string> = {};
             if (normalizeDomain(existingDiscovery.website_domain) !== normalizedDiscoveredDomain) {
-              const { error: domainUpdateError } = await supabase
+              existingUpdate.website_domain = normalizedDiscoveredDomain;
+            }
+            if (shouldUseDetectedName) {
+              existingUpdate.name = detectedPlanName;
+            }
+            if (Object.keys(existingUpdate).length > 0) {
+              const { error: existingUpdateError } = await supabase
                 .from("subscriptions")
-                .update({ website_domain: normalizedDiscoveredDomain })
+                .update(existingUpdate)
                 .eq("id", existingDiscovery.id)
                 .eq("user_id", userId);
-              if (domainUpdateError) {
-                console.warn("[Extension Sync] Failed to link existing subscription to domain:", domainUpdateError);
+              if (existingUpdateError) {
+                console.warn("[Extension Sync] Failed to update existing subscription details:", existingUpdateError);
               }
             }
             continue;
