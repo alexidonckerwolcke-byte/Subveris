@@ -91,7 +91,7 @@ export default function Privacy() {
                 <li>Gmail scanning requires explicit OAuth authorization and can be disabled anytime in Settings → Connected Services.</li>
                 <li>Deployed API requests use HTTPS. Database protection, backups, and encryption at rest depend on the Supabase project configuration and provider controls.</li>
                 <li>Full extension tracking is enabled for authenticated Premium or Family plan users. Free tier users see a notice that full tracking is paused, although previously synced account data may remain until deleted.</li>
-                <li>You can export or delete all your data at any time via your account settings.</li>
+                <li>You can start an account export or deletion from account settings. The current export endpoint includes subscription data and may not include every data category; contact us for a complete access or deletion request.</li>
               </ul>
             </div>
 
@@ -163,7 +163,7 @@ export default function Privacy() {
                 To exercise a right, email <a href="mailto:help.subveris@gmail.com" className="font-medium text-primary underline">help.subveris@gmail.com</a>
                 from the address associated with your account and describe your request. We may ask for information needed to verify your identity.
                 We will respond without undue delay and normally within one month. This period may be extended by up to two additional months for complex requests,
-                and we will explain any extension. You can also export or delete available account data through account settings.
+                and we will explain any extension. Account settings provide export and account-deletion actions, but the current automated export does not include every data category. Contact us for data not available through those actions.
               </p>
             </div>
 
