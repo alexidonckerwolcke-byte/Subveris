@@ -1493,11 +1493,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
     if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
       const userId = extractUserId(req) || req.headers.get("x-test-user-id");
       const isPublicSecurityRoute = pathname === "/security/session";
+      const isExtensionSessionRoute = pathname === "/security/extension-session";
       const isAdminRenewalRoute = pathname === "/admin/renewal-checks";
-      if (!userId && !isPublicSecurityRoute && !isAdminRenewalRoute) {
+      if (!userId && !isPublicSecurityRoute && !isExtensionSessionRoute && !isAdminRenewalRoute) {
         return sendJson({ error: "Unauthorized" }, { status: 401 });
       }
-      if (!isPublicSecurityRoute && !isAdminRenewalRoute && !validateCsrfSession(req, userId)) {
+      if (!isPublicSecurityRoute && !isExtensionSessionRoute && !isAdminRenewalRoute && !validateCsrfSession(req, userId)) {
         return sendJson({ error: "Invalid or missing CSRF session" }, { status: 403 });
       }
     }
