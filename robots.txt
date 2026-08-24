@@ -3,4 +3,4 @@ Allow: /
 Disallow: /admin
 Disallow: /private
 
-Sitemap: https://www.subveris.com/sitemap.xml
+Sitemap: https://subveris.com/sitemap.xml
