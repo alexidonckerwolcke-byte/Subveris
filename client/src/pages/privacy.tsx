@@ -28,7 +28,7 @@ export default function Privacy() {
             <div>
               <h2 className="text-lg font-semibold">Data Controller</h2>
               <p className="mt-3 text-muted-foreground">
-                The data controller is <strong>[INSERT YOUR LEGAL NAME OR COMPANY NAME]</strong>, trading as Subveris.
+                The data controller is <strong>Subveris</strong>.
                 Our contact email is <a href="mailto:help.subveris@gmail.com" className="font-medium text-primary underline">help.subveris@gmail.com</a>.
                 Our registered address is <strong>[INSERT YOUR REGISTERED BUSINESS ADDRESS]</strong>. Replace the bracketed details before publishing this policy.
               </p>
