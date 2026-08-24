@@ -34,8 +34,13 @@ export default function Insights() {
   const { user } = useAuth();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
 
-  const { data: personalSubscriptions } = useQuery<any[]>({
+  const { data: personalSubscriptions = [], isLoading: personalSubscriptionsLoading } = useQuery<any[]>({
     queryKey: ["/api/subscriptions"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/subscriptions");
+      return response.json();
+    },
+    refetchInterval: 30000,
   });
 
   const { data: familyData, isLoading: familyDataLoading, isFetching: familyDataFetching, refetch: refetchFamilyData } = useQuery<any>({
@@ -116,7 +121,9 @@ export default function Insights() {
             )
           : computeBehavioralFromSubs(personalSubscriptions || [])
       );
-  const behavioralLoading = showFamilyData ? familyBehavioralLoading : personalBehavioralLoading;
+  const behavioralLoading = showFamilyData
+    ? familyBehavioralLoading
+    : personalSubscriptionsLoading && personalBehavioralLoading;
 
   // Personal cost analysis
   const { data: personalCostAnalysis, isLoading: personalAnalysisLoading } = useQuery<CostPerUseAnalysis[]>({
@@ -136,7 +143,9 @@ export default function Insights() {
     refetchOnWindowFocus: true,
   });
 
-  const analysisLoading = showFamilyData ? familyAnalysisLoading : personalAnalysisLoading;
+  const analysisLoading = showFamilyData
+    ? familyAnalysisLoading
+    : personalSubscriptionsLoading && personalAnalysisLoading;
 
   const computedFamilyCostAnalysis = showFamilyData ? computeCostPerUseFromSubs(familySubscriptions) : [];
 
