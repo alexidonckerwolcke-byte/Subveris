@@ -63,6 +63,10 @@
       button:hover {
         background: #b84d32;
       }
+      .login-form { display: none; margin-top: 12px; }
+      .login-form input { box-sizing: border-box; width: 100%; padding: 9px; margin-top: 7px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; }
+      .login-form button { margin-top: 9px; }
+      .login-error { color: #b42318; font-size: 11px; margin-top: 7px; }
     </style>
   </head>
   <body>
@@ -72,6 +76,12 @@
     </div>
     <div id="status" class="status disconnected">Not connected</div>
     <button id="login-button" style="display: none;">Log in to Subveris</button>
+    <form id="login-form" class="login-form">
+      <input id="login-email" type="email" autocomplete="email" placeholder="Email address" required />
+      <input id="login-password" type="password" autocomplete="current-password" placeholder="Password" required />
+      <button id="login-submit" type="submit">Log in securely</button>
+      <div id="login-error" class="login-error" role="alert"></div>
+    </form>
     <div id="tracking-status" class="status" style="margin-top: 10px; font-size: 12px;"></div>
     <div id="debug-info" style="margin-top: 12px; padding: 8px; background: #f0f0f0; border-radius: 4px; font-size: 11px; color: #555;"></div>
     <section id="dashboard" style="display: none;">

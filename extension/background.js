@@ -2,7 +2,7 @@
 // Safari 15+, Firefox, and Edge use 'browser' global
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
 const browser = globalThis.browser || globalThis.chrome;
-const DEFAULT_API_URL = 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1/api';
+const DEFAULT_API_URL = 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1';
 
 browser.runtime.onInstalled.addListener(() => {
   console.log('Subveris Usage Tracker Extension Installed');

@@ -2,6 +2,8 @@
 // Firefox and Edge use 'browser' global
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
 const browser = globalThis.browser || globalThis.chrome;
+const SUPABASE_URL = 'https://xuilgccacufwinvkocfl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1aWxnY2NhY3Vmd2ludmtvY2ZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NzY4OTYsImV4cCI6MjA4MTU1Mjg5Nn0.f0xa0hY6VDht7Qeqfbc0UaKpZLzCB43CXwOlfxDJ93M';
 
 // Detect which browser is running
 function detectBrowser() {
@@ -44,6 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const trackingStatus = document.getElementById('tracking-status');
   const debugInfo = document.getElementById('debug-info');
   const loginButton = document.getElementById('login-button');
+  const loginForm = document.getElementById('login-form');
+  const loginSubmit = document.getElementById('login-submit');
+  const loginError = document.getElementById('login-error');
 
   function escapeHtml(value) {
     return String(value)
@@ -161,6 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const isFreeTier = !['premium', 'family'].includes((result.subscription_status || 'free').toLowerCase());
       
       if (result.supabaseUserUUID && result.authToken) {
+        if (loginButton) loginButton.style.display = 'none';
+        if (loginForm) loginForm.style.display = 'none';
         statusDiv.textContent = '✅ Connected to Subveris';
         statusDiv.className = 'status connected';
         
@@ -188,9 +195,10 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           if (loginButton) {
             loginButton.style.display = 'block';
-            loginButton.textContent = 'Log in to Subveris';
-            loginButton.onclick = () => browser.tabs.create({ url: 'https://subveris.com/login' });
+            loginButton.textContent = 'Upgrade your Subveris plan';
+            loginButton.onclick = () => browser.tabs.create({ url: 'https://subveris.com/pricing' });
           }
+          if (loginForm) loginForm.style.display = 'none';
           return;
         }
 
@@ -249,8 +257,53 @@ document.addEventListener('DOMContentLoaded', () => {
           loginButton.textContent = 'Log in to Subveris';
           loginButton.onclick = () => browser.tabs.create({ url: 'https://subveris.com/login' });
         }
+        if (loginForm) loginForm.style.display = 'block';
       }
     });
+  });
+
+  loginForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = document.getElementById('login-email')?.value.trim();
+    const password = document.getElementById('login-password')?.value;
+    if (!email || !password) return;
+
+    loginSubmit.disabled = true;
+    loginSubmit.textContent = 'Signing in...';
+    loginError.textContent = '';
+    try {
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.access_token || !data.user?.id) {
+        throw new Error(data.error_description || data.msg || data.error || 'Invalid email or password');
+      }
+
+      browser.runtime.sendMessage({
+        type: 'SUBVERIS_AUTH_TOKEN',
+        token: data.access_token,
+        userId: data.user.id,
+        apiUrl: 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1',
+      }, (result) => {
+        if (browser.runtime.lastError || !result?.success) {
+          loginError.textContent = browser.runtime.lastError?.message || result?.error || 'Your account needs an active Premium or Family plan.';
+          loginSubmit.disabled = false;
+          loginSubmit.textContent = 'Log in securely';
+          return;
+        }
+        window.location.reload();
+      });
+    } catch (error) {
+      loginError.textContent = error instanceof Error ? error.message : 'Login failed';
+      loginSubmit.disabled = false;
+      loginSubmit.textContent = 'Log in securely';
+    }
   });
   
   // Show discovery section for connected users
