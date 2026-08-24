@@ -173,7 +173,7 @@ export default function Insights() {
   // analysis is actually the authoritative one.
   const costAnalysis: CostPerUseAnalysis[] | undefined = showFamilyData
     ? (dedupeByKey([...(baseAnalysis || []), ...perMemberAnalyses], 'subscriptionId') as CostPerUseAnalysis[])
-    : baseAnalysis;
+    : (baseAnalysis?.length ? baseAnalysis : computeCostPerUseFromSubs(personalSubscriptions));
   const displayCostAnalysis = !showFamilyData && tier === "free"
     ? (costAnalysis?.slice(0, limits.maxCostPerUseSubscriptions) ?? [])
     : costAnalysis;
@@ -185,8 +185,26 @@ export default function Insights() {
     refetchOnWindowFocus: true,
   });
 
-  const insights = showFamilyData ? familyData?.insights : personalInsights;
-  const insightsLoading = showFamilyData ? familyDataLoading : personalInsightsLoading;
+  const { data: generatedRecommendations, isLoading: recommendationsLoading } = useQuery<any[]>({
+    queryKey: ["/api/recommendations"],
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+
+  const generatedInsights = (generatedRecommendations || []).map((recommendation) => ({
+    ...recommendation,
+    potentialSavings: recommendation.potentialSavings ?? recommendation.savings ?? null,
+    priority: recommendation.priority ?? (recommendation.confidence >= 0.9 ? 1 : 2),
+    isRead: false,
+  }));
+  const insights = showFamilyData
+    ? familyData?.insights
+    : personalInsights?.length
+      ? personalInsights
+      : generatedInsights;
+  const insightsLoading = showFamilyData
+    ? familyDataLoading
+    : personalInsightsLoading || recommendationsLoading;
 
   // Force refetch of behavioral insights when page loads
   useEffect(() => {
@@ -198,8 +216,10 @@ export default function Insights() {
   // compute potential savings using server metrics when available (no pagination issues)
   const totalPotentialSavings = useMemo(() => {
     const subs = showFamilyData ? familySubscriptions : personalSubscriptions || [];
-    return calculatePotentialSavings(subs);
-  }, [familySubscriptions, personalSubscriptions, showFamilyData]);
+    return calculatePotentialSavings(subs, (amount, fromCurrency) =>
+      convertAmount(amount, (fromCurrency || "USD") as any, displayCurrency)
+    );
+  }, [convertAmount, displayCurrency, familySubscriptions, personalSubscriptions, showFamilyData]);
 
   const highPriorityCount = (insights as any)?.filter((i: any) => i?.priority === 1)?.length || 0;
   const totalSubscriptionCount = showFamilyData ? familySubscriptionCount : personalSubscriptionCount;

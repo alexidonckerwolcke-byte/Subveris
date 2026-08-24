@@ -1537,8 +1537,33 @@ runtimeDeno?.serve?.(async (req: Request) => {
       });
     }
 
+    // Gmail connection status
+    if (pathname === "/auth/gmail-status" && req.method === "GET") {
+      const userId = extractUserId(req);
+      if (!userId) {
+        return sendJson({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      try {
+        const { data: userData, error } = await supabase
+          .from("users")
+          .select("gmail_access_token, gmail_refresh_token")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        return sendJson({
+          connected: Boolean(userData?.gmail_access_token || userData?.gmail_refresh_token),
+        });
+      } catch (err) {
+        console.error("[Gmail] Failed to check connection status:", err);
+        return sendJson({ error: "Failed to check Gmail status" }, { status: 500 });
+      }
+    }
+
     // Gmail OAuth URL generation
-    if (pathname === "/auth/gmail-oauth-url" && req.method === "GET") {
+    if (pathname === "/auth/gmail-oauth-url" && (req.method === "GET" || req.method === "POST")) {
       const userId = extractUserId(req);
       if (!userId) {
         return sendJson(
@@ -4568,8 +4593,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }
 
         const stripeSecretKey = Deno?.env?.get("STRIPE_SECRET_KEY") ?? "";
-        const keyMasked = stripeSecretKey ? `${stripeSecretKey.substring(0, 20)}...${stripeSecretKey.substring(stripeSecretKey.length - 10)}` : "NOT_SET";
-        console.log("[Stripe] Secret key configured:", !!stripeSecretKey, "key:", keyMasked);
+        console.log("[Stripe] Secret key configured:", !!stripeSecretKey);
         if (!stripeSecretKey) {
           console.error("STRIPE_SECRET_KEY not configured");
           return sendJson({ error: "Stripe not configured" }, { status: 500 });
@@ -4615,6 +4639,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             },
             body: new URLSearchParams({
               email: user.email,
+              "metadata[user_id]": userId,
             }),
           });
 
@@ -4629,12 +4654,19 @@ runtimeDeno?.serve?.(async (req: Request) => {
           console.log("[Stripe] Created customer:", customerId);
 
           // Store customer ID in database
-          const { error: upsertError } = await supabase
-            .from("user_subscriptions")
-            .upsert({
-              user_id: userId,
-              stripe_customer_id: customerId,
-            }, { onConflict: "user_id" });
+          const customerRecord = {
+            user_id: userId,
+            stripe_customer_id: customerId,
+          };
+          const customerWrite = subData
+            ? await supabase
+                .from("user_subscriptions")
+                .update(customerRecord)
+                .eq("user_id", userId)
+            : await supabase
+                .from("user_subscriptions")
+                .insert({ id: generateId(), ...customerRecord });
+          const upsertError = customerWrite.error;
           
           console.log("[Stripe] Upsert customer ID result:", { upsertError });
         }
@@ -4660,6 +4692,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
             mode: "subscription",
             success_url: successUrl,
             cancel_url: cancelUrl,
+            "metadata[user_id]": userId,
+            "subscription_data[metadata][user_id]": userId,
           }),
         });
 
@@ -4758,6 +4792,40 @@ runtimeDeno?.serve?.(async (req: Request) => {
         const subData = await subRes.json();
         console.log("[Stripe] Subscription retrieved:", { id: subData.id, status: subData.status, items: subData.items?.data?.length });
 
+        const price = subData.items?.data?.[0]?.price;
+        const recurringInterval = price?.recurring?.interval || "month";
+        const recurringIntervalCount = Number(price?.recurring?.interval_count || 1);
+        const periodStartSeconds = Number(subData.current_period_start || subData.start_date || subData.created);
+        let periodEndSeconds = Number(subData.current_period_end || subData.billing_cycle_anchor);
+        if (!Number.isFinite(periodEndSeconds) && Number.isFinite(periodStartSeconds)) {
+          const fallbackEnd = new Date(periodStartSeconds * 1000);
+          if (recurringInterval === "year") {
+            fallbackEnd.setFullYear(fallbackEnd.getFullYear() + recurringIntervalCount);
+          } else if (recurringInterval === "month") {
+            fallbackEnd.setMonth(fallbackEnd.getMonth() + recurringIntervalCount);
+          } else if (recurringInterval === "week") {
+            fallbackEnd.setDate(fallbackEnd.getDate() + (7 * recurringIntervalCount));
+          } else {
+            fallbackEnd.setDate(fallbackEnd.getDate() + recurringIntervalCount);
+          }
+          periodEndSeconds = fallbackEnd.getTime() / 1000;
+        }
+        if (!Number.isFinite(periodEndSeconds)) {
+          console.error("[Stripe] Subscription has no usable billing period:", {
+            id: subData.id,
+            keys: Object.keys(subData),
+          });
+          return sendJson({ error: "Stripe subscription has no valid billing period" }, { status: 500 });
+        }
+        const periodEnd = new Date(periodEndSeconds * 1000);
+        if (Number.isNaN(periodEnd.getTime())) {
+          console.error("[Stripe] Subscription current period end is out of range:", subData.id);
+          return sendJson({ error: "Stripe subscription has an invalid billing period" }, { status: 500 });
+        }
+        const periodStart = Number.isFinite(periodStartSeconds)
+          ? new Date(periodStartSeconds * 1000)
+          : new Date(Date.now());
+
         // Determine subscription type based on price ID
         const priceId = subData.items?.data?.[0]?.price?.id;
         const premiumPriceId = Deno?.env?.get("STRIPE_PREMIUM_PRICE_ID") || "";
@@ -4770,22 +4838,42 @@ runtimeDeno?.serve?.(async (req: Request) => {
           tier = "premium";
         }
 
-        // Store subscription in database
+        const subscriptionRow = {
+          user_id: userId,
+          id: generateId(),
+          name: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Plan (Stripe)`,
+          description: `Stripe ${tier} subscription`,
+          amount: (subData.items?.data?.[0]?.price?.unit_amount ?? 0) / 100,
+          currency: (subData.items?.data?.[0]?.price?.currency ?? "USD").toUpperCase(),
+          frequency: recurringInterval === "year" ? "yearly" : recurringInterval === "week" ? "weekly" : recurringInterval === "month" ? "monthly" : "quarterly",
+          category: "software",
+          next_billing_at: periodEnd.toISOString(),
+          status: "active",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        // Store or refresh the Stripe subscription record. Checkout completion
+        // can be retried after a redirect or webhook without creating a duplicate.
         try {
-          const { error } = await supabase.from("subscriptions").insert({
-            user_id: userId,
-            id: subData.id,
-            name: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Plan (Stripe)`,
-            description: `Stripe ${tier} subscription`,
-            amount: (subData.items?.data?.[0]?.price?.unit_amount ?? 0) / 100, // Convert from cents
-            currency: (subData.items?.data?.[0]?.price?.currency ?? "USD").toUpperCase(),
-            frequency: subData.items?.data?.[0]?.price?.recurring?.interval || "monthly",
-            category: "software",
-            renewal_date: new Date(subData.current_period_end * 1000).toISOString(),
-            status: "active",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
+          const { data: existingSubscription, error: lookupError } = await supabase
+            .from("subscriptions")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("name", subscriptionRow.name)
+            .eq("description", subscriptionRow.description)
+            .maybeSingle();
+
+          if (lookupError) throw lookupError;
+
+          const result = existingSubscription
+            ? await supabase.from("subscriptions").update({
+                ...subscriptionRow,
+                id: undefined,
+                created_at: undefined,
+              }).eq("id", existingSubscription.id).eq("user_id", userId)
+            : await supabase.from("subscriptions").insert(subscriptionRow);
+          const error = result.error;
 
           if (error) {
             console.error("[Stripe] Failed to store subscription:", error);
@@ -4796,6 +4884,41 @@ runtimeDeno?.serve?.(async (req: Request) => {
         } catch (dbError) {
           console.error("[Stripe] Database error:", dbError);
           return sendJson({ error: "Failed to store subscription" }, { status: 500 });
+        }
+
+        const planRecord = {
+          user_id: userId,
+          stripe_customer_id: sessionData.customer,
+          stripe_subscription_id: subscriptionId,
+          stripe_price_id: priceId,
+          plan_type: tier,
+          status: subData.status || "active",
+          current_period_start: periodStart.toISOString(),
+          current_period_end: periodEnd.toISOString(),
+          cancel_at_period_end: Boolean(subData.cancel_at_period_end),
+          updated_at: new Date().toISOString(),
+        };
+        const { data: existingPlan, error: planLookupError } = await supabase
+          .from("user_subscriptions")
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const planWrite = planLookupError
+          ? { error: planLookupError }
+          : existingPlan
+            ? await supabase
+                .from("user_subscriptions")
+                .update(planRecord)
+                .eq("id", existingPlan.id)
+                .eq("user_id", userId)
+            : await supabase
+                .from("user_subscriptions")
+                .insert({ id: generateId(), ...planRecord });
+        const planUpdateError = planWrite.error;
+
+        if (planUpdateError) {
+          console.error("[Stripe] Failed to activate user plan:", planUpdateError);
+          return sendJson({ error: "Failed to activate subscription plan" }, { status: 500 });
         }
 
         return sendJson({
