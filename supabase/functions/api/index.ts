@@ -4575,6 +4575,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
           return sendJson({ error: "Stripe not configured" }, { status: 500 });
         }
 
+        const configuredPriceIds = [
+          Deno?.env?.get("STRIPE_PREMIUM_PRICE_ID"),
+          Deno?.env?.get("STRIPE_FAMILY_PRICE_ID"),
+        ].filter(Boolean);
+        if (configuredPriceIds.length > 0 && !configuredPriceIds.includes(priceId)) {
+          return sendJson({ error: "Invalid Stripe plan price configured." }, { status: 400 });
+        }
+
         // Get user's Stripe customer ID from user_subscriptions table
         const { data: subData, error: subError } = await supabase
           .from("user_subscriptions")
