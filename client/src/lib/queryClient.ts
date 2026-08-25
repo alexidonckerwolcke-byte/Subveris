@@ -1,5 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { apiFetch } from "./api";
+import { apiFetch, fetchWithRemoteFallback, resolveApiUrl, resolveAuthToken } from "./api";
 
 function buildQueryPath(queryKey: unknown[]) {
   const pathSegments = queryKey

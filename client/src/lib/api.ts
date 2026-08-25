@@ -58,7 +58,7 @@ async function ensureCsrfSession(authToken: string | null) {
   return existing;
 }
 
-async function resolveAuthToken(forceRefresh = false) {
+export async function resolveAuthToken(forceRefresh = false) {
   const tokenStr = localStorage.getItem("supabase.auth.token");
   if (!forceRefresh && tokenStr) {
     try {

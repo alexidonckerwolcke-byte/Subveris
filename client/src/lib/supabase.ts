@@ -44,7 +44,7 @@ export function resolveSupabaseConfig() {
   };
 }
 
-function createSupabaseStub() {
+function createSupabaseStub(): any {
   return {
     auth: {
       getSession: async () => ({ data: { session: null }, error: null }),
