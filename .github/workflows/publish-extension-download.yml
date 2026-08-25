@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - "extension/**"
+      - "scripts/build-extension-packages.mjs"
+      - ".github/workflows/publish-extension-download.yml"
   workflow_dispatch:
 
 permissions:
