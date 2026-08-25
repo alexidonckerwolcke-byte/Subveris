@@ -137,7 +137,7 @@ async function handleMetrics(method: string, params: URLSearchParams) {
     let unusedSubscriptions = 0;
     let toCancelSubscriptions = 0;
 
-    (subscriptions || []).forEach(sub => {
+    (subscriptions || []).forEach((sub: any) => {
       if (sub.status !== 'cancelled') {
         activeSubscriptions++;
         totalMonthlySpend += sub.price || 0;
@@ -402,8 +402,8 @@ async function handleBehavioralInsights(method: string, params: URLSearchParams)
 
     // Generate behavioral insights
     const insights = {
-      frequent_cancellations: (subscriptions || []).filter(s => s.marked_to_cancel).length > 3,
-      unused_services: (subscriptions || []).filter(s => s.usage_frequency === 'never').length,
+      frequent_cancellations: (subscriptions || []).filter((s: any) => s.marked_to_cancel).length > 3,
+      unused_services: (subscriptions || []).filter((s: any) => s.usage_frequency === 'never').length,
       peak_spending_month: 'N/A',
       subscription_growth: (subscriptions || []).length,
     };
@@ -439,12 +439,12 @@ async function handleCostPerUse(method: string, params: URLSearchParams) {
 
     // Calculate opportunity costs - subscriptions with low usage frequency
     const opportunityCosts = (subscriptions || [])
-      .filter(sub => {
+      .filter((sub: any) => {
         // Only show subscriptions that are potentially under-utilized
         const usageCount = sub.usage_count || 0;
         return usageCount < 5; // Less than 5 uses
       })
-      .map(sub => ({
+      .map((sub: any) => ({
         subscriptionId: sub.id,
         subscriptionName: sub.name,
         monthlyAmount: sub.amount || 0,
@@ -456,7 +456,7 @@ async function handleCostPerUse(method: string, params: URLSearchParams) {
         status: sub.status,
         subStatus: sub.status,
       }))
-      .sort((a, b) => b.monthlyAmount - a.monthlyAmount);
+      .sort((a: any, b: any) => b.monthlyAmount - a.monthlyAmount);
 
     return new Response(JSON.stringify(opportunityCosts), { status: 200 });
   } catch (error) {
@@ -519,7 +519,7 @@ async function handleMonthlySavings(method: string, params: URLSearchParams) {
       return new Response(JSON.stringify({ error: error.message }), { status: 500 });
     }
 
-    const monthlySavings = (subscriptions || []).reduce((sum, sub) => sum + (sub.price || 0), 0);
+    const monthlySavings = (subscriptions || []).reduce((sum: number, sub: any) => sum + (sub.price || 0), 0);
 
     return new Response(JSON.stringify({ monthly_savings: monthlySavings }), { status: 200 });
   } catch (error) {

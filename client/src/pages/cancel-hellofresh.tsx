@@ -143,7 +143,7 @@ export default function CancelHelloFreshPage() {
 
         <CancelRelatedGuides current="/cancel-hellofresh" />
         <CancelPageFaq productName="HelloFresh" />
-        <CancelPageJsonLd productName="HelloFresh" url="https://subveris.com/cancel-hellofresh" steps={steps} />
+        <CancelPageJsonLd productName="HelloFresh" url="https://subveris.com/cancel-hellofresh" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Keep track of weekly and monthly subscriptions</h2>

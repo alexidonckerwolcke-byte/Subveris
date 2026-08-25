@@ -141,7 +141,7 @@ export default function CancelDisneyPlusPage() {
 
         <CancelRelatedGuides current="/cancel-disney-plus" />
         <CancelPageFaq productName="Disney Plus" />
-        <CancelPageJsonLd productName="Disney Plus" url="https://subveris.com/cancel-disney-plus" steps={steps} />
+        <CancelPageJsonLd productName="Disney Plus" url="https://subveris.com/cancel-disney-plus" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop paying for subscriptions you no longer use</h2>

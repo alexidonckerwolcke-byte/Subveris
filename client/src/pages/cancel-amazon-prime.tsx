@@ -147,7 +147,7 @@ export default function CancelAmazonPrimePage() {
 
         <CancelRelatedGuides current="/cancel-amazon-prime" />
         <CancelPageFaq productName="Amazon Prime" />
-        <CancelPageJsonLd productName="Amazon Prime" url="https://subveris.com/cancel-amazon-prime" steps={steps} />
+        <CancelPageJsonLd productName="Amazon Prime" url="https://subveris.com/cancel-amazon-prime" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop wasting money on forgotten subscriptions</h2>

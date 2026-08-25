@@ -3,7 +3,7 @@ import { useState } from "react";
 import { AuthModal } from "@/components/auth-modal";
 import { usePageMeta } from "@/lib/usePageMeta";
 import { pickMetaVariant, reportAbConversion } from "@/lib/abMeta";
-import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd } from "@/components/cancel-page-helpers";
+import { CancelRelatedGuides, CancelPageFaq, CancelPageJsonLd, getProductWhyCopy, getProductSidebarCopy, getProductIntro, getProductBadge } from "@/components/cancel-page-helpers";
 
 const steps = [
   {

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
+import { User, Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { apiFetch } from '@/lib/api';
 import { queryClient } from './queryClient';
@@ -169,7 +169,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     supabase.auth.getSession()
-      .then(({ data: { session } }) => {
+      .then((result: { data: { session: Session | null } }) => {
+        const session: Session | null = result.data.session;
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -192,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setLoading(false);
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error('[Auth] getSession failed:', error);
         setLoading(false);
       });
@@ -207,7 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
@@ -454,8 +455,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (supabase) {
       try {
         // Fire and forget - don't await this as it may timeout/error
-        supabase.auth.signOut().catch(err => {
-          console.debug('Supabase logout endpoint error (expected):', err?.message);
+        supabase.auth.signOut().catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.debug('Supabase logout endpoint error (expected):', message);
         });
       } catch (error) {
         // Ignore

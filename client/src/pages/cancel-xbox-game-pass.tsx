@@ -138,7 +138,7 @@ export default function CancelXboxGamePassPage() {
 
         <CancelRelatedGuides current="/cancel-xbox-game-pass" />
         <CancelPageFaq productName="Xbox Game Pass" />
-        <CancelPageJsonLd productName="Xbox Game Pass" url="https://subveris.com/cancel-xbox-game-pass" steps={steps} />
+        <CancelPageJsonLd productName="Xbox Game Pass" url="https://subveris.com/cancel-xbox-game-pass" />
 
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Protect your bank account from automated renewals</h2>

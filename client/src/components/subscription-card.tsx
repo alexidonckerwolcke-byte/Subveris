@@ -105,7 +105,7 @@ export function SubscriptionCard({
     : `/cancel-custom?name=${encodeURIComponent(subscription.name)}${providerWebsiteUrl ? `&url=${encodeURIComponent(providerWebsiteUrl)}` : ""}`;
 
   const handleUsageUpdated = () => {
-    invalidateAfterUsage(showFamilyData, familyGroupId);
+    invalidateAfterUsage(Boolean(showFamilyData), familyGroupId);
   };
 
   const handleScheduled = () => {

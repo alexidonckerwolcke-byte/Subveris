@@ -98,7 +98,7 @@ export default function FamilyCalendarPage() {
             title: `${sub.name} Renewal`,
             eventType: 'renewal',
             amount: sub.amount,
-            userId: sub.user_id,
+            userId: sub.userId,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           } as CalendarEvent;

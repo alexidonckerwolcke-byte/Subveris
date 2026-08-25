@@ -395,7 +395,7 @@ export default function CostOptimizer() {
   );
 
   const priorityActions = useMemo(
-    () => generatePriorityActions(subscriptions || [], formatAmount),
+    () => generatePriorityActions(subscriptions || [], (amount, fromCurrency) => formatAmount(amount, fromCurrency as any)),
     [subscriptions, formatAmount]
   );
 

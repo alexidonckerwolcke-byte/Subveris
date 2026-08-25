@@ -41,6 +41,7 @@ export function getStatusColor(status: SubscriptionStatus): string {
     "to-cancel": "bg-chart-5/10 text-chart-5 border-chart-5/20",
     canceled: "bg-chart-3/10 text-chart-3 border-chart-3/20",
     deleted: "bg-muted/50 text-muted-foreground border-muted",
+    cancelling: "bg-chart-5/10 text-chart-5 border-chart-5/20",
   };
   return colors[status];
 }
