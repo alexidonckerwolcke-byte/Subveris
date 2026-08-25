@@ -968,7 +968,7 @@ export default function HomePage() {
               <a href="/terms" className="hover:text-foreground transition-colors">Terms</a>
               <a href="/privacy" className="hover:text-foreground transition-colors">Privacy</a>
               <a href="/security" className="hover:text-foreground transition-colors">Security</a>
-              <a href="/docs" className="hover:text-foreground transition-colors">Cookies</a>
+              <a href="/cookies" className="hover:text-foreground transition-colors">Cookies</a>
             </nav>
 
             <div className="text-sm text-muted-foreground">
