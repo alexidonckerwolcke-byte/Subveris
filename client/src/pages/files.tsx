@@ -91,6 +91,15 @@ export default function Files() {
     }
   };
 
+  const handleDownloadFirefoxExtension = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const link = document.createElement("a");
+    link.href = `${window.location.origin}/subveris-extension-firefox.zip`;
+    link.download = "subveris-extension-firefox.zip";
+    link.click();
+  };
+
   const handleDownload = async () => {
     setDownloadingData(true);
     try {
@@ -214,6 +223,16 @@ export default function Files() {
                       >
                         <Download className="h-4 w-4 mr-2" />
                         {downloadingExtension ? "Downloading..." : "Download Extension"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 ml-2"
+                        onClick={handleDownloadFirefoxExtension}
+                        type="button"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Firefox Extension
                       </Button>
                     </div>
                   </div>
