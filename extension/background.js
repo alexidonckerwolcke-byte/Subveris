@@ -87,10 +87,15 @@ function getServiceNameFromDomain(domain) {
 }
 
 function normalizeApiUrl(apiUrl) {
-  if (!apiUrl || /^https?:\/\/localhost(?::\d+)?$/i.test(apiUrl) || /^https?:\/\/127\.0\.0\.1(?::\d+)?$/i.test(apiUrl)) {
+  if (!apiUrl) {
     return DEFAULT_API_URL;
   }
-  return apiUrl.replace(/\/$/, '');
+
+  const normalizedUrl = apiUrl.replace(/\/$/, '');
+  if (/^https?:\/\/(localhost|127\.0\.0\.1):5173$/i.test(normalizedUrl)) {
+    return 'http://localhost:5000';
+  }
+  return normalizedUrl;
 }
 
 function loadKnownSubscriptions() {
