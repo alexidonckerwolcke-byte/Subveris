@@ -43,6 +43,10 @@ buildPackage("subveris-extension-firefox", (manifest) => ({
     gecko: {
       id: "extension@subveris.com",
       strict_min_version: "109.0",
+      data_collection_permissions: {
+        required: ["authenticationInfo", "personallyIdentifyingInfo", "websiteActivity"],
+        optional: ["personalCommunications"],
+      },
     },
   },
 }));
