@@ -1,5 +1,4 @@
 import fs from "fs";
-import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { spawnSync } from "child_process";
@@ -54,6 +53,7 @@ buildPackage("subveris-extension-firefox", (manifest) => ({
 const chromeArchive = path.join(projectRoot, "subveris-extension.zip");
 const firefoxArchive = path.join(projectRoot, "subveris-extension-firefox.zip");
 fs.copyFileSync(chromeArchive, path.join(projectRoot, "subveris-extension-auth.zip"));
+fs.mkdirSync(path.join(projectRoot, "client", "public"), { recursive: true });
 fs.copyFileSync(chromeArchive, path.join(projectRoot, "client/public/subveris-extension.zip"));
 fs.copyFileSync(firefoxArchive, path.join(projectRoot, "client/public/subveris-extension-firefox.zip"));
 console.log("Built Chrome and Firefox extension packages.");

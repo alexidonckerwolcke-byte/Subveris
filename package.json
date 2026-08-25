@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:extension": "node scripts/build-extension-packages.mjs",
     "preview": "vite preview",
     "start": "node server.js",
     "sitemap:build": "node scripts/generate-sitemap.mjs",
