@@ -28,17 +28,17 @@ A cross-browser extension that automatically discovers and tracks your subscript
 ### Safari
 Safari support is coming soon. The extension is currently available for Chrome, Edge, and Firefox.
 
-For detailed guides, see: [INSTALL_FIREFOX.md](INSTALL_FIREFOX.md)
+For detailed guides, see: [INSTALL_FIREFOX.md](INSTALL_FIREFOX.md) and [COOKIE_DISCLOSURE.md](COOKIE_DISCLOSURE.md)
 
 ## First Time Setup
 
 After installation:
 
-1. **Open your Subveris app** (subveris.app)
-2. **Log in** with your account
-3. **Go to Settings → Connected Services**
-4. **Connect Gmail** (optional but recommended - scans receipts every 5 minutes)
-5. **Visit any subscription site** to test tracking
+1. **Open the extension popup** by clicking the Subveris icon
+2. **Log in** with your Subveris email and password; Google-only accounts must set a password in Subveris first
+3. **Have an active Premium or Family plan**; free accounts cannot use extension tracking
+4. **Connect Gmail** in the popup if you want optional receipt scanning
+5. **Visit any subscription site** to test tracking; Subveris does not need to remain open
 
 ## How It Works
 
@@ -74,7 +74,8 @@ After installation:
 
 - ✅ All data encrypted in transit (HTTPS)
 - ✅ Gmail access is OAuth read-only
-- ✅ No cookies or passwords stored
+- ✅ Cookies are inspected only for supported-service login signals and are not intentionally stored as a cookie jar
+- ✅ Passwords are not stored; short-lived extension session tokens are stored locally for authenticated syncing
 - ✅ No tracking of your browsing behavior outside subscriptions
 - ✅ All data tied to your account, never shared
 
