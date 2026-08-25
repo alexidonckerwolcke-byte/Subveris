@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Subveris - Find Unused Subscriptions",
+  "name": "Subveris Subscription Insights",
   "version": "1.2.0",
-  "description": "Track subscription usage and find recurring services you no longer use.",
+  "description": "Discover subscriptions, track service usage, and find recurring services you no longer use.",
   "permissions": ["storage", "tabs", "cookies", "downloads", "identity"],
   "host_permissions": [
     "https://subveris.com/*",
@@ -35,7 +35,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Subveris - Find Unused Subscriptions"
+    "default_title": "Subveris Subscription Insights"
   },
   "content_scripts": [
     {

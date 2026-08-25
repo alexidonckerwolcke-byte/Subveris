@@ -1,4 +1,4 @@
-# Subveris Tracker Extension
+# Subveris Subscription Insights Extension
 
 A cross-browser extension that automatically discovers and tracks your subscriptions through multiple methods:
 
@@ -104,7 +104,7 @@ extension/
 
 **Extension not appearing in toolbar?**
 - Go to your browser's extension settings
-- Find "Subveris Tracker" and enable it
+- Find "Subveris Subscription Insights" and enable it
 - Restart the browser
 
 **Gmail connection failing?**

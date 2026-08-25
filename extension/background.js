@@ -5,12 +5,12 @@ const browser = globalThis.browser || globalThis.chrome;
 const DEFAULT_API_URL = 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1';
 
 browser.runtime.onInstalled.addListener(() => {
-  console.log('Subveris Usage Tracker Extension Installed');
+  console.log('Subveris Subscription Insights Extension Installed');
   loadKnownSubscriptions();
 });
 
 browser.runtime.onStartup.addListener(() => {
-  console.log('Subveris Usage Tracker Extension started');
+  console.log('Subveris Subscription Insights Extension started');
   loadKnownSubscriptions();
 });
 
