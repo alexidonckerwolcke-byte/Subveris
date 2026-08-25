@@ -179,7 +179,7 @@ beforeunload event on page:
 
 ### Check Extension Console
 1. Go to chrome://extensions/
-2. Find "Subveris Usage Tracker"
+2. Find "Subveris Subscription Insights"
 3. Click "Details" → "Inspect views: background page"
 4. Check the console output
 

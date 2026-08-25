@@ -8,7 +8,7 @@
 2. Enable **"Developer mode"** (toggle in top-right corner)
 3. Click **"Load unpacked"** button
 4. Select the `/extension` folder from this project
-5. You should see "Subveris Usage Tracker" in your extensions list
+5. You should see "Subveris Subscription Insights" in your extensions list
 
 ### 2. Start the Development Server
 
@@ -47,7 +47,7 @@ npm run dev
 For debugging, check the extension's console:
 
 1. Go to `chrome://extensions/`
-2. Find "Subveris Usage Tracker"
+2. Find "Subveris Subscription Insights"
 3. Click **"Details"** → **"Inspect views: background page"**
 4. Open **Developer Tools** (F12)
 5. Check the **Console** tab for logs like:
