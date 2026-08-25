@@ -25,8 +25,8 @@ export default function Files() {
     setDownloadingExtension(true);
     try {
       console.log("[1] Starting extension download...");
-      const downloadUrl = `${window.location.origin}/subveris-extension.zip`;
-      const response = await fetch(downloadUrl, { method: "GET" });
+      const downloadUrl = `${window.location.origin}/subveris-extension.zip?v=${Date.now()}`;
+      const response = await fetch(downloadUrl, { method: "GET", cache: "no-store" });
       
       console.log("[2] Response received:", {
         status: response.status,
@@ -95,7 +95,7 @@ export default function Files() {
     e.preventDefault();
     e.stopPropagation();
     const link = document.createElement("a");
-    link.href = `${window.location.origin}/subveris-extension-firefox.zip`;
+    link.href = `${window.location.origin}/subveris-extension-firefox.zip?v=${Date.now()}`;
     link.download = "subveris-extension-firefox.zip";
     link.click();
   };
@@ -104,8 +104,8 @@ export default function Files() {
     setDownloadingData(true);
     try {
       console.log("[1] Starting extension download...");
-      const downloadUrl = `${window.location.origin}/subveris-extension.zip`;
-      const response = await fetch(downloadUrl, { method: "GET" });
+      const downloadUrl = `${window.location.origin}/subveris-extension.zip?v=${Date.now()}`;
+      const response = await fetch(downloadUrl, { method: "GET", cache: "no-store" });
       
       console.log("[2] Response received:", {
         status: response.status,
