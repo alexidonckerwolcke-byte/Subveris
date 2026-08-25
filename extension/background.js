@@ -86,11 +86,18 @@ function getServiceNameFromDomain(domain) {
   return null;
 }
 
+function normalizeApiUrl(apiUrl) {
+  if (!apiUrl || /^https?:\/\/localhost(?::\d+)?$/i.test(apiUrl) || /^https?:\/\/127\.0\.0\.1(?::\d+)?$/i.test(apiUrl)) {
+    return DEFAULT_API_URL;
+  }
+  return apiUrl.replace(/\/$/, '');
+}
+
 function loadKnownSubscriptions() {
   refreshSubscriptionStatus();
   browser.storage.local.get(['authToken', 'subverisApiUrl', 'detectedSubscriptions'], (result) => {
     const token = result.authToken;
-    const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
+    const apiUrl = normalizeApiUrl(result.subverisApiUrl);
     const existingSubs = result.detectedSubscriptions || {};
 
     if (!token) {
@@ -282,7 +289,7 @@ function isTierAllowed(status) {
 function refreshSubscriptionStatus(callback = () => {}) {
   browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
     const token = result.authToken;
-    const configuredApiUrl = result.subverisApiUrl || DEFAULT_API_URL;
+    const configuredApiUrl = normalizeApiUrl(result.subverisApiUrl);
     const apiUrls = configuredApiUrl === DEFAULT_API_URL
       ? [DEFAULT_API_URL]
       : [configuredApiUrl, DEFAULT_API_URL];
@@ -568,7 +575,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'SUBVERIS_AUTH_TOKEN') {
     console.log('[Background] Exchanging raw extension auth token for an opaque session for user:', request.userId);
-    const apiUrl = request.apiUrl || DEFAULT_API_URL;
+    const apiUrl = normalizeApiUrl(request.apiUrl);
     const rawToken = request.token;
 
     if (!rawToken || !request.userId) {
@@ -600,14 +607,14 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
         authSessionId: sessionId,
         authCsrfToken: csrfToken,
         supabaseUserUUID: request.userId,
-        subverisApiUrl: request.apiUrl || null,
+        subverisApiUrl: apiUrl,
         extensionSessionExpiresAt: data.expiresAt || null,
       }, () => {
         if (browser.runtime.lastError) {
           console.error('[Background] Storage error:', browser.runtime.lastError);
           sendResponse({ success: false, error: browser.runtime.lastError });
         } else {
-          console.log('[Background] ✅ Stored opaque extension session token and API URL: User ID =', request.userId, 'apiUrl =', request.apiUrl);
+          console.log('[Background] ✅ Stored opaque extension session token and API URL: User ID =', request.userId, 'apiUrl =', apiUrl);
           refreshSubscriptionStatus((status, statusError) => {
             if (statusError) {
               sendResponse({ success: false, error: 'Could not verify your Subveris plan.' });
