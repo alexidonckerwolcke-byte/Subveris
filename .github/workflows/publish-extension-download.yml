@@ -34,10 +34,7 @@ jobs:
 
       - name: Build extension archives
         run: |
-          rm -f subveris-extension-auth.zip subveris-extension.zip client/public/subveris-extension.zip
-          (cd extension && zip -qr ../subveris-extension-auth.zip . -x '*.DS_Store')
-          cp subveris-extension-auth.zip subveris-extension.zip
-          cp subveris-extension-auth.zip client/public/subveris-extension.zip
+          node scripts/build-extension-packages.mjs
           unzip -p client/public/subveris-extension.zip manifest.json | grep -E '"name"|"version"'
 
       - name: Commit updated download archives
