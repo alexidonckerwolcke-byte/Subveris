@@ -143,8 +143,8 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border/40 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="container mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-4">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden shadow-sm">
               <img src="/assets/logo-icon.png" alt="Subveris Logo" width={40} height={40} className="h-full w-full object-cover" />
             </div>
@@ -167,10 +167,10 @@ export default function HomePage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Button onClick={() => { setAuthDefaultTab('signin'); setAuthModalOpen(true); }} variant="ghost" size="lg" className="text-sm font-medium">
+            <Button onClick={() => { setAuthDefaultTab('signin'); setAuthModalOpen(true); }} variant="ghost" size="sm" className="text-xs font-medium sm:text-sm">
               Log In
             </Button>
-            <Button onClick={() => { setAuthDefaultTab('signup'); setAuthModalOpen(true); }} size="lg" className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => { setAuthDefaultTab('signup'); setAuthModalOpen(true); }} size="sm" className="bg-primary px-3 text-xs hover:bg-primary/90 sm:text-sm">
               Get Started
             </Button>
           </div>
@@ -325,7 +325,7 @@ export default function HomePage() {
       {/* 3️⃣ FEATURES SECTION */}
       <section id="features" className="container mx-auto px-4 py-28">
         <div className="max-w-4xl mx-auto">
-          <Badge variant="outline" className="mb-6 border-primary text-primary px-4 py-1">Premium Features</Badge>
+          <Badge variant="outline" className="mb-6 max-w-full border-primary px-4 py-1 text-center text-primary whitespace-normal">Premium Features</Badge>
           <h2 className="text-5xl font-bold mb-8 tracking-tight">Features designed for high-value spenders.</h2>
           <p className="text-xl text-muted-foreground max-w-3xl mb-12">
             Subveris combines clear data handling with practical analytics so you can make better decisions about recurring spending.
@@ -378,8 +378,8 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200/70 bg-white/95">
-            <table className="w-full text-left border-collapse">
+          <div className="max-w-4xl mx-auto overflow-x-auto rounded-[2rem] shadow-2xl border border-slate-200/70 bg-white/95">
+            <table className="min-w-[560px] w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-950/5 border-b border-slate-200/70">
                   <th className="p-8 text-lg font-bold text-slate-900">Capability</th>
@@ -692,8 +692,8 @@ export default function HomePage() {
           {/* Feature Comparison Table */}
           <div className="max-w-6xl mx-auto">
             <h3 className="text-2xl font-bold text-center mb-8">Detailed Feature Comparison</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
+            <div className="max-w-full overflow-x-auto overscroll-x-contain">
+              <table className="min-w-[620px] w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b-2 border-primary/20">
                     <th className="text-left py-4 px-6 font-semibold">Feature</th>

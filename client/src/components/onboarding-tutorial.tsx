@@ -23,10 +23,13 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useLocation } from "wouter";
 
 interface TutorialStep {
   title: string;
   description: string;
+  route: string;
+  action: string;
   icon: React.ComponentType<{ className?: string }>;
   content: React.ReactNode;
   features: string[];
@@ -36,6 +39,8 @@ const tutorialSteps: TutorialStep[] = [
   {
     title: "Welcome to Subveris!",
     description: "Your personal subscription optimization assistant",
+    route: "/",
+    action: "Start on your Dashboard",
     icon: CheckCircle2,
     content: (
       <div className="text-center space-y-4">
@@ -50,6 +55,8 @@ const tutorialSteps: TutorialStep[] = [
   {
     title: "Dashboard Overview",
     description: "See your subscriptions at a glance",
+    route: "/",
+    action: "Review your spending summary",
     icon: BarChart3,
     content: (
       <div className="space-y-4">
@@ -75,6 +82,8 @@ const tutorialSteps: TutorialStep[] = [
   {
     title: "Optimize Subscriptions",
     description: "Add, analyze, and improve your service spend",
+    route: "/subscriptions",
+    action: "Add your first subscription",
     icon: CreditCard,
     content: (
       <div className="space-y-4">
@@ -100,6 +109,8 @@ const tutorialSteps: TutorialStep[] = [
   {
     title: "Insights & Savings",
     description: "Find hidden savings and cost-per-use data",
+    route: "/insights",
+    action: "Review a savings opportunity",
     icon: TrendingUp,
     content: (
       <div className="space-y-4">
@@ -125,6 +136,8 @@ const tutorialSteps: TutorialStep[] = [
   {
     title: "Family Sharing",
     description: "Share subscriptions and optimize family costs",
+    route: "/family-sharing",
+    action: "See how family sharing works",
     icon: Users,
     content: (
       <div className="space-y-4">
@@ -150,6 +163,8 @@ const tutorialSteps: TutorialStep[] = [
   {
     title: "Settings & Security",
     description: "Control your preferences and protect your account",
+    route: "/settings",
+    action: "Open your account settings",
     icon: Shield,
     content: (
       <div className="space-y-4">
@@ -176,6 +191,7 @@ const tutorialSteps: TutorialStep[] = [
 
 export function OnboardingTutorial() {
   const { isNewUser, tutorialCompleted, completeTutorial, justSignedUp } = useAuth();
+  const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -195,6 +211,12 @@ export function OnboardingTutorial() {
     }
   }, []);
 
+  useEffect(() => {
+    if (isOpen) {
+      setLocation(tutorialSteps[currentStep].route);
+    }
+  }, [currentStep, isOpen, setLocation]);
+
   if (tutorialCompleted && !isOpen) {
     return null;
   }
@@ -205,6 +227,11 @@ export function OnboardingTutorial() {
     } else {
       handleComplete();
     }
+  };
+
+  const handleExplore = () => {
+    setLocation(step.route);
+    setIsOpen(false);
   };
 
   const handlePrevious = () => {
@@ -228,7 +255,7 @@ export function OnboardingTutorial() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="w-full max-w-[min(calc(100vw-2rem),40rem)]">
+      <DialogContent className="w-full max-w-[min(calc(100vw-2rem),40rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -252,6 +279,12 @@ export function OnboardingTutorial() {
         </DialogHeader>
 
         <div className="py-6">
+          <div className="mb-6 flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">You are learning from the real app screen.</span>
+            <Button variant="outline" size="sm" onClick={handleExplore}>
+              {step.action}
+            </Button>
+          </div>
           {step.content}
           {step.features.length > 0 && (
             <div className="mt-6">
@@ -267,8 +300,8 @@ export function OnboardingTutorial() {
           )}
         </div>
 
-        <DialogFooter className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <DialogFooter className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               variant="outline"
               onClick={handleSkip}
@@ -289,7 +322,7 @@ export function OnboardingTutorial() {
               Previous
             </Button>
 
-            <div className="flex gap-1 mx-4">
+            <div className="mx-2 flex gap-1 sm:mx-4">
               {tutorialSteps.map((_, index) => (
                 <div
                   key={index}

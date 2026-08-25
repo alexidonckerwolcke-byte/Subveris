@@ -227,7 +227,7 @@ export default function Files() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="mt-2 ml-2"
+                        className="mt-2 sm:ml-2"
                         onClick={handleDownloadFirefoxExtension}
                         type="button"
                       >

@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DollarSign, Euro, PoundSterling, Coins } from "lucide-react";
 
-const currencyOptions: { code: Currency; name: string; symbol: string; icon: typeof DollarSign }[] = [
+export const currencyOptions: { code: Currency; name: string; symbol: string; icon: typeof DollarSign }[] = [
   { code: 'USD', name: 'US Dollar', symbol: '$', icon: DollarSign },
   { code: 'EUR', name: 'Euro', symbol: '€', icon: Euro },
   { code: 'GBP', name: 'British Pound', symbol: '£', icon: PoundSterling },

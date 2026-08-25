@@ -113,9 +113,9 @@ export function BehavioralInsights({
               className="p-3 rounded-xl border border-border bg-white/80 shadow-sm dark:bg-slate-900/70"
               data-testid={`insight-${insight.subscriptionId}`}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-foreground text-sm">{getSubscriptionLabel(insight)}</span>
-                <span className="text-xs font-semibold text-chart-2">
+              <div className="mb-2 flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                <span className="min-w-0 break-words font-medium text-foreground text-sm">{getSubscriptionLabel(insight)}</span>
+                <span className="shrink-0 text-xs font-semibold text-chart-2">
                   {formatAmount(insight.monthlyAmount, insight.currency as Currency)}/mo
                 </span>
               </div>

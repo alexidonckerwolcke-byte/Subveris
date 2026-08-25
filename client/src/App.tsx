@@ -229,7 +229,7 @@ function AppContent() {
           <SidebarProvider style={style as React.CSSProperties}>
             <div className="flex h-screen w-full">
               <AppSidebar disabled={!user} />
-              <div className="flex flex-col flex-1 overflow-hidden">
+              <div className="flex min-w-0 flex-col flex-1 overflow-hidden">
                 <header className="flex h-14 items-center justify-between gap-4 border-b border-border/70 bg-surface/80 backdrop-blur-md px-4 shrink-0 shadow-sm">
                   <SidebarTrigger data-testid="button-sidebar-toggle" disabled={!user} />
                   <div className="flex items-center gap-3">
@@ -272,7 +272,7 @@ function AppContent() {
                     )}
                   </div>
                 </header>
-                <main className="flex-1 overflow-auto relative">
+                <main className="relative min-w-0 flex-1 overflow-auto">
                   <Router user={user} />
                   <OnboardingTutorial />
                   <PostSignupFlow

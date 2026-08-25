@@ -110,14 +110,14 @@ export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, tot
                 className="space-y-2"
                 data-testid={`cost-analysis-${analysis.subscriptionId}`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{displayName}</span>
-                    <Badge className={ratingConfig.className}>
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="min-w-0 break-words font-medium">{displayName}</span>
+                    <Badge className={`shrink-0 whitespace-normal text-center ${ratingConfig.className}`}>
                       {ratingConfig.label}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <span className={`font-semibold ${getValueRatingColor(analysis.valueRating)}`}>
                       {formatAmount(analysis.costPerUse, analysis.currency as Currency)}
                     </span>
@@ -130,11 +130,11 @@ export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, tot
                     style={{ width: `${percent}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="shrink-0">
                     {formatAmount(analysis.monthlyAmount, analysis.currency as Currency)}/mo
                   </span>
-                  <span>
+                  <span className="text-right">
                     {usageCount} uses this month
                   </span>
                 </div>

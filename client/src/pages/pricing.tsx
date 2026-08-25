@@ -414,7 +414,7 @@ export default function PricingPage() {
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl -z-10" />
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl -z-10" />
           
-          <h1 className="text-6xl md:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
             Premium Plans
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed mb-8">
@@ -445,7 +445,7 @@ export default function PricingPage() {
           )}
         </div>
 
-        <div className="grid md:grid-cols-3 gap-10 max-w-7xl mx-auto mb-16">
+        <div className="grid gap-10 max-w-7xl mx-auto mb-16 lg:grid-cols-3">
           {plans.map((plan) => (
             <Card
               key={plan.name}

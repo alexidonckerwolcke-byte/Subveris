@@ -42,8 +42,8 @@ const DocsPage: React.FC = () => {
   }, [handleMenuClick]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
-      <aside className="w-64 min-h-screen bg-gray-100 dark:bg-sidebar border-r border-sidebar-border px-4 py-8 flex flex-col gap-2 sticky top-0 z-10">
+    <div className="flex min-h-screen flex-col bg-background text-foreground md:flex-row">
+      <aside className="flex w-full shrink-0 flex-col gap-2 border-b border-sidebar-border bg-gray-100 px-4 py-4 dark:bg-sidebar md:sticky md:top-0 md:min-h-screen md:w-64 md:border-b-0 md:border-r md:py-8">
         <h2 className="text-lg font-bold mb-4 text-foreground">Docs Menu</h2>
         {menuItems.map((item) => (
           <button
@@ -55,7 +55,7 @@ const DocsPage: React.FC = () => {
           </button>
         ))}
       </aside>
-      <main className="prose lg:prose-lg dark:prose-invert flex-1 mx-auto px-8 py-8">
+      <main className="prose min-w-0 max-w-none flex-1 px-4 py-8 dark:prose-invert sm:px-8 lg:prose-lg">
         <h1>Subveris Documentation</h1>
         <p>Welcome to the official documentation for Subveris, your all-in-one subscription optimization and analytics platform. All information is available on this page.</p>
         <hr />

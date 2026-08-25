@@ -196,12 +196,12 @@ export function SubscriptionCalendar({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             Renewal Calendar
           </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 sm:justify-end">
             <Button
               variant="outline"
               size="sm"
@@ -210,7 +210,7 @@ export function SubscriptionCalendar({
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="min-w-40 text-center font-medium text-sm">{monthName}</span>
+            <span className="min-w-32 text-center font-medium text-sm sm:min-w-40">{monthName}</span>
             <Button
               variant="outline"
               size="sm"
@@ -226,7 +226,8 @@ export function SubscriptionCalendar({
       <CardContent>
         <div className="space-y-4">
           {/* Calendar Grid */}
-          <div className="border rounded-lg overflow-hidden border-border">
+          <div className="max-w-full overflow-x-auto rounded-lg border border-border">
+            <div className="min-w-[640px] overflow-hidden">
             {/* Day headers */}
             <div className="grid grid-cols-7 gap-0 bg-muted/30">
               {daysOfWeek.map((day) => (
@@ -268,7 +269,7 @@ export function SubscriptionCalendar({
                                   className="cursor-pointer group"
                                   onClick={() => handleEditRenewalDate(event)}
                                 >
-                                  <Badge className={`text-xs py-0 px-1 ${getEventColor(event.eventType)}`}> 
+                                  <Badge className={`block max-w-full whitespace-normal break-words text-left text-xs leading-tight py-0 px-1 ${getEventColor(event.eventType)}`}>
                                     {event.title}
                                   </Badge>
                                   {event.amount && (
@@ -300,6 +301,7 @@ export function SubscriptionCalendar({
                 })}
               </div>
             ))}
+            </div>
           </div>
 
           {/* Events Summary */}
@@ -319,10 +321,10 @@ export function SubscriptionCalendar({
                   .map((event) => {
                     const subscription = subscriptions.find((s) => s.id === event.subscriptionId);
                     return (
-                      <div key={event.id} className="flex items-center justify-between p-2 bg-muted/5 rounded border border-border text-sm">
-                        <div>
-                          <div className="font-medium text-foreground">{event.title}</div>
-                          <div className="text-xs text-muted-foreground">
+                      <div key={event.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded border border-border bg-muted/5 p-2 text-sm">
+                        <div className="min-w-0 flex-1">
+                          <div className="break-words font-medium text-foreground">{event.title}</div>
+                          <div className="break-words text-xs text-muted-foreground">
                             {formatDate(event.eventDate)} • <span className="font-semibold text-foreground">{subscription?.name}</span>
                           </div>
                         </div>

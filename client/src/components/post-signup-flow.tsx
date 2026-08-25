@@ -5,6 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Check, Sparkles, Shield, ArrowRight, Globe } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useCurrency, type Currency } from '@/lib/currency-context';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { currencyOptions } from '@/components/currency-selector';
 
 interface PostSignupFlowProps {
   open: boolean;
@@ -14,19 +21,6 @@ interface PostSignupFlowProps {
 export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
   const { setCurrency } = useCurrency();
   const [step, setStep] = useState<'currency' | 'plan' | 'mfa'>('currency');
-
-  const currencies: Array<{ code: Currency; name: string; symbol: string }> = [
-    { code: 'USD', name: 'US Dollar', symbol: '$' },
-    { code: 'EUR', name: 'Euro', symbol: '€' },
-    { code: 'GBP', name: 'British Pound', symbol: '£' },
-    { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
-    { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
-    { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
-    { code: 'CHF', name: 'Swiss Franc', symbol: 'Fr' },
-    { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
-    { code: 'INR', name: 'Indian Rupee', symbol: '₹' },
-    { code: 'BRL', name: 'Brazilian Real', symbol: 'R$' },
-  ];
 
   const plans = [
     {
@@ -113,7 +107,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
         onClose();
       }}>
         <DialogContent 
-          className="w-full max-w-[min(calc(100vw-2rem),500px)] max-h-[calc(100vh-2rem)] overflow-y-auto"
+          className="flex w-full max-w-[min(calc(100vw-2rem),500px)] max-h-[calc(100dvh-1rem)] min-h-0 flex-col overflow-y-auto overscroll-contain"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
@@ -130,19 +124,34 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-4">
-            {currencies.map((curr) => (
-              <Button
-                key={curr.code}
-                variant="outline"
-                className="h-full w-full min-h-[110px] flex flex-col items-center justify-center p-4 text-center hover:bg-primary hover:text-primary-foreground"
-                onClick={() => handleCurrencySelect(curr.code)}
+          <div className="py-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    Choose a currency
+                  </span>
+                  <span className="text-muted-foreground">{currencyOptions.length} available</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[min(60vh,24rem)] overflow-y-auto"
               >
-                <span className="text-2xl font-bold">{curr.symbol}</span>
-                <span className="text-xs font-medium mt-1">{curr.code}</span>
-                <span className="text-xs text-muted-foreground">{curr.name}</span>
-              </Button>
-            ))}
+                {currencyOptions.map((curr) => (
+                  <DropdownMenuItem
+                    key={curr.code}
+                    onClick={() => handleCurrencySelect(curr.code)}
+                    className="gap-2"
+                  >
+                    <curr.icon className="h-4 w-4" />
+                    <span>{curr.name}</span>
+                    <span className="ml-auto text-muted-foreground">{curr.symbol}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="text-sm text-muted-foreground text-center">

@@ -173,6 +173,7 @@
   /* apply basic font and background styles globally */
   html {
     scroll-behavior: smooth;
+    overflow-x: hidden;
   }
 
   body {
@@ -182,7 +183,9 @@
                 linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
     color: hsl(var(--foreground));
     min-height: 100vh;
+    overflow-x: hidden;
     background-attachment: fixed;
+    overflow-wrap: anywhere;
   }
   #root {
     min-height: 100vh;

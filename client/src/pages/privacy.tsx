@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 
 export default function Privacy() {
   return (
-    <div className="container mx-auto max-w-4xl px-6 py-16">
-      <div className="rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-10 text-white shadow-2xl ring-1 ring-white/10">
+    <div className="container mx-auto max-w-4xl min-w-0 px-4 py-10 sm:px-6 sm:py-16">
+      <div className="min-w-0 rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-5 text-white shadow-2xl ring-1 ring-white/10 sm:p-10">
         <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Privacy Policy</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white">How Subveris protects your data</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
@@ -17,7 +17,7 @@ export default function Privacy() {
       </div>
 
       <div className="mt-10 grid gap-6">
-        <Card className="border border-border/80 shadow-xl">
+        <Card className="min-w-0 border border-border/80 shadow-xl">
           <CardHeader className="bg-background/80">
             <div>
               <CardTitle>Trusted data handling</CardTitle>
