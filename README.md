@@ -131,7 +131,7 @@ curl -X POST http://localhost:5000/api/subscription/cancel \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-Cancellation assistance is included in Free, Premium, and Household plans. Subveris does not charge a separate cancellation or percentage-of-savings fee.
+Cancellation assistance is included in Free, Premium, and Family plans. Subveris does not charge a separate cancellation or percentage-of-savings fee.
 
 ### Family-sharing endpoints
 

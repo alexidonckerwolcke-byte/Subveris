@@ -72,11 +72,11 @@ export default function PricingPage() {
       popular: false,
     },
     {
-      name: "Household",
+      name: "Family",
       tier: "family",
       price: "14,99 €",
       period: "per month",
-      description: "Optimize shared household spending together",
+      description: "Optimize shared family spending together",
       features: [
         "All Premium Features",
         "Unlimited subscriptions",
@@ -85,10 +85,10 @@ export default function PricingPage() {
         "Cost-per-use analytics",
         "Behavioral insights",
         "Savings projections",
-        "Household spending insights",
-        "Share subscriptions with household members",
-        "Split costs across the household",
-        "Household optimization overview",
+        "Family spending insights",
+        "Share subscriptions with family members",
+        "Split costs across the family",
+        "Family optimization overview",
         "Priority support",
         "Export reports (CSV/PDF)",
       ],
@@ -315,7 +315,7 @@ export default function PricingPage() {
       if (plan.tier === "premium" && currentTier === "family") {
         return schedulePlanChangeMutation.isPending ? "Scheduling..." : "Schedule Premium Downgrade";
       }
-      return createCheckoutMutation.isPending ? "Redirecting..." : plan.tier === "family" ? "Upgrade to Household" : "Upgrade to Premium";
+      return createCheckoutMutation.isPending ? "Redirecting..." : plan.tier === "family" ? "Upgrade to Family" : "Upgrade to Premium";
     }
     
     if (plan.tier === "free" && (currentTier === "premium" || currentTier === "family")) {
@@ -438,8 +438,8 @@ export default function PricingPage() {
             <Badge className="inline-block px-6 py-2 text-base font-semibold bg-gradient-to-r from-purple-600 to-pink-600">
               <Sparkles className="h-4 w-4 mr-2 fill-white" />
               {subscriptionStatus?.cancelAtPeriodEnd 
-                ? "Household (Ending Soon)"
-                : "Household Plan Active"
+                ? "Family (Ending Soon)"
+                : "Family Plan Active"
               }
             </Badge>
           )}
