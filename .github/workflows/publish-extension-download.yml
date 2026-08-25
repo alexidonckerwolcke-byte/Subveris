@@ -1,0 +1,63 @@
+name: Publish extension download
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "extension/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-extension-download
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate extension scripts and manifest
+        run: |
+          node -e "const fs=require('fs'); const manifest=JSON.parse(fs.readFileSync('extension/manifest.json')); if (!manifest.name || !manifest.version) throw new Error('Invalid extension manifest'); console.log(manifest.name, manifest.version)"
+          node --check extension/background.js
+          node --check extension/content.js
+          node --check extension/popup.js
+
+      - name: Build extension archives
+        run: |
+          rm -f subveris-extension-auth.zip subveris-extension.zip client/public/subveris-extension.zip
+          (cd extension && zip -qr ../subveris-extension-auth.zip . -x '*.DS_Store')
+          cp subveris-extension-auth.zip subveris-extension.zip
+          cp subveris-extension-auth.zip client/public/subveris-extension.zip
+          unzip -p client/public/subveris-extension.zip manifest.json | grep -E '"name"|"version"'
+
+      - name: Commit updated download archives
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add subveris-extension-auth.zip subveris-extension.zip client/public/subveris-extension.zip
+          git diff --cached --quiet || git commit -m "build updated extension download"
+          git push origin HEAD:main
+
+      - name: Install site dependencies
+        run: npm ci
+
+      - name: Build website
+        run: npm run build
+
+      - name: Publish website and extension download
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist/public
+          publish_branch: gh-pages
+          force_orphan: false
