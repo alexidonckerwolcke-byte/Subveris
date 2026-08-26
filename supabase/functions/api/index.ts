@@ -1612,6 +1612,15 @@ runtimeDeno?.serve?.(async (req: Request) => {
         );
       }
 
+      const { data: userPlan } = await supabase
+        .from('user_subscriptions')
+        .select('plan_type, status')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!userPlan || !['premium', 'family'].includes(String(userPlan.plan_type).toLowerCase()) || !['active', 'trialing'].includes(String(userPlan.status).toLowerCase())) {
+        return sendJson({ error: 'Gmail scanning requires an active Premium or Family plan' }, { status: 403 });
+      }
+
       try {
         const oauthUrl = generateGmailOAuthUrl(userId);
         return sendJson({ oauthUrl });
@@ -1632,6 +1641,15 @@ runtimeDeno?.serve?.(async (req: Request) => {
           { error: "Unauthorized" },
           { status: 401 }
         );
+      }
+
+      const { data: userPlan } = await supabase
+        .from('user_subscriptions')
+        .select('plan_type, status')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!userPlan || !['premium', 'family'].includes(String(userPlan.plan_type).toLowerCase()) || !['active', 'trialing'].includes(String(userPlan.status).toLowerCase())) {
+        return sendJson({ error: 'Gmail scanning requires an active Premium or Family plan' }, { status: 403 });
       }
 
       try {
@@ -4830,8 +4848,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         console.log("[Stripe] Using customer ID:", customerId);
         // Create checkout session
-        const successUrl = Deno?.env?.get("STRIPE_CHECKOUT_SUCCESS_URL") || "https://subveris.com/pricing?checkout=success";
-        const cancelUrl = Deno?.env?.get("STRIPE_CHECKOUT_CANCEL_URL") || "https://subveris.com/pricing?checkout=cancel";
+        const successUrl = "https://subveris.com/pricing?checkout=success";
+        const cancelUrl = "https://subveris.com/pricing?checkout=cancel";
 
         console.log("[Stripe] Creating checkout session with:", { customerId, priceId, successUrl, cancelUrl });
 

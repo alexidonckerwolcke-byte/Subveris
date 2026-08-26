@@ -1689,6 +1689,13 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const { data: userPlan } = await supabase.from('user_subscriptions').select('plan_type, status').eq('user_id', user.id).maybeSingle();
+    if (!userPlan || !['premium', 'family'].includes(String(userPlan.plan_type || '').toLowerCase()) || !['active', 'trialing'].includes(String(userPlan.status || '').toLowerCase())) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Gmail scanning requires an active Premium or Family plan' }));
+      return;
+    }
+
     const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
     const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
     const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
@@ -1712,6 +1719,13 @@ const server = http.createServer(async (req, res) => {
     if (!user) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
+    const { data: userPlan } = await supabase.from('user_subscriptions').select('plan_type, status').eq('user_id', user.id).maybeSingle();
+    if (!userPlan || !['premium', 'family'].includes(String(userPlan.plan_type || '').toLowerCase()) || !['active', 'trialing'].includes(String(userPlan.status || '').toLowerCase())) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Gmail scanning requires an active Premium or Family plan' }));
       return;
     }
 

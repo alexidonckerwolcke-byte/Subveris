@@ -49,13 +49,13 @@ buildPackage("subveris-extension", (manifest) => manifest);
 buildPackage("subveris-extension-firefox", (manifest) => ({
   ...manifest,
   background: {
-    ...manifest.background,
     scripts: ["background.js"],
   },
   browser_specific_settings: {
     gecko: {
       id: "extension@subveris.com",
-      strict_min_version: "109.0",
+      strict_min_version: "140.0",
+      strict_min_version_android: "142.0",
       data_collection_permissions: {
         required: ["authenticationInfo", "personallyIdentifyingInfo", "websiteActivity"],
         optional: ["personalCommunications"],

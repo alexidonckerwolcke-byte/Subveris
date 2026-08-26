@@ -13,7 +13,7 @@ function detectBrowser() {
   
   if (userAgent.includes('Firefox')) {
     browserName = 'Firefox 🦊';
-    browserNotes = 'Firefox fully supports all features. Visit <a href="https://addons.mozilla.org" target="_blank" style="color: #007bff; text-decoration: none;">Firefox Add-ons</a> to find the latest version.';
+    browserNotes = 'Firefox fully supports all features.';
   } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
     browserName = 'Safari 🧭';
     browserNotes = 'Safari support is coming soon. The extension is currently available for Chrome, Edge, and Firefox.';
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     browserNameEl.textContent = browserName;
   }
   if (browserNotesEl) {
-    browserNotesEl.innerHTML = browserNotes;
+    browserNotesEl.textContent = browserNotes;
   }
   
   const statusDiv = document.getElementById('status');
@@ -49,15 +49,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginForm = document.getElementById('login-form');
   const loginSubmit = document.getElementById('login-submit');
   const loginError = document.getElementById('login-error');
-
-  function escapeHtml(value) {
-    return String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
 
   const cancellationGuides = {
     'Netflix': 'cancel-netflix',
@@ -103,10 +94,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('total-subs').textContent = String(subscriptions.length);
     document.getElementById('unused-subs').textContent = String(needsReview.length);
     document.getElementById('annual-waste').textContent = `€${annualCost.toFixed(0)}`;
-    list.innerHTML = '';
+    list.replaceChildren();
 
     if (!withUsage.length) {
-      list.innerHTML = '<div class="empty">Visit a subscription service to start building your usage picture.</div>';
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'Visit a subscription service to start building your usage picture.';
+      list.appendChild(empty);
     } else {
       withUsage.forEach((subscription) => {
         const days = subscription.daysUnused;
@@ -114,13 +108,45 @@ document.addEventListener('DOMContentLoaded', () => {
         const lastOpened = days === null ? 'No visit recorded' : days === 0 ? 'Opened today' : `Last opened ${days}d ago`;
         const price = subscription.monthlyPrice ? `€${subscription.monthlyPrice.toFixed(2)}/mo` : 'Price unknown';
         const guideSlug = cancellationGuides[subscription.serviceName];
-        const guideButton = guideSlug
-          ? `<button class="guide-button" type="button" data-guide-slug="${guideSlug}">View guide in Subveris</button>`
-          : '';
-        const cancelledLabel = subscription.markedCancelled
-          ? `<span class="muted">Marked cancelled by you</span>`
-          : `<button class="guide-button mark-button" type="button" data-mark-cancelled="${escapeHtml(subscription.serviceName)}">Mark as cancelled</button>`;
-        list.insertAdjacentHTML('beforeend', `<article class="subscription"><div class="subscription-top"><div><div class="subscription-name">${escapeHtml(subscription.serviceName)}</div><div class="subscription-meta">${escapeHtml(price)} · ${escapeHtml(lastOpened)} · ${subscription.visitCount || 1} visit${(subscription.visitCount || 1) === 1 ? '' : 's'}</div>${guideButton} ${cancelledLabel}</div><span class="risk risk-${risk}">${risk === 'low' ? 'active' : risk === 'medium' ? 'review' : 'unused'}</span></div></article>`);
+        const article = document.createElement('article');
+        article.className = 'subscription';
+        const top = document.createElement('div');
+        top.className = 'subscription-top';
+        const details = document.createElement('div');
+        const name = document.createElement('div');
+        name.className = 'subscription-name';
+        name.textContent = subscription.serviceName;
+        const meta = document.createElement('div');
+        meta.className = 'subscription-meta';
+        meta.textContent = `${price} · ${lastOpened} · ${subscription.visitCount || 1} visit${(subscription.visitCount || 1) === 1 ? '' : 's'}`;
+        details.append(name, meta);
+        if (guideSlug) {
+          const guideButton = document.createElement('button');
+          guideButton.className = 'guide-button';
+          guideButton.type = 'button';
+          guideButton.dataset.guideSlug = guideSlug;
+          guideButton.textContent = 'View guide in Subveris';
+          details.appendChild(guideButton);
+        }
+        if (subscription.markedCancelled) {
+          const cancelledLabel = document.createElement('span');
+          cancelledLabel.className = 'muted';
+          cancelledLabel.textContent = 'Marked cancelled by you';
+          details.appendChild(cancelledLabel);
+        } else {
+          const markButton = document.createElement('button');
+          markButton.className = 'guide-button mark-button';
+          markButton.type = 'button';
+          markButton.dataset.markCancelled = subscription.serviceName;
+          markButton.textContent = 'Mark as cancelled';
+          details.appendChild(markButton);
+        }
+        const riskLabel = document.createElement('span');
+        riskLabel.className = `risk risk-${risk}`;
+        riskLabel.textContent = risk === 'low' ? 'active' : risk === 'medium' ? 'review' : 'unused';
+        top.append(details, riskLabel);
+        article.appendChild(top);
+        list.appendChild(article);
       });
     }
     list.querySelectorAll('[data-guide-slug]').forEach((button) => {
@@ -187,11 +213,11 @@ document.addEventListener('DOMContentLoaded', () => {
             trackingStatus.className = 'status disconnected';
           }
           if (debugInfo) {
-            debugInfo.innerHTML = `
-              <strong>Browser extension not included:</strong><br>
-              Upgrade to Premium or Family for browser usage tracking and private-page scanning.<br>
-              <small style="color: #999;">The Subveris web app and cancellation guides remain available without the extension.</small>
-            `;
+            debugInfo.textContent = [
+              'Browser extension not included:',
+              'Upgrade to Premium or Family for browser usage tracking and private-page scanning.',
+              'The Subveris web app and cancellation guides remain available without the extension.',
+            ].join('\n');
           }
           if (loginButton) {
             loginButton.style.display = 'block';
@@ -225,15 +251,16 @@ document.addEventListener('DOMContentLoaded', () => {
             ? newlyDetected.map(sub => sub.serviceName).join(', ')
             : 'None';
 
-          let subsHTML = `
-            <strong>Subscription summary</strong><br>
-            <span style="color: #10b981;">Known from account: ${knownFromAccount.length}</span><br>
-            ${accountNames}<br><br>
-            <span style="color: #f59e0b;">Detected in browser: ${newlyDetected.length}</span><br>
-            ${browserNames}<br><br>
-            <small>Current site: ${domain}</small>`;
-
-          debugInfo.innerHTML = subsHTML;
+          debugInfo.textContent = [
+            'Subscription summary',
+            `Known from account: ${knownFromAccount.length}`,
+            accountNames,
+            '',
+            `Detected in browser: ${newlyDetected.length}`,
+            browserNames,
+            '',
+            `Current site: ${domain}`,
+          ].join('\n');
         }
       } else {
         statusDiv.textContent = '❌ Not connected';
@@ -244,13 +271,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         if (debugInfo) {
-          debugInfo.innerHTML = `
-            <strong>Setup Required:</strong><br>
-            1. Open the Subveris app<br>
-            2. Log in with your account<br>
-            3. The extension will auto-connect<br>
-            <small style="color: #999;">Waiting for authentication...</small>
-          `;
+          debugInfo.textContent = [
+            'Setup Required:',
+            '1. Open the Subveris app',
+            '2. Log in with your account',
+            '3. The extension will auto-connect',
+            'Waiting for authentication...',
+          ].join('\n');
         }
         if (loginButton) {
           loginButton.style.display = 'block';

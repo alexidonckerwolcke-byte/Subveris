@@ -22,8 +22,11 @@ import { useState, useRef, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscription } from "@/lib/subscription-context";
 
 export default function Settings() {
+  // Temporarily hidden while Gmail OAuth verification is pending.
+  const showGmailScanning = false;
   const { toast } = useToast();
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -32,6 +35,8 @@ export default function Settings() {
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailConnecting, setGmailConnecting] = useState(false);
   const { user, hasPassword } = useAuth();
+  const { tier } = useSubscription();
+  const gmailAllowed = tier === "premium" || tier === "family";
   const userEmail = user?.email ?? "";
 
   // Check if 2FA is enabled when user data loads
@@ -234,6 +239,7 @@ export default function Settings() {
           </Card>
         </div>
 
+        {showGmailScanning && (
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -251,7 +257,9 @@ export default function Settings() {
               <div>
                 <p className="font-medium">📧 Gmail</p>
                 <p className="text-sm text-muted-foreground">
-                  {gmailConnected
+                  {!gmailAllowed
+                    ? "Premium feature - connect Gmail to scan receipts automatically"
+                    : gmailConnected
                     ? "Connected - Inbox scanned every 5 minutes"
                     : "Connect to auto-detect subscriptions from email receipts"}
                 </p>
@@ -260,17 +268,18 @@ export default function Settings() {
                 variant={gmailConnected ? "destructive" : "default"}
                 size="sm"
                 onClick={gmailConnected ? handleDisconnectGmail : handleConnectGmail}
-                disabled={gmailConnecting}
+                disabled={gmailConnecting || (!gmailConnected && !gmailAllowed)}
               >
                 {gmailConnecting
                   ? "Connecting..."
                   : gmailConnected
                     ? "Disconnect"
-                    : "Connect"}
+                    : gmailAllowed ? "Connect" : "Premium required"}
               </Button>
             </div>
           </CardContent>
         </Card>
+        )}
 
         <Card>
           <CardHeader>

@@ -818,7 +818,11 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Email scanning: detect subscription receipts from Gmail
 function scanGmailForSubscriptions() {
-  browser.storage.local.get(['gmailAuthToken', 'lastGmailScan'], (result) => {
+  browser.storage.local.get(['gmailAuthToken', 'lastGmailScan', 'subscription_status'], (result) => {
+    if (!isTierAllowed(String(result.subscription_status || 'free').toLowerCase())) {
+      console.log('[Background] Gmail scanning requires Premium or Family plan');
+      return;
+    }
     const token = result.gmailAuthToken;
     if (!token) {
       console.log('[Background] Gmail not authorized, skipping email scan');
