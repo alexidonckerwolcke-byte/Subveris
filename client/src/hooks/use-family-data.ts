@@ -5,8 +5,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useSubscription } from "@/lib/subscription-context";
 
 export function useFamilyDataMode() {
-  const { user } = useAuth();
+  const { user, isPremium, planType } = useAuth();
   const { tier } = useSubscription();
+  const hasPaidAccess = isPremium || planType === "premium" || planType === "family" || tier !== "free";
 
   // Get family groups for this user
   const { data: familyGroups, isLoading: familyGroupsLoading } = useQuery<any[], Error>({
@@ -40,17 +41,17 @@ export function useFamilyDataMode() {
     : familyGroupId
       ? familySettingsLoading
         ? undefined
-        : tier !== "free" && familySettings?.show_family_data === true
+        : hasPaidAccess && familySettings?.show_family_data === true
       : false;
 
   useEffect(() => {
-    if (tier === "free" && familyGroupId) {
+    if (!hasPaidAccess && familyGroupId) {
       queryClient.setQueryData(["/api/family-groups", familyGroupId, "settings"], {
         show_family_data: false,
         family_group_id: familyGroupId,
       });
     }
-  }, [tier, familyGroupId]);
+  }, [hasPaidAccess, familyGroupId]);
 
   if (familyGroupsLoading) {
     return {

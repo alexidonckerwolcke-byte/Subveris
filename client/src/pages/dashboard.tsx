@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
 import { calculatePotentialSavings } from "@/lib/health-score";
-import { normalizeMonthlySpendingSeries } from "@/lib/utils";
+import { calculateMonthlySpendingSeries, normalizeMonthlySpendingSeries } from "@/lib/utils";
 import type { Subscription, MonthlySpending, SpendingByCategory } from "@shared/schema";
 
 function parseBillingDate(date?: string | Date | null) {
@@ -60,7 +60,7 @@ function getUpcomingRenewals(subscriptions: Subscription[] = []) {
 }
 
 export default function Dashboard() {
-  const { formatAmount } = useCurrency();
+  const { formatAmount, convertAmount } = useCurrency();
   const { user } = useAuth();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
   const [, navigate] = useLocation();
@@ -95,9 +95,9 @@ export default function Dashboard() {
   });
 
   const { data: monthlySpending, isLoading: monthlySpendingLoading } = useQuery<MonthlySpending[]>({
-    queryKey: ["/api/spending/monthly"],
+    queryKey: ["/api/spending/monthly", showFamilyData === true],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/spending/monthly");
+      const response = await apiRequest("GET", showFamilyData === true ? "/api/spending/monthly?family=true" : "/api/spending/monthly");
       return response.json();
     },
     refetchInterval: 30000,
@@ -119,9 +119,7 @@ export default function Dashboard() {
 
   const subscriptions = showFamilyData === true ? familySubscriptions : personalSubscriptions;
 
-  const monthlySpendingData = showFamilyData === true && familyData?.spending && familyData.spending.length > 0
-    ? familyData.spending
-    : monthlySpending;
+  const monthlySpendingData = monthlySpending;
 
   const categorySpendingData = showFamilyData === true && familyData?.byCategory && familyData.byCategory.length > 0
     ? familyData.byCategory

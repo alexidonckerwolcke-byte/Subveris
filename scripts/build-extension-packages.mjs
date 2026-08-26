@@ -18,6 +18,20 @@ function buildPackage(name, transformManifest) {
     `${JSON.stringify(transformManifest(structuredClone(sourceManifest)), null, 2)}\n`,
   );
 
+  const packageManifest = JSON.parse(fs.readFileSync(path.join(packageRoot, "manifest.json"), "utf8"));
+  const referencedFiles = new Set([
+    packageManifest.action?.default_popup,
+    packageManifest.background?.service_worker,
+    ...(packageManifest.background?.scripts || []),
+    ...(packageManifest.content_scripts || []).flatMap((script) => script.js || []),
+    ...(packageManifest.web_accessible_resources || []).flatMap((resource) => resource.resources || []),
+  ].filter(Boolean));
+  for (const referencedFile of referencedFiles) {
+    if (!fs.existsSync(path.join(packageRoot, referencedFile))) {
+      throw new Error(`Extension package ${name} is missing manifest file: ${referencedFile}`);
+    }
+  }
+
   const archivePath = path.join(projectRoot, `${name}.zip`);
   fs.rmSync(archivePath, { force: true });
   const result = spawnSync("zip", ["-qr", archivePath, ".", "-x", "*.DS_Store"], {

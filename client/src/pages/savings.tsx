@@ -28,7 +28,7 @@ import {
 } from "recharts";
 import type { DashboardMetrics, MonthlySpending, Subscription } from "@shared/schema";
 import { useCurrency, type Currency } from "@/lib/currency-context";
-import { calculateMonthlyCost, isSubscriptionBilledInMonth, normalizeMonthlySpendingSeries } from "@/lib/utils";
+import { calculateMonthlyCost, calculateMonthlySpendingSeries, isSubscriptionBilledInMonth, normalizeMonthlySpendingSeries } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
 import { calculatePotentialSavings } from "@/lib/health-score";
@@ -217,10 +217,6 @@ export default function Savings() {
     return getVisibleFamilySubscriptions(familyData, user?.id);
   }, [familyData, user?.id]);
 
-  const familyPotentialSavings = useMemo(() => {
-    return calculatePotentialSavings(familySubscriptions || []);
-  }, [familySubscriptions]);
-
   const familySavingsComputed = useMemo(() => {
     if (!familySubscriptions || familySubscriptions.length === 0) {
       return {
@@ -281,10 +277,6 @@ export default function Savings() {
       unusedSubscriptions,
     };
   }, [familySubscriptions, user?.id, convertAmount]);
-
-  const displayedPotentialSavings = isFamilyMode
-    ? familyPotentialSavings
-    : personalPotentialSavings;
 
   // Personal behavioral insights (always load)
 
@@ -456,7 +448,11 @@ export default function Savings() {
 
   // Personal spending (always load)
   const { data: personalSpending, isLoading: personalSpendingLoading } = useQuery<MonthlySpending[]>({
-    queryKey: ["/api/spending/monthly"],
+    queryKey: ["/api/spending/monthly", isFamilyMode],
+    queryFn: async () => {
+      const response = await apiRequest("GET", isFamilyMode ? "/api/spending/monthly?family=true" : "/api/spending/monthly");
+      return response.json();
+    },
   });
 
   const spendingLoading = familyModePending
@@ -465,63 +461,14 @@ export default function Savings() {
       ? familyDataLoading
       : personalSpendingLoading;
 
-  // Compute monthly spending from subscriptions for family mode
   function computeMonthlySpendingFromFamilySubscriptions() {
-    if (!familySubscriptions || familySubscriptions.length === 0) return [];
-    
-    const now = new Date();
-    const currentDayOfMonth = now.getDate();
-    const months: { [key: string]: number } = {};
-    
-    // Create labels for last 6 months + current month (7 total)
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const label = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-      months[label] = 0;
-    }
-    
-    // Add subscription costs to months where they renew
-    for (const sub of familySubscriptions) {
-      if (!sub || sub.status === 'deleted' || sub.status === 'canceled') continue;
-      if (sub.status !== 'active' && sub.status !== 'unused' && sub.status !== 'to-cancel') continue;
-      
-      const monthlyCost = convertAmount(
-        calculateMonthlyCost(sub.amount || 0, sub.frequency || 'monthly'),
-        (sub.currency as Currency) || 'USD',
-        'USD'
-      );
-      
-      // Check each month to see if this subscription should be included
-      for (const [monthLabel, _] of Object.entries(months)) {
-        let includeInMonth = false;
-        const monthDate = new Date(monthLabel + " 1");
-        const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-        const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59);
-        const isCurrentMonth = monthDate.getFullYear() === now.getFullYear() && monthDate.getMonth() === now.getMonth();
-        
-        // Get the renewal date for this subscription
-        if (isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth)) {
-          includeInMonth = true;
-        }
-        
-        if (includeInMonth) {
-          months[monthLabel] += monthlyCost;
-        }
-      }
-    }
-    
-    return Object.entries(months).map(([month, amount]) => ({ 
-      month, 
-      amount: Math.round(amount * 100) / 100 
-    }));
+    return calculateMonthlySpendingSeries(familySubscriptions, convertAmount);
   }
 
   // Use server data if available for owner views, otherwise compute from visible family subscriptions.
-  const effectiveMonthlySpending = isFamilyMode
-    ? ((familyData?.spending && familyData.spending.length > 0)
-        ? familyData.spending
-        : computeMonthlySpendingFromFamilySubscriptions())
-    : (isPersonalMode ? (personalSpending || []) : []);
+  const effectiveMonthlySpending = isFamilyMode || isPersonalMode
+    ? (personalSpending || [])
+    : [];
 
   // Normalize monthly spending into a fixed-length recent months series (defaults to 6 months)
   // Includes the current month and the previous months, with zero-fill for missing months.
@@ -767,14 +714,14 @@ export default function Savings() {
                   <Zap className="h-5 w-5 text-chart-1" />
                 </div>
                 <span className="text-sm font-medium text-muted-foreground">
-                  Potential
+                  Monthly Spend
                 </span>
               </div>
               {metricsLoading ? (
                 <Skeleton className="h-9 w-24" />
               ) : (
                 <span className="text-3xl font-bold text-chart-2 dark:text-foreground" data-testid="text-potential-savings">
-                    {formatAmount(displayedPotentialSavings, 'USD')}
+                    {formatAmount(personalMetrics?.totalMonthlySpend ?? 0, 'USD')}
                   <span className="text-sm font-normal text-muted-foreground">/mo</span>
                 </span>
               )}

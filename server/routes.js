@@ -156,11 +156,14 @@ export async function registerRoutes(server, app) {
         return res.status(403).json({ error: 'Not authorized to modify this group' });
       }
 
-      // Update settings
+      // Upsert the settings row instead of writing the group record.
       const { data, error } = await client
-        .from('family_groups')
-        .update({ show_family_data })
-        .eq('id', groupId)
+        .from('family_group_settings')
+        .upsert({
+          family_group_id: groupId,
+          owner_id: userId,
+          show_family_data: Boolean(show_family_data),
+        }, { onConflict: 'family_group_id' })
         .select()
         .single();
 

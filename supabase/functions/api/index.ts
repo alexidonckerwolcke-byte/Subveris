@@ -682,6 +682,37 @@ export function isSubscriptionBilledInMonth(
   return isCurrentMonth ? renewalDay <= today : true;
 }
 
+export function isSubscriptionScheduledInMonth(
+  sub: any,
+  monthStart: Date,
+  monthEnd: Date,
+  now: Date,
+  isCurrentMonth: boolean,
+  renewalDate: Date,
+): boolean {
+  const renewalDay = toDateOnlyLocal(renewalDate);
+  if (!renewalDay || renewalDay > monthEnd) return false;
+
+  const createdAt = sub.created_at || sub.createdAt;
+  if (createdAt) {
+    const createdDate = toDateOnlyLocal(createdAt);
+    if (createdDate && createdDate > monthEnd) return false;
+  }
+
+  if (isCurrentMonth && renewalDay > now) return false;
+
+  const frequency = String(sub.frequency || 'monthly').toLowerCase();
+  if (frequency === 'weekly') return true;
+  if (frequency === 'monthly') return true;
+
+  const renewalMonth = renewalDay.getFullYear() * 12 + renewalDay.getMonth();
+  const targetMonth = monthStart.getFullYear() * 12 + monthStart.getMonth();
+  const monthsSinceRenewal = targetMonth - renewalMonth;
+  if (frequency === 'quarterly') return monthsSinceRenewal % 3 === 0;
+  if (frequency === 'yearly' || frequency === 'annual') return monthsSinceRenewal % 12 === 0;
+  return isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate);
+}
+
 function getNestedFamilyGroup(m: any) {
   const nested = m?.family_groups;
   if (Array.isArray(nested)) {
@@ -4574,8 +4605,45 @@ runtimeDeno?.serve?.(async (req: Request) => {
       return sendJson({ success: true });
     }
 
-    if (pathname.match(/^\/family-groups\/[^/]+\/shared-subscriptions\/[^/]+\/cost-splits$/) && req.method === "POST") {
-      return sendJson({ success: true });
+    if (pathname.match(/^\/family-groups\/[^/]+\/shared-subscriptions\/[^/]+\/cost-splits$/) && (req.method === "GET" || req.method === "POST")) {
+      const match = pathname.match(/^\/family-groups\/([^/]+)\/shared-subscriptions\/([^/]+)\/cost-splits$/);
+      const groupId = match?.[1];
+      const sharedId = match?.[2];
+      const userId = extractUserId(req);
+      if (!groupId || !sharedId) return sendJson({ error: 'Invalid request' }, { status: 400 });
+      if (!userId) return sendJson({ error: 'Unauthorized' }, { status: 401 });
+
+      const { data: groupRow } = await supabase.from('family_groups').select('owner_id').eq('id', groupId).single();
+      const { data: sharedRow } = await supabase
+        .from('shared_subscriptions')
+        .select('id, family_group_id')
+        .eq('id', sharedId)
+        .eq('family_group_id', groupId)
+        .single();
+      if (!groupRow || !sharedRow) return sendJson({ error: 'Shared subscription not found' }, { status: 404 });
+
+      if (req.method === 'GET') {
+        const { data, error } = await supabase.from('cost_splits').select('*').eq('shared_subscription_id', sharedId);
+        if (error) return sendJson({ error: 'Failed to fetch cost splits' }, { status: 500 });
+        return sendJson((data || []).map((split: any) => ({ ...split, userId: split.user_id })));
+      }
+
+      if (groupRow.owner_id !== userId) return sendJson({ error: 'Only the group owner can decide cost splits' }, { status: 403 });
+      let body: any;
+      try { body = await req.json(); } catch { return sendJson({ error: 'Invalid request body' }, { status: 400 }); }
+      const splitUserId = body?.userId;
+      const percentage = Number(body?.percentage);
+      if (!splitUserId || !Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+        return sendJson({ error: 'userId and a percentage from 0 to 100 are required' }, { status: 400 });
+      }
+      const { data, error } = await supabase.from('cost_splits').upsert({
+        shared_subscription_id: sharedId,
+        user_id: splitUserId,
+        percentage: Math.round(percentage * 100) / 100,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'shared_subscription_id,user_id' }).select().single();
+      if (error) return sendJson({ error: 'Failed to save cost split' }, { status: 500 });
+      return sendJson({ ...data, userId: data.user_id }, { status: 201 });
     }
 
     if (pathname.match(/^\/family-groups\/[^/]+\/settings$/) && req.method === "PUT") {
@@ -5311,11 +5379,31 @@ runtimeDeno?.serve?.(async (req: Request) => {
       console.log('[spending/monthly] Search params:', Array.from(url.searchParams.entries()));
 
       try {
-        // Get all subscriptions
-        const { data: subscriptions, error } = await supabase
-          .from("subscriptions")
-          .select("*")
-          .eq("user_id", userId);
+        const familyMode = url.searchParams.get('family') === 'true';
+        let subscriptionQuery = supabase.from("subscriptions").select("*").eq("user_id", userId);
+
+        if (familyMode) {
+          const { data: ownedGroups } = await supabase.from('family_groups').select('id').eq('owner_id', userId);
+          const { data: memberGroups } = await supabase.from('family_group_members').select('family_group_id').eq('user_id', userId);
+          const groupIds = Array.from(new Set([
+            ...(ownedGroups || []).map((group: any) => group.id),
+            ...(memberGroups || []).map((group: any) => group.family_group_id),
+          ])).filter(Boolean);
+
+          if (groupIds.length > 0) {
+            const { data: groupMembers } = await supabase.from('family_group_members').select('user_id').in('family_group_id', groupIds);
+            const { data: groupOwners } = await supabase.from('family_groups').select('owner_id').in('id', groupIds);
+            const memberIds = Array.from(new Set([
+              userId,
+              ...(groupMembers || []).map((member: any) => member.user_id),
+              ...(groupOwners || []).map((group: any) => group.owner_id),
+            ])).filter(Boolean);
+            subscriptionQuery = supabase.from("subscriptions").select("*").in("user_id", memberIds);
+          }
+        }
+
+        // Get personal subscriptions, or the merged family subscription set.
+        const { data: subscriptions, error } = await subscriptionQuery;
 
         if (error || !subscriptions) {
           console.error("Error fetching subscriptions for spending monthly:", error);
@@ -6275,9 +6363,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           const renewalDate = toDateOnlyLocal(renewalDateStr);
           if (!renewalDate) continue;
 
-          if (isCurrentMonth) {
-            if (!isSubscriptionBilledInCurrentMonth(sub, now, renewalDate)) continue;
-          } else if (!isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate)) {
+          if (!isSubscriptionScheduledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate)) {
             continue;
           }
 

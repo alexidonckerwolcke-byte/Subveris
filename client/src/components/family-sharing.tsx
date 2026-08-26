@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Eye,
+  Wallet,
 } from "lucide-react";
 import { CostPerUse } from "@/components/cost-per-use";
 import { computeCostPerUseFromSubs } from "@/lib/cost-analysis";
@@ -38,7 +39,7 @@ import { useFamilyDataMode } from "@/hooks/use-family-data";
 export function FamilySharing() {
   const { toast } = useToast();
   const { formatAmount } = useCurrency();
-  const { user } = useAuth();
+  const { user, isPremium, planType } = useAuth();
   const [newGroupName, setNewGroupName] = useState("");
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -52,6 +53,8 @@ export function FamilySharing() {
   const [selectedMemberForSharing, setSelectedMemberForSharing] = useState<string>("");
   const [selectedMembersToShareWith, setSelectedMembersToShareWith] = useState<string[]>([]);
   const [optimisticSharedIds, setOptimisticSharedIds] = useState<Set<string>>(new Set());
+  const [splitDialogShared, setSplitDialogShared] = useState<any | null>(null);
+  const [splitValues, setSplitValues] = useState<Record<string, string>>({});
 
   // Fetch family groups
   const { data: groups = [], isLoading: groupsLoading } = useQuery<FamilyGroup[]>({
@@ -110,6 +113,7 @@ export function FamilySharing() {
   // Determine effective family-data visibility by combining server setting
   // with the client's subscription eligibility (so downgrades immediately hide data).
   const effectiveShowFamilyData = Boolean(isFamilyAccessEnabled && familySettings?.show_family_data && selectedGroupId);
+  const hasPaidFamilyAccess = isPremium || planType === 'premium' || planType === 'family';
 
   // Fetch aggregated family data
   const { data: familyData } = useQuery<any>({
@@ -164,6 +168,20 @@ export function FamilySharing() {
     seenIds.add(key);
     return true;
   });
+
+  const { data: costSplits = [] } = useQuery<any[]>({
+    queryKey: ["/api/family-groups", selectedGroupId, "cost-splits", allSharedSubscriptions.map((s: any) => s.id).join(',')],
+    enabled: !!selectedGroupId && allSharedSubscriptions.length > 0,
+    queryFn: async () => {
+      const rows = await Promise.all(allSharedSubscriptions.map(async (shared: any) => {
+        const response = await apiRequest('GET', `/api/family-groups/${selectedGroupId}/shared-subscriptions/${shared.id}/cost-splits`);
+        const splits = await response.json();
+        return (splits || []).map((split: any) => ({ ...split, sharedSubscriptionId: shared.id }));
+      }));
+      return rows.flat();
+    },
+  });
+
   // debug: log combined shared ids when running tests
   // eslint-disable-next-line no-console
   console.log('[FamilySharing] allSharedSubscriptions:', allSharedSubscriptions.map(s => ({ id: s.id, subscription_id: s.subscription_id, subName: s.subscription?.name })));
@@ -362,29 +380,18 @@ export function FamilySharing() {
     }
   });
 
-  // assign cost splits simply via prompts
-  const assignSplits = async (sharedId: string) => {
-    if (!selectedGroupId || !familyData) return;
-    const membersList: any[] = familyData.members || [];
-    for (const m of membersList) {
-      const val = window.prompt(`Enter split % for ${m.email}`, '0');
-      if (val !== null) {
-        const num = Number(val);
-        if (!isNaN(num)) {
-          try {
-            await apiRequest('POST', `/api/family-groups/${selectedGroupId}/shared-subscriptions/${sharedId}/cost-splits`, {
-              userId: m.user_id,
-              percentage: num,
-            });
-          } catch (e: any) {
-            console.error('split error', e);
-          }
-        }
-      }
-    }
-    queryClient.invalidateQueries({ queryKey: ["/api/family-groups", selectedGroupId, "family-data"] });
-    toast({ title: 'Splits saved', description: 'Cost splits have been recorded.' });
-  };
+  const saveSplitMutation = useMutation({
+    mutationFn: async ({ sharedId, userId, percentage }: { sharedId: string; userId: string; percentage: number }) => {
+      if (!selectedGroupId) throw new Error('No group selected');
+      const response = await apiRequest('POST', `/api/family-groups/${selectedGroupId}/shared-subscriptions/${sharedId}/cost-splits`, { userId, percentage });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/family-groups", selectedGroupId, "cost-splits"] });
+      toast({ title: 'Cost split saved', description: 'The family cost allocation was updated.' });
+    },
+    onError: (error: any) => toast({ title: 'Could not save split', description: error?.message || 'Only the host can update cost splits.', variant: 'destructive' }),
+  });
 
   // Toggle family data view mutation
   const toggleFamilyDataMutation = useMutation({
@@ -431,6 +438,19 @@ export function FamilySharing() {
   const ownedGroups = groups.filter((g) => g.ownerId === user?.id);
   const canCreateGroup = ownedGroups.length < 1;
   const canAddMember = members.length < 5;
+  const familyMembers = members.length > 0 ? members : (familyData?.members || []);
+  const costDashboard = allSharedSubscriptions.map((shared: any) => {
+    const subscription = shared.subscription;
+    const splits = costSplits.filter((split: any) => split.sharedSubscriptionId === shared.id);
+    return { shared, subscription, splits };
+  }).filter((row: any) => row.subscription);
+  const memberCostTotals = familyMembers.reduce((totals: Record<string, number>, member: any) => {
+    totals[member.userId || member.user_id] = 0;
+    return totals;
+  }, {});
+  costDashboard.forEach(({ subscription, splits }) => splits.forEach((split: any) => {
+    if (Object.prototype.hasOwnProperty.call(memberCostTotals, split.userId)) memberCostTotals[split.userId] += Number(subscription.amount || 0) * Number(split.percentage || 0) / 100;
+  }));
 
   return (
     <div className="space-y-4">
@@ -544,6 +564,21 @@ export function FamilySharing() {
       {/* Selected Group Details */}
       {selectedGroup && (
         <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base"><Wallet className="h-4 w-4" />Family cost split</CardTitle>
+              <CardDescription>{isOwner ? 'You control how each shared subscription is divided.' : 'The host controls how shared subscription costs are divided.'}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {familyMembers.map((member: any) => {
+                  const memberId = member.userId || member.user_id;
+                  return <div key={memberId} className="rounded-lg border bg-muted/30 p-3"><div className="text-sm font-medium">{getMemberDisplayName(member)}</div><div className="mt-1 text-lg font-semibold">{formatAmount(memberCostTotals[memberId] || 0)}</div><div className="text-xs text-muted-foreground">Assigned shared costs</div></div>;
+                })}
+              </div>
+              {costDashboard.length === 0 ? <p className="text-sm text-muted-foreground">Share a subscription to start assigning costs.</p> : <div className="space-y-2">{costDashboard.map(({ shared, subscription, splits }: any) => <div key={shared.id} className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border p-3"><div className="min-w-0"><div className="break-words text-sm font-medium">{subscription.name}</div><div className="text-xs text-muted-foreground">{formatAmount(subscription.amount || 0, subscription.currency as Currency)} total</div></div><div className="flex flex-wrap items-center gap-2 text-xs">{splits.length === 0 ? <span className="text-muted-foreground">Not assigned</span> : splits.map((split: any) => <Badge key={split.userId}>{getMemberDisplayName(memberLookup[split.userId] || { userId: split.userId }, false)} {split.percentage}%</Badge>)}{isOwner && <Button size="sm" variant="outline" onClick={() => { setSplitDialogShared({ ...shared, subscription }); setSplitValues(Object.fromEntries(splits.map((split: any) => [split.userId, String(split.percentage)]))); }}>Edit split</Button>}</div></div>)}</div>}
+            </CardContent>
+          </Card>
           <div className="grid gap-4 md:grid-cols-2">
             {/* Members */}
             <Card>
@@ -678,9 +713,17 @@ export function FamilySharing() {
                   size="sm"
                   onClick={() => {
                     console.log('[toggle] Current show_family_data:', familySettings?.show_family_data);
+                    if (!hasPaidFamilyAccess) {
+                      toast({
+                        title: 'Upgrade required',
+                        description: 'Show Family Data is available on Premium and Family plans.',
+                        variant: 'destructive',
+                      });
+                      return;
+                    }
                     toggleFamilyDataMutation.mutate(!familySettings?.show_family_data);
                   }}
-                  disabled={toggleFamilyDataMutation.isPending || settingsLoading || !isFamilyAccessEnabled}
+                  disabled={toggleFamilyDataMutation.isPending || settingsLoading || !isOwner}
                 >
                   {toggleFamilyDataMutation.isPending ? "Updating..." : (familySettings?.show_family_data ? "Disable" : "Enable")}
                 </Button>
@@ -1116,6 +1159,41 @@ export function FamilySharing() {
               disabled={selectedMembersToShareWith.length === 0 || shareSubscriptionMutation.isPending}
             >
               {shareSubscriptionMutation.isPending ? "Sharing..." : "Share"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!splitDialogShared} onOpenChange={(open) => !open && setSplitDialogShared(null)}>
+        <DialogContent className="w-full max-w-[min(calc(100vw-2rem),28rem)]" aria-describedby="cost-split-desc">
+          <DialogHeader>
+            <DialogTitle>Set cost split</DialogTitle>
+            <DialogDescription id="cost-split-desc">
+              Decide how {splitDialogShared?.subscription?.name || 'this subscription'} is divided. Percentages should total 100%.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            {familyMembers.map((member: any) => {
+              const memberId = member.userId || member.user_id;
+              return <div key={memberId} className="flex items-center gap-3"><span className="min-w-0 flex-1 break-words text-sm">{getMemberDisplayName(member)}</span><Input className="w-24" type="number" min="0" max="100" step="1" value={splitValues[memberId] ?? ''} onChange={(event) => setSplitValues((current) => ({ ...current, [memberId]: event.target.value }))} /><span className="text-sm text-muted-foreground">%</span></div>;
+            })}
+            <p className={`text-sm ${Object.values(splitValues).reduce((total, value) => total + (Number(value) || 0), 0) === 100 ? 'text-green-600' : 'text-amber-600'}`}>
+              Total: {Object.values(splitValues).reduce((total, value) => total + (Number(value) || 0), 0)}%
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSplitDialogShared(null)}>Cancel</Button>
+            <Button
+              disabled={!splitDialogShared || saveSplitMutation.isPending || Object.values(splitValues).reduce((total, value) => total + (Number(value) || 0), 0) !== 100}
+              onClick={async () => {
+                if (!splitDialogShared) return;
+                for (const [userId, value] of Object.entries(splitValues)) {
+                  saveSplitMutation.mutate({ sharedId: splitDialogShared.id, userId, percentage: Number(value) || 0 });
+                }
+                setSplitDialogShared(null);
+              }}
+            >
+              {saveSplitMutation.isPending ? 'Saving...' : 'Save split'}
             </Button>
           </DialogFooter>
         </DialogContent>

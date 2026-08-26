@@ -227,6 +227,28 @@ export function advanceDateByFrequency(date: Date, frequency: string): Date {
   return result;
 }
 
+function retreatDateByFrequency(date: Date, frequency: string): Date {
+  const result = new Date(date);
+  const freq = String(frequency || 'monthly').toLowerCase().trim();
+  const day = result.getDate();
+
+  if (freq === 'monthly') {
+    result.setMonth(result.getMonth() - 1);
+  } else if (freq === 'yearly' || freq === 'annual') {
+    result.setFullYear(result.getFullYear() - 1);
+  } else if (freq === 'weekly') {
+    result.setDate(result.getDate() - 7);
+  } else if (freq === 'quarterly') {
+    result.setMonth(result.getMonth() - 3);
+  } else {
+    result.setMonth(result.getMonth() - 1);
+  }
+
+  if (result.getDate() !== day) result.setDate(0);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
 export function getAdvancedRenewalDateIfNeeded(date: string | Date | null | undefined, frequency: string, now = new Date()): Date | null {
   const renewalDate = parseSubscriptionRenewalDate(date);
   if (!renewalDate) return null;
@@ -283,6 +305,57 @@ export function isSubscriptionBilledInMonth(
   if (renewalDay < monthStartDate) return false;
   if (renewalDay > monthEndDate) return false;
   return isCurrentMonth ? renewalDay <= today : true;
+}
+
+export function calculateMonthlySpendingSeries(
+  subscriptions: any[] | undefined,
+  convertAmount: (amount: number, fromCurrency?: any, toCurrency?: any) => number,
+  months = 6,
+): MonthlySpending[] {
+  const now = new Date();
+  const list = Array.isArray(subscriptions) ? subscriptions : [];
+
+  return Array.from({ length: months + 1 }, (_, index) => {
+    const monthDate = new Date(now.getFullYear(), now.getMonth() - (months - index), 1);
+    const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+    const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59, 999);
+    const isCurrentMonth = monthDate.getFullYear() === now.getFullYear() && monthDate.getMonth() === now.getMonth();
+
+    const amount = list.reduce((total, subscription) => {
+      const status = String(subscription?.status || '').toLowerCase();
+      if (!['active', 'unused', 'to-cancel'].includes(status)) return total;
+
+      const renewalDate = parseSubscriptionRenewalDate(
+        subscription?.nextBillingDate || subscription?.next_billing_at || subscription?.next_billing_date || subscription?.next_billing,
+      );
+      if (!renewalDate) return total;
+
+      const renewalDay = parseDateOnlyLocal(renewalDate);
+      if (!renewalDay || (isCurrentMonth && renewalDay > parseDateOnlyLocal(now)!)) return total;
+
+      const createdDate = parseSubscriptionRenewalDate(subscription?.createdAt || subscription?.created_at);
+      if (createdDate && createdDate > monthEnd) return total;
+
+      const frequency = String(subscription?.frequency || 'monthly').toLowerCase();
+      let occurrence = new Date(renewalDay);
+      let guard = 0;
+      while (occurrence > monthEnd && guard++ < 120) {
+        occurrence = retreatDateByFrequency(occurrence, frequency);
+      }
+      while (occurrence < monthStart && guard++ < 240) {
+        occurrence = advanceDateByFrequency(occurrence, frequency);
+      }
+      if (occurrence < monthStart || occurrence > monthEnd) return total;
+
+      const monthlyCost = calculateMonthlyCost(Number(subscription?.amount) || 0, frequency);
+      return total + convertAmount(monthlyCost, subscription?.currency || 'USD', 'USD');
+    }, 0);
+
+    return {
+      month: monthDate.toLocaleString('en-US', { month: 'short', year: 'numeric' }),
+      amount: Math.round(amount * 100) / 100,
+    };
+  });
 }
 
 export function isRenewalDateInCurrentMonth(date: Date, now = new Date()): boolean {
