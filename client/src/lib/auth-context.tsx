@@ -107,6 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsPremium(premiumData.isPremium);
         setPremiumStatus(premiumData.status);
         setPlanType(premiumData.planType || 'free');
+        if (premiumData.planType === 'premium' || premiumData.planType === 'family') {
+          localStorage.setItem(`subveris-plan:${userId}`, premiumData.planType);
+        }
         setCancelAtPeriodEnd(premiumData.cancelAtPeriodEnd);
         setCurrentPeriodEnd(premiumData.currentPeriodEnd);
       }
@@ -371,7 +374,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + '/auth/callback'
+        redirectTo: window.location.hostname === 'localhost'
+          ? window.location.origin + '/auth/callback'
+          : 'https://subveris.com/auth/callback'
       }
     });
 

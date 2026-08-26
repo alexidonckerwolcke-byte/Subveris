@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth-context";
 
 export type SubscriptionTier = "free" | "premium" | "family";
 
@@ -67,7 +68,16 @@ const TIER_LIMITS = {
 };
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
-  const [tier, setTierState] = useState<SubscriptionTier>("free");
+  const { user, isPremium, planType } = useAuth();
+  const getCachedTier = (userId?: string): SubscriptionTier => {
+    if (!userId || typeof window === "undefined") return "free";
+    const cached = localStorage.getItem(`subveris-plan:${userId}`);
+    return cached === "premium" || cached === "family" ? cached : "free";
+  };
+  const authTier: SubscriptionTier = planType === "premium" || planType === "family"
+    ? planType
+    : isPremium ? "premium" : "free";
+  const [tier, setTierState] = useState<SubscriptionTier>(() => getCachedTier(user?.id));
 
   // Fetch subscription status from our API
   const { data: subscriptionData, isLoading, refetch } = useQuery<{
@@ -90,7 +100,19 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     },
     enabled: true, // Always enabled since we need to check auth status
     retry: false,
-    staleTime: 0, // Always refetch when needed
+    initialData: (() => {
+      const cachedTier = getCachedTier(user?.id);
+      if (cachedTier === "free") return undefined;
+      return {
+        isPremium: true,
+        planType: cachedTier,
+        status: "active",
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: null,
+        stripeSubscriptionId: null,
+      };
+    })(),
+    staleTime: 60 * 1000,
     refetchOnWindowFocus: true, // Refetch when window regains focus
     refetchOnReconnect: true, // Refetch when network reconnects
   });
@@ -106,6 +128,15 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   } : null;
 
   useEffect(() => {
+    if (authTier !== "free") {
+      setTierState(authTier);
+    } else if (!user) {
+      setTierState("free");
+    }
+  }, [authTier, user]);
+
+  useEffect(() => {
+    if (isLoading) return;
     if (subscriptionData?.status === "active") {
       if (subscriptionData?.planType) {
         setTierState(subscriptionData.planType);
@@ -117,7 +148,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     } else {
       setTierState("free");
     }
-  }, [subscriptionData]);
+  }, [isLoading, subscriptionData]);
+
+  useEffect(() => {
+    if (user?.id && tier !== "free") {
+      localStorage.setItem(`subveris-plan:${user.id}`, tier);
+    }
+  }, [tier, user?.id]);
 
   // Prefetch all subscription data and related queries when the provider mounts
   useEffect(() => {

@@ -443,7 +443,7 @@ export function FamilySharing() {
     const subscription = shared.subscription;
     const splits = costSplits.filter((split: any) => split.sharedSubscriptionId === shared.id);
     return { shared, subscription, splits };
-  }).filter((row: any) => row.subscription);
+  }).filter((row: any) => row.subscription && row.splits.length > 0);
   const memberCostTotals = familyMembers.reduce((totals: Record<string, number>, member: any) => {
     totals[member.userId || member.user_id] = 0;
     return totals;
