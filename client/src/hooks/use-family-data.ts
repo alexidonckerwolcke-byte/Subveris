@@ -67,6 +67,8 @@ export function useFamilyDataMode() {
 
   // Get the family group for this user (owner or member)
   const familyGroupId = mergedFamilyGroups[0]?.id;
+  const familyGroupOwnerId = mergedFamilyGroups.find((group) => group.id === familyGroupId)?.ownerId;
+  const isFamilyGroupOwner = Boolean(user?.id && familyGroupOwnerId === user.id);
 
   // Get family settings if user is in a family group
   const { data: familySettings, isLoading: familySettingsLoading } = useQuery<any, Error>({
@@ -120,6 +122,7 @@ export function useFamilyDataMode() {
       showFamilyData: false,
       isInFamily: false,
       isFamilyDataModeReady: true,
+      isFamilyGroupOwner: false,
     };
   }
 
@@ -128,5 +131,6 @@ export function useFamilyDataMode() {
     showFamilyData,
     isInFamily: !!familyGroupId,
     isFamilyDataModeReady,
+    isFamilyGroupOwner,
   };
 }

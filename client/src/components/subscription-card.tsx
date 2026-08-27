@@ -91,12 +91,13 @@ export function SubscriptionCard({
   const [isSendingReminder, setIsSendingReminder] = useState(false);
   const [isConfirmingCancellation, setIsConfirmingCancellation] = useState(false);
   
-  const { familyGroupId, showFamilyData } = useFamilyDataMode();
+  const { familyGroupId, showFamilyData, isFamilyGroupOwner } = useFamilyDataMode();
 
   const isOwnedByCurrentUser = Boolean(
     user?.id &&
     (subscription.userId === user.id || (subscription as any).user_id === user.id)
   );
+  const canManageSubscription = isOwnedByCurrentUser || isFamilyGroupOwner;
 
   const isDeletedSubscription = isSubscriptionDeleted(subscription);
   const effectiveStatus = isDeletedSubscription ? 'deleted' : subscription.status;
@@ -241,7 +242,7 @@ export function SubscriptionCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {onEdit && isOwnedByCurrentUser && !isDeletedSubscription && (
+              {onEdit && canManageSubscription && !isDeletedSubscription && (
                 <DropdownMenuItem
                   onClick={() => onEdit(subscription)}
                   data-testid={`action-edit-subscription-${subscription.id}`}
@@ -258,7 +259,7 @@ export function SubscriptionCard({
                   View Cancellation Guide
                 </DropdownMenuItem>
               )}
-              {isOwnedByCurrentUser ? (
+              {canManageSubscription ? (
                 <>
                   {!isDeletedSubscription && (
                     <DropdownMenuItem
@@ -294,7 +295,7 @@ export function SubscriptionCard({
                       {isSendingReminder ? "Sending..." : "Send Reminder Email"}
                     </DropdownMenuItem>
                   )}
-                  {isOwnedByCurrentUser && (effectiveStatus === "to-cancel" || effectiveStatus === "cancelling") && (
+                  {canManageSubscription && (effectiveStatus === "to-cancel" || effectiveStatus === "cancelling") && (
                     <DropdownMenuItem
                       onClick={handleConfirmCancellation}
                       disabled={isConfirmingCancellation}
