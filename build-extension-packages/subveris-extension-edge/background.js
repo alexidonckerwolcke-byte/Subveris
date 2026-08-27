@@ -492,8 +492,8 @@ function sendUsageTracking(domain, timeSpent, serviceName, serviceUrl) {
     }
 
     updateZeroUsageSignal(domain, timeSpent, (isZeroUsage) => {
-      browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
-        const token = result.authToken;
+      browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl'], (result) => {
+        const token = result.supabaseAuthToken || result.authToken;
         const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
 
         if (!token) {
@@ -738,8 +738,8 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'authorizeGmail') {
     // Attempt Gmail authorization via backend OAuth endpoint
-    browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
-      const token = result.authToken;
+      browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl'], (result) => {
+        const token = result.supabaseAuthToken || result.authToken;
       const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
 
       if (!token) {

@@ -445,3 +445,8 @@ if (document.readyState === 'loading') {
 
 window.addEventListener('pagehide', trackUsageIfNeeded);
 window.addEventListener('beforeunload', trackUsageIfNeeded);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    trackUsageIfNeeded();
+  }
+});
