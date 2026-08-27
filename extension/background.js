@@ -484,10 +484,11 @@ function runCookieSessionScan() {
   });
 }
 
-function sendUsageTracking(domain, timeSpent, serviceName, serviceUrl) {
+function sendUsageTracking(domain, timeSpent, serviceName, serviceUrl, callback = () => {}) {
   ensureTierAccess((allowed) => {
     if (!allowed) {
       console.log('[Background] Usage tracking skipped because the extension is not included in the current plan.');
+      callback({ success: false, error: 'An active Premium or Family plan is required.' });
       return;
     }
 
@@ -498,6 +499,7 @@ function sendUsageTracking(domain, timeSpent, serviceName, serviceUrl) {
 
         if (!token) {
           console.error('[Background] ❌ No auth token found for TRACK_USAGE');
+          callback({ success: false, error: 'No authenticated session token found.' });
           return;
         }
 
@@ -524,21 +526,21 @@ function sendUsageTracking(domain, timeSpent, serviceName, serviceUrl) {
           console.log('[Background] TRACK_USAGE_FOR_ALL_MEMBERS response status:', response.status);
           if (!response.ok) {
             console.error('[Background] TRACK_USAGE_FOR_ALL_MEMBERS request failed:', response.status, response.statusText);
-            return sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName, serviceUrl);
+            return sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName, serviceUrl, callback);
           }
 
           console.log('[Background] ✅ TRACK_USAGE_FOR_ALL_MEMBERS successful for:', domain);
-          return response.json();
+          return response.json().then((body) => callback({ success: true, body }));
         }).catch((error) => {
           console.error('[Background] Failed TRACK_USAGE_FOR_ALL_MEMBERS fetch:', error);
-          return sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName, serviceUrl);
+          return sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName, serviceUrl, callback);
         });
       });
     });
   });
 }
 
-function sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName, serviceUrl) {
+function sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName, serviceUrl, callback = () => {}) {
   const payload = JSON.stringify({
     domain,
     serviceUrl,
@@ -561,11 +563,14 @@ function sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName
     console.log('[Background] TRACK_USAGE fallback response status:', response.status);
     if (!response.ok) {
       console.error('[Background] TRACK_USAGE fallback request failed:', response.status, response.statusText);
+      response.text().then((error) => callback({ success: false, error: error || `HTTP ${response.status}` }));
     } else {
       console.log('[Background] ✅ TRACK_USAGE fallback successful for:', domain);
+      response.json().then((body) => callback({ success: true, body })).catch(() => callback({ success: true }));
     }
   }).catch((error) => {
     console.error('[Background] Failed TRACK_USAGE fallback fetch:', error);
+    callback({ success: false, error: error.message || 'Usage tracking request failed.' });
   });
 }
 
@@ -648,8 +653,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'TRACK_USAGE') {
     console.log('[Background] TRACK_USAGE request for domain:', request.domain, 'timeSpent:', request.timeSpent);
-    sendUsageTracking(request.domain, request.timeSpent, request.serviceName, request.serviceUrl);
-    sendResponse({ success: true, queued: true });
+    sendUsageTracking(request.domain, request.timeSpent, request.serviceName, request.serviceUrl, sendResponse);
     return true;
   }
 

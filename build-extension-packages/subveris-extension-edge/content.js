@@ -128,8 +128,8 @@ function sendUsageTracking(domain, timeSpent) {
       console.log('[Extension] 💡 If this error persists, reload the page after reloading the extension.');
       return;
     }
-    if (!response || !response.success) {
-      console.warn('[Extension] ⚠️ TRACK_USAGE response was not successful:', response);
+    if (!response?.success) {
+      console.warn('[Extension] ⚠️ TRACK_USAGE was not accepted by the API:', response?.error || response);
     } else {
       console.log('[Extension] ✅ Usage tracking successful for:', domain);
     }
