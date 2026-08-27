@@ -37,6 +37,7 @@ interface SubscriptionCardProps {
   subscription: Subscription;
   onStatusChange: (id: string, status: SubscriptionStatus) => void;
   isPremium?: boolean;
+  onEdit?: (subscription: Subscription) => void;
 }
 
 const cancellationGuideSlugs: Record<string, string> = {
@@ -80,6 +81,7 @@ export function SubscriptionCard({
   subscription,
   onStatusChange,
   isPremium = false,
+  onEdit,
 }: SubscriptionCardProps) {
   const { formatAmount } = useCurrency();
   const { user, getToken } = useAuth();
@@ -222,13 +224,21 @@ export function SubscriptionCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                className="opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
                 data-testid={`subscription-menu-${subscription.id}`}
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {onEdit && isOwnedByCurrentUser && !isDeletedSubscription && (
+                <DropdownMenuItem
+                  onClick={() => onEdit(subscription)}
+                  data-testid={`action-edit-subscription-${subscription.id}`}
+                >
+                  Edit subscription
+                </DropdownMenuItem>
+              )}
               {guideUrl && !isDeletedSubscription && (
                 <DropdownMenuItem
                   onClick={() => window.open(guideUrl, "_blank", "noopener,noreferrer")}

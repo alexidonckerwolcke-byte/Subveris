@@ -67,6 +67,7 @@ export default function Subscriptions() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
   const [isSubmittingLocal, setIsSubmittingLocal] = useState(false);
   const [currentTab, setCurrentTab] = useState<string>("all");
   const submissionInFlightRef = useRef<boolean>(false);  // Track if submission is in progress
@@ -251,6 +252,43 @@ export default function Subscriptions() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (data: AddSubscriptionForm) => {
+      if (!editingSubscription) throw new Error("No subscription selected");
+      const res = await apiRequest("PATCH", `/api/subscriptions/${editingSubscription.id}`, {
+        name: data.name.trim(),
+        category: data.category,
+        amount: data.amount,
+        frequency: data.frequency,
+        nextBillingDate: data.nextBillingDate,
+        websiteDomain: data.websiteDomain?.trim() || null,
+        websiteUrl: data.websiteUrl?.trim() || null,
+        currency,
+      });
+      return res.json();
+    },
+    onSuccess: (updatedSubscription) => {
+      queryClient.setQueryData<InfiniteData<SubscriptionsPage>>(["/api/subscriptions", PER_PAGE], (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          pages: current.pages.map((page) => ({
+            ...page,
+            items: page.items.map((subscription) => subscription.id === updatedSubscription.id ? updatedSubscription : subscription),
+          })),
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions", PER_PAGE] });
+      queryClient.invalidateQueries({ queryKey: ["/api/metrics"] });
+      if (familyGroupId) queryClient.invalidateQueries({ queryKey: ["/api/family-groups", familyGroupId, "family-data"] });
+      setDialogOpen(false);
+      setEditingSubscription(null);
+      toast({ title: "Subscription updated", description: "Your subscription details have been saved." });
+    },
+    onError: (error) => toast({ title: "Error", description: `Failed to update subscription: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" }),
+  });
+
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: SubscriptionStatus }) => {
       console.log(`[Subscriptions] Updating subscription ${id} status to ${status}`);
@@ -327,6 +365,20 @@ export default function Subscriptions() {
     updateStatusMutation.mutate({ id, status });
   };
 
+  const openEditSubscription = (subscription: Subscription) => {
+    setEditingSubscription(subscription);
+    form.reset({
+      name: subscription.name,
+      category: subscription.category,
+      amount: String(subscription.amount) as any,
+      frequency: subscription.frequency,
+      nextBillingDate: String((subscription as any).nextBillingDate || (subscription as any).next_billing_at || '').split('T')[0],
+      websiteDomain: (subscription as any).websiteDomain || (subscription as any).website_domain || '',
+      websiteUrl: (subscription as any).websiteUrl || (subscription as any).website_url || '',
+    });
+    setDialogOpen(true);
+  };
+
   const onSubmit = async (data: AddSubscriptionForm) => {
     // Triple-check to prevent duplicate submissions
     if (isSubmittingLocal || addMutation.isPending || submissionInFlightRef.current) {
@@ -353,7 +405,11 @@ export default function Subscriptions() {
       setIsSubmittingLocal(true);
       submissionInFlightRef.current = true;
       console.log('[Subscriptions] Form submission started', { name: data.name });
-      await addMutation.mutateAsync(data);
+      if (editingSubscription) {
+        await updateMutation.mutateAsync(data);
+      } else {
+        await addMutation.mutateAsync(data);
+      }
     } catch (error) {
       console.error('[Subscriptions] Form submission error:', error);
     } finally {
@@ -390,7 +446,10 @@ export default function Subscriptions() {
               Manage the services you keep, review the ones that are slipping, and stay ahead of renewals without the noise.
             </p>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) setEditingSubscription(null);
+          }}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-subscription">
                 <Plus className="h-4 w-4 mr-2" />
@@ -399,9 +458,9 @@ export default function Subscriptions() {
             </DialogTrigger>
             <DialogContent aria-describedby="add-subscription-desc">
               <DialogHeader>
-                <DialogTitle>Add New Subscription</DialogTitle>
+                <DialogTitle>{editingSubscription ? "Edit Subscription" : "Add New Subscription"}</DialogTitle>
                 <DialogDescription id="add-subscription-desc">
-                  Manually add a subscription that wasn't automatically detected.
+                  {editingSubscription ? "Update the details for this subscription." : "Manually add a subscription that wasn't automatically detected."}
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
@@ -436,7 +495,7 @@ export default function Subscriptions() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-category">
                               <SelectValue placeholder="Select category" />
@@ -474,7 +533,7 @@ export default function Subscriptions() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Billing Frequency</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-frequency">
                                 <SelectValue placeholder="Select frequency" />
@@ -544,10 +603,10 @@ export default function Subscriptions() {
                     </Button>
                     <Button
                       type="submit"
-                      disabled={addMutation.isPending || isSubmittingLocal || submissionInFlightRef.current}
+                      disabled={addMutation.isPending || updateMutation.isPending || isSubmittingLocal || submissionInFlightRef.current}
                       data-testid="button-submit-subscription"
                     >
-                      {addMutation.isPending || isSubmittingLocal ? "Adding..." : "Add Subscription"}
+                      {addMutation.isPending || updateMutation.isPending || isSubmittingLocal ? "Saving..." : editingSubscription ? "Save Changes" : "Add Subscription"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -637,6 +696,7 @@ export default function Subscriptions() {
                           key={sub.id}
                           subscription={sub}
                           onStatusChange={handleStatusChange}
+                          onEdit={openEditSubscription}
                           isPremium={tier === "premium"}
                         />
                       ))}
@@ -652,6 +712,7 @@ export default function Subscriptions() {
                           key={sub.id}
                           subscription={sub}
                           onStatusChange={handleStatusChange}
+                          onEdit={openEditSubscription}
                           isPremium={tier === "premium"}
                         />
                       ))}
@@ -667,6 +728,7 @@ export default function Subscriptions() {
                           key={sub.id}
                           subscription={sub}
                           onStatusChange={handleStatusChange}
+                          onEdit={openEditSubscription}
                           isPremium={tier === "premium"}
                         />
                       ))}
@@ -716,6 +778,7 @@ export default function Subscriptions() {
                     key={sub.id}
                     subscription={sub}
                     onStatusChange={handleStatusChange}
+                    onEdit={openEditSubscription}
 
                     isPremium={tier === "premium"}
                   />
@@ -735,6 +798,7 @@ export default function Subscriptions() {
                     key={sub.id}
                     subscription={sub}
                     onStatusChange={handleStatusChange}
+                    onEdit={openEditSubscription}
 
                     isPremium={tier === "premium"}
                   />
@@ -755,6 +819,7 @@ export default function Subscriptions() {
                     key={sub.id}
                     subscription={sub}
                     onStatusChange={handleStatusChange}
+                    onEdit={openEditSubscription}
 
                     isPremium={tier === "premium"}
                   />
@@ -778,6 +843,7 @@ export default function Subscriptions() {
                       key={sub.id}
                       subscription={sub}
                       onStatusChange={handleStatusChange}
+                      onEdit={openEditSubscription}
                       isPremium={tier === "premium"}
                     />
                   ))}

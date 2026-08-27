@@ -1871,8 +1871,17 @@ runtimeDeno?.serve?.(async (req: Request) => {
       if (body.category !== undefined) {
         updates.category = body.category;
       }
+      if (body.frequency !== undefined) {
+        updates.frequency = body.frequency;
+      }
       if (body.amount !== undefined) {
         updates.amount = body.amount;
+      }
+      if (body.websiteDomain !== undefined) {
+        updates.website_domain = body.websiteDomain || null;
+      }
+      if (body.websiteUrl !== undefined) {
+        updates.website_url = body.websiteUrl || null;
       }
 
       if (body.nextBillingDate) {
