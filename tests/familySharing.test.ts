@@ -4,6 +4,12 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 function makeFakeClient() {
   function defaultResult(table: string, chain: any) {
     if (table === 'family_groups') {
+      const selecting = chain._select || '';
+      const eqId = chain._query.some((q: any) => q.op === 'eq' && q.args[0] === 'id');
+      const inOwner = chain._query.some((q: any) => q.op === 'eq' && q.args[0] === 'owner_id');
+      if (inOwner || (selecting.includes('id') && !eqId)) {
+        return [{ id: 'grp1', owner_id: 'owner123' }];
+      }
       // used to verify owner
       return { owner_id: 'owner123' };
     }
@@ -152,6 +158,7 @@ vi.spyOn(require('crypto'), 'randomUUID').mockReturnValue('fixed-uuid');
 
 import * as familySharing from '../server/family-sharing';
 import { mergeFamilyGroupsForUser } from '../client/src/hooks/use-family-data';
+import { getFamilyTrackableUserIds } from '../supabase/functions/api/index';
 
 
 describe('family-sharing helpers', () => {
@@ -166,6 +173,13 @@ describe('family-sharing helpers', () => {
 
     expect(groups).toHaveLength(2);
     expect(groups.map((group) => group.id)).toEqual(['owner-group', 'member-group']);
+  });
+
+  it('resolves family member user ids for usage tracking', async () => {
+    const userIds = await getFamilyTrackableUserIds('owner123', makeFakeClient());
+
+    expect(userIds).toContain('owner123');
+    expect(userIds).toContain('member1');
   });
 
   it('throws if non-owner adds member', async () => {

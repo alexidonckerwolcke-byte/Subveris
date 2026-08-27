@@ -1162,6 +1162,108 @@ async function loadAllSubscriptions(userId: string) {
   return { subscriptions: transformedData, count: data?.length ?? 0 };
 }
 
+export async function getFamilyTrackableUserIds(userId: string, client: any = supabase): Promise<string[]> {
+  if (!userId) {
+    return [];
+  }
+
+  if (!client) {
+    return [userId];
+  }
+
+  const trackableUserIds = new Set<string>([userId]);
+
+  const { data: ownedGroups, error: ownedGroupsError } = await client
+    .from("family_groups")
+    .select("id")
+    .eq("owner_id", userId);
+
+  if (!ownedGroupsError && Array.isArray(ownedGroups) && ownedGroups.length) {
+    const ownedGroupIds = ownedGroups
+      .map((group: any) => group?.id)
+      .filter(Boolean);
+
+    if (ownedGroupIds.length) {
+      const { data: groupMembers, error: groupMembersError } = await client
+        .from("family_group_members")
+        .select("user_id")
+        .in("family_group_id", ownedGroupIds);
+
+      if (!groupMembersError && Array.isArray(groupMembers)) {
+        for (const member of groupMembers) {
+          if (member?.user_id) trackableUserIds.add(String(member.user_id));
+        }
+      }
+    }
+  }
+
+  const { data: memberGroups, error: memberGroupsError } = await client
+    .from("family_group_members")
+    .select("family_group_id")
+    .eq("user_id", userId);
+
+  if (!memberGroupsError && Array.isArray(memberGroups) && memberGroups.length) {
+    const memberGroupIds = memberGroups
+      .map((group: any) => group?.family_group_id)
+      .filter(Boolean);
+
+    if (memberGroupIds.length) {
+      const { data: groupOwners, error: groupOwnersError } = await client
+        .from("family_groups")
+        .select("owner_id")
+        .in("id", memberGroupIds);
+
+      if (!groupOwnersError && Array.isArray(groupOwners)) {
+        for (const group of groupOwners) {
+          if (group?.owner_id) trackableUserIds.add(String(group.owner_id));
+        }
+      }
+
+      const { data: allMembers, error: allMembersError } = await client
+        .from("family_group_members")
+        .select("user_id")
+        .in("family_group_id", memberGroupIds);
+
+      if (!allMembersError && Array.isArray(allMembers)) {
+        for (const member of allMembers) {
+          if (member?.user_id) trackableUserIds.add(String(member.user_id));
+        }
+      }
+    }
+  }
+
+  return Array.from(trackableUserIds).filter(Boolean);
+}
+
+async function isUserFamilyGroupOwnerForSubscription(userId: string, memberUserId: string) {
+  if (!userId || !memberUserId || userId === memberUserId) {
+    return false;
+  }
+
+  const { data: ownerGroups, error: ownerGroupsError } = await supabase
+    .from('family_groups')
+    .select('id')
+    .eq('owner_id', userId);
+
+  if (ownerGroupsError || !ownerGroups?.length) {
+    return false;
+  }
+
+  const groupIds = ownerGroups.map((group: any) => group.id).filter(Boolean);
+  if (!groupIds.length) {
+    return false;
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from('family_group_members')
+    .select('id')
+    .in('family_group_id', groupIds)
+    .eq('user_id', memberUserId)
+    .maybeSingle();
+
+  return !membershipError && !!membership;
+}
+
 async function updateSubscription(userId: string, subscriptionId: string, updates: any) {
   console.log('[API] updateSubscription owner check', { userId, subscriptionId });
   const subscription = await getSubscriptionById(userId, subscriptionId);
@@ -1205,7 +1307,6 @@ async function updateSubscription(userId: string, subscriptionId: string, update
     .from("subscriptions")
     .update(normalizedUpdates)
     .eq("id", subscriptionId)
-    .eq("user_id", userId)
     .select()
     .maybeSingle();
 
@@ -1258,8 +1359,7 @@ async function getSubscriptionById(userId: string, subscriptionId: string) {
     .from("subscriptions")
     .select("*")
     .eq("id", subscriptionId)
-    .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
   if (error || !subscription) {
     const { data: found, error: foundError } = await supabase
@@ -1271,7 +1371,15 @@ async function getSubscriptionById(userId: string, subscriptionId: string) {
     return null;
   }
 
-  return subscription;
+  if (subscription.user_id === userId) {
+    return subscription;
+  }
+
+  if (await isUserFamilyGroupOwnerForSubscription(userId, subscription.user_id)) {
+    return subscription;
+  }
+
+  return null;
 }
 
 async function deleteSubscription(userId: string, subscriptionId: string) {
@@ -1283,8 +1391,7 @@ async function deleteSubscription(userId: string, subscriptionId: string) {
   const { error } = await supabase
     .from("subscriptions")
     .update({ status: "deleted", deleted_at: new Date().toISOString() })
-    .eq("id", subscriptionId)
-    .eq("user_id", userId);
+    .eq("id", subscriptionId);
 
   if (error) {
     throw error;
@@ -2813,6 +2920,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           discoveredDomains.push(fallbackDomain);
         }
 
+        const familyTrackableUserIds = await getFamilyTrackableUserIds(userId);
         const createdDomains: string[] = [];
         for (const discoveredDomain of discoveredDomains) {
           const normalizedDiscoveredDomain = normalizeDomain(discoveredDomain);
@@ -2820,11 +2928,17 @@ runtimeDeno?.serve?.(async (req: Request) => {
             continue;
           }
 
-          const { data: existingDiscoveries, error: discoveryLookupError } = await supabase
-            .from("subscriptions")
-            .select("id, name, website_domain, status, is_detected")
-            .eq("user_id", userId)
-            .neq("status", "deleted");
+          const { data: existingDiscoveries, error: discoveryLookupError } = familyTrackableUserIds.length > 0
+            ? await supabase
+              .from("subscriptions")
+              .select("id, name, website_domain, status, is_detected")
+              .in("user_id", familyTrackableUserIds)
+              .neq("status", "deleted")
+            : await supabase
+              .from("subscriptions")
+              .select("id, name, website_domain, status, is_detected")
+              .eq("user_id", userId)
+              .neq("status", "deleted");
 
           if (discoveryLookupError) {
             console.warn("[Extension Sync] Failed to lookup discovered domain:", discoveryLookupError);
@@ -2952,10 +3066,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
             ? body.websiteUrl.trim()
             : null;
         if (normalizedDomain) {
+          const subscriptionLookupUserIds = familyTrackableUserIds.length > 0 ? familyTrackableUserIds : [userId];
           const { data: matchingSubscriptions, error: matchingError } = await supabase
             .from("subscriptions")
             .select("*")
-            .eq("user_id", userId)
+            .in("user_id", subscriptionLookupUserIds)
             .neq("status", "deleted");
 
           if (!matchingError && matchingSubscriptions?.length) {
