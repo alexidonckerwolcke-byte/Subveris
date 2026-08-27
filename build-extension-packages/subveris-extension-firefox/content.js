@@ -193,8 +193,10 @@ function detectAndTrackSubscription() {
         domain,
         detectedAt: Date.now()
       }, (response) => {
-        if (response) {
+        if (response?.success) {
           console.log('[Extension] ✅ Subscription detection sent:', serviceName);
+        } else {
+          console.log('[Extension] ⏭️ Subscription detection skipped:', response?.error || 'Premium or Family plan required');
         }
       });
     }
@@ -430,6 +432,9 @@ function trackUsageIfNeeded() {
   // The background worker performs the authoritative plan check and can refresh stale status.
   sendUsageTracking(domain, timeSpent);
 }
+
+// Record an active visit even when a single-page app keeps the tab alive.
+window.setTimeout(trackUsageIfNeeded, 10000);
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
