@@ -1238,6 +1238,7 @@ async function updateSubscription(userId: string, subscriptionId: string, update
     logoUrl: sub.logo_url,
     isDetected: sub.is_detected,
     websiteDomain: sub.website_domain,
+    websiteUrl: sub.website_url,
     scheduledCancellationDate: sub.scheduled_cancellation_date,
     cancellationUrl: sub.cancellation_url,
     nextBillingDate: (() => {
