@@ -12,7 +12,6 @@
   ],
   "host_permissions": [
     "https://subveris.com/*",
-    "https://subveris.com/*",
     "https://*.netflix.com/*",
     "https://*.spotify.com/*",
     "https://*.amazon.com/*",
@@ -46,7 +45,6 @@
   "content_scripts": [
     {
       "matches": [
-        "https://subveris.com/*",
         "https://subveris.com/*",
         "https://*.netflix.com/*",
         "https://*.spotify.com/*",
