@@ -697,7 +697,7 @@ export default function Subscriptions() {
                           subscription={sub}
                           onStatusChange={handleStatusChange}
                           onEdit={openEditSubscription}
-                          isPremium={tier === "premium"}
+                          isPremium={tier === "premium" || tier === "family"}
                         />
                       ))}
                     </div>
@@ -713,7 +713,7 @@ export default function Subscriptions() {
                           subscription={sub}
                           onStatusChange={handleStatusChange}
                           onEdit={openEditSubscription}
-                          isPremium={tier === "premium"}
+                          isPremium={tier === "premium" || tier === "family"}
                         />
                       ))}
                     </div>
@@ -729,7 +729,7 @@ export default function Subscriptions() {
                           subscription={sub}
                           onStatusChange={handleStatusChange}
                           onEdit={openEditSubscription}
-                          isPremium={tier === "premium"}
+                          isPremium={tier === "premium" || tier === "family"}
                         />
                       ))}
                     </div>
@@ -744,7 +744,7 @@ export default function Subscriptions() {
                           key={sub.id}
                           subscription={sub}
                           onStatusChange={handleStatusChange}
-                          isPremium={tier === "premium"}
+                          isPremium={tier === "premium" || tier === "family"}
                         />
                       ))}
                     </div>
@@ -780,7 +780,7 @@ export default function Subscriptions() {
                     onStatusChange={handleStatusChange}
                     onEdit={openEditSubscription}
 
-                    isPremium={tier === "premium"}
+                    isPremium={tier === "premium" || tier === "family"}
                   />
                 ))
               ) : (
@@ -800,7 +800,7 @@ export default function Subscriptions() {
                     onStatusChange={handleStatusChange}
                     onEdit={openEditSubscription}
 
-                    isPremium={tier === "premium"}
+                    isPremium={tier === "premium" || tier === "family"}
                   />
                 ))
               ) : (
@@ -821,7 +821,7 @@ export default function Subscriptions() {
                     onStatusChange={handleStatusChange}
                     onEdit={openEditSubscription}
 
-                    isPremium={tier === "premium"}
+                    isPremium={tier === "premium" || tier === "family"}
                   />
                 ))
               ) : (
@@ -844,7 +844,7 @@ export default function Subscriptions() {
                       subscription={sub}
                       onStatusChange={handleStatusChange}
                       onEdit={openEditSubscription}
-                      isPremium={tier === "premium"}
+                      isPremium={tier === "premium" || tier === "family"}
                     />
                   ))}
                 </>

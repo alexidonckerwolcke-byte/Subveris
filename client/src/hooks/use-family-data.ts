@@ -65,10 +65,13 @@ export function useFamilyDataMode() {
 
   const mergedFamilyGroups = mergeFamilyGroupsForUser(familyGroups || [], membershipData?.groups || []);
 
-  // Get the family group for this user (owner or member)
-  const familyGroupId = mergedFamilyGroups[0]?.id;
-  const familyGroupOwnerId = mergedFamilyGroups.find((group) => group.id === familyGroupId)?.ownerId;
-  const isFamilyGroupOwner = Boolean(user?.id && familyGroupOwnerId === user.id);
+  // Prefer a group owned by the current user when both owner and member groups exist.
+  const ownedFamilyGroup = mergedFamilyGroups.find((group) => {
+    const role = String(group?.role || '').toLowerCase();
+    return user?.id && (group?.ownerId === user.id || role === 'owner');
+  });
+  const familyGroupId = ownedFamilyGroup?.id || mergedFamilyGroups[0]?.id;
+  const isFamilyGroupOwner = Boolean(ownedFamilyGroup && user?.id);
 
   // Get family settings if user is in a family group
   const { data: familySettings, isLoading: familySettingsLoading } = useQuery<any, Error>({

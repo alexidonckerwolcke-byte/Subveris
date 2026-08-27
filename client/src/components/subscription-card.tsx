@@ -97,7 +97,11 @@ export function SubscriptionCard({
     user?.id &&
     (subscription.userId === user.id || (subscription as any).user_id === user.id)
   );
-  const canManageSubscription = isOwnedByCurrentUser || isFamilyGroupOwner;
+  
+  // Allow management if:
+  // 1. User owns the subscription, OR
+  // 2. User is a family owner AND is viewing family data (member subscriptions in family mode)
+  const canManageSubscription = isOwnedByCurrentUser || (showFamilyData && isFamilyGroupOwner);
 
   const isDeletedSubscription = isSubscriptionDeleted(subscription);
   const effectiveStatus = isDeletedSubscription ? 'deleted' : subscription.status;
