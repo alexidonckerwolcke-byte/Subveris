@@ -1901,12 +1901,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
           const existingRenewal = toDateOnlyLocal(existingSub.next_billing_at);
           console.log(`[API] PATCH /subscriptions/${subscriptionId} existingRenewal:`, existingRenewal);
           if (parsedNewDate && today) {
-            // Only preserve an existing billing_month when this update was
-            // triggered by the auto-advance flow on the client. Manual edits
-            // should not be forced to preserve the old billing_month.
+            // Once a subscription has been counted in the current month,
+            // editing its next renewal must not remove that month's spend.
             const isAutoAdvance = Boolean(body.autoAdvanced);
-            if (isAutoAdvance && existingRenewal && existingRenewal <= today && parsedNewDate > today) {
-              updates.billing_month = existingSub.billing_month || formatBillingMonth(existingRenewal);
+            const currentBillingMonth = formatBillingMonth(today);
+            const wasBilledThisMonth = existingSub.billing_month === currentBillingMonth;
+            if (wasBilledThisMonth || (isAutoAdvance && existingRenewal && existingRenewal <= today && parsedNewDate > today)) {
+              updates.billing_month = existingSub.billing_month || currentBillingMonth;
             } else {
               updates.billing_month = parsedNewDate <= today ? formatBillingMonth(today) : formatBillingMonth(parsedNewDate);
             }
