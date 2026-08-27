@@ -292,8 +292,9 @@ function isTierAllowed(status) {
 }
 
 function refreshSubscriptionStatus(callback = () => {}) {
-  browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
+  browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl'], (result) => {
     const token = result.authToken;
+    const planToken = result.supabaseAuthToken || token;
     const configuredApiUrl = normalizeApiUrl(result.subverisApiUrl);
     const apiUrls = configuredApiUrl === DEFAULT_API_URL
       ? [DEFAULT_API_URL]
@@ -305,7 +306,7 @@ function refreshSubscriptionStatus(callback = () => {}) {
 
     const tryUrl = (index) => {
       fetch(`${apiUrls[index]}/api/user/premium-status`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${planToken}` },
         cache: 'no-store',
       }).then(async (response) => {
         const data = await response.json().catch(() => ({}));
@@ -609,6 +610,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       browser.storage.local.set({
         authToken: opaqueToken,
+        supabaseAuthToken: rawToken,
         authSessionId: sessionId,
         authCsrfToken: csrfToken,
         supabaseUserUUID: request.userId,
