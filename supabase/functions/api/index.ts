@@ -2935,15 +2935,28 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         let matchingSubscription: any = null;
         const normalizedDomain = normalizeDomain(typeof body.domain === "string" ? body.domain : null);
+        const serviceUrl = typeof body.serviceUrl === "string" && body.serviceUrl.trim()
+          ? body.serviceUrl.trim()
+          : typeof body.websiteUrl === "string" && body.websiteUrl.trim()
+            ? body.websiteUrl.trim()
+            : null;
         if (normalizedDomain) {
           const { data: matchingSubscriptions, error: matchingError } = await supabase
             .from("subscriptions")
             .select("*")
             .eq("user_id", userId)
-            .eq("website_domain", normalizedDomain);
+            .neq("status", "deleted");
 
           if (!matchingError && matchingSubscriptions?.length) {
-            matchingSubscription = matchingSubscriptions[0];
+            const normalizedServiceName = String(body.serviceName || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+            matchingSubscription = matchingSubscriptions.find((subscription: any) => {
+              const subscriptionDomain = normalizeDomain(subscription.website_domain);
+              const subscriptionUrlDomain = normalizeDomain(subscription.website_url);
+              const subscriptionName = String(subscription.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+              return subscriptionDomain === normalizedDomain ||
+                subscriptionUrlDomain === normalizedDomain ||
+                (normalizedServiceName && (subscriptionName === normalizedServiceName || subscriptionName.includes(normalizedServiceName)));
+            }) || null;
           }
         }
 
@@ -2971,6 +2984,9 @@ runtimeDeno?.serve?.(async (req: Request) => {
             last_used_at: new Date().toISOString(),
             total_active_seconds: Number(matchingSubscription.total_active_seconds || 0) + Math.max(0, activeTimeSeconds),
           };
+
+          updatePayload.website_domain = normalizedDomain || matchingSubscription.website_domain;
+          if (serviceUrl) updatePayload.website_url = serviceUrl;
 
           if (detectedPrice !== null && Number.isFinite(detectedPrice)) {
             updatePayload.amount = detectedPrice;

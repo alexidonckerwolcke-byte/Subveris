@@ -30,6 +30,11 @@ function isTierAllowed(status) {
   return status === 'premium' || status === 'family';
 }
 
+function isSubverisPage() {
+  const hostname = window.location.hostname.replace(/^www\./i, '').toLowerCase();
+  return hostname === 'subveris.com' || hostname.endsWith('.subveris.com');
+}
+
 // Inject script to capture auth token from page context
 const script = document.createElement('script');
 script.src = browser.runtime.getURL('inject.js');
@@ -116,7 +121,8 @@ function getAuthToken() {
 
 function sendUsageTracking(domain, timeSpent) {
   const serviceName = getServiceNameFromDomain(domain);
-  const success = sendMessageToBackground({ type: 'TRACK_USAGE', domain, serviceName, timeSpent }, (response, err) => {
+  const serviceUrl = window.location.href;
+  const success = sendMessageToBackground({ type: 'TRACK_USAGE', domain, serviceName, serviceUrl, timeSpent }, (response, err) => {
     if (err) {
       console.error('[Extension] ❌ TRACK_USAGE message failed:', err.message);
       console.log('[Extension] 💡 If this error persists, reload the page after reloading the extension.');
@@ -170,6 +176,7 @@ function getServiceNameFromDomain(domain) {
 }
 
 function detectAndTrackSubscription() {
+  if (isSubverisPage()) return;
   getSubscriptionStatus((status) => {
     if (!isTierAllowed(status)) {
       return;
@@ -195,7 +202,7 @@ function detectAndTrackSubscription() {
 }
 
 function saveDiscoveredPrice(priceData) {
-  if (!priceData) {
+  if (!priceData || isSubverisPage()) {
     return;
   }
 
@@ -354,6 +361,7 @@ function extractSubscriptionPriceData() {
 }
 
 function scanForSubscriptionPricing() {
+  if (isSubverisPage()) return;
   getSubscriptionStatus((status) => {
     if (!isTierAllowed(status)) {
       return;
@@ -404,7 +412,7 @@ getAuthToken().then((token) => {
 });
 
 function trackUsageIfNeeded() {
-  if (window.__subverisUsageSent) return;
+  if (window.__subverisUsageSent || isSubverisPage()) return;
 
   const endTime = Date.now();
   const timeSpent = Math.round((endTime - startTime) / 1000);
