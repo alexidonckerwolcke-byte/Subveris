@@ -1471,19 +1471,42 @@ const server = http.createServer(async (req, res) => {
 
       if (req.method === 'GET') {
         try {
-          const { data, error } = await supabase
+          const { data: ownerGroups, error: ownerError } = await supabase
             .from('family_groups')
             .select('*')
             .eq('owner_id', user.id);
 
-          if (error) {
+          const { data: memberRows, error: memberError } = await supabase
+            .from('family_group_members')
+            .select('family_group_id, role, family_groups(id, name, created_at, owner_id)')
+            .eq('user_id', user.id);
+
+          if (ownerError || memberError) {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify([]));
             return;
           }
 
+          const merged = new Map();
+          for (const group of ownerGroups || []) {
+            merged.set(group.id, { ...group, role: 'owner' });
+          }
+          for (const row of memberRows || []) {
+            const nestedGroup = Array.isArray(row?.family_groups) ? row.family_groups[0] : row?.family_groups;
+            const group = nestedGroup || { id: row?.family_group_id, name: 'Family group', owner_id: null, created_at: row?.joined_at };
+            if (!group?.id) continue;
+            const existing = merged.get(group.id) || {};
+            merged.set(group.id, { ...existing, ...group, role: existing.role || row?.role || 'member' });
+          }
+
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(data || []));
+          res.end(JSON.stringify([...merged.values()].map((group) => ({
+            id: group.id,
+            name: group.name,
+            createdAt: group.created_at,
+            ownerId: group.owner_id,
+            role: group.role,
+          }))));
         } catch (error) {
           console.error('Error fetching family groups:', error);
           res.writeHead(200, { 'Content-Type': 'application/json' });

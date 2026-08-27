@@ -4,6 +4,32 @@ import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useSubscription } from "@/lib/subscription-context";
 
+export function mergeFamilyGroupsForUser(ownerGroups: any[] = [], membershipGroups: any[] = []) {
+  const merged = new Map<string, any>();
+
+  for (const group of [...(ownerGroups || []), ...(membershipGroups || [])]) {
+    if (!group || !group.id) continue;
+
+    const normalized = {
+      ...group,
+      id: group.id,
+      name: group.name || 'Family group',
+      ownerId: group.ownerId ?? group.owner_id,
+      createdAt: group.createdAt ?? group.created_at,
+      role: group.role || 'member',
+    };
+
+    const existing = merged.get(normalized.id);
+    merged.set(normalized.id, {
+      ...existing,
+      ...normalized,
+      role: existing?.role || normalized.role,
+    });
+  }
+
+  return [...merged.values()];
+}
+
 export function useFamilyDataMode() {
   const { user, isPremium, planType } = useAuth();
   const { tier } = useSubscription();
@@ -15,7 +41,17 @@ export function useFamilyDataMode() {
     ? localStorage.getItem(`subveris-family-mode:${user.id}:${cachedGroupId}`) === "true"
     : false;
 
-  // Get family groups for this user
+  const { data: membershipData } = useQuery<any, Error>({
+    queryKey: ["/api/family-groups/me/membership"],
+    enabled: !!user?.id,
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/family-groups/me/membership');
+      return response.json();
+    },
+  });
+
+  // Get family groups for this user, including groups where the user is a member.
   const { data: familyGroups, isLoading: familyGroupsLoading } = useQuery<any[], Error>({
     queryKey: ["/api/family-groups"],
     enabled: !!user?.id,
@@ -27,8 +63,10 @@ export function useFamilyDataMode() {
     },
   });
 
-  // Get the family group for this user (owner's group)
-  const familyGroupId = familyGroups?.[0]?.id;
+  const mergedFamilyGroups = mergeFamilyGroupsForUser(familyGroups || [], membershipData?.groups || []);
+
+  // Get the family group for this user (owner or member)
+  const familyGroupId = mergedFamilyGroups[0]?.id;
 
   // Get family settings if user is in a family group
   const { data: familySettings, isLoading: familySettingsLoading } = useQuery<any, Error>({

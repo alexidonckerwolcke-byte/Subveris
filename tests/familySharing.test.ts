@@ -151,11 +151,22 @@ vi.mock('@supabase/supabase-js', () => {
 vi.spyOn(require('crypto'), 'randomUUID').mockReturnValue('fixed-uuid');
 
 import * as familySharing from '../server/family-sharing';
+import { mergeFamilyGroupsForUser } from '../client/src/hooks/use-family-data';
 
 
 describe('family-sharing helpers', () => {
   // no beforeEach needed; the fake client lives inside the mock factory and its
   // methods already start fresh for each test file run.
+
+  it('merges owned and member family groups for the active user', () => {
+    const groups = mergeFamilyGroupsForUser(
+      [{ id: 'owner-group', name: 'Owner group', ownerId: 'owner123', role: 'owner' }],
+      [{ id: 'member-group', name: 'Member group', ownerId: 'owner456', role: 'member' }],
+    );
+
+    expect(groups).toHaveLength(2);
+    expect(groups.map((group) => group.id)).toEqual(['owner-group', 'member-group']);
+  });
 
   it('throws if non-owner adds member', async () => {
     await expect(familySharing.addFamilyMember('grp1', 'not-owner', 'member1')).rejects.toThrow(

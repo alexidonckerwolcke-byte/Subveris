@@ -3729,28 +3729,60 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       }
 
       try {
-        // Only fetch groups where user is the owner to avoid RLS issues on family_group_members
         const { data: ownerGroups, error: ownerError } = await supabase
           .from("family_groups")
           .select("id,name,created_at,owner_id")
           .eq("owner_id", userId);
+
         if (ownerError) {
           console.error("Error fetching owner groups:", ownerError);
-          // Continue with empty array if fetch fails
         }
 
-        return sendJson(
-          (ownerGroups || []).map((group: any) => ({
+        const { data: memberRows, error: memberError } = await supabase
+          .from("family_group_members")
+          .select("family_group_id, role, family_groups(id, name, created_at, owner_id)")
+          .eq("user_id", userId);
+
+        if (memberError) {
+          console.error("Error fetching member groups:", memberError);
+        }
+
+        const combineGroup = (group: any, fallbackRole?: string) => {
+          if (!group || !group.id) return null;
+          return {
             id: group.id,
             name: group.name,
-            createdAt: group.created_at,
-            ownerId: group.owner_id,
-          })),
-          origin
-        );
+            createdAt: group.created_at || group.createdAt,
+            ownerId: group.owner_id || group.ownerId,
+            role: group.role || fallbackRole || 'member',
+          };
+        };
+
+        const merged = new Map<string, any>();
+
+        for (const group of ownerGroups || []) {
+          const normalized = combineGroup(group, 'owner');
+          if (normalized) {
+            merged.set(normalized.id, normalized);
+          }
+        }
+
+        for (const row of memberRows || []) {
+          const nestedGroup = Array.isArray(row?.family_groups) ? row.family_groups[0] : row?.family_groups;
+          const normalized = combineGroup(nestedGroup || { id: row?.family_group_id }, row?.role || 'member');
+          if (normalized) {
+            const existing = merged.get(normalized.id);
+            merged.set(normalized.id, {
+              ...existing,
+              ...normalized,
+              role: existing?.role || normalized.role,
+            });
+          }
+        }
+
+        return sendJson([...merged.values()], origin);
       } catch (err) {
         console.error("Error fetching family groups:", err);
-        // Return empty array to allow app to continue
         return sendJson([]);
       }
     }
