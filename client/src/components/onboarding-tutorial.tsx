@@ -255,7 +255,7 @@ export function OnboardingTutorial() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="w-full max-w-[min(calc(100vw-2rem),40rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto">
+      <DialogContent className="w-full max-w-[min(calc(100vw-2rem),40rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto" aria-describedby="onboarding-tutorial-desc">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -264,7 +264,7 @@ export function OnboardingTutorial() {
               </div>
               <div>
                 <DialogTitle className="text-xl">{step.title}</DialogTitle>
-                <DialogDescription>{step.description}</DialogDescription>
+                <DialogDescription id="onboarding-tutorial-desc">{step.description}</DialogDescription>
               </div>
             </div>
             <Button

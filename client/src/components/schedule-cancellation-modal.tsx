@@ -89,10 +89,10 @@ export function ScheduleCancellationReminderModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent aria-describedby="schedule-cancellation-desc">
         <DialogHeader>
           <DialogTitle>Schedule Cancellation Reminder</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="schedule-cancellation-desc">
             Set a reminder to cancel <strong>{subscription.name}</strong> on a specific date. We'll send you a reminder email with a direct link to cancel.
           </DialogDescription>
         </DialogHeader>

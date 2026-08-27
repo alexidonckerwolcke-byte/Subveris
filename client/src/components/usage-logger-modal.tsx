@@ -109,10 +109,10 @@ export function UsageLoggerModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent aria-describedby="usage-logger-desc">
         <DialogHeader>
           <DialogTitle>Log Usage - {subscription.name}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="usage-logger-desc">
             Track how many times you've used this subscription
           </DialogDescription>
         </DialogHeader>

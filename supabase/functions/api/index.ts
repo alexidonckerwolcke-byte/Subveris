@@ -2350,7 +2350,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       try {
         const authBase = new URL('auth/v1/', process.env.SUPABASE_URL || '').href;
-        const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+        const anonKey = runtimeDeno?.env?.get('SUPABASE_ANON_KEY');
         
         const response = await fetch(new URL('factors', authBase).href, {
           method: 'POST',
@@ -2523,7 +2523,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         // Use service role to update email via Auth API
         const authBase = new URL('auth/v1/', process.env.SUPABASE_URL || '').href;
-        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        const serviceKey = runtimeDeno?.env?.get('SUPABASE_SERVICE_ROLE_KEY');
 
         const response = await fetch(new URL('admin/users/' + userId, authBase).href, {
           method: 'PUT',
@@ -2573,7 +2573,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         // Use service role to update password via Auth API
         const authBase = new URL('auth/v1/', process.env.SUPABASE_URL || '').href;
-        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        const serviceKey = runtimeDeno?.env?.get('SUPABASE_SERVICE_ROLE_KEY');
 
         const response = await fetch(new URL('admin/users/' + userId, authBase).href, {
           method: 'PUT',
@@ -2644,7 +2644,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         // Delete user from Auth using service role
         const authBase = new URL('auth/v1/', process.env.SUPABASE_URL || '').href;
-        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        const serviceKey = runtimeDeno?.env?.get('SUPABASE_SERVICE_ROLE_KEY');
 
         const response = await fetch(new URL('admin/users/' + userId, authBase).href, {
           method: 'DELETE',
@@ -2966,12 +2966,23 @@ runtimeDeno?.serve?.(async (req: Request) => {
               const subscriptionName = String(subscription.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
               return subscriptionDomain === normalizedDomain ||
                 subscriptionUrlDomain === normalizedDomain ||
-                (normalizedServiceName && (subscriptionName === normalizedServiceName || subscriptionName.includes(normalizedServiceName)));
+                (normalizedServiceName && (
+                  subscriptionName === normalizedServiceName ||
+                  subscriptionName.includes(normalizedServiceName) ||
+                  normalizedServiceName.includes(subscriptionName)
+                ));
             }) || null;
           }
         }
 
         let updatedSubscription: any = matchingSubscription;
+        if (!matchingSubscription) {
+          return sendJson({
+            error: `No subscription matched domain ${normalizedDomain || 'unknown'} or service ${body.serviceName || 'unknown'}. Add the subscription with this domain first.`,
+            domain: normalizedDomain || null,
+            serviceUrl,
+          }, { status: 404 });
+        }
         if (matchingSubscription) {
           const activeTimeSeconds = typeof body.activeTimeSeconds === "number"
             ? body.activeTimeSeconds
@@ -3141,7 +3152,9 @@ runtimeDeno?.serve?.(async (req: Request) => {
         let planType: "free" | "premium" | "family" = "free";
         if (!userSubscriptionError && userSubscription) {
           const rawPlanType = String(userSubscription.plan_type || "free").toLowerCase();
-          const normalizedPlanType = rawPlanType === "premium" || rawPlanType === "family" ? rawPlanType : "free";
+          const normalizedPlanType = rawPlanType === "premium" || rawPlanType === "family"
+            ? (rawPlanType as "premium" | "family")
+            : "free";
           const effectiveStatus = String(userSubscription.status || "active").toLowerCase();
           const isActivePlan = effectiveStatus === "active" || effectiveStatus === "trialing";
           planType = (normalizedPlanType === "premium" || normalizedPlanType === "family") && isActivePlan ? normalizedPlanType : "free";
@@ -3660,14 +3673,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
       const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
       
-      const allSubs = data || [];
-      const activeSubs = allSubs.filter((s) => normalizeSubscriptionStatus(s.status) === "active");
-      const renewalRelevantSubs = allSubs.filter((s) => {
+      const allSubs: any[] = data || [];
+      const activeSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.status) === "active");
+      const renewalRelevantSubs = allSubs.filter((s: any) => {
         const status = normalizeSubscriptionStatus(s.status);
         return status === "active" || status === "unused" || status === "to-cancel" || isSubscriptionDeleted(s) || isSubscriptionCanceled(s);
       });
-      const unusedSubs = allSubs.filter((s) => normalizeSubscriptionStatus(s.status) === "unused");
-      const toCancelSubs = allSubs.filter((s) => normalizeSubscriptionStatus(s.status) === "to-cancel");
+const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.status) === "unused");
+        const toCancelSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.status) === "to-cancel");
       
       // Calculate total monthly spend only for subscriptions renewing in this month.
       // Includes active, unused, and to-cancel subscriptions when their next renewal falls in the current month.
@@ -3682,17 +3695,17 @@ runtimeDeno?.serve?.(async (req: Request) => {
         return sum + convertToUSD(monthlyAmount, s.currency);
       }, 0);
       
-      const deletedSubs = allSubs.filter((s) => isSubscriptionDeleted(s));
+      const deletedSubs = allSubs.filter((s: any) => isSubscriptionDeleted(s));
       
       // Calculate this month's savings (subscriptions deleted this month)
       const thisMonthSavings = deletedSubs
-        .filter((s) => {
+        .filter((s: any) => {
           const deletedAt = s.deleted_at || s.deletedAt;
           if (!deletedAt) return false;
           const deleted = new Date(deletedAt);
           return deleted >= monthStart && deleted <= now;
         })
-        .reduce((sum, s) => {
+        .reduce((sum: number, s: any) => {
           const monthlyAmount = calculateMonthlyCost(Number(s.amount) || 0, s.frequency);
           return sum + convertToUSD(monthlyAmount, s.currency);
         }, 0);
@@ -3780,8 +3793,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
         };
 
         const allGroups = [
-          ...(ownerGroups || []).map(g => ({ ...g, role: 'owner' })),
-          ...(memberRows || []).map(m => {
+          ...(ownerGroups || []).map((g: any) => ({ ...g, role: 'owner' })),
+          ...(memberRows || []).map((m: any) => {
             const nestedGroup = getNestedFamilyGroup(m);
             return {
               id: nestedGroup?.id,
@@ -3789,10 +3802,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
               created_at: nestedGroup?.created_at,
               role: m.role,
             };
-          }).filter(g => g.id)
+          }).filter((g: any) => g.id)
         ];
 
-        const membershipInfo = (memberRows || []).map(m => {
+        const membershipInfo = (memberRows || []).map((m: any) => {
           const nestedGroup = getNestedFamilyGroup(m);
           return {
             groupId: m.family_group_id,
@@ -3958,7 +3971,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           return sendJson({ familyMetrics: null, isMemberOfFamily: false });
         }
 
-        const memberIds = members?.map(m => m.user_id) || [];
+        const memberIds = members?.map((m: any) => m.user_id) || [];
         if (!memberIds.includes(userId)) {
           memberIds.push(userId); // Include owner if not already in members
         }
@@ -3975,10 +3988,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }
 
         // Aggregate metrics
-        const totalSavings = (metrics || []).reduce((sum, m) => sum + (m.total_savings || 0), 0);
-        const totalSpent = (metrics || []).reduce((sum, m) => sum + (m.total_spent || 0), 0);
-        const activeSubscriptions = (metrics || []).reduce((sum, m) => sum + (m.active_subscriptions || 0), 0);
-        const cancelledSubscriptions = (metrics || []).reduce((sum, m) => sum + (m.cancelled_subscriptions || 0), 0);
+        const totalSavings = (metrics || []).reduce((sum: number, m: any) => sum + (m.total_savings || 0), 0);
+        const totalSpent = (metrics || []).reduce((sum: number, m: any) => sum + (m.total_spent || 0), 0);
+        const activeSubscriptions = (metrics || []).reduce((sum: number, m: any) => sum + (m.active_subscriptions || 0), 0);
+        const cancelledSubscriptions = (metrics || []).reduce((sum: number, m: any) => sum + (m.cancelled_subscriptions || 0), 0);
 
         const familyMetrics = {
           totalSavings,
@@ -4482,10 +4495,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       // Filter results based on user permissions
-      let filteredSharedSubs = sharedSubs || [];
+      let filteredSharedSubs: any[] = sharedSubs || [];
       if (groupRow.owner_id !== userId) {
         // Members only see subscriptions shared with them
-        filteredSharedSubs = filteredSharedSubs.filter(sub => sub.shared_with_user_id === userId);
+        filteredSharedSubs = filteredSharedSubs.filter((sub: any) => sub.shared_with_user_id === userId);
       }
       // Owners see all shared subscriptions in their group
 
@@ -6326,10 +6339,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       // Filter shared records based on user permissions
-      let filteredSharedRecords = sharedRecords || [];
+      let filteredSharedRecords: any[] = sharedRecords || [];
       if (!isOwner) {
         // Members only see subscriptions explicitly shared with them.
-        filteredSharedRecords = filteredSharedRecords.filter(record => record.shared_with_user_id === userId);
+        filteredSharedRecords = filteredSharedRecords.filter((record: any) => record.shared_with_user_id === userId);
       }
       // Owners see all shared subscriptions in their group
 

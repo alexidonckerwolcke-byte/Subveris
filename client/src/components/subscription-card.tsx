@@ -199,6 +199,16 @@ export function SubscriptionCard({
     : monthlyAmount;
 
   const valueRating = costPerUse <= 2 ? "excellent" : costPerUse <= 5 ? "good" : costPerUse <= 10 ? "fair" : "poor";
+  const lastUsedAt = (subscription as any).lastUsedDate || (subscription as any).last_used_at;
+  const activityLabel = (() => {
+    if (!lastUsedAt) return "No usage recorded";
+    const lastUsed = new Date(lastUsedAt);
+    if (Number.isNaN(lastUsed.getTime())) return "No usage recorded";
+    const daysSinceUse = Math.max(0, Math.floor((Date.now() - lastUsed.getTime()) / 86400000));
+    if (daysSinceUse === 0) return "Used today";
+    return `Inactive for ${daysSinceUse} day${daysSinceUse === 1 ? "" : "s"}`;
+  })();
+  const isInactive = activityLabel.startsWith("Inactive") || activityLabel === "No usage recorded";
 
   return (
     <>
@@ -359,6 +369,9 @@ export function SubscriptionCard({
                   return formatted || '—';
                 })()
               }
+            </p>
+            <p className={`text-xs mt-1 font-medium ${isInactive ? "text-chart-5" : "text-chart-2"}`}>
+              Activity: {activityLabel}
             </p>
             {subscription.scheduledCancellationDate && (
               <p className="text-xs text-chart-5 mt-1 font-medium">

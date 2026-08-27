@@ -629,8 +629,8 @@ export function FamilySharing() {
                 <p className="text-sm text-muted-foreground">No members yet</p>
               ) : (
                 <div className="space-y-2">
-                  {members.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between p-2 rounded bg-muted/50">
+                  {members.map((member, index) => (
+                    <div key={member.id || member.userId || (member as any).user_id || (member as any).email || `member-${index}`} className="flex items-center justify-between p-2 rounded bg-muted/50">
                       <div className="flex items-center gap-2 flex-1">
                         <Badge variant="outline">
                           {member.role === 'owner' ? '👑 Owner' : '👤 Member'}
@@ -912,7 +912,7 @@ export function FamilySharing() {
           <DialogHeader>
             <DialogTitle>Member Details</DialogTitle>
             <DialogDescription id="member-details-desc">
-              View {members.find(m => m.userId === selectedMemberId)?.email}'s subscriptions and insights
+              View {members.find(m => m.userId === selectedMemberId)?.email || 'this family member'}'s subscriptions and insights
             </DialogDescription>
           </DialogHeader>
 
@@ -1107,10 +1107,10 @@ export function FamilySharing() {
                     const subOwnerId = (subscriptionToShare as any)?.userId ?? (subscriptionToShare as any)?.user_id;
                     return mid !== subOwnerId && mid !== selectedGroup?.ownerId;
                   })
-                  .map((member) => {
+                  .map((member, index) => {
                     const mid = (member as any).userId ?? (member as any).user_id;
                     return (
-                      <label key={mid || (member as any).id || Math.random()} className="flex items-center space-x-2">
+                      <label key={mid || (member as any).id || (member as any).email || `share-member-${index}`} className="flex items-center space-x-2">
                         <input
                           type="checkbox"
                           checked={selectedMembersToShareWith.includes(mid)}

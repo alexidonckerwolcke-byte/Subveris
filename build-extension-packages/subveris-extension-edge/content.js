@@ -186,18 +186,27 @@ function detectAndTrackSubscription() {
     const serviceName = getServiceNameFromDomain(domain);
 
     if (serviceName) {
-      console.log('[Extension] Detected subscription service:', serviceName);
       sendMessageToBackground({
-        type: 'DETECT_SUBSCRIPTION',
-        serviceName,
-        domain,
-        detectedAt: Date.now()
+        type: 'CHECK_SERVICE_SESSION',
+        domain
       }, (response) => {
-        if (response?.success) {
-          console.log('[Extension] ✅ Subscription detection sent:', serviceName);
-        } else {
-          console.log('[Extension] ⏭️ Subscription detection skipped:', response?.error || 'Premium or Family plan required');
+        if (!response?.authenticated) {
+          console.log('[Extension] ⏭️ Skipping detection; no active service session:', serviceName);
+          return;
         }
+        console.log('[Extension] Detected authenticated subscription service:', serviceName);
+        sendMessageToBackground({
+          type: 'DETECT_SUBSCRIPTION',
+          serviceName,
+          domain,
+          detectedAt: Date.now()
+        }, (detectionResponse) => {
+          if (detectionResponse?.success) {
+            console.log('[Extension] ✅ Authenticated subscription detection sent:', serviceName);
+          } else {
+            console.log('[Extension] ⏭️ Subscription detection skipped:', detectionResponse?.error || 'Premium or Family plan required');
+          }
+        });
       });
     }
   });

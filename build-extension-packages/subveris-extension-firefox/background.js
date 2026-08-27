@@ -6,12 +6,18 @@ const DEFAULT_API_URL = 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1';
 
 browser.runtime.onInstalled.addListener(() => {
   console.log('Subveris Subscription Insights Extension Installed');
+  browser.alarms?.create('refresh-subscription-activity', { periodInMinutes: 60 });
   loadKnownSubscriptions();
 });
 
 browser.runtime.onStartup.addListener(() => {
   console.log('Subveris Subscription Insights Extension started');
+  browser.alarms?.create('refresh-subscription-activity', { periodInMinutes: 60 });
   loadKnownSubscriptions();
+});
+
+browser.alarms?.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'refresh-subscription-activity') loadKnownSubscriptions();
 });
 
 const ZERO_USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -91,7 +97,7 @@ function normalizeApiUrl(apiUrl) {
     return DEFAULT_API_URL;
   }
 
-  const normalizedUrl = apiUrl.replace(/\/$/, '');
+  const normalizedUrl = apiUrl.replace(/\/$/, '').replace(/\/api$/, '');
   if (/^https?:\/\/(localhost|127\.0\.0\.1):5173$/i.test(normalizedUrl)) {
     return 'http://localhost:5000';
   }
@@ -100,8 +106,8 @@ function normalizeApiUrl(apiUrl) {
 
 function loadKnownSubscriptions() {
   refreshSubscriptionStatus();
-  browser.storage.local.get(['authToken', 'subverisApiUrl', 'detectedSubscriptions'], (result) => {
-    const token = result.authToken;
+  browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl', 'detectedSubscriptions'], (result) => {
+    const token = result.supabaseAuthToken || result.authToken;
     const apiUrl = normalizeApiUrl(result.subverisApiUrl);
     const existingSubs = result.detectedSubscriptions || {};
 
@@ -148,11 +154,12 @@ function loadKnownSubscriptions() {
         const key = serviceName;
 
         merged[key] = {
+          ...existingSubs[key],
           serviceName: key,
           subscriptionId: sub.id || existingSubs[key]?.subscriptionId || null,
           domain: domain || existingSubs[key]?.domain || null,
           detectedAt: existingSubs[key]?.detectedAt || Date.now(),
-          lastSeen: Date.now(),
+          lastSeen: existingSubs[key]?.lastSeen || Date.now(),
           source: 'api-subscriptions'
         };
       });
@@ -181,6 +188,7 @@ function addDetectedSubscription(serviceName, domain) {
       subs[serviceName] = {
         serviceName,
         domain,
+        serviceUrl: `https://${domain}/`,
         detectedAt: now,
         lastSeen: now,
         lastVisit: now,
@@ -190,6 +198,8 @@ function addDetectedSubscription(serviceName, domain) {
     } else {
       subs[serviceName].lastSeen = now;
       subs[serviceName].lastVisit = now;
+      subs[serviceName].domain = domain || subs[serviceName].domain;
+      subs[serviceName].serviceUrl = subs[serviceName].serviceUrl || `https://${domain}/`;
       subs[serviceName].visitCount = (existing.visitCount || 0) + 1;
       if (!subs[serviceName].monthlyPrice && MONTHLY_PRICES[serviceName]) {
         subs[serviceName].monthlyPrice = MONTHLY_PRICES[serviceName];
@@ -654,6 +664,20 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'TRACK_USAGE') {
     console.log('[Background] TRACK_USAGE request for domain:', request.domain, 'timeSpent:', request.timeSpent);
     sendUsageTracking(request.domain, request.timeSpent, request.serviceName, request.serviceUrl, sendResponse);
+    return true;
+  }
+
+  if (request.type === 'CHECK_SERVICE_SESSION') {
+    const domain = String(request.domain || '').replace(/^www\./i, '').toLowerCase();
+    if (!domain) {
+      sendResponse({ authenticated: false });
+      return false;
+    }
+    browser.cookies.getAll({ domain }, (cookies) => {
+      const sessionCookiePattern = /(sess|session|auth|token|login|user|account|sid)/i;
+      const authenticated = (cookies || []).some((cookie) => sessionCookiePattern.test(cookie.name || ''));
+      sendResponse({ authenticated });
+    });
     return true;
   }
 

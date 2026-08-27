@@ -105,6 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
       withUsage.forEach((subscription) => {
         const days = subscription.daysUnused;
         const risk = days === null || days >= 60 ? 'high' : days >= 30 ? 'medium' : 'low';
+        const activity = days === null || days >= 30 ? 'Inactive' : 'Active';
         const lastOpened = days === null ? 'No visit recorded' : days === 0 ? 'Opened today' : `Last opened ${days}d ago`;
         const price = subscription.monthlyPrice ? `€${subscription.monthlyPrice.toFixed(2)}/mo` : 'Price unknown';
         const guideSlug = cancellationGuides[subscription.serviceName];
@@ -118,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         name.textContent = subscription.serviceName;
         const meta = document.createElement('div');
         meta.className = 'subscription-meta';
-        meta.textContent = `${price} · ${lastOpened} · ${subscription.visitCount || 1} visit${(subscription.visitCount || 1) === 1 ? '' : 's'}`;
+        meta.textContent = `${price} · ${activity} · ${lastOpened} · ${subscription.visitCount || 1} visit${(subscription.visitCount || 1) === 1 ? '' : 's'}`;
         details.append(name, meta);
         if (guideSlug) {
           const guideButton = document.createElement('button');

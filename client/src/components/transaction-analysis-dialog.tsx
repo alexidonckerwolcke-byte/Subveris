@@ -124,10 +124,10 @@ export function TransactionAnalysisDialog({ onAnalysisComplete, isLoading = fals
           Analyze Transactions
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" aria-describedby="transaction-analysis-desc">
         <DialogHeader>
           <DialogTitle>Analyze Bank Transactions</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="transaction-analysis-desc">
             Paste your bank or payment app transactions to detect recurring charges that might be subscriptions.
           </DialogDescription>
         </DialogHeader>

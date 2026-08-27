@@ -108,6 +108,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
       }}>
         <DialogContent 
           className="flex w-full max-w-[min(calc(100vw-2rem),500px)] max-h-[calc(100dvh-1rem)] min-h-0 flex-col overflow-y-auto overscroll-contain"
+          aria-describedby="post-signup-currency-desc"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
@@ -118,7 +119,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
               </div>
               <DialogTitle>Select Your Currency</DialogTitle>
             </div>
-            <DialogDescription className="mt-2">
+            <DialogDescription id="post-signup-currency-desc" className="mt-2">
               Choose your preferred currency for displaying all subscription amounts. 
               <strong> This is required to continue.</strong>
             </DialogDescription>
