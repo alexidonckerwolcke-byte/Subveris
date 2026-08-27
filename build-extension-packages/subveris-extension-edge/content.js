@@ -15,7 +15,7 @@ function getRootDomain(hostname) {
 }
 
 function getSubscriptionStatus(callback) {
-  if (!window.browser || !browser.storage || !browser.storage.local) {
+  if (!browser || !browser.storage || !browser.storage.local) {
     callback('free');
     return;
   }
@@ -39,9 +39,9 @@ script.onload = function() {
 (document.head || document.documentElement).appendChild(script);
 
 function sendMessageToBackground(message, callback) {
-  if (!window.browser || !browser.runtime || typeof browser.runtime.sendMessage !== 'function') {
+  if (!browser || !browser.runtime || typeof browser.runtime.sendMessage !== 'function') {
     console.warn('[Extension] browser.runtime.sendMessage unavailable in this context:', {
-      browser: typeof window.browser,
+      browser: typeof browser,
       browserRuntime: typeof browser?.runtime,
       sendMessage: typeof browser?.runtime?.sendMessage,
     });
@@ -101,7 +101,7 @@ window.addEventListener('message', (event) => {
 // Get auth token from browser storage (set by inject script via background)
 function getAuthToken() {
   return new Promise((resolve) => {
-    if (!window.browser || !browser.storage || !browser.storage.local) {
+    if (!browser || !browser.storage || !browser.storage.local) {
       console.warn('[Extension] browser.storage.local unavailable in this context');
       return resolve(null);
     }
