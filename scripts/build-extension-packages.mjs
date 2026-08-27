@@ -46,6 +46,13 @@ fs.rmSync(outputRoot, { recursive: true, force: true });
 fs.mkdirSync(outputRoot, { recursive: true });
 
 buildPackage("subveris-extension", (manifest) => manifest);
+buildPackage("subveris-extension-edge", (manifest) => {
+  const edgeManifest = { ...manifest };
+  delete edgeManifest.update_url;
+  edgeManifest.name = "Subveris Subscription Insights for Microsoft Edge";
+  edgeManifest.description = "Discover subscriptions, track service usage, and find recurring services you no longer use with Microsoft Edge.";
+  return edgeManifest;
+});
 buildPackage("subveris-extension-firefox", (manifest) => ({
   ...manifest,
   background: {
@@ -64,9 +71,11 @@ buildPackage("subveris-extension-firefox", (manifest) => ({
 }));
 
 const chromeArchive = path.join(projectRoot, "subveris-extension.zip");
+const edgeArchive = path.join(projectRoot, "subveris-extension-edge.zip");
 const firefoxArchive = path.join(projectRoot, "subveris-extension-firefox.zip");
 fs.copyFileSync(chromeArchive, path.join(projectRoot, "subveris-extension-auth.zip"));
 fs.mkdirSync(path.join(projectRoot, "client", "public"), { recursive: true });
 fs.copyFileSync(chromeArchive, path.join(projectRoot, "client/public/subveris-extension.zip"));
+fs.copyFileSync(edgeArchive, path.join(projectRoot, "client/public/subveris-extension-edge.zip"));
 fs.copyFileSync(firefoxArchive, path.join(projectRoot, "client/public/subveris-extension-firefox.zip"));
-console.log("Built Chrome and Firefox extension packages.");
+console.log("Built Chrome, Microsoft Edge, and Firefox extension packages.");

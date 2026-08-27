@@ -100,6 +100,15 @@ export default function Files() {
     link.click();
   };
 
+  const handleDownloadEdgeExtension = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const link = document.createElement("a");
+    link.href = `${window.location.origin}/subveris-extension-edge.zip?v=${Date.now()}`;
+    link.download = "subveris-extension-edge.zip";
+    link.click();
+  };
+
   const handleDownload = async () => {
     setDownloadingData(true);
     try {
@@ -233,6 +242,16 @@ export default function Files() {
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Download Firefox Extension
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 sm:ml-2"
+                        onClick={handleDownloadEdgeExtension}
+                        type="button"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Microsoft Edge Extension
                       </Button>
                     </div>
                   </div>

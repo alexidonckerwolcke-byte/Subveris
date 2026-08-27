@@ -1,0 +1,112 @@
+{
+  "manifest_version": 3,
+  "name": "Subveris Subscription Insights for Microsoft Edge",
+  "version": "1.2.4",
+  "description": "Discover subscriptions, track service usage, and find recurring services you no longer use with Microsoft Edge.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "cookies",
+    "downloads",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://subveris.com/*",
+    "https://subveris.com/*",
+    "https://*.netflix.com/*",
+    "https://*.spotify.com/*",
+    "https://*.amazon.com/*",
+    "https://*.disneyplus.com/*",
+    "https://*.youtube.com/*",
+    "https://*.hbomax.com/*",
+    "https://*.tinder.com/*",
+    "https://*.linkedin.com/*",
+    "https://*.hellofresh.com/*",
+    "https://*.icloud.com/*",
+    "https://*.canva.com/*",
+    "https://*.microsoft.com/*",
+    "https://*.nordvpn.com/*",
+    "https://*.playstation.com/*",
+    "https://*.xbox.com/*",
+    "https://*.audible.com/*",
+    "https://*.readly.com/*",
+    "https://*.duolingo.com/*",
+    "https://*.viaplay.com/*",
+    "https://*.adobe.com/*",
+    "https://*.supabase.co/*",
+    "http://localhost:3000/*",
+    "http://localhost:5000/*",
+    "https://www.googleapis.com/*",
+    "https://gmail.googleapis.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Subveris Subscription Insights"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://subveris.com/*",
+        "https://subveris.com/*",
+        "https://*.netflix.com/*",
+        "https://*.spotify.com/*",
+        "https://*.amazon.com/*",
+        "https://*.disneyplus.com/*",
+        "https://*.youtube.com/*",
+        "https://*.hbomax.com/*",
+        "https://*.tinder.com/*",
+        "https://*.linkedin.com/*",
+        "https://*.hellofresh.com/*",
+        "https://*.icloud.com/*",
+        "https://*.canva.com/*",
+        "https://*.microsoft.com/*",
+        "https://*.nordvpn.com/*",
+        "https://*.playstation.com/*",
+        "https://*.xbox.com/*",
+        "https://*.audible.com/*",
+        "https://*.readly.com/*",
+        "https://*.duolingo.com/*",
+        "https://*.viaplay.com/*",
+        "https://*.adobe.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "inject.js"
+      ],
+      "matches": [
+        "https://subveris.com/*",
+        "https://subveris.com/*",
+        "https://*.netflix.com/*",
+        "https://*.spotify.com/*",
+        "https://*.amazon.com/*",
+        "https://*.disneyplus.com/*",
+        "https://*.youtube.com/*",
+        "https://*.hbomax.com/*",
+        "https://*.tinder.com/*",
+        "https://*.linkedin.com/*",
+        "https://*.hellofresh.com/*",
+        "https://*.icloud.com/*",
+        "https://*.canva.com/*",
+        "https://*.microsoft.com/*",
+        "https://*.nordvpn.com/*",
+        "https://*.playstation.com/*",
+        "https://*.xbox.com/*",
+        "https://*.audible.com/*",
+        "https://*.readly.com/*",
+        "https://*.duolingo.com/*",
+        "https://*.viaplay.com/*",
+        "https://*.adobe.com/*"
+      ]
+    }
+  ]
+}

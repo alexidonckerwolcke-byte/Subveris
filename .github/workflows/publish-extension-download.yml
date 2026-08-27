@@ -37,13 +37,13 @@ jobs:
       - name: Build extension archives
         run: |
           node scripts/build-extension-packages.mjs
-          unzip -p client/public/subveris-extension.zip manifest.json | grep -E '"name"|"version"'
+          unzip -p client/public/subveris-extension-edge.zip manifest.json | grep -E '"name"|"version"'
 
       - name: Commit updated download archives
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add subveris-extension-auth.zip subveris-extension.zip subveris-extension-firefox.zip client/public/subveris-extension.zip client/public/subveris-extension-firefox.zip
+          git add subveris-extension-auth.zip subveris-extension.zip subveris-extension-edge.zip subveris-extension-firefox.zip client/public/subveris-extension.zip client/public/subveris-extension-edge.zip client/public/subveris-extension-firefox.zip
           git diff --cached --quiet || git commit -m "build updated extension download"
           git push origin HEAD:main
 
