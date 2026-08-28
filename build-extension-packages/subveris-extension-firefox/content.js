@@ -74,7 +74,18 @@ function sendMessageToBackground(message, callback) {
 // Listen for messages from the injected script (page context) and forward/store token
 window.addEventListener('message', (event) => {
   if (event.source !== window) return;
-  if (!event.data || event.data.type !== 'SUBVERIS_AUTH_TOKEN') return;
+  if (!event.data) return;
+
+  if (event.data.type === 'SUBVERIS_AUTH_LOGOUT') {
+    cachedAuthToken = null;
+    sendMessageToBackground({ type: 'SUBVERIS_AUTH_LOGOUT' }, (response, err) => {
+      if (err) console.warn('[Extension] Failed to clear logged-out account:', err);
+      else console.log('[Extension] Cleared stored Subveris account state:', response);
+    });
+    return;
+  }
+
+  if (event.data.type !== 'SUBVERIS_AUTH_TOKEN') return;
 
   const token = event.data.token || null;
   const userId = event.data.userId || null;

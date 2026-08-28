@@ -697,6 +697,7 @@ export default function Subscriptions() {
                           subscription={sub}
                           onStatusChange={handleStatusChange}
                           onEdit={openEditSubscription}
+                          canManageSubscription={Boolean(showFamilyData && familyData?.isOwner === true)}
                           isPremium={tier === "premium" || tier === "family"}
                         />
                       ))}
@@ -713,6 +714,7 @@ export default function Subscriptions() {
                           subscription={sub}
                           onStatusChange={handleStatusChange}
                           onEdit={openEditSubscription}
+                          canManageSubscription={Boolean(showFamilyData && familyData?.isOwner === true)}
                           isPremium={tier === "premium" || tier === "family"}
                         />
                       ))}
@@ -729,6 +731,7 @@ export default function Subscriptions() {
                           subscription={sub}
                           onStatusChange={handleStatusChange}
                           onEdit={openEditSubscription}
+                          canManageSubscription={Boolean(showFamilyData && familyData?.isOwner === true)}
                           isPremium={tier === "premium" || tier === "family"}
                         />
                       ))}
@@ -744,6 +747,7 @@ export default function Subscriptions() {
                           key={sub.id}
                           subscription={sub}
                           onStatusChange={handleStatusChange}
+                          canManageSubscription={Boolean(showFamilyData && familyData?.isOwner === true)}
                           isPremium={tier === "premium" || tier === "family"}
                         />
                       ))}
@@ -779,7 +783,7 @@ export default function Subscriptions() {
                     subscription={sub}
                     onStatusChange={handleStatusChange}
                     onEdit={openEditSubscription}
-
+                    canManageSubscription={Boolean(showFamilyData && familyData?.isOwner === true)}
                     isPremium={tier === "premium" || tier === "family"}
                   />
                 ))
@@ -799,7 +803,7 @@ export default function Subscriptions() {
                     subscription={sub}
                     onStatusChange={handleStatusChange}
                     onEdit={openEditSubscription}
-
+                    canManageSubscription={Boolean(showFamilyData && familyData?.isOwner === true)}
                     isPremium={tier === "premium" || tier === "family"}
                   />
                 ))
@@ -820,7 +824,7 @@ export default function Subscriptions() {
                     subscription={sub}
                     onStatusChange={handleStatusChange}
                     onEdit={openEditSubscription}
-
+                    canManageSubscription={Boolean(showFamilyData && familyData?.isOwner === true)}
                     isPremium={tier === "premium" || tier === "family"}
                   />
                 ))
@@ -844,6 +848,7 @@ export default function Subscriptions() {
                       subscription={sub}
                       onStatusChange={handleStatusChange}
                       onEdit={openEditSubscription}
+                      canManageSubscription={Boolean(showFamilyData && familyData?.isOwner === true)}
                       isPremium={tier === "premium" || tier === "family"}
                     />
                   ))}

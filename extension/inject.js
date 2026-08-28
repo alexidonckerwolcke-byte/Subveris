@@ -44,6 +44,11 @@ function sendAuthToken(force = false) {
       userId: userId
     }, '*');
   } else {
+    if (lastSentToken || lastSentUserId) {
+      lastSentToken = null;
+      lastSentUserId = null;
+      window.postMessage({ type: 'SUBVERIS_AUTH_LOGOUT' }, '*');
+    }
     console.log('[Inject] No authenticated session found');
   }
 }
@@ -65,5 +70,14 @@ Storage.prototype.setItem = function(key, value) {
   if (key === 'supabase.auth.token' || key === 'supabase_auth_token' || key === 'supabaseUserUUID') {
     console.log('[Inject] Auth state updated, resending');
     sendAuthToken();
+  }
+};
+
+const originalRemoveItem = Storage.prototype.removeItem;
+Storage.prototype.removeItem = function(key) {
+  originalRemoveItem.call(this, key);
+  if (key === 'supabase.auth.token' || key === 'supabase_auth_token' || key === 'supabaseUserUUID') {
+    console.log('[Inject] Auth state removed, clearing extension account');
+    sendAuthToken(true);
   }
 };

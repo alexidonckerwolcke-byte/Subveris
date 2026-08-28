@@ -38,6 +38,7 @@ interface SubscriptionCardProps {
   onStatusChange: (id: string, status: SubscriptionStatus) => void;
   isPremium?: boolean;
   onEdit?: (subscription: Subscription) => void;
+  canManageSubscription?: boolean;
 }
 
 const cancellationGuideSlugs: Record<string, string> = {
@@ -82,6 +83,7 @@ export function SubscriptionCard({
   onStatusChange,
   isPremium = false,
   onEdit,
+  canManageSubscription: canManageSubscriptionOverride,
 }: SubscriptionCardProps) {
   const { formatAmount } = useCurrency();
   const { user, getToken } = useAuth();
@@ -101,7 +103,9 @@ export function SubscriptionCard({
   // Allow management if:
   // 1. User owns the subscription, OR
   // 2. User is a family owner AND is viewing family data (member subscriptions in family mode)
-  const canManageSubscription = isOwnedByCurrentUser || (showFamilyData && isFamilyGroupOwner);
+  const canManageSubscription = isOwnedByCurrentUser
+    || canManageSubscriptionOverride === true
+    || (showFamilyData && isFamilyGroupOwner);
 
   const isDeletedSubscription = isSubscriptionDeleted(subscription);
   const effectiveStatus = isDeletedSubscription ? 'deleted' : subscription.status;

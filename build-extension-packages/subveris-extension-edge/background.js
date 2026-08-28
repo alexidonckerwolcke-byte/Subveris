@@ -104,6 +104,44 @@ function normalizeApiUrl(apiUrl) {
   return normalizedUrl;
 }
 
+const ACCOUNT_STATE_KEYS = [
+  'authToken',
+  'supabaseAuthToken',
+  'authSessionId',
+  'authCsrfToken',
+  'supabaseUserUUID',
+  'extensionSessionExpiresAt',
+  'subscription_status',
+  'detectedSubscriptions',
+  'detectedSubscription',
+  'lastDetectedSubscriptionAt',
+  'gmailAuthToken',
+  'gmailTokenExpiresAt',
+  'trackingPaused',
+  'upgradePrompt',
+  'cookieScanCompleted',
+];
+
+function clearStoredAccountState(callback) {
+  browser.storage.local.remove(ACCOUNT_STATE_KEYS, () => {
+    if (browser.runtime.lastError) {
+      console.warn('[Background] Failed to clear previous account state:', browser.runtime.lastError);
+    }
+    if (callback) callback();
+  });
+}
+
+function clearStateForAccountSwitch(userId, callback) {
+  browser.storage.local.get(['supabaseUserUUID'], (result) => {
+    if (result.supabaseUserUUID && result.supabaseUserUUID !== userId) {
+      console.log('[Background] Account changed; clearing cached state for:', result.supabaseUserUUID);
+      clearStoredAccountState(callback);
+      return;
+    }
+    callback();
+  });
+}
+
 function loadKnownSubscriptions() {
   refreshSubscriptionStatus();
   browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl', 'detectedSubscriptions'], (result) => {
@@ -596,6 +634,11 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === 'SUBVERIS_AUTH_LOGOUT') {
+    clearStoredAccountState(() => sendResponse({ success: true, cleared: true }));
+    return true;
+  }
+
   if (request.type === 'SUBVERIS_AUTH_TOKEN') {
     console.log('[Background] Exchanging raw extension auth token for an opaque session for user:', request.userId);
     const apiUrl = normalizeApiUrl(request.apiUrl);
@@ -607,7 +650,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     const exchangeUrl = `${apiUrl}/api/security/extension-session`;
-    fetch(exchangeUrl, {
+    clearStateForAccountSwitch(request.userId, () => fetch(exchangeUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -657,7 +700,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }).catch((error) => {
       console.error('[Background] Failed to exchange raw token for opaque session:', error);
       sendResponse({ success: false, error: error.message || 'Failed to exchange session' });
-    });
+    }));
     return true;
   }
 

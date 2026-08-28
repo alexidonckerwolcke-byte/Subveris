@@ -1259,9 +1259,9 @@ async function isUserFamilyGroupOwnerForSubscription(userId: string, memberUserI
     .select('id')
     .in('family_group_id', groupIds)
     .eq('user_id', memberUserId)
-    .maybeSingle();
+    .limit(1);
 
-  return !membershipError && !!membership;
+  return !membershipError && Array.isArray(membership) && membership.length > 0;
 }
 
 async function updateSubscription(userId: string, subscriptionId: string, updates: any) {
@@ -6310,7 +6310,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       if (!showFamilyData) {
         const { data: personalSubscriptions, error: personalSubsError } = await supabase
           .from("subscriptions")
-          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, cancellation_confirmed_at, estimated_monthly_savings, estimated_annual_savings, deleted_at, website_domain")
+          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, monthly_usage_count, usage_month, total_active_seconds, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, cancellation_confirmed_at, estimated_monthly_savings, estimated_annual_savings, deleted_at, website_domain, website_url")
           .eq("user_id", userId);
 
         if (personalSubsError) {
@@ -6465,7 +6465,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
 
       const { data: allSubscriptions, error: subsError } = await supabase
         .from("subscriptions")
-          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, cancellation_confirmed_at, estimated_monthly_savings, estimated_annual_savings, deleted_at, website_domain")
+          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, monthly_usage_count, usage_month, total_active_seconds, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, cancellation_confirmed_at, estimated_monthly_savings, estimated_annual_savings, deleted_at, website_domain, website_url")
         .in("user_id", memberIds);
 
       if (subsError) {
