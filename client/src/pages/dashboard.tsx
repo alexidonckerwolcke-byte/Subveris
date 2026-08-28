@@ -72,6 +72,7 @@ export default function Dashboard() {
       return response.json();
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
   const { data: personalSubscriptions = [], isLoading: subscriptionsLoading } = useQuery<Subscription[]>({
@@ -81,6 +82,7 @@ export default function Dashboard() {
       return response.json();
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
   const { data: familyData } = useQuery<any>({
@@ -92,6 +94,7 @@ export default function Dashboard() {
       return response.json();
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
   const { data: monthlySpending, isLoading: monthlySpendingLoading } = useQuery<MonthlySpending[]>({
@@ -101,6 +104,7 @@ export default function Dashboard() {
       return response.json();
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
   const { data: categorySpending, isLoading: categorySpendingLoading } = useQuery<SpendingByCategory[]>({
@@ -110,6 +114,7 @@ export default function Dashboard() {
       return response.json();
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
   const familySubscriptions = useMemo(

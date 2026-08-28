@@ -113,8 +113,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       };
     })(),
     staleTime: 60 * 1000,
-    refetchOnWindowFocus: true, // Refetch when window regains focus
-    refetchOnReconnect: true, // Refetch when network reconnects
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const subscriptionStatus = subscriptionData ? {

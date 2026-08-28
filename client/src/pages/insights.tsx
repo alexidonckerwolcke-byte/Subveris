@@ -41,6 +41,8 @@ export default function Insights() {
       return response.json();
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
   });
 
   const { data: familyData, isLoading: familyDataLoading, isFetching: familyDataFetching, refetch: refetchFamilyData } = useQuery<any>({
@@ -57,13 +59,13 @@ export default function Insights() {
   const { data: personalMetrics, isLoading: personalMetricsLoading } = useQuery<any>({
     queryKey: ["/api/metrics"],
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   const { data: personalBehavioralInsights, isLoading: personalBehavioralLoading, refetch: refetchBehavioral } = useQuery<OpportunityCost[]>({
     queryKey: ["/api/insights/behavioral"],
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   // Family behavioral insights
@@ -75,7 +77,7 @@ export default function Insights() {
     },
     enabled: showFamilyData && !!familyGroupId,
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   function computeBehavioralFromSubs(subs: any[] | undefined) {
@@ -132,7 +134,7 @@ export default function Insights() {
     // at runtime but now yields a compile error so we switch to the
     // equivalent boolean behaviour (refetch if stale).
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   // Family cost analysis (load if in family mode)
@@ -140,7 +142,7 @@ export default function Insights() {
     queryKey: [`/api/analysis/cost-per-use?familyGroupId=${familyGroupId}`],
     enabled: showFamilyData && !!familyGroupId,
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   const analysisLoading = showFamilyData
@@ -191,7 +193,7 @@ export default function Insights() {
   const { data: personalInsights, isLoading: personalInsightsLoading, refetch: refetchInsights } = useQuery<Insight[]>({
     queryKey: ["/api/insights"],
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   const { data: generatedRecommendations, isLoading: recommendationsLoading } = useQuery<any[]>({

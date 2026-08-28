@@ -27,6 +27,8 @@ export default function DetectedSubscriptions() {
       return response.json();
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
   });
 
   const { data: familyData } = useQuery<any>({
@@ -38,6 +40,8 @@ export default function DetectedSubscriptions() {
       return response.json();
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
   });
 
   const visibleSubscriptions = showFamilyData
