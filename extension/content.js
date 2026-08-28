@@ -8,6 +8,10 @@ let cachedAuthToken = null;
 let pricingScanTimer = null;
 let pricingObserver = null;
 
+function isExtensionContextInvalidated(error) {
+  return String(error?.message || error || '').toLowerCase().includes('extension context invalidated');
+}
+
 function getRootDomain(hostname) {
   const parts = hostname.split('.');
   if (parts.length <= 2) return hostname;
@@ -20,10 +24,20 @@ function getSubscriptionStatus(callback) {
     return;
   }
 
-  browser.storage.local.get(['subscription_status'], (result) => {
-    const status = (result.subscription_status || 'free').toLowerCase();
-    callback(status);
-  });
+  try {
+    browser.storage.local.get(['subscription_status'], (result) => {
+      if (browser.runtime.lastError) {
+        if (!isExtensionContextInvalidated(browser.runtime.lastError)) console.warn('[Extension] Failed to read subscription status:', browser.runtime.lastError);
+        callback('free');
+        return;
+      }
+      const status = (result.subscription_status || 'free').toLowerCase();
+      callback(status);
+    });
+  } catch (error) {
+    if (!isExtensionContextInvalidated(error)) console.warn('[Extension] Failed to read subscription status:', error);
+    callback('free');
+  }
 }
 
 function isTierAllowed(status) {
@@ -37,7 +51,11 @@ function isSubverisPage() {
 
 // Inject script to capture auth token from page context
 const script = document.createElement('script');
-script.src = browser.runtime.getURL('inject.js');
+try {
+  script.src = browser.runtime.getURL('inject.js');
+} catch (error) {
+  if (!isExtensionContextInvalidated(error)) console.warn('[Extension] Could not initialize auth bridge:', error);
+}
 script.onload = function() {
   this.remove();
 };
@@ -122,11 +140,21 @@ function getAuthToken() {
       return resolve(null);
     }
 
-    browser.storage.local.get(['authToken'], (result) => {
-      console.log('[Extension] Auth token check:', result.authToken ? 'FOUND' : 'NOT FOUND');
-      if (result.authToken) cachedAuthToken = result.authToken;
-      resolve(result.authToken);
-    });
+    try {
+      browser.storage.local.get(['authToken'], (result) => {
+        if (browser.runtime.lastError) {
+          if (!isExtensionContextInvalidated(browser.runtime.lastError)) console.warn('[Extension] Failed to read auth token:', browser.runtime.lastError);
+          resolve(null);
+          return;
+        }
+        console.log('[Extension] Auth token check:', result.authToken ? 'FOUND' : 'NOT FOUND');
+        if (result.authToken) cachedAuthToken = result.authToken;
+        resolve(result.authToken);
+      });
+    } catch (error) {
+      if (!isExtensionContextInvalidated(error)) console.warn('[Extension] Failed to read auth token:', error);
+      resolve(null);
+    }
   });
 }
 
@@ -245,16 +273,20 @@ function saveDiscoveredPrice(priceData) {
     isZeroUsage: false,
   };
 
-  browser.storage.local.set({
-    detectedSubscription: payload,
-    lastDetectedSubscriptionAt: Date.now()
-  }, () => {
-    if (browser.runtime.lastError) {
-      console.error('[Extension] Failed to store detected subscription:', browser.runtime.lastError);
-      return;
-    }
-    console.log('[Extension] Saved detected subscription payload:', payload);
-  });
+  try {
+    browser.storage.local.set({
+      detectedSubscription: payload,
+      lastDetectedSubscriptionAt: Date.now()
+    }, () => {
+      if (browser.runtime.lastError) {
+        if (!isExtensionContextInvalidated(browser.runtime.lastError)) console.warn('[Extension] Failed to store detected subscription:', browser.runtime.lastError);
+        return;
+      }
+      console.log('[Extension] Saved detected subscription payload:', payload);
+    });
+  } catch (error) {
+    if (!isExtensionContextInvalidated(error)) console.warn('[Extension] Failed to store detected subscription:', error);
+  }
 
   sendMessageToBackground({ type: 'PRICE_DISCOVERY', payload }, () => {});
 }

@@ -34,6 +34,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function notifyExtensionAuthChange(session: Session | null) {
+  if (typeof window === 'undefined') return;
+
+  if (session?.access_token && session.user?.id) {
+    window.postMessage({
+      type: 'SUBVERIS_AUTH_TOKEN',
+      token: session.access_token,
+      userId: session.user.id,
+    }, window.location.origin);
+    return;
+  }
+
+  window.postMessage({ type: 'SUBVERIS_AUTH_LOGOUT' }, window.location.origin);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -186,11 +201,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Mirror the current Supabase session token into our localStorage helper
         if (session?.access_token) {
+          notifyExtensionAuthChange(session);
           localStorage.setItem('supabase.auth.token', JSON.stringify({
             access_token: session.access_token,
             refresh_token: session.refresh_token,
           }));
         } else {
+          notifyExtensionAuthChange(null);
           localStorage.removeItem('supabase.auth.token');
         }
 
