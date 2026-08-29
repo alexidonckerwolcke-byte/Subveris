@@ -30,6 +30,11 @@ export function mergeFamilyGroupsForUser(ownerGroups: any[] = [], membershipGrou
   return [...merged.values()];
 }
 
+export function shouldUseFamilyAwareSpending(familyGroupId?: string | null, showFamilyData?: boolean, isFamilyGroupOwner?: boolean): boolean {
+  if (!familyGroupId) return false;
+  return Boolean(showFamilyData || (typeof isFamilyGroupOwner === 'boolean' && !isFamilyGroupOwner));
+}
+
 export function useFamilyDataMode() {
   const { user, isPremium, planType } = useAuth();
   const { tier } = useSubscription();

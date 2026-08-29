@@ -92,6 +92,14 @@ export function parseDateOnlyLocal(date?: string | Date | null): Date | null {
   return parsed;
 }
 
+export function getLocalMonthRange(now = new Date()) {
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  return { monthStart, monthEnd, today };
+}
+
 export function getValueRating(costPerUse: number, usageCount: number = 0): "excellent" | "good" | "fair" | "poor" {
   // Single use or no usage means poor value regardless of price
   if (usageCount <= 1) return "poor";
@@ -272,6 +280,32 @@ export function getSubscriptionBillingMonth(sub: any): string | null {
   const match = billingMonth.match(/^(\d{4})-(\d{2})$/);
   if (!match) return null;
   return `${match[1]}-${match[2]}`;
+}
+
+export function isSubscriptionBilledInCurrentMonth(sub: any, now = new Date(), renewalDate?: Date): boolean {
+  const targetMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const billingMonth = getSubscriptionBillingMonth(sub);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const renewal = renewalDate ?? parseSubscriptionRenewalDate(
+    (sub as any).nextBillingDate || (sub as any).next_billing_at || (sub as any).next_billing_date || (sub as any).next_billing,
+  );
+  if (!renewal) return false;
+
+  const renewalDay = parseDateOnlyLocal(renewal);
+  if (!renewalDay) return false;
+
+  if (billingMonth === targetMonth) {
+    if (renewalDay <= today) return true;
+    if (renewalDay > monthEnd) return true;
+    return false;
+  }
+
+  if (renewalDay < monthStart) return false;
+  if (renewalDay > monthEnd) return false;
+  return renewalDay <= today;
 }
 
 export function isSubscriptionBilledInMonth(

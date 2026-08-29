@@ -203,18 +203,40 @@ export function SubscriptionCard({
     ? subscription.amount * 4
     : subscription.amount;
 
-  const costPerUse = (subscription.monthlyUsageCount || 0) > 0 
-    ? monthlyAmount / (subscription.monthlyUsageCount || 0)
+  const storedMonthlyUsageCount = Number(
+    (subscription as any).monthlyUsageCount ?? (subscription as any).monthly_usage_count ?? 0
+  );
+  const usageMonth = String(
+    (subscription as any).usageMonth ?? (subscription as any).usage_month ?? ""
+  ).slice(0, 7);
+  const currentUsageMonth = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  })();
+  const monthlyUsageCount = usageMonth && usageMonth !== currentUsageMonth
+    ? 0
+    : storedMonthlyUsageCount;
+  const costPerUse = monthlyUsageCount > 0 
+    ? monthlyAmount / monthlyUsageCount
     : monthlyAmount;
 
   const valueRating = costPerUse <= 2 ? "excellent" : costPerUse <= 5 ? "good" : costPerUse <= 10 ? "fair" : "poor";
   const lastUsedAt = (subscription as any).lastUsedDate || (subscription as any).last_used_at;
   const activityLabel = (() => {
     if (!lastUsedAt) return "No usage recorded";
-    const lastUsed = new Date(lastUsedAt);
+    const rawLastUsed = String(lastUsedAt).trim();
+    const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(rawLastUsed);
+    const lastUsed = dateOnlyMatch
+      ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
+      : new Date(rawLastUsed);
     if (Number.isNaN(lastUsed.getTime())) return "No usage recorded";
-    const daysSinceUse = Math.max(0, Math.floor((Date.now() - lastUsed.getTime()) / 86400000));
+
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const lastUsedStart = new Date(lastUsed.getFullYear(), lastUsed.getMonth(), lastUsed.getDate());
+    const daysSinceUse = Math.max(0, Math.round((todayStart.getTime() - lastUsedStart.getTime()) / 86400000));
     if (daysSinceUse === 0) return "Used today";
+    if (daysSinceUse === 1) return "Used yesterday";
     return `Inactive for ${daysSinceUse} day${daysSinceUse === 1 ? "" : "s"}`;
   })();
   const isInactive = activityLabel.startsWith("Inactive") || activityLabel === "No usage recorded";
@@ -417,7 +439,7 @@ export function SubscriptionCard({
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">Usage:</span>
-              <span className="font-medium">{subscription.monthlyUsageCount || 0}x this month</span>
+              <span className="font-medium">{monthlyUsageCount}x this month</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">Cost/use:</span>

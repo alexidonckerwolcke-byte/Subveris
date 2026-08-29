@@ -540,19 +540,21 @@ export function FamilySharing() {
                         {group.memberCount || 0} members
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setGroupToDelete(group);
-                        setDeleteDialogOpen(true);
-                        setDeleteConfirmText("");
-                      }}
-                      disabled={deleteGroupMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {group.ownerId === user?.id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setGroupToDelete(group);
+                          setDeleteDialogOpen(true);
+                          setDeleteConfirmText("");
+                        }}
+                        disabled={deleteGroupMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -594,28 +596,36 @@ export function FamilySharing() {
               </Alert>
 
               {/* Add Member Form */}
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Member email or ID"
-                  value={newMemberEmail}
-                  onChange={(e) => setNewMemberEmail(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && newMemberEmail) {
-                      addMemberMutation.mutate(newMemberEmail);
-                    }
-                  }}
-                />
-                <Button
-                  onClick={() => newMemberEmail && addMemberMutation.mutate(newMemberEmail)}
-                  disabled={!newMemberEmail || addMemberMutation.isPending || !canAddMember}
-                  size="sm"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              {!canAddMember && (
-                <p className="text-sm text-red-600">
-                  This family group can contain up to 5 people.
+              {isOwner ? (
+                <>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Member email or ID"
+                      value={newMemberEmail}
+                      onChange={(e) => setNewMemberEmail(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && newMemberEmail) {
+                          addMemberMutation.mutate(newMemberEmail);
+                        }
+                      }}
+                    />
+                    <Button
+                      onClick={() => newMemberEmail && addMemberMutation.mutate(newMemberEmail)}
+                      disabled={!newMemberEmail || addMemberMutation.isPending || !canAddMember}
+                      size="sm"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {!canAddMember && (
+                    <p className="text-sm text-red-600">
+                      This family group can contain up to 5 people.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Only the family owner can add or remove members.
                 </p>
               )}
 
@@ -698,7 +708,7 @@ export function FamilySharing() {
             
             {settingsLoading ? (
               <Skeleton className="h-20 w-full" />
-            ) : (
+            ) : isOwner ? (
               <div className="flex items-center justify-between p-3 rounded border">
                 <div>
                   <div className="font-medium">Show Family Data</div>
@@ -727,6 +737,10 @@ export function FamilySharing() {
                 >
                   {toggleFamilyDataMutation.isPending ? "Updating..." : (familySettings?.show_family_data ? "Disable" : "Enable")}
                 </Button>
+              </div>
+            ) : (
+              <div className="p-3 rounded border bg-muted/40 text-sm text-muted-foreground">
+                Only the family owner can manage the combined family view.
               </div>
             )}
 

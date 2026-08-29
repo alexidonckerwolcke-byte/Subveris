@@ -72,29 +72,59 @@ export function getVisibleFamilySubscriptions(familyData: any, currentUserId?: s
 
   const isOwner = familyData?.isOwner === true
     || isOwnerFromMembers(familyData, currentUserId);
+  const hasExplicitFamilyDataFlag = Object.prototype.hasOwnProperty.call(familyData || {}, 'familyDataSharingEnabled')
+    || Object.prototype.hasOwnProperty.call(familyData || {}, 'show_family_data')
+    || Object.prototype.hasOwnProperty.call(familyData || {}, 'showFamilyData');
+  const familyDataSharingEnabled = familyData?.familyDataSharingEnabled === true
+    || familyData?.show_family_data === true
+    || familyData?.showFamilyData === true;
+  const ownerHasCombinedFamilyDataset = isOwner && (
+    familyDataSharingEnabled
+    || (!hasExplicitFamilyDataFlag && Array.isArray(familyData?.subscriptions) && familyData.subscriptions.some((sub: any) => normalizeSubscriptionOwnerId(sub) !== currentUserId))
+    || (!hasExplicitFamilyDataFlag && Array.isArray(familyData?.sharedSubscriptions) && familyData.sharedSubscriptions.length > 0)
+  );
 
-  if (!isOwner && currentUserId) {
+  if (!currentUserId) {
+    return Array.from(uniqueSubs.values());
+  }
+
+  if (!isOwner) {
     const visibleIds = new Set<string>();
-    const memberDeletedIds = new Set<string>();
+    const deletedIds = new Set<string>();
 
     for (const sub of subscriptions) {
       const ownerId = normalizeSubscriptionOwnerId(sub);
       if (sub?.id && ownerId === currentUserId) {
         visibleIds.add(sub.id);
         if (isSubscriptionDeleted(sub)) {
-          memberDeletedIds.add(sub.id);
+          deletedIds.add(sub.id);
         }
       }
     }
 
     for (const shared of sharedSubscriptions) {
+      const sharedWithUserId = normalizeId(shared?.shared_with_user_id ?? shared?.sharedWithUserId);
       const sharedId = shared?.subscription?.id || shared?.subscription_id;
-      if (sharedId) visibleIds.add(sharedId);
+      const ownerId = normalizeSubscriptionOwnerId(shared?.subscription ?? shared);
+      const isSharedWithCurrentUser = sharedWithUserId === currentUserId;
+      const isCurrentUsersOwnSubscription = ownerId === currentUserId;
+      const hasNoOwnershipMetadata = !ownerId && !sharedWithUserId;
+
+      if (sharedId && (isCurrentUsersOwnSubscription || isSharedWithCurrentUser || hasNoOwnershipMetadata)) {
+        visibleIds.add(String(sharedId));
+      }
     }
 
     return Array.from(uniqueSubs.values()).filter((sub) => {
       if (!sub?.id) return false;
-      return visibleIds.has(sub.id) || memberDeletedIds.has(sub.id);
+      return visibleIds.has(sub.id) || deletedIds.has(sub.id);
+    });
+  }
+
+  if (!ownerHasCombinedFamilyDataset) {
+    return Array.from(uniqueSubs.values()).filter((sub) => {
+      const ownerId = normalizeSubscriptionOwnerId(sub);
+      return ownerId === currentUserId;
     });
   }
 

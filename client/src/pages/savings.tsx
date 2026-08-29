@@ -724,7 +724,7 @@ export default function Savings() {
                 <Skeleton className="h-9 w-24" />
               ) : (
                 <span className="text-3xl font-bold text-chart-2 dark:text-foreground" data-testid="text-potential-savings">
-                    {formatAmount(personalMetrics?.totalMonthlySpend ?? 0, 'USD')}
+                    {formatAmount(metrics?.totalMonthlySpend ?? 0, 'USD')}
                   <span className="text-sm font-normal text-muted-foreground">/mo</span>
                 </span>
               )}

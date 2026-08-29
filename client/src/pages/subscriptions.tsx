@@ -154,6 +154,8 @@ export default function Subscriptions() {
   const { data: familyData, isLoading: familyLoading } = useQuery<any>({
     queryKey: ["/api/family-groups", familyGroupId, "family-data"],
     enabled: !!familyGroupId,
+    refetchInterval: showFamilyData ? 30000 : false,
+    refetchIntervalInBackground: false,
     queryFn: async () => {
       if (!familyGroupId) return null;
       const response = await apiRequest('GET', `/api/family-groups/${familyGroupId}/family-data`);

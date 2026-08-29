@@ -58,6 +58,12 @@ async function ensureCsrfSession(authToken: string | null) {
   return existing;
 }
 
+export function clearStoredAuthState() {
+  localStorage.removeItem("supabase.auth.token");
+  sessionStorage.removeItem("subveris.session.id");
+  sessionStorage.removeItem("subveris.csrf.token");
+}
+
 export async function resolveAuthToken(forceRefresh = false) {
   const tokenStr = localStorage.getItem("supabase.auth.token");
   if (!forceRefresh && tokenStr) {
@@ -97,7 +103,10 @@ function normalizeBase(base: string) {
 function withTimeout(ms: number, promise: Promise<Response>): Promise<Response> {
   const timeoutPromise = new Promise<Response>((_, reject) => {
     const id = window.setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms);
-    promise.finally(() => window.clearTimeout(id));
+    promise.then(
+      () => window.clearTimeout(id),
+      () => window.clearTimeout(id),
+    );
   });
   return Promise.race([promise, timeoutPromise]);
 }
@@ -110,6 +119,17 @@ async function fetchWithRetry(url: string, init: RequestInit, retries = 2): Prom
       return await withTimeout(8000, fetch(url, init));
     } catch (error) {
       lastError = error;
+
+      const message = error instanceof Error ? error.message : String(error);
+      const isConnectionClosed = message.includes('Failed to fetch') || message.includes('ERR_CONNECTION_CLOSED') || message.includes('NetworkError') || message.includes('load interrupted');
+
+      if (isConnectionClosed && attempt === retries) {
+        return new Response(JSON.stringify({ error: 'Request failed because the connection was closed or the network was unavailable' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
       if (attempt === retries) {
         throw error;
       }
@@ -168,14 +188,40 @@ export async function fetchWithRemoteFallback(url: string, init: RequestInit) {
     try {
       return await fetchWithRetry(fetchUrl, init);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isConnectionClosed = message.includes('Failed to fetch') || message.includes('ERR_CONNECTION_CLOSED') || message.includes('NetworkError') || message.includes('load interrupted');
+
+      if (isConnectionClosed && secondaryUrl && fetchUrl === primaryUrl) {
+        console.warn("[apiFetch] connection closed while calling primary API; falling back to remote API", { primaryUrl, secondaryUrl, error });
+        try {
+          return await fetchWithRetry(secondaryUrl, init);
+        } catch (retryError) {
+          return new Response(JSON.stringify({ error: 'Request failed because the connection was closed or the network was unavailable' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       if (secondaryUrl && fetchUrl === primaryUrl) {
         console.warn("[apiFetch] primary /api request failed, retrying against remote API", { primaryUrl, secondaryUrl, error });
         try {
           return await fetchWithRetry(secondaryUrl, init);
         } catch (retryError) {
-          throw retryError;
+          return new Response(JSON.stringify({ error: 'Request failed because the connection was closed or the network was unavailable' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          });
         }
       }
+
+      if (!secondaryUrl) {
+        return new Response(JSON.stringify({ error: 'Request failed because the connection was closed or the network was unavailable' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
       throw error;
     }
   };
@@ -188,7 +234,7 @@ export async function fetchWithRemoteFallback(url: string, init: RequestInit) {
       secondaryUrl,
       status: res.status,
     });
-    return await fetch(secondaryUrl, init);
+    return await attemptFetch(secondaryUrl);
   }
 
   return res;
@@ -206,10 +252,8 @@ export function resolveLocalApiUrl(path: string) {
 }
 
 export async function apiFetch(input: string, init?: RequestInit) {
-  let token = await resolveAuthToken();
-  if (!token) {
-    token = await resolveAuthToken(true);
-  }
+  // Ask Supabase for the current session so an inactive tab cannot reuse an expired bearer token.
+  const token = await resolveAuthToken(true);
   const effectiveToken = token || supabaseAnonKey;
   const primaryUrl = resolveApiUrl(input);
   const mutationMethod = (init?.method || "GET").toUpperCase();
@@ -258,6 +302,7 @@ export async function apiFetch(input: string, init?: RequestInit) {
   }
 
   if (res.status === 401) {
+    clearStoredAuthState();
     const refreshedToken = await resolveAuthToken(true);
     const retryToken = refreshedToken || supabaseAnonKey;
     if (retryToken && retryToken !== effectiveToken) {

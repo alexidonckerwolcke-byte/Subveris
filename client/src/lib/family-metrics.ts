@@ -13,22 +13,60 @@ export interface FamilyMetrics {
  * logic originally embedded in FamilySharing component but is extracted so we
  * can unit test it and keep the component cleaner.
  */
+export function getCurrentMonthFamilySpend(familyData: any, monthlySpending: Array<{ month?: string; amount?: number; isCurrentMonth?: boolean }> = []): number {
+  const fromSpendingSeries = Array.isArray(familyData?.spending) && familyData.spending.length > 0
+    ? familyData.spending.find((entry: any) => entry?.isCurrentMonth)
+    : undefined;
+
+  if (fromSpendingSeries && typeof fromSpendingSeries.amount === 'number') {
+    return Number(fromSpendingSeries.amount) || 0;
+  }
+
+  const fromMonthlySeries = Array.isArray(monthlySpending) && monthlySpending.length > 0
+    ? monthlySpending.find((entry: any) => entry?.isCurrentMonth)
+    : undefined;
+
+  if (fromMonthlySeries && typeof fromMonthlySeries.amount === 'number') {
+    return Number(fromMonthlySeries.amount) || 0;
+  }
+
+  if (typeof familyData?.metrics?.totalMonthlySpending === 'number') {
+    return Number(familyData.metrics.totalMonthlySpending) || 0;
+  }
+
+  return 0;
+}
+
 export function computeFamilyMetrics(familyData: any): FamilyMetrics {
   const isSubscriptionActiveLike = (sub: any) => {
     const status = String(sub?.status || '').trim().toLowerCase();
     return status === 'active' || status === 'unused' || status === 'to-cancel';
   };
 
+  const unwrapSharedItem = (shared: any) => {
+    if (!shared) return null;
+    const candidate = shared.subscription ?? shared;
+    return {
+      ...shared,
+      ...candidate,
+      id: candidate?.id ?? shared.subscription_id ?? shared.id,
+      status: candidate?.status ?? shared?.status,
+      amount: candidate?.amount ?? shared?.amount,
+      frequency: candidate?.frequency ?? shared?.frequency,
+      currency: candidate?.currency ?? shared?.currency,
+      next_billing_at: candidate?.next_billing_at ?? shared?.next_billing_at,
+    };
+  };
+
   const subs = (familyData?.subscriptions || []).filter((s: any) => isSubscriptionActiveLike(s));
-  const sharedRaw = (familyData?.sharedSubscriptions || []).filter((sh: any) => {
-    const status = String(sh?.status || sh.subscription?.status || '').trim().toLowerCase();
-    return status === 'active' || status === 'unused' || status === 'to-cancel';
-  });
+  const sharedRaw = (familyData?.sharedSubscriptions || [])
+    .map(unwrapSharedItem)
+    .filter((item: any) => item && isSubscriptionActiveLike(item));
 
   // Deduplicate: don't count a shared subscription twice if it already
   // appears in the main subscriptions list (common when owner shares their own)
-  const sharedIds = new Set(sharedRaw.map((sh: any) => sh.subscription_id || sh.subscription?.id));
-  const uniqueShared = sharedRaw.filter((sh: any) => !subs.some((s: any) => s.id === (sh.subscription_id || sh.subscription?.id)));
+  const sharedIds = new Set(sharedRaw.map((sh: any) => sh.subscription_id || sh.subscription?.id || sh.id));
+  const uniqueShared = sharedRaw.filter((sh: any) => !subs.some((s: any) => s.id === (sh.subscription_id || sh.subscription?.id || sh.id)));
 
   const members = familyData?.members || [];
 
@@ -36,7 +74,7 @@ export function computeFamilyMetrics(familyData: any): FamilyMetrics {
   const activeSubscriptions =
     subs.filter((s: any) => String(s.status || '').trim().toLowerCase() === 'active' || String(s.status || '').trim().toLowerCase() === 'unused').length +
     uniqueShared.filter((sh: any) => {
-      const status = String(sh?.status || sh.subscription?.status || '').trim().toLowerCase();
+      const status = String(sh?.status || '').trim().toLowerCase();
       return status === 'active' || status === 'unused';
     }).length;
 

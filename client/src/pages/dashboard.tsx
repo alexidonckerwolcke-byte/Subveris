@@ -8,9 +8,10 @@ import { SpendingChart } from "@/components/spending-chart";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/lib/currency-context";
 import { useAuth } from "@/lib/auth-context";
-import { useFamilyDataMode } from "@/hooks/use-family-data";
+import { shouldUseFamilyAwareSpending, useFamilyDataMode } from "@/hooks/use-family-data";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
 import { calculatePotentialSavings } from "@/lib/health-score";
+import { getCurrentMonthFamilySpend } from "@/lib/family-metrics";
 import { calculateMonthlySpendingSeries, normalizeMonthlySpendingSeries } from "@/lib/utils";
 import type { Subscription, MonthlySpending, SpendingByCategory } from "@shared/schema";
 
@@ -62,8 +63,9 @@ function getUpcomingRenewals(subscriptions: Subscription[] = []) {
 export default function Dashboard() {
   const { formatAmount, convertAmount } = useCurrency();
   const { user } = useAuth();
-  const { familyGroupId, showFamilyData } = useFamilyDataMode();
+  const { familyGroupId, showFamilyData, isFamilyGroupOwner } = useFamilyDataMode();
   const [, navigate] = useLocation();
+  const shouldUseFamilyAwareSpendingData = shouldUseFamilyAwareSpending(familyGroupId, showFamilyData, isFamilyGroupOwner);
 
   const { data: metrics, isLoading: metricsLoading } = useQuery({
     queryKey: ["/api/metrics"],
@@ -98,9 +100,9 @@ export default function Dashboard() {
   });
 
   const { data: monthlySpending, isLoading: monthlySpendingLoading } = useQuery<MonthlySpending[]>({
-    queryKey: ["/api/spending/monthly", showFamilyData === true],
+    queryKey: ["/api/spending/monthly", shouldUseFamilyAwareSpendingData],
     queryFn: async () => {
-      const response = await apiRequest("GET", showFamilyData === true ? "/api/spending/monthly?family=true" : "/api/spending/monthly");
+      const response = await apiRequest("GET", shouldUseFamilyAwareSpendingData ? "/api/spending/monthly?family=true" : "/api/spending/monthly");
       return response.json();
     },
     refetchInterval: 30000,
@@ -108,9 +110,9 @@ export default function Dashboard() {
   });
 
   const { data: categorySpending, isLoading: categorySpendingLoading } = useQuery<SpendingByCategory[]>({
-    queryKey: ["/api/spending/category"],
+    queryKey: ["/api/spending/category", shouldUseFamilyAwareSpendingData],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/spending/category");
+      const response = await apiRequest("GET", shouldUseFamilyAwareSpendingData ? "/api/spending/category?family=true" : "/api/spending/category");
       return response.json();
     },
     refetchInterval: 30000,
@@ -122,19 +124,34 @@ export default function Dashboard() {
     [familyData, user?.id]
   );
 
-  const subscriptions = showFamilyData === true ? familySubscriptions : personalSubscriptions;
+  const isMemberFamilyView = Boolean(familyGroupId) && !isFamilyGroupOwner;
+  const familyAwareMode = showFamilyData === true || isMemberFamilyView;
+  const subscriptions = familyAwareMode ? familySubscriptions : personalSubscriptions;
 
   const monthlySpendingData = monthlySpending;
 
-  const categorySpendingData = showFamilyData === true && familyData?.byCategory && familyData.byCategory.length > 0
+  const categorySpendingData = familyAwareMode && familyData?.byCategory && familyData.byCategory.length > 0
     ? familyData.byCategory
     : categorySpending;
 
   const normalizedMonthlySpending = normalizeMonthlySpendingSeries(monthlySpendingData, 6);
 
-  const totalMonthlySpend = metrics?.totalMonthlySpend ?? 0;
+  const familyCurrentMonthSpend = useMemo(() => {
+    if (!familyAwareMode) return 0;
+    const currentEntry = Array.isArray(monthlySpendingData)
+      ? monthlySpendingData.find((entry: any) => entry?.isCurrentMonth)
+      : undefined;
+    if (currentEntry && typeof currentEntry.amount === 'number') {
+      return Number(currentEntry.amount) || 0;
+    }
+    return getCurrentMonthFamilySpend(familyData, monthlySpendingData);
+  }, [familyAwareMode, familyData, monthlySpendingData]);
+
+  const totalMonthlySpend = familyAwareMode ? familyCurrentMonthSpend : (metrics?.totalMonthlySpend ?? 0);
   const annualProjection = Math.round(totalMonthlySpend * 12 * 100) / 100;
-  const activeSubscriptions = (subscriptions || []).filter((sub) => sub?.status === "active").length;
+  const activeSubscriptions = (familyAwareMode
+    ? familySubscriptions
+    : (subscriptions || [])).filter((sub) => sub?.status === "active").length;
   const detectedSubscriptions = (subscriptions || []).filter((sub) => sub?.isDetected === true || (sub as any)?.is_detected === true).length;
   const potentialSavings = useMemo(
     () => calculatePotentialSavings(subscriptions || []),

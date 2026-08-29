@@ -20,7 +20,8 @@ export function computeCostPerUseFromSubs(subs: any[] | undefined): CostPerUseAn
           ? sub.amount * 4
           : sub.amount;
       // support both snake_case (raw rows) and camelCase (API response)
-      const currentMonth = new Date().toISOString().slice(0, 7);
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       const usageMonth = (sub.usage_month ?? sub.usageMonth) as string | null;
       const monthlyUsageCount = (sub.monthly_usage_count ?? sub.monthlyUsageCount) as number | undefined;
       // also accept legacy/common fields `usage_count` or `usageCount`

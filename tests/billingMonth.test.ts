@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDateLocal, getSubscriptionBillingMonth, getAdvancedRenewalDateIfNeeded, isSubscriptionBilledInMonth, parseSubscriptionRenewalDate } from '../client/src/lib/utils';
+import { formatDateLocal, getLocalMonthRange, getSubscriptionBillingMonth, getAdvancedRenewalDateIfNeeded, isSubscriptionBilledInCurrentMonth, isSubscriptionBilledInMonth, parseSubscriptionRenewalDate } from '../client/src/lib/utils';
 
 describe('billing month helpers', () => {
   it('parses billingMonth from subscription payload', () => {
@@ -45,6 +45,17 @@ describe('billing month helpers', () => {
     expect(isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, true)).toBe(true);
   });
 
+  it('treats a forwarded renewal as still billed in the current month when billing_month matches the month', () => {
+    const sub = {
+      nextBillingDate: '2026-06-03',
+      billing_month: '2026-05',
+      status: 'active',
+    };
+    const now = new Date('2026-05-14T12:00:00Z');
+
+    expect(isSubscriptionBilledInCurrentMonth(sub, now)).toBe(true);
+  });
+
   it('does not count future-month renewals without billing_month for the current month', () => {
     const sub = {
       nextBillingDate: '2026-06-09',
@@ -67,6 +78,23 @@ describe('billing month helpers', () => {
     const monthEnd = new Date(2026, 4, 31, 23, 59, 59, 999);
 
     expect(isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, true)).toBe(false);
+  });
+
+  it('uses local month boundaries for the monthly reset', () => {
+    const originalTz = process.env.TZ;
+    process.env.TZ = 'America/Los_Angeles';
+
+    const now = new Date('2026-06-01T00:30:00-07:00');
+    const { monthStart, monthEnd } = getLocalMonthRange(now);
+
+    expect(monthStart.getFullYear()).toBe(2026);
+    expect(monthStart.getMonth()).toBe(5);
+    expect(monthStart.getDate()).toBe(1);
+    expect(monthEnd.getFullYear()).toBe(2026);
+    expect(monthEnd.getMonth()).toBe(5);
+    expect(monthEnd.getDate()).toBe(30);
+
+    process.env.TZ = originalTz;
   });
 
   it('parses date-only renewal dates as local dates', () => {

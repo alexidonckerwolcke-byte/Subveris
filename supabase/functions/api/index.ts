@@ -353,6 +353,13 @@ function getBillingMonth(value: Date): string {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function getLocalMonthRange(now: Date) {
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return { monthStart, monthEnd, today };
+}
+
 async function sendZeroUsageAlertEmail(userId: string, domain: string): Promise<void> {
   try {
     if (!supabase) {
@@ -924,13 +931,12 @@ function getRequestLocalNow(url: URL): Date {
 }
 
 function isRenewalDateInCurrentMonth(date: Date, now = new Date()): boolean {
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+  const { monthStart, monthEnd } = getLocalMonthRange(now);
   return date >= monthStart && date <= monthEnd;
 }
 
 function isRenewalDateToday(date: Date, now = new Date()): boolean {
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const { today } = getLocalMonthRange(now);
   return date.getTime() === today.getTime();
 }
 
@@ -1055,8 +1061,7 @@ async function sendRenewalReminderEmail(to: string, subscriptions: any[]): Promi
 }
 
 function isRenewalDateTodayOrEarlierInCurrentMonth(date: Date, now = new Date()): boolean {
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const { monthStart, today } = getLocalMonthRange(now);
   return date >= monthStart && date <= today;
 }
 
@@ -1106,6 +1111,7 @@ function normalizeSubscriptionRow(sub: any) {
   return {
     ...sub,
     userId: sub.user_id,
+    billingMonth: sub.billing_month || sub.billingMonth,
     usageCount: sub.usage_count,
     monthlyUsageCount: sub.monthly_usage_count,
     usageMonth: sub.usage_month,
@@ -1442,7 +1448,7 @@ async function incrementSubscriptionUsageCount(userId: string, subscriptionId: s
 }
 
 function buildCostPerUseAnalysis(subscriptions: any[]) {
-  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+  const currentMonth = getBillingMonth(new Date());
   return (subscriptions || [])
     .filter(sub => sub && sub.status !== 'deleted')
     .map((sub: any) => {
@@ -3784,9 +3790,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
         );
       }
 
-      const now = new Date();
-      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+      const now = getRequestLocalNow(url);
+      const { monthStart, monthEnd } = getLocalMonthRange(now);
       
       const allSubs: any[] = data || [];
       const activeSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.status) === "active");
@@ -5585,34 +5590,68 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
 
       try {
         const familyMode = url.searchParams.get('family') === 'true';
-        let subscriptionQuery = supabase.from("subscriptions").select("*").eq("user_id", userId);
+        let subscriptions: any[] = [];
 
-        if (familyMode) {
-          const { data: ownedGroups } = await supabase.from('family_groups').select('id').eq('owner_id', userId);
-          const { data: memberGroups } = await supabase.from('family_group_members').select('family_group_id').eq('user_id', userId);
-          const groupIds = Array.from(new Set([
-            ...(ownedGroups || []).map((group: any) => group.id),
-            ...(memberGroups || []).map((group: any) => group.family_group_id),
+        const { data: ownedGroups } = await supabase.from('family_groups').select('id, owner_id').eq('owner_id', userId);
+        const { data: memberGroups } = await supabase.from('family_group_members').select('family_group_id, user_id').eq('user_id', userId);
+        const groupIds = Array.from(new Set([
+          ...(ownedGroups || []).map((group: any) => group.id),
+          ...(memberGroups || []).map((group: any) => group.family_group_id),
+        ])).filter(Boolean);
+
+        if (groupIds.length > 0) {
+          const { data: groupMembers } = await supabase.from('family_group_members').select('user_id, family_group_id').in('family_group_id', groupIds);
+          const { data: groupOwners } = await supabase.from('family_groups').select('id, owner_id').in('id', groupIds);
+          const ownerIds = new Set((groupOwners || []).map((group: any) => String(group.owner_id)));
+          const isOwner = ownerIds.has(String(userId));
+
+          const memberIds = Array.from(new Set([
+            userId,
+            ...(groupMembers || []).map((member: any) => member.user_id),
+            ...(groupOwners || []).map((group: any) => group.owner_id),
           ])).filter(Boolean);
 
-          if (groupIds.length > 0) {
-            const { data: groupMembers } = await supabase.from('family_group_members').select('user_id').in('family_group_id', groupIds);
-            const { data: groupOwners } = await supabase.from('family_groups').select('owner_id').in('id', groupIds);
-            const memberIds = Array.from(new Set([
-              userId,
-              ...(groupMembers || []).map((member: any) => member.user_id),
-              ...(groupOwners || []).map((group: any) => group.owner_id),
-            ])).filter(Boolean);
-            subscriptionQuery = supabase.from("subscriptions").select("*").in("user_id", memberIds);
+          const { data: familySubscriptions, error } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .in('user_id', memberIds);
+
+          if (error) {
+            console.error('Error fetching family subscriptions for spending monthly:', error);
+            return sendJson([]);
           }
+
+          const { data: sharedRecords } = await supabase
+            .from('shared_subscriptions')
+            .select('subscription_id, shared_with_user_id, family_group_id')
+            .in('family_group_id', groupIds);
+
+          const sharedIds = new Set((sharedRecords || [])
+            .filter((record: any) => isOwner || !record.shared_with_user_id || record.shared_with_user_id === userId)
+            .map((record: any) => String(record.subscription_id))
+            .filter(Boolean));
+
+          subscriptions = (familySubscriptions || []).filter((sub: any) => {
+            const subId = String(sub.id);
+            if (familyMode && isOwner) return true;
+            if (familyMode) return sub.user_id === userId || sharedIds.has(subId);
+            if (isOwner) return false;
+            return sub.user_id === userId || sharedIds.has(subId);
+          });
         }
 
-        // Get personal subscriptions, or the merged family subscription set.
-        const { data: subscriptions, error } = await subscriptionQuery;
+        if ((!familyMode && !subscriptions.length) || (familyMode && subscriptions.length === 0)) {
+          const { data: personalSubscriptions, error } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', userId);
 
-        if (error || !subscriptions) {
-          console.error("Error fetching subscriptions for spending monthly:", error);
-          return sendJson([]);
+          if (error || !personalSubscriptions) {
+            console.error('Error fetching subscriptions for spending monthly:', error);
+            return sendJson([]);
+          }
+
+          subscriptions = personalSubscriptions;
         }
 
         console.log(`[spending/monthly] Found ${subscriptions.length} subscriptions for user`);
@@ -6052,9 +6091,8 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       const query = new URL(req.url).searchParams;
       const familyMode = query.get("family") === "true";
 
-      const today = new Date();
-      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-      const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      const today = getRequestLocalNow(url);
+      const { monthStart, monthEnd } = getLocalMonthRange(today);
 
       const normalizeStatus = (status: any) => String(status || '').trim().toLowerCase();
       const isInCurrentMonth = (timestamp: string | undefined | null) => {
@@ -6307,10 +6345,10 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
 
       const memberIds = Array.from(new Set([ownerId, ...(members || []).map((m: any) => String(m.user_id))]));
 
-      if (!showFamilyData) {
+      if (!showFamilyData && isOwner) {
         const { data: personalSubscriptions, error: personalSubsError } = await supabase
           .from("subscriptions")
-          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, monthly_usage_count, usage_month, total_active_seconds, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, cancellation_confirmed_at, estimated_monthly_savings, estimated_annual_savings, deleted_at, website_domain, website_url")
+          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, billing_month, status, usage_count, monthly_usage_count, usage_month, total_active_seconds, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, cancellation_confirmed_at, estimated_monthly_savings, estimated_annual_savings, deleted_at, website_domain, website_url")
           .eq("user_id", userId);
 
         if (personalSubsError) {
@@ -6465,7 +6503,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
 
       const { data: allSubscriptions, error: subsError } = await supabase
         .from("subscriptions")
-          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, status, usage_count, monthly_usage_count, usage_month, total_active_seconds, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, cancellation_confirmed_at, estimated_monthly_savings, estimated_annual_savings, deleted_at, website_domain, website_url")
+          .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, billing_month, status, usage_count, monthly_usage_count, usage_month, total_active_seconds, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, cancellation_confirmed_at, estimated_monthly_savings, estimated_annual_savings, deleted_at, website_domain, website_url")
         .in("user_id", memberIds);
 
       if (subsError) {
@@ -6625,8 +6663,10 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         percentage: totalAmount > 0 ? Math.round((entry.amount / totalAmount) * 100) : 0,
       }));
 
+      const payloadSubscriptions = isOwner ? allSubsRaw : visibleSubscriptions;
+
       return sendJson({
-        subscriptions: allSubsRaw,
+        subscriptions: payloadSubscriptions,
         sharedSubscriptions: filteredSharedRecords,
         members: members || [],
         isOwner,
@@ -6643,6 +6683,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         },
         spending,
         byCategory: byCategoryWithPercentages,
+        familyDataSharingEnabled: true,
       });
     }
 
@@ -6715,33 +6756,83 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       }
 
       try {
-        // Get all subscriptions so we can filter deleted/canceled rows consistently
-        const { data: subscriptions, error } = await supabase
-          .from("subscriptions")
-          .select("*")
-          .eq("user_id", userId);
+        const url = new URL(req.url);
+        const familyMode = url.searchParams.get('family') === 'true';
 
-        if (error || !subscriptions) {
-          console.error("Error fetching subscriptions for spending category:", error);
-          return sendJson([]);
+        let subscriptions: any[] = [];
+        const { data: ownedGroups } = await supabase.from('family_groups').select('id, owner_id').eq('owner_id', userId);
+        const { data: memberGroups } = await supabase.from('family_group_members').select('family_group_id, user_id').eq('user_id', userId);
+        const groupIds = Array.from(new Set([
+          ...(ownedGroups || []).map((group: any) => group.id),
+          ...(memberGroups || []).map((group: any) => group.family_group_id),
+        ])).filter(Boolean);
+
+        if (groupIds.length > 0) {
+          const { data: groupMembers } = await supabase.from('family_group_members').select('user_id, family_group_id').in('family_group_id', groupIds);
+          const { data: groupOwners } = await supabase.from('family_groups').select('id, owner_id').in('id', groupIds);
+          const ownerIds = new Set((groupOwners || []).map((group: any) => String(group.owner_id)));
+          const isOwner = ownerIds.has(String(userId));
+
+          const memberIds = Array.from(new Set([
+            userId,
+            ...(groupMembers || []).map((member: any) => member.user_id),
+            ...(groupOwners || []).map((group: any) => group.owner_id),
+          ])).filter(Boolean);
+
+          const { data: familySubscriptions, error: familyError } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .in('user_id', memberIds);
+
+          if (familyError) {
+            console.error('Error fetching family subscriptions for spending category:', familyError);
+            return sendJson([]);
+          }
+
+          const { data: sharedRecords } = await supabase
+            .from('shared_subscriptions')
+            .select('subscription_id, shared_with_user_id, family_group_id')
+            .in('family_group_id', groupIds);
+
+          const sharedIds = new Set((sharedRecords || [])
+            .filter((record: any) => isOwner || !record.shared_with_user_id || record.shared_with_user_id === userId)
+            .map((record: any) => String(record.subscription_id))
+            .filter(Boolean));
+
+          subscriptions = (familySubscriptions || []).filter((sub: any) => {
+            const subId = String(sub.id);
+            if (familyMode && isOwner) return true;
+            if (familyMode) return sub.user_id === userId || sharedIds.has(subId);
+            if (isOwner) return false;
+            return sub.user_id === userId || sharedIds.has(subId);
+          });
         }
 
-        // Get current month boundaries using the user's local offset
+        if ((!familyMode && !subscriptions.length) || (familyMode && subscriptions.length === 0)) {
+          const { data: personalSubscriptions, error } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', userId);
+
+          if (error || !personalSubscriptions) {
+            console.error('Error fetching subscriptions for spending category:', error);
+            return sendJson([]);
+          }
+
+          subscriptions = personalSubscriptions;
+        }
+
         const offsetMinutes = getRequestOffsetMinutes(url);
         const now = getRequestLocalNow(url);
-        const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-        const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59));
-        const currentDayOfMonth = now.getUTCDate();
+        const { monthStart, monthEnd } = getLocalMonthRange(now);
 
-        // Group by category and calculate totals, only for subscriptions in current month
-        const categoryMap = new Map();
-        
+        const categoryMap = new Map<string, { amount: number; count: number }>();
+
         (subscriptions || []).forEach((sub: any) => {
           if (isSubscriptionDeleted(sub)) return;
           const normalizedStatus = normalizeSubscriptionStatus(sub.status);
           if (normalizedStatus !== 'active' && normalizedStatus !== 'unused' && normalizedStatus !== 'to-cancel') return;
 
-          // Only include subscriptions that renew today or earlier in the current month
           let includeInSpending = false;
           const renewalDateStr = normalizeSubscriptionDate(sub);
           if (renewalDateStr) {
@@ -6750,7 +6841,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
               includeInSpending = true;
             }
           }
-          
+
           if (includeInSpending) {
             const frequency = (sub.frequency || 'monthly').toLowerCase();
             const amount = Number(sub.amount) || 0;
@@ -6758,11 +6849,11 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
             const monthlyAmount = frequency === 'yearly' ? usdAmount / 12 :
                                 frequency === 'quarterly' ? usdAmount / 3 :
                                 frequency === 'weekly' ? usdAmount * 4 : usdAmount;
-            
+
             const existing = categoryMap.get(sub.category) || { amount: 0, count: 0 };
             categoryMap.set(sub.category, {
               amount: existing.amount + monthlyAmount,
-              count: existing.count + 1
+              count: existing.count + 1,
             });
           }
         });
@@ -6772,12 +6863,12 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           category,
           amount: Math.round(data.amount * 100) / 100,
           percentage: total > 0 ? Math.round((data.amount / total) * 100) : 0,
-          count: data.count
+          count: data.count,
         }));
 
         return sendJson(categories);
       } catch (err) {
-        console.error("Exception generating spending category data:", err);
+        console.error('Exception generating spending category data:', err);
         return sendJson([]);
       }
     }

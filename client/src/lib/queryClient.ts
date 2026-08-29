@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { apiFetch, fetchWithRemoteFallback, resolveApiUrl, resolveAuthToken } from "./api";
+import { apiFetch, clearStoredAuthState, fetchWithRemoteFallback, resolveApiUrl, resolveAuthToken } from "./api";
+import { supabase } from "./supabase";
 
 function buildQueryPath(queryKey: unknown[]) {
   const pathSegments = queryKey
@@ -107,6 +108,14 @@ export const getQueryFn: <T>(options: {
     }
 
     let token = await resolveAuthToken(true);
+    if (supabase) {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session) {
+        clearStoredAuthState();
+        return null;
+      }
+    }
+
     const queryPath = buildQueryPath(queryKey as unknown[]);
     const queryPathWithLocal = appendLocalTimeQuery(queryPath);
     
