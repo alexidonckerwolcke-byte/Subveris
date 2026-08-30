@@ -242,6 +242,52 @@ function clearStateForAccountSwitch(userId, callback) {
   });
 }
 
+function refreshOpaqueSessionFromStoredRawToken(callback = () => {}) {
+  browser.storage.local.get(['supabaseAuthToken', 'supabaseUserUUID', 'subverisApiUrl'], (result) => {
+    const rawToken = result.supabaseAuthToken;
+    const userId = result.supabaseUserUUID;
+    const apiUrl = normalizeApiUrl(result.subverisApiUrl || DEFAULT_API_URL);
+
+    if (!rawToken || !userId) {
+      callback(false);
+      return;
+    }
+
+    fetch(`${apiUrl}/api/security/extension-session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${rawToken}`,
+      },
+      body: JSON.stringify({ userId }),
+      keepalive: true,
+    }).then(async (response) => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to refresh extension session');
+      }
+
+      browser.storage.local.set({
+        authToken: data.sessionToken || null,
+        extensionSessionExpiresAt: data.expiresAt || null,
+        subverisApiUrl: apiUrl,
+      }, () => {
+        if (browser.runtime.lastError) {
+          console.warn('[Background] Failed to persist refreshed extension session:', browser.runtime.lastError);
+          callback(false);
+          return;
+        }
+        console.log('[Background] ✅ Refreshed stale extension session without logging the user out.');
+        refreshSubscriptionStatus(() => {});
+        callback(true);
+      });
+    }).catch((error) => {
+      console.warn('[Background] Could not refresh stale extension session:', error);
+      callback(false);
+    });
+  });
+}
+
 function loadKnownSubscriptions() {
   refreshSubscriptionStatus();
   browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl', 'detectedSubscriptions'], (result) => {
@@ -381,14 +427,9 @@ function syncDetectedSubscriptions(subscriptions) {
     }).then((response) => {
       if (!response.ok) {
         if (response.status === 401) {
-          console.warn('[Background] Stale or invalid extension session detected while syncing subscriptions; clearing cached auth state.');
-          clearStoredAccountState(() => {
-            browser.storage.local.set({ subverisApiUrl: normalizeApiUrl(DEFAULT_API_URL) }, () => {
-              if (browser.runtime.lastError) {
-                console.warn('[Background] Failed to reset API URL after stale session:', browser.runtime.lastError);
-              }
-            });
-          });
+          console.warn('[Background] Stale or invalid extension session detected while syncing subscriptions; refreshing the opaque session instead of logging out the user.');
+          refreshOpaqueSessionFromStoredRawToken(() => {});
+          return;
         }
         console.warn('[Background] Failed to sync subscriptions:', response.status);
         return;
