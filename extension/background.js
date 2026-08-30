@@ -711,29 +711,66 @@ function sendUsageTracking(domain, timeSpent, serviceName, serviceUrl, callback 
           rollingWindowDays: 30
         });
 
-        const url = `${apiUrl}/api/track-usage-for-all-members`;
+        const usageTrackingEndpoints = [
+          { key: 'EXTENSION_USAGE_SYNC', url: `${apiUrl}/api/extension/usage-sync` },
+          { key: 'LEGACY_TRACK_USAGE', url: `${apiUrl}/api/track-usage-for-all-members` },
+          { key: 'TRACK_USAGE_FALLBACK', url: `${apiUrl}/api/track-usage-by-domain` }
+        ];
 
-        fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: payload,
-          keepalive: true
-        }).then((response) => {
-          console.log('[Background] TRACK_USAGE_FOR_ALL_MEMBERS response status:', response.status);
-          if (!response.ok) {
-            console.error('[Background] TRACK_USAGE_FOR_ALL_MEMBERS request failed:', response.status, response.statusText);
-            return sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName, serviceUrl, callback);
+        const tryUsageTrackingEndpoint = (index) => {
+          const endpoint = usageTrackingEndpoints[index];
+          if (!endpoint) {
+            console.warn('[Background] All usage tracking endpoints returned a failure. Skipping tracking silently.');
+            callback({ success: false, error: 'Usage tracking unavailable on all configured endpoints.' });
+            return;
           }
 
-          console.log('[Background] ✅ TRACK_USAGE_FOR_ALL_MEMBERS successful for:', domain);
-          return response.json().then((body) => callback({ success: true, body }));
-        }).catch((error) => {
-          console.error('[Background] Failed TRACK_USAGE_FOR_ALL_MEMBERS fetch:', error);
-          return sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName, serviceUrl, callback);
-        });
+          fetch(endpoint.url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: payload,
+            keepalive: true
+          }).then((response) => {
+            console.log(`[Background] ${endpoint.key} response status:`, response.status);
+            if (!response.ok) {
+              const isExpectedMissingRoute = response.status === 404;
+              const hasMoreEndpoints = index < usageTrackingEndpoints.length - 1;
+
+              if (isExpectedMissingRoute && hasMoreEndpoints) {
+                console.warn(`[Background] ${endpoint.key} returned 404; trying the next usage tracking endpoint.`);
+                return tryUsageTrackingEndpoint(index + 1);
+              }
+
+              if (isExpectedMissingRoute) {
+                console.warn('[Background] All configured usage sync endpoints are unavailable; skipping usage tracking for now.');
+                callback({ success: false, error: 'Usage tracking endpoint unavailable.' });
+                return;
+              }
+
+              console.warn(`[Background] ${endpoint.key} request failed:`, response.status, response.statusText);
+              if (hasMoreEndpoints) {
+                return tryUsageTrackingEndpoint(index + 1);
+              }
+              return callback({ success: false, error: `HTTP ${response.status}` });
+            }
+
+            console.log(`[Background] ✅ ${endpoint.key} successful for:`, domain);
+            return response.json().then((body) => callback({ success: true, body })).catch(() => callback({ success: true }));
+          }).catch((error) => {
+            console.warn(`[Background] ${endpoint.key} fetch failed:`, error?.message || error);
+            const hasMoreEndpoints = index < usageTrackingEndpoints.length - 1;
+            if (hasMoreEndpoints) {
+              return tryUsageTrackingEndpoint(index + 1);
+            }
+            console.error('[Background] Failed all usage tracking fetch attempts:', error);
+            callback({ success: false, error: error?.message || 'Usage tracking request failed.' });
+          });
+        };
+
+        tryUsageTrackingEndpoint(0);
       });
     });
   });

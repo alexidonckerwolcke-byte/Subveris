@@ -196,15 +196,22 @@ window.addEventListener('message', (event) => {
   setTimeout(() => {
     const success = sendMessageToBackground({ type: 'SUBVERIS_AUTH_TOKEN', token, userId, apiUrl, csrfToken }, (response, err) => {
       if (err) {
-        console.error('[Extension] ❌ SUBVERIS_AUTH_TOKEN message failed:', err.message);
-        console.log('[Extension] 💡 Reload the page after reloading the extension.');
+        if (isExtensionContextInvalidated(err)) {
+          console.info('[Extension] Auth token sync skipped because the extension context was reloaded.');
+        } else {
+          console.error('[Extension] ❌ SUBVERIS_AUTH_TOKEN message failed:', err.message || err);
+        }
       } else {
         console.log('[Extension] Background script storage response:', response);
       }
     });
 
     if (!success) {
-      console.error('[Extension] ❌ SUBVERIS_AUTH_TOKEN message could not be sent. Reload the page after reloading the extension.');
+      if (isExtensionContextInvalidated(new Error('Background message failed to send.'))) {
+        console.info('[Extension] Background message was deferred because the extension context was invalidated.');
+      } else {
+        console.error('[Extension] ❌ SUBVERIS_AUTH_TOKEN message could not be sent. Reload the page after reloading the extension.');
+      }
     }
   }, 100);
 });
@@ -240,8 +247,12 @@ function sendUsageTracking(domain, timeSpent) {
   const serviceUrl = window.location.href;
   const success = sendMessageToBackground({ type: 'TRACK_USAGE', domain, serviceName, serviceUrl, timeSpent }, (response, err) => {
     if (err) {
-      console.error('[Extension] ❌ TRACK_USAGE message failed:', err.message);
-      console.log('[Extension] 💡 If this error persists, reload the page after reloading the extension.');
+      if (isExtensionContextInvalidated(err)) {
+        console.info('[Extension] Usage tracking was skipped because the extension context was reloaded.');
+      } else {
+        console.error('[Extension] ❌ TRACK_USAGE message failed:', err.message || err);
+        console.log('[Extension] 💡 If this error persists, reload the page after reloading the extension.');
+      }
       return;
     }
     if (!response?.success) {
@@ -252,8 +263,12 @@ function sendUsageTracking(domain, timeSpent) {
   });
 
   if (!success) {
-    console.error('[Extension] ❌ TRACK_USAGE message could not be sent to background.');
-    console.log('[Extension] 💡 Reload the page after reloading the extension in chrome://extensions/');
+    if (isExtensionContextInvalidated(new Error('Background message failed to send.'))) {
+      console.info('[Extension] Usage tracking was deferred because the extension context was invalidated.');
+    } else {
+      console.error('[Extension] ❌ TRACK_USAGE message could not be sent to background.');
+      console.log('[Extension] 💡 Reload the page after reloading the extension in chrome://extensions/');
+    }
   }
 }
 

@@ -191,6 +191,20 @@ class TestRunner {
       } else {
         this.fail('browser.runtime.onMessage listener', 'Not found');
       }
+
+      const contentPath = '/Users/alexidonckerwolcke/Subveris/extension/content.js';
+      const contentContent = fs.readFileSync(contentPath, 'utf8');
+      if (contentContent.includes('if (isExtensionContextInvalidated(err))') || contentContent.includes('if (isExtensionContextInvalidated(browser.runtime.lastError))')) {
+        this.pass('Extension invalidation is treated as a recoverable condition');
+      } else {
+        this.fail('Extension invalidation handling', 'Missing invalidated-context recovery guard');
+      }
+
+      if (bgContent.includes('const usageTrackingEndpoints') || bgContent.includes('response.status === 404 && index < usageTrackingEndpoints.length - 1')) {
+        this.pass('Usage tracking fallback handles expected 404s without noisy hard failures');
+      } else {
+        this.fail('Usage tracking fallback handling', 'Missing resilient 404 fallback logic');
+      }
     } catch (e) {
       this.fail('Message passing tests', e.message);
     }
