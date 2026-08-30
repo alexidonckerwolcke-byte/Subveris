@@ -1831,12 +1831,52 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }
 
         console.log(`[Extension] Received ${subscriptions.length} detected subscriptions from browser`);
-        
-        // Just acknowledge receipt - subscriptions are stored in browser extension
-        // Backend doesn't need to persist these as they're available via GET /subscriptions
+
+        let persisted = 0;
+        for (const detected of subscriptions) {
+          const domain = normalizeDomain(typeof detected?.domain === "string" ? detected.domain : null);
+          const serviceName = typeof detected?.serviceName === "string" && detected.serviceName.trim()
+            ? detected.serviceName.trim()
+            : null;
+          if (!domain && !serviceName) continue;
+
+          const { data: existingRows, error: lookupError } = await supabase
+            .from("subscriptions")
+            .select("id, name, website_domain, is_detected")
+            .eq("user_id", userId)
+            .neq("status", "deleted");
+          if (lookupError) {
+            console.warn("[Extension] Failed to find detected subscription match:", lookupError);
+            continue;
+          }
+
+          const normalizedName = serviceName?.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() || "";
+          const existing = (existingRows || []).find((subscription: any) => {
+            const existingDomain = normalizeDomain(subscription.website_domain);
+            const existingName = String(subscription.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+            return (domain && existingDomain === domain) || (normalizedName && existingName === normalizedName);
+          });
+
+          if (existing) {
+            const updatePayload: Record<string, any> = { is_detected: true };
+            if (domain && normalizeDomain(existing.website_domain) !== domain) updatePayload.website_domain = domain;
+            const { error: updateError } = await supabase
+              .from("subscriptions")
+              .update(updatePayload)
+              .eq("id", existing.id)
+              .eq("user_id", userId);
+            if (!updateError) persisted += 1;
+            continue;
+          }
+
+          // A login cookie alone is not proof of a paid subscription. New rows
+          // are created only by the pricing/renewal evidence flow below.
+        }
+
         return sendJson({
           success: true,
           received: subscriptions.length,
+          persisted,
           message: "Detected subscriptions received"
         });
       } catch (err) {
@@ -3009,7 +3049,6 @@ runtimeDeno?.serve?.(async (req: Request) => {
             continue;
           }
 
-          const now = new Date();
           const detectedBillingCycle = normalizeBillingCycle(body.detectedBillingCycle ?? body.billingCycle ?? null);
           const detectedRenewalDate = normalizeRenewalDate(body.detectedRenewalDate ?? body.nextRenewalDate ?? null);
           const detectedPrice = typeof body.detectedPrice === "number" && Number.isFinite(body.detectedPrice)
@@ -3021,6 +3060,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
           const detectedServiceName = typeof body.serviceName === "string" && body.serviceName.trim()
             ? body.serviceName.trim()
             : null;
+          if (!(detectedPrice > 0 && detectedPlanName && detectedRenewalDate)) {
+            continue;
+          }
+          const now = new Date();
           const displayName = detectedPlanName && detectedServiceName &&
             !detectedPlanName.toLowerCase().includes(detectedServiceName.toLowerCase())
             ? detectedServiceName.toLowerCase().includes(detectedPlanName.toLowerCase())

@@ -222,32 +222,30 @@ function detectAndTrackSubscription() {
     }
 
     const domain = window.location.hostname.replace(/^www\./i, '').toLowerCase();
-    const serviceName = getServiceNameFromDomain(domain);
+    const serviceName = getServiceNameFromDomain(domain) || domain;
 
-    if (serviceName) {
+    sendMessageToBackground({
+      type: 'CHECK_SERVICE_SESSION',
+      domain
+    }, (response) => {
+      if (!response?.authenticated) {
+        console.log('[Extension] ⏭️ Skipping detection; no active service session:', domain);
+        return;
+      }
+      console.log('[Extension] Detected authenticated subscription service:', serviceName);
       sendMessageToBackground({
-        type: 'CHECK_SERVICE_SESSION',
-        domain
-      }, (response) => {
-        if (!response?.authenticated) {
-          console.log('[Extension] ⏭️ Skipping detection; no active service session:', serviceName);
-          return;
+        type: 'DETECT_SUBSCRIPTION',
+        serviceName,
+        domain,
+        detectedAt: Date.now()
+      }, (detectionResponse) => {
+        if (detectionResponse?.success) {
+          console.log('[Extension] ✅ Authenticated subscription detection sent:', serviceName);
+        } else {
+          console.log('[Extension] ⏭️ Subscription detection skipped:', detectionResponse?.error || 'Premium or Family plan required');
         }
-        console.log('[Extension] Detected authenticated subscription service:', serviceName);
-        sendMessageToBackground({
-          type: 'DETECT_SUBSCRIPTION',
-          serviceName,
-          domain,
-          detectedAt: Date.now()
-        }, (detectionResponse) => {
-          if (detectionResponse?.success) {
-            console.log('[Extension] ✅ Authenticated subscription detection sent:', serviceName);
-          } else {
-            console.log('[Extension] ⏭️ Subscription detection skipped:', detectionResponse?.error || 'Premium or Family plan required');
-          }
-        });
       });
-    }
+    });
   });
 }
 
@@ -377,7 +375,7 @@ function extractSubscriptionPriceData() {
 
   const currencyRegex = /(€|£|\$)\s*([0-9]+(?:[.,][0-9]{1,2})?)/g;
   const frequencyRegex = /(\/\s*(mo|maand|month|months|m|year|jaar|yr|annually|annual|y))/i;
-  const planRegex = /(premium plan|pro tier|active subscription|subscription plan|billing plan|plan)/i;
+  const planRegex = /\b((?:premium|pro|plus|business|family|enterprise|standard|ultimate|gold|platinum)\s+(?:plan|tier|membership|subscription)|active subscription|subscription plan|billing plan)\b/i;
   const matches = [...normalizedText.matchAll(currencyRegex)];
 
   if (!matches.length) {
@@ -393,11 +391,11 @@ function extractSubscriptionPriceData() {
   const detectedBillingCycle = detectBillingCycle(normalizedText);
   const detectedRenewalDate = detectRenewalDate(normalizedText);
 
-  if (!Number.isFinite(parsedPrice)) {
+  if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
     return null;
   }
 
-  if (!frequencyMatch && !planMatch) {
+  if (!planMatch || !detectedRenewalDate || !frequencyMatch) {
     return null;
   }
 
