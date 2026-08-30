@@ -49,17 +49,26 @@ function isSubverisPage() {
   return hostname === 'subveris.com' || hostname.endsWith('.subveris.com');
 }
 
-// Inject script to capture auth token from page context
-const script = document.createElement('script');
-try {
-  script.src = browser.runtime.getURL('inject.js');
-} catch (error) {
-  if (!isExtensionContextInvalidated(error)) console.warn('[Extension] Could not initialize auth bridge:', error);
+// Inject script to capture auth token from page context.
+// Some pages or stale extension loads may not expose the resource, so fail softly.
+const injectScriptUrl = browser && browser.runtime && typeof browser.runtime.getURL === 'function'
+  ? browser.runtime.getURL('inject.js')
+  : null;
+
+if (injectScriptUrl && window.location.protocol !== 'file:') {
+  const script = document.createElement('script');
+  script.src = injectScriptUrl;
+  script.onload = function() {
+    this.remove();
+  };
+  script.onerror = function() {
+    console.info('[Extension] inject.js unavailable on this page; continuing without auth bridge.');
+    this.remove();
+  };
+  (document.head || document.documentElement).appendChild(script);
+} else if (!injectScriptUrl) {
+  console.info('[Extension] Auth bridge disabled because runtime.getURL is unavailable in this context.');
 }
-script.onload = function() {
-  this.remove();
-};
-(document.head || document.documentElement).appendChild(script);
 
 function sendMessageToBackground(message, callback) {
   if (!browser || !browser.runtime || typeof browser.runtime.sendMessage !== 'function') {
