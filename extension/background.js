@@ -4,20 +4,109 @@
 const browser = globalThis.browser || globalThis.chrome;
 const DEFAULT_API_URL = 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1';
 
+function rehydrateAuthFromSubverisTabs() {
+  if (!browser.tabs || typeof browser.tabs.query !== 'function') {
+    return;
+  }
+
+  browser.tabs.query({
+    url: ['https://subveris.com/*', 'https://*.subveris.com/*']
+  }, (tabs) => {
+    if (!tabs || !tabs.length) {
+      return;
+    }
+
+    tabs.forEach((tab) => {
+      if (!tab || typeof tab.id !== 'number') {
+        return;
+      }
+
+      browser.tabs.sendMessage(tab.id, { type: 'GET_AUTH_TOKEN' }, (response) => {
+        if (browser.runtime.lastError) {
+          return;
+        }
+
+        const token = response?.token;
+        const userId = response?.userId;
+        const apiUrl = response?.apiUrl || null;
+
+        if (!token || !userId) {
+          return;
+        }
+
+        const hasExistingUser = Boolean(browser.storage.local.get && false);
+        if (hasExistingUser) {
+          return;
+        }
+
+        browser.storage.local.get(['supabaseUserUUID'], (stored) => {
+          const currentUserId = stored.supabaseUserUUID;
+          if (currentUserId && currentUserId !== userId) {
+            return;
+          }
+
+          const exchangeUrl = `${normalizeApiUrl(apiUrl || DEFAULT_API_URL)}/api/security/extension-session`;
+          fetch(exchangeUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ userId }),
+            keepalive: true,
+          }).then(async (response) => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(data.error || 'Failed to rehydrate extension session');
+            }
+
+            browser.storage.local.set({
+              authToken: data.sessionToken || null,
+              supabaseAuthToken: token,
+              supabaseUserUUID: userId,
+              subverisApiUrl: normalizeApiUrl(apiUrl || DEFAULT_API_URL),
+              extensionSessionExpiresAt: data.expiresAt || null,
+            }, () => {
+              if (!browser.runtime.lastError) {
+                refreshSubscriptionStatus(() => {});
+              }
+            });
+          }).catch(() => {});
+        });
+      });
+    });
+  });
+}
+
 browser.runtime.onInstalled.addListener(() => {
   console.log('Subveris Subscription Insights Extension Installed');
   browser.alarms?.create('refresh-subscription-activity', { periodInMinutes: 60 });
   loadKnownSubscriptions();
+  rehydrateAuthFromSubverisTabs();
 });
 
 browser.runtime.onStartup.addListener(() => {
   console.log('Subveris Subscription Insights Extension started');
   browser.alarms?.create('refresh-subscription-activity', { periodInMinutes: 60 });
   loadKnownSubscriptions();
+  rehydrateAuthFromSubverisTabs();
 });
 
 browser.alarms?.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'refresh-subscription-activity') loadKnownSubscriptions();
+  if (alarm.name === 'refresh-subscription-activity') {
+    loadKnownSubscriptions();
+    rehydrateAuthFromSubverisTabs();
+  }
+});
+
+browser.tabs?.onActivated?.addListener(() => {
+  rehydrateAuthFromSubverisTabs();
+});
+
+browser.tabs?.onUpdated?.addListener((tabId, changeInfo, tab) => {
+  if (tab && typeof tab.url === 'string' && /https:\/\/(?:www\.)?subveris\.com\//.test(tab.url) && changeInfo.status === 'complete') {
+    rehydrateAuthFromSubverisTabs();
+  }
 });
 
 const ZERO_USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -656,7 +745,18 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'SUBVERIS_AUTH_LOGOUT') {
-    clearStoredAccountState(() => sendResponse({ success: true, cleared: true }));
+    browser.storage.local.get(['supabaseUserUUID'], (result) => {
+      const currentUserId = result.supabaseUserUUID || null;
+      const logoutUserId = request.userId || null;
+
+      if (currentUserId && logoutUserId && currentUserId !== logoutUserId) {
+        console.log('[Background] Ignoring stale logout event for different user:', logoutUserId, 'current:', currentUserId);
+        sendResponse({ success: true, cleared: false, reason: 'stale-user-logout' });
+        return;
+      }
+
+      clearStoredAccountState(() => sendResponse({ success: true, cleared: true }));
+    });
     return true;
   }
 

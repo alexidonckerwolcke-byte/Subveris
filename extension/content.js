@@ -98,14 +98,48 @@ function sendMessageToBackground(message, callback) {
   }
 }
 
+browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (!request || request.type !== 'GET_AUTH_TOKEN') {
+    return false;
+  }
+
+  try {
+    const rawTokenData = localStorage.getItem('supabase.auth.token');
+    let token = null;
+    let userId = localStorage.getItem('supabaseUserUUID');
+
+    if (rawTokenData) {
+      const parsed = JSON.parse(rawTokenData);
+      token = parsed?.session?.access_token || parsed?.access_token || null;
+      if (!userId) userId = parsed?.session?.user?.id || parsed?.user?.id || null;
+    }
+
+    if (!token) {
+      token = localStorage.getItem('supabase_auth_token');
+    }
+
+    sendResponse({
+      token,
+      userId,
+      apiUrl: localStorage.getItem('subverisApiUrl') || null
+    });
+    return true;
+  } catch (error) {
+    console.warn('[Extension] Failed to read auth state on GET_AUTH_TOKEN request:', error);
+    sendResponse({ token: null, userId: null, apiUrl: null });
+    return true;
+  }
+});
+
 // Listen for messages from the injected script (page context) and forward/store token
 window.addEventListener('message', (event) => {
   if (event.source !== window) return;
   if (!event.data) return;
 
   if (event.data.type === 'SUBVERIS_AUTH_LOGOUT') {
+    const loggedOutUserId = event.data.userId || null;
     cachedAuthToken = null;
-    sendMessageToBackground({ type: 'SUBVERIS_AUTH_LOGOUT' }, (response, err) => {
+    sendMessageToBackground({ type: 'SUBVERIS_AUTH_LOGOUT', userId: loggedOutUserId }, (response, err) => {
       if (err) console.warn('[Extension] Failed to clear logged-out account:', err);
       else console.log('[Extension] Cleared stored Subveris account state:', response);
     });

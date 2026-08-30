@@ -4,7 +4,16 @@
 let lastSentToken = null;
 let lastSentUserId = null;
 
+function isSubverisPage() {
+  const hostname = window.location.hostname.replace(/^www\./i, '').toLowerCase();
+  return hostname === 'subveris.com' || hostname.endsWith('.subveris.com');
+}
+
 function sendAuthToken(force = false) {
+  if (!isSubverisPage()) {
+    return;
+  }
+
   let token = null;
   let userId = null;
   
@@ -47,9 +56,12 @@ function sendAuthToken(force = false) {
     if (lastSentToken || lastSentUserId) {
       lastSentToken = null;
       lastSentUserId = null;
-      window.postMessage({ type: 'SUBVERIS_AUTH_LOGOUT' }, '*');
+      window.postMessage({
+        type: 'SUBVERIS_AUTH_LOGOUT',
+        userId: userId || null
+      }, '*');
     }
-    console.log('[Inject] No authenticated session found');
+    console.log('[Inject] No authenticated session found on Subveris');
   }
 }
 
@@ -67,6 +79,7 @@ sendAuthToken();
 const originalSetItem = Storage.prototype.setItem;
 Storage.prototype.setItem = function(key, value) {
   originalSetItem.call(this, key, value);
+  if (!isSubverisPage()) return;
   if (key === 'supabase.auth.token' || key === 'supabase_auth_token' || key === 'supabaseUserUUID') {
     console.log('[Inject] Auth state updated, resending');
     sendAuthToken();
@@ -76,6 +89,7 @@ Storage.prototype.setItem = function(key, value) {
 const originalRemoveItem = Storage.prototype.removeItem;
 Storage.prototype.removeItem = function(key) {
   originalRemoveItem.call(this, key);
+  if (!isSubverisPage()) return;
   if (key === 'supabase.auth.token' || key === 'supabase_auth_token' || key === 'supabaseUserUUID') {
     console.log('[Inject] Auth state removed, clearing extension account');
     sendAuthToken(true);
