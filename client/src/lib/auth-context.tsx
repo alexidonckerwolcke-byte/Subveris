@@ -259,9 +259,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }));
           // Store user UUID for browser extension
           localStorage.setItem('supabaseUserUUID', session.user.id);
-          // Store API base URL for browser extension
-          localStorage.setItem('subverisApiUrl', window.location.origin);
-          
+          // Store the Supabase Function base URL for browser extension requests.
+          // Do not use the website origin here; the extension appends /api/... and expects
+          // the Supabase Functions host, not the marketing site host.
+          const supabaseFunctionBase = (
+            import.meta.env.VITE_SUPABASE_URL?.trim()
+              ? `${import.meta.env.VITE_SUPABASE_URL.trim().replace(/\/$/, '')}/functions/v1`
+              : 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1'
+          );
+          localStorage.setItem('subverisApiUrl', supabaseFunctionBase);
+
           // Sync to Chrome extension storage for background scripts
           const chromeGlobal = (globalThis as any).chrome;
           if (chromeGlobal?.storage?.local) {

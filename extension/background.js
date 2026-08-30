@@ -98,6 +98,17 @@ function normalizeApiUrl(apiUrl) {
   }
 
   const normalizedUrl = apiUrl.replace(/\/$/, '').replace(/\/api$/, '');
+
+  try {
+    const parsed = new URL(normalizedUrl);
+    const hostname = parsed.hostname.replace(/^www\./i, '').toLowerCase();
+    if (hostname === 'subveris.com' && !normalizedUrl.includes('/functions/v1')) {
+      return DEFAULT_API_URL;
+    }
+  } catch (error) {
+    // Ignore invalid URLs; fall through to legacy behavior.
+  }
+
   if (/^https?:\/\/(localhost|127\.0\.0\.1):5173$/i.test(normalizedUrl)) {
     return 'http://localhost:5000';
   }
@@ -280,6 +291,16 @@ function syncDetectedSubscriptions(subscriptions) {
       keepalive: true
     }).then((response) => {
       if (!response.ok) {
+        if (response.status === 401) {
+          console.warn('[Background] Stale or invalid extension session detected while syncing subscriptions; clearing cached auth state.');
+          clearStoredAccountState(() => {
+            browser.storage.local.set({ subverisApiUrl: normalizeApiUrl(DEFAULT_API_URL) }, () => {
+              if (browser.runtime.lastError) {
+                console.warn('[Background] Failed to reset API URL after stale session:', browser.runtime.lastError);
+              }
+            });
+          });
+        }
         console.warn('[Background] Failed to sync subscriptions:', response.status);
         return;
       }

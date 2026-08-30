@@ -98,6 +98,17 @@ function normalizeApiUrl(apiUrl) {
   }
 
   const normalizedUrl = apiUrl.replace(/\/$/, '').replace(/\/api$/, '');
+
+  try {
+    const parsed = new URL(normalizedUrl);
+    const hostname = parsed.hostname.replace(/^www\./i, '').toLowerCase();
+    if (hostname === 'subveris.com' && !normalizedUrl.includes('/functions/v1')) {
+      return DEFAULT_API_URL;
+    }
+  } catch (error) {
+    // Ignore invalid URLs; fall through to legacy behavior.
+  }
+
   if (/^https?:\/\/(localhost|127\.0\.0\.1):5173$/i.test(normalizedUrl)) {
     return 'http://localhost:5000';
   }
