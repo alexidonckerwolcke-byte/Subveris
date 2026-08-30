@@ -51,21 +51,39 @@ function isSubverisPage() {
 
 // Inject script to capture auth token from page context.
 // Some pages or stale extension loads may not expose the resource, so fail softly.
-const injectScriptUrl = browser && browser.runtime && typeof browser.runtime.getURL === 'function'
-  ? browser.runtime.getURL('inject.js')
-  : null;
+function getInjectScriptUrl() {
+  try {
+    if (!browser || !browser.runtime || typeof browser.runtime.getURL !== 'function') {
+      return null;
+    }
+    return browser.runtime.getURL('inject.js');
+  } catch (error) {
+    if (!isExtensionContextInvalidated(error)) {
+      console.warn('[Extension] Failed to resolve inject.js URL:', error);
+    }
+    return null;
+  }
+}
+
+const injectScriptUrl = getInjectScriptUrl();
 
 if (injectScriptUrl && window.location.protocol !== 'file:') {
-  const script = document.createElement('script');
-  script.src = injectScriptUrl;
-  script.onload = function() {
-    this.remove();
-  };
-  script.onerror = function() {
-    console.info('[Extension] inject.js unavailable on this page; continuing without auth bridge.');
-    this.remove();
-  };
-  (document.head || document.documentElement).appendChild(script);
+  try {
+    const script = document.createElement('script');
+    script.src = injectScriptUrl;
+    script.onload = function() {
+      this.remove();
+    };
+    script.onerror = function() {
+      console.info('[Extension] inject.js unavailable on this page; continuing without auth bridge.');
+      this.remove();
+    };
+    (document.head || document.documentElement).appendChild(script);
+  } catch (error) {
+    if (!isExtensionContextInvalidated(error)) {
+      console.warn('[Extension] Failed to inject auth bridge:', error);
+    }
+  }
 } else if (!injectScriptUrl) {
   console.info('[Extension] Auth bridge disabled because runtime.getURL is unavailable in this context.');
 }
@@ -83,22 +101,33 @@ function sendMessageToBackground(message, callback) {
 
   try {
     browser.runtime.sendMessage(message, (response) => {
-      if (browser.runtime.lastError) {
-        console.warn('[Extension] Background message error:', browser.runtime.lastError);
-        if (callback) callback(null, browser.runtime.lastError);
-        return;
+      try {
+        if (browser.runtime.lastError) {
+          if (!isExtensionContextInvalidated(browser.runtime.lastError)) {
+            console.warn('[Extension] Background message error:', browser.runtime.lastError);
+          }
+          if (callback) callback(null, browser.runtime.lastError);
+          return;
+        }
+        if (callback) callback(response);
+      } catch (error) {
+        if (!isExtensionContextInvalidated(error)) {
+          console.warn('[Extension] Failed to process background response:', error);
+        }
       }
-      if (callback) callback(response);
     });
     return true;
   } catch (e) {
-    console.warn('[Extension] Failed to send message to background:', e);
+    if (!isExtensionContextInvalidated(e)) {
+      console.warn('[Extension] Failed to send message to background:', e);
+    }
     if (callback) callback(null, e);
     return false;
   }
 }
 
-browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+try {
+  browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request || request.type !== 'GET_AUTH_TOKEN') {
     return false;
   }
@@ -130,6 +159,11 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 });
+} catch (error) {
+  if (!isExtensionContextInvalidated(error)) {
+    console.warn('[Extension] Failed to register runtime message listener:', error);
+  }
+}
 
 // Listen for messages from the injected script (page context) and forward/store token
 window.addEventListener('message', (event) => {
