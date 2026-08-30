@@ -260,6 +260,14 @@ describeE2E('E2E family sharing & cost-per-use', () => {
     expect(Array.isArray(splitsRes.body)).toBe(true);
     expect(splitsRes.body.length).toBe(1);
 
+    const memberFamilyDataAfterSplit = await request(app)
+      .get(`/api/family-groups/${groupId}/family-data`)
+      .set('Authorization', memberToken)
+      .expect(200);
+    expect(Array.isArray(memberFamilyDataAfterSplit.body.costSplits)).toBe(true);
+    expect(memberFamilyDataAfterSplit.body.costSplits.some((split: any) => split.shared_subscription_id === sharedId && split.user_id === memberId)).toBe(true);
+    expect(memberFamilyDataAfterSplit.body.sharedSubscriptions.some((shared: any) => shared.id === sharedId && Array.isArray(shared.costSplits) && shared.costSplits.some((split: any) => split.userId === memberId))).toBe(true);
+
     // now unshare and ensure both lists clear
     await request(app)
       .delete(`/api/family-groups/${groupId}/shared-subscriptions/${sharedId}`)

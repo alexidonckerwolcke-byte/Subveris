@@ -6574,6 +6574,40 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       }
       // Owners see all shared subscriptions in their group
 
+      const sharesForVisibleRecords = filteredSharedRecords || [];
+      const visibleSharedRecordIds = sharesForVisibleRecords
+        .map((shared: any) => shared.id)
+        .filter((id: any) => id !== null && id !== undefined)
+        .map((id: any) => String(id));
+
+      let visibleCostSplits: any[] = [];
+      if (visibleSharedRecordIds.length > 0) {
+        const { data: costSplitRows, error: costSplitError } = await supabase
+          .from('cost_splits')
+          .select('id, shared_subscription_id, user_id, percentage, created_at, updated_at')
+          .in('shared_subscription_id', visibleSharedRecordIds);
+
+        if (costSplitError) {
+          console.error('Error fetching cost splits for family data:', costSplitError);
+          return sendJson({ error: 'Failed to load cost splits' }, { status: 500 });
+        }
+
+        visibleCostSplits = (costSplitRows || []).map((split: any) => ({
+          ...split,
+          userId: split.user_id,
+          sharedSubscriptionId: split.shared_subscription_id,
+        }));
+      }
+
+      const costSplitsBySharedId = new Map<string, any[]>();
+      for (const split of visibleCostSplits) {
+        const key = String(split.sharedSubscriptionId || split.shared_subscription_id || '');
+        if (!key) continue;
+        const existing = costSplitsBySharedId.get(key) || [];
+        existing.push(split);
+        costSplitsBySharedId.set(key, existing);
+      }
+
       const allSubsRaw = allSubscriptions || [];
       const sharedSubscriptionIds = filteredSharedRecords
         .map((shared: any) => shared.subscription_id)
@@ -6707,10 +6741,15 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       }));
 
       const payloadSubscriptions = isOwner ? allSubsRaw : visibleSubscriptions;
+      const sharedSubscriptionsWithCostSplits = (filteredSharedRecords || []).map((record: any) => ({
+        ...record,
+        costSplits: costSplitsBySharedId.get(String(record.id)) || [],
+      }));
 
       return sendJson({
         subscriptions: payloadSubscriptions,
-        sharedSubscriptions: filteredSharedRecords,
+        sharedSubscriptions: sharedSubscriptionsWithCostSplits,
+        costSplits: visibleCostSplits,
         members: members || [],
         isOwner,
         isMember: true,

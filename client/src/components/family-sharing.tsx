@@ -388,6 +388,7 @@ export function FamilySharing() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/family-groups", selectedGroupId, "cost-splits"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/family-groups", selectedGroupId, "family-data"] });
       toast({ title: 'Cost split saved', description: 'The family cost allocation was updated.' });
     },
     onError: (error: any) => toast({ title: 'Could not save split', description: error?.message || 'Only the host can update cost splits.', variant: 'destructive' }),
