@@ -40,14 +40,15 @@ export default function Insights() {
       const response = await apiRequest("GET", "/api/subscriptions");
       return response.json();
     },
-    refetchInterval: 30000,
-    refetchIntervalInBackground: false,
+    refetchInterval: false,
     refetchOnWindowFocus: false,
   });
 
   const { data: familyData, isLoading: familyDataLoading, isFetching: familyDataFetching, refetch: refetchFamilyData } = useQuery<any>({
     queryKey: ["/api/family-groups", familyGroupId, "family-data"],
     enabled: !!familyGroupId,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 
   const familySubscriptions = useMemo(() => getVisibleFamilySubscriptions(familyData, user?.id), [familyData, user?.id]);

@@ -73,8 +73,8 @@ export default function Dashboard() {
       const response = await apiRequest("GET", "/api/metrics");
       return response.json();
     },
-    refetchInterval: 30000,
-    refetchIntervalInBackground: false,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 
   const { data: personalSubscriptions = [], isLoading: subscriptionsLoading } = useQuery<Subscription[]>({
@@ -83,8 +83,8 @@ export default function Dashboard() {
       const response = await apiRequest("GET", "/api/subscriptions");
       return response.json();
     },
-    refetchInterval: 30000,
-    refetchIntervalInBackground: false,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 
   const { data: familyData } = useQuery<any>({
@@ -95,8 +95,8 @@ export default function Dashboard() {
       const response = await apiRequest("GET", `/api/family-groups/${familyGroupId}/family-data`);
       return response.json();
     },
-    refetchInterval: 30000,
-    refetchIntervalInBackground: false,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 
   const { data: monthlySpending, isLoading: monthlySpendingLoading } = useQuery<MonthlySpending[]>({
@@ -105,8 +105,8 @@ export default function Dashboard() {
       const response = await apiRequest("GET", shouldUseFamilyAwareSpendingData ? "/api/spending/monthly?family=true" : "/api/spending/monthly");
       return response.json();
     },
-    refetchInterval: 30000,
-    refetchIntervalInBackground: false,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 
   const { data: categorySpending, isLoading: categorySpendingLoading } = useQuery<SpendingByCategory[]>({
@@ -115,8 +115,8 @@ export default function Dashboard() {
       const response = await apiRequest("GET", shouldUseFamilyAwareSpendingData ? "/api/spending/category?family=true" : "/api/spending/category");
       return response.json();
     },
-    refetchInterval: 30000,
-    refetchIntervalInBackground: false,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 
   const familySubscriptions = useMemo(

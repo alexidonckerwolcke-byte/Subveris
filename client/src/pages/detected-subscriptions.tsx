@@ -26,8 +26,7 @@ export default function DetectedSubscriptions() {
       const response = await apiRequest("GET", "/api/subscriptions");
       return response.json();
     },
-    refetchInterval: 30000,
-    refetchIntervalInBackground: false,
+    refetchInterval: false,
     refetchOnWindowFocus: false,
   });
 
@@ -39,8 +38,7 @@ export default function DetectedSubscriptions() {
       const response = await apiRequest("GET", `/api/family-groups/${familyGroupId}/family-data`);
       return response.json();
     },
-    refetchInterval: 30000,
-    refetchIntervalInBackground: false,
+    refetchInterval: false,
     refetchOnWindowFocus: false,
   });
 
