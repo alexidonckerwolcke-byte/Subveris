@@ -1834,6 +1834,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
         let persisted = 0;
         for (const detected of subscriptions) {
+          const isApprovedForSync = detected?.approvedForSync === true || detected?.source === "gmail-metadata-approved" || detected?.requiresReview === false;
+          if (!isApprovedForSync) {
+            console.log("[Extension] skipping unapproved detected subscription:", detected?.serviceName || detected?.name || "unknown");
+            continue;
+          }
+
           const domain = normalizeDomain(typeof detected?.domain === "string" ? detected.domain : null);
           const serviceName = typeof detected?.serviceName === "string" && detected.serviceName.trim()
             ? detected.serviceName.trim()
@@ -2043,6 +2049,9 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
       if (body.status) {
         updates.status = body.status;
+      }
+      if (body.isDetected !== undefined || body.is_detected !== undefined) {
+        updates.is_detected = Boolean(body.isDetected ?? body.is_detected);
       }
       if (body.usageCount !== undefined) {
         updates.usage_count = body.usageCount;

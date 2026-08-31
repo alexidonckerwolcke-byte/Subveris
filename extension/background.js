@@ -393,7 +393,10 @@ function addDetectedSubscription(serviceName, domain) {
         lastSeen: now,
         lastVisit: now,
         visitCount: 1,
-        monthlyPrice: MONTHLY_PRICES[serviceName] || null
+        monthlyPrice: MONTHLY_PRICES[serviceName] || null,
+        requiresReview: true,
+        approvedForSync: false,
+        isDetectedCandidate: true,
       };
     } else {
       subs[serviceName].lastSeen = now;
@@ -401,6 +404,9 @@ function addDetectedSubscription(serviceName, domain) {
       subs[serviceName].domain = domain || subs[serviceName].domain;
       subs[serviceName].serviceUrl = subs[serviceName].serviceUrl || `https://${domain}/`;
       subs[serviceName].visitCount = (existing.visitCount || 0) + 1;
+      subs[serviceName].requiresReview = true;
+      subs[serviceName].approvedForSync = false;
+      subs[serviceName].isDetectedCandidate = true;
       if (!subs[serviceName].monthlyPrice && MONTHLY_PRICES[serviceName]) {
         subs[serviceName].monthlyPrice = MONTHLY_PRICES[serviceName];
       }
@@ -411,8 +417,7 @@ function addDetectedSubscription(serviceName, domain) {
         console.error('[Background] Failed to store detected subscription:', browser.runtime.lastError);
         return;
       }
-      console.log('[Background] ✅ Added detected subscription:', serviceName);
-      syncDetectedSubscriptions(subs);
+      console.log('[Background] ✅ Added detected subscription pending approval:', serviceName);
     });
   });
 }
@@ -435,6 +440,7 @@ function approveReviewedSubscription(serviceName, callback = () => {}) {
     subs[serviceName] = {
       ...item,
       requiresReview: false,
+      approvedForSync: true,
       isDetectedCandidate: false,
       source: item.source === 'gmail-metadata-candidate' ? 'gmail-metadata-approved' : (item.source || 'manual-review'),
       lastSeen: Date.now(),
@@ -454,6 +460,23 @@ function approveReviewedSubscription(serviceName, callback = () => {}) {
   });
 }
 
+const DETECTED_DISMISS_GRACE_MS = 24 * 60 * 60 * 1000;
+
+function pruneExpiredDismissedSubscriptions(subscriptions) {
+  const now = Date.now();
+  const cleaned = {};
+
+  Object.entries(subscriptions || {}).forEach(([key, item]) => {
+    if (!item) return;
+    if (item.dismissedAt && now - item.dismissedAt >= DETECTED_DISMISS_GRACE_MS) {
+      return;
+    }
+    cleaned[key] = item;
+  });
+
+  return cleaned;
+}
+
 function dismissReviewedSubscription(serviceName, callback = () => {}) {
   if (!serviceName) {
     callback({ success: false, error: 'Missing service name' });
@@ -461,14 +484,32 @@ function dismissReviewedSubscription(serviceName, callback = () => {}) {
   }
 
   browser.storage.local.get(['detectedSubscriptions'], (result) => {
-    const subs = result.detectedSubscriptions || {};
-    delete subs[serviceName];
+    const subs = pruneExpiredDismissedSubscriptions(result.detectedSubscriptions || {});
+    const item = subs[serviceName] || (result.detectedSubscriptions || {})[serviceName];
+
+    if (!item) {
+      callback({ success: false, error: 'Review item not found' });
+      return;
+    }
+
+    subs[serviceName] = {
+      ...item,
+      requiresReview: false,
+      approvedForSync: false,
+      isDetectedCandidate: false,
+      dismissedAt: Date.now(),
+      dismissedUntil: Date.now() + DETECTED_DISMISS_GRACE_MS,
+      source: item.source || 'manual-review',
+      lastSeen: Date.now(),
+      lastVisit: item.lastVisit || Date.now(),
+    };
+
     browser.storage.local.set({ detectedSubscriptions: subs }, () => {
       if (browser.runtime.lastError) {
         callback({ success: false, error: browser.runtime.lastError.message });
         return;
       }
-      console.log('[Background] Dismissed Gmail review item:', serviceName);
+      console.log('[Background] Dismissed review item for grace period:', serviceName);
       callback({ success: true });
     });
   });
@@ -484,8 +525,21 @@ function syncDetectedSubscriptions(subscriptions) {
       return;
     }
 
+    const approvedSubscriptions = Object.values(subscriptions || {}).filter((item) => {
+      if (!item || !item.serviceName) return false;
+      if (item.markedCancelled) return false;
+      if (item.approvedForSync === true) return true;
+      if (item.source === 'gmail-metadata-approved') return true;
+      return false;
+    });
+
+    if (!approvedSubscriptions.length) {
+      console.log('[Background] No approved detected subscriptions to sync.');
+      return;
+    }
+
     const payload = JSON.stringify({
-      subscriptions: Object.values(subscriptions),
+      subscriptions: approvedSubscriptions,
       syncedAt: Date.now()
     });
 
@@ -1320,7 +1374,7 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
     frequency: 'monthly',
     status: 'active',
     detectedRenewalDate: renewalDate,
-    requiresReview: isLowConfidence,
+    requiresReview: true,
     isDetectedCandidate: true,
     source: 'gmail-metadata-candidate',
     detectedAt: Date.now(),
@@ -1403,14 +1457,15 @@ function scanGmailForSubscriptions(force = false) {
                     ...candidate,
                     serviceName: candidate.serviceName,
                     domain: candidate.domain || null,
-                    requiresReview: Boolean(candidate.requiresReview),
+                    requiresReview: true,
+                    approvedForSync: false,
                     isDetectedCandidate: true,
                   };
-                  console.log('[Background] ✅ Suggested Gmail candidate:', candidate.serviceName, {
+                  console.log('[Background] ✅ Suggested Gmail candidate pending approval:', candidate.serviceName, {
                     ageInDays,
                     amount: candidate.amount,
                     detectedRenewalDate: candidate.detectedRenewalDate,
-                    requiresReview: candidate.requiresReview,
+                    requiresReview: true,
                   });
                 }
               }
@@ -1422,8 +1477,9 @@ function scanGmailForSubscriptions(force = false) {
                     detectedSubscriptions: merged,
                     lastGmailScan: Date.now()
                   }, () => {
-                    if (Object.keys(detectedSubs).length > 0) {
-                      syncDetectedSubscriptions(merged);
+                    // Gmail detections must be explicitly approved before they are added to the user's subscriptions.
+                    if (browser.runtime.lastError) {
+                      console.error('[Background] Failed to persist Gmail review queue:', browser.runtime.lastError);
                     }
                   });
                 });
@@ -1498,7 +1554,10 @@ function monitorDownloadsForCSV() {
                 lastSeen: Date.now(),
                 source: 'csv-import',
                 amount: !isNaN(amount) ? amount : null,
-                frequency: frequency || 'monthly'
+                frequency: frequency || 'monthly',
+                requiresReview: true,
+                approvedForSync: false,
+                isDetectedCandidate: true,
               };
               console.log('[Background] ✅ Parsed from CSV:', name, amount ? `($${amount})` : '');
             }
@@ -1508,7 +1567,7 @@ function monitorDownloadsForCSV() {
             browser.storage.local.get(['detectedSubscriptions'], (existing) => {
               const merged = { ...existing.detectedSubscriptions || {}, ...detectedSubs };
               browser.storage.local.set({ detectedSubscriptions: merged }, () => {
-                syncDetectedSubscriptions(merged);
+                // pending approvals are not synced until the user explicitly approves them
               });
             });
           }

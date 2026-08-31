@@ -12,6 +12,12 @@ import { Sparkles, ExternalLink, Plus, ArrowRight } from "lucide-react";
 import type { Subscription } from "@shared/schema";
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+
+const ACTION_PENDING = "pending" as const;
+const ACTION_APPROVED = "approved" as const;
+const ACTION_DISMISSED = "dismissed" as const;
 
 export default function DetectedSubscriptions() {
   const { formatAmount } = useCurrency();
@@ -19,6 +25,9 @@ export default function DetectedSubscriptions() {
   const { limits } = useSubscription();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
   const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [actionState, setActionState] = useState<Record<string, { status: "pending" | "approved" | "dismissed"; dismissedAt?: number }>>({});
 
   const { data: subscriptions = [], isLoading } = useQuery<Subscription[]>({
     queryKey: ["/api/subscriptions"],
@@ -47,17 +56,114 @@ export default function DetectedSubscriptions() {
     : subscriptions;
 
   const detectedSubscriptions = useMemo(() => {
+    const now = Date.now();
+
     return (visibleSubscriptions || [])
-      .filter((sub) => sub?.isDetected === true || (sub as any)?.is_detected === true)
+      .filter((sub) => {
+        if (sub?.isDetected !== true && !(sub as any)?.is_detected) {
+          return false;
+        }
+
+        const itemState = actionState[sub.id];
+        if (itemState?.status === "dismissed" && itemState.dismissedAt) {
+          return now - itemState.dismissedAt < 24 * 60 * 60 * 1000;
+        }
+
+        return true;
+      })
       .sort((a, b) => (a?.name || "").localeCompare(b?.name || ""));
-  }, [visibleSubscriptions]);
+  }, [visibleSubscriptions, actionState]);
 
   const totalDetectedAmount = detectedSubscriptions.reduce((sum, sub) => sum + (Number(sub?.amount) || 0), 0);
 
   const categories = Array.from(new Set(detectedSubscriptions.map((sub) => sub?.category || "other")));
 
+  const approveDetectedMutation = useMutation({
+    mutationFn: async (subscriptionId: string) => {
+      const res = await apiRequest("PATCH", `/api/subscriptions/${subscriptionId}`, {
+        status: "active",
+        isDetected: false,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to approve detection");
+      }
+      return data;
+    },
+    onSuccess: (_, subscriptionId) => {
+      setActionState((current) => ({ ...current, [subscriptionId]: { status: ACTION_APPROVED } }));
+      queryClient.setQueryData(["/api/subscriptions"], (current: any) => {
+        if (!Array.isArray(current)) return current;
+        return current.map((sub: any) =>
+          sub?.id === subscriptionId
+            ? { ...sub, isDetected: false, is_detected: false, status: "active" }
+            : sub
+        );
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/metrics"] });
+      toast({
+        title: "Detection approved",
+        description: "The subscription has been added as a normal active subscription.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Approval failed",
+        description: error instanceof Error ? error.message : "Unable to approve the detected subscription.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const dismissDetectedMutation = useMutation({
+    mutationFn: async (subscriptionId: string) => {
+      const res = await apiRequest("PATCH", `/api/subscriptions/${subscriptionId}`, {
+        isDetected: false,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to dismiss detection");
+      }
+      return data;
+    },
+    onSuccess: (_, subscriptionId) => {
+      setActionState((current) => ({
+        ...current,
+        [subscriptionId]: { status: ACTION_DISMISSED, dismissedAt: Date.now() },
+      }));
+      queryClient.setQueryData(["/api/subscriptions"], (current: any) => {
+        if (!Array.isArray(current)) return current;
+        return current.filter((sub: any) => sub?.id !== subscriptionId);
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/metrics"] });
+      toast({
+        title: "Detection dismissed",
+        description: "This browser detection has been hidden from the review queue.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Dismiss failed",
+        description: error instanceof Error ? error.message : "Unable to dismiss the detected subscription.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleAddManually = () => {
     navigate("/subscriptions");
+  };
+
+  const handleApproveDetected = (subscriptionId: string) => {
+    setActionState((current) => ({ ...current, [subscriptionId]: { status: ACTION_PENDING } }));
+    approveDetectedMutation.mutate(subscriptionId);
+  };
+
+  const handleDismissDetected = (subscriptionId: string) => {
+    setActionState((current) => ({ ...current, [subscriptionId]: { status: ACTION_PENDING } }));
+    dismissDetectedMutation.mutate(subscriptionId);
   };
 
   return (
@@ -212,7 +318,38 @@ export default function DetectedSubscriptions() {
                         </p>
                       </div>
 
-                      <div className="flex gap-2 lg:justify-end">
+                      {actionState[sub.id]?.status === ACTION_PENDING ? (
+                        <div className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400">
+                          Pending approval
+                        </div>
+                      ) : actionState[sub.id]?.status === ACTION_APPROVED ? (
+                        <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400">
+                          Approved
+                        </div>
+                      ) : actionState[sub.id]?.status === ACTION_DISMISSED ? (
+                        <div className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          Dismissed for 24h
+                        </div>
+                      ) : null}
+
+                      <div className="flex flex-wrap gap-2 lg:justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full text-slate-900 dark:text-slate-100"
+                          onClick={() => handleDismissDetected(sub.id)}
+                          disabled={dismissDetectedMutation.isPending || actionState[sub.id]?.status === ACTION_DISMISSED || actionState[sub.id]?.status === ACTION_APPROVED}
+                        >
+                          Dismiss
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="rounded-full bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:text-white dark:hover:bg-emerald-400"
+                          onClick={() => handleApproveDetected(sub.id)}
+                          disabled={approveDetectedMutation.isPending || actionState[sub.id]?.status === ACTION_APPROVED || actionState[sub.id]?.status === ACTION_DISMISSED}
+                        >
+                          Approve
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -220,13 +357,6 @@ export default function DetectedSubscriptions() {
                           onClick={() => navigate(`/subscriptions?id=${sub.id}`)}
                         >
                           Review
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="rounded-full bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-slate-200"
-                          onClick={() => navigate(`/subscriptions?id=${sub.id}`)}
-                        >
-                          View Details
                         </Button>
                       </div>
                     </div>

@@ -103,7 +103,7 @@ describe('buildDiscoverySyncPayload', () => {
       serviceName: 'Netflix',
       amount: 15.99,
       frequency: 'monthly',
-      requiresReview: false,
+      requiresReview: true,
       isDetectedCandidate: true,
     });
   });

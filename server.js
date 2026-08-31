@@ -537,6 +537,12 @@ const server = http.createServer(async (req, res) => {
         const saved = [];
 
         for (const item of items) {
+          const isApprovedForSync = item?.approvedForSync === true || item?.source === 'gmail-metadata-approved' || item?.requiresReview === false;
+          if (!isApprovedForSync) {
+            console.log('[Extension Sync] skipping unapproved detected subscription:', item?.serviceName || item?.name || 'unknown');
+            continue;
+          }
+
           const serviceName = String(item.serviceName || item.name || item.service_name || item.provider || item.title || '').trim();
           const domainRaw = item.domain || item.website_domain || item.website || item.websiteDomain || item.domainName || '';
           const normalizedDomain = String(domainRaw || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '').toLowerCase();
