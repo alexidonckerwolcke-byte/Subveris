@@ -1729,8 +1729,8 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const scope = 'https://www.googleapis.com/auth/gmail.readonly';
-    const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
+    const scope = 'https://www.googleapis.com/auth/gmail.metadata';
+    const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=${encodeURIComponent('select_account consent')}`;
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ oauthUrl }));

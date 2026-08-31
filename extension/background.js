@@ -1114,7 +1114,7 @@ function scanGmailForSubscriptions() {
       /(netflix|spotify|adobe|microsoft|amazon|disney|hbo|youtube|hulu|canva|duolingo)/i
     ];
 
-    fetch('https://www.googleapis.com/gmail/v1/users/me/messages?q=subject:(receipt OR invoice OR renewal OR confirmation) is:unread', {
+    fetch('https://www.googleapis.com/gmail/v1/users/me/messages?format=metadata&metadataHeaders=Subject%2CFrom&q=subject:(receipt OR invoice OR renewal OR confirmation) is:unread', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1131,7 +1131,7 @@ function scanGmailForSubscriptions() {
         let processedCount = 0;
 
         data.messages.forEach(msg => {
-          fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+          fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject%2CFrom`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -1140,19 +1140,10 @@ function scanGmailForSubscriptions() {
           }).then(r => r.json())
             .then(msgData => {
               processedCount++;
-              const subject = msgData.payload?.headers?.find(h => h.name === 'Subject')?.value || '';
-              const body = msgData.payload?.parts?.find(p => p.mimeType === 'text/plain')?.body?.data || '';
-              
-              let decodedBody = '';
-              try {
-                decodedBody = atob(body);
-              } catch (e) {
-                decodedBody = body;
-              }
+              const subject = msgData.payload?.headers?.find(h => h.name === 'Subject')?.value || msgData.snippet || '';
+              const from = msgData.payload?.headers?.find(h => h.name === 'From')?.value || '';
+              const fullText = `${subject} ${from} ${msgData.snippet || ''}`.toLowerCase();
 
-              const fullText = (subject + ' ' + decodedBody).toLowerCase();
-
-              // Extract service name
               const serviceMatch = fullText.match(/(netflix|spotify|adobe|microsoft|apple|amazon|disney|hbo|youtube|hulu|canva|duolingo|audible|xbox|playstation|nordvpn|linkedin)/i);
               if (serviceMatch) {
                 const serviceName = serviceMatch[0].charAt(0).toUpperCase() + serviceMatch[0].slice(1);
@@ -1164,13 +1155,12 @@ function scanGmailForSubscriptions() {
                   domain: null,
                   detectedAt: Date.now(),
                   lastSeen: Date.now(),
-                  source: 'gmail-receipt',
+                  source: 'gmail-metadata',
                   amount
                 };
-                console.log('[Background] ✅ Detected from Gmail:', serviceName, amount ? `($${amount})` : '');
+                console.log('[Background] ✅ Detected from Gmail metadata:', serviceName, amount ? `($${amount})` : '');
               }
 
-              // If processed all messages, save and sync
               if (processedCount === data.messages.length) {
                 browser.storage.local.get(['detectedSubscriptions'], (existing) => {
                   const merged = { ...existing.detectedSubscriptions || {}, ...detectedSubs };

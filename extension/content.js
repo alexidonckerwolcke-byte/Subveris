@@ -67,18 +67,7 @@ function getInjectScriptUrl() {
 
 const injectScriptUrl = getInjectScriptUrl();
 
-function canInjectAuthBridge() {
-  if (!injectScriptUrl) return false;
-
-  const protocol = window.location?.protocol?.toLowerCase() || '';
-  if (protocol === 'file:' || protocol === 'chrome-extension:' || protocol === 'moz-extension:' || protocol === 'edge-extension:') {
-    return false;
-  }
-
-  return true;
-}
-
-if (canInjectAuthBridge()) {
+if (injectScriptUrl && window.location.protocol !== 'file:') {
   try {
     const script = document.createElement('script');
     script.src = injectScriptUrl;

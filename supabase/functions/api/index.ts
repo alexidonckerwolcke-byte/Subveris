@@ -1557,10 +1557,10 @@ function generateGmailOAuthUrl(userId: string): string {
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: GOOGLE_REDIRECT_URI,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/gmail.readonly",
+    scope: "https://www.googleapis.com/auth/gmail.metadata",
     state: userId, // Use userId as state for validation
     access_type: "offline",
-    prompt: "consent",
+    prompt: "select_account consent",
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
