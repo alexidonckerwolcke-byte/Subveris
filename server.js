@@ -591,7 +591,10 @@ const server = http.createServer(async (req, res) => {
           } else {
             const { data, error } = await supabase
               .from('subscriptions')
-              .insert(record)
+              .insert({
+                ...record,
+                status: String(item.status || item.detectedStatus || 'detected_pending_verification').toLowerCase() || 'detected_pending_verification',
+              })
               .select();
             if (error) {
               console.warn('[Extension Sync] insert failed:', error.message);

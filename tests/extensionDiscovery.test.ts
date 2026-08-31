@@ -1,8 +1,48 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { buildDiscoverySyncPayload } = require('../extension/price-discovery-utils.cjs');
+
+beforeAll(() => {
+  globalThis.setInterval = (() => 0) as any;
+  globalThis.clearInterval = (() => undefined) as any;
+  globalThis.browser = {
+    runtime: {
+      onInstalled: { addListener() {} },
+      onStartup: { addListener() {} },
+      onMessage: { addListener() {} },
+      lastError: undefined,
+    },
+    alarms: {
+      create() {},
+      onAlarm: { addListener() {} },
+    },
+    tabs: {
+      query() {},
+      onActivated: { addListener() {} },
+      onUpdated: { addListener() {} },
+      sendMessage() {},
+    },
+    cookies: {
+      getAll() {},
+    },
+    downloads: {
+      onChanged: { addListener() {} },
+      search() { return []; },
+    },
+    storage: {
+      local: {
+        get(_keys: any, callback: any) { callback({}); },
+        set(_obj: any, callback: any) { if (callback) callback(); },
+        remove(_keys: any, callback: any) { if (callback) callback(); },
+      },
+    },
+  } as any;
+  globalThis.chrome = globalThis.browser as any;
+  vi.stubGlobal('browser', globalThis.browser);
+  vi.stubGlobal('chrome', globalThis.browser);
+});
 
 describe('buildDiscoverySyncPayload', () => {
   it('maps detected pricing signals into the server payload shape', () => {
@@ -48,5 +88,23 @@ describe('buildDiscoverySyncPayload', () => {
     expect(payload.detectedPlanName).toBeNull();
     expect(payload.detectedBillingCycle).toBeNull();
     expect(payload.detectedRenewalDate).toBeNull();
+  });
+
+  it('extracts a real Gmail subscription candidate from message text', async () => {
+    await import('../extension/background.js');
+    const candidate = globalThis.buildGmailSubscriptionCandidate(
+      'Your Netflix subscription has been renewed',
+      'billing@netflix.com',
+      'Your charge was $15.99 on Sep 28, 2026',
+      { internalDate: Date.now().toString() }
+    );
+
+    expect(candidate).toMatchObject({
+      serviceName: 'Netflix',
+      amount: 15.99,
+      frequency: 'monthly',
+      requiresReview: false,
+      isDetectedCandidate: true,
+    });
   });
 });

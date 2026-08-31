@@ -1,7 +1,23 @@
 // Cross-browser compatibility shim
 // Safari 15+, Firefox, and Edge use 'browser' global
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
-const browser = globalThis.browser || globalThis.chrome;
+const browser = globalThis.browser || globalThis.chrome || {
+  runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, lastError: undefined },
+  alarms: { create() {}, onAlarm: { addListener() {} } },
+  tabs: { query() {}, onActivated: { addListener() {} }, onUpdated: { addListener() {} }, sendMessage() {} },
+  cookies: { getAll() { return []; } },
+  downloads: { onChanged: { addListener() {} }, search() { return []; } },
+  storage: {
+    local: {
+      get(_keys, callback) { if (callback) callback({}); },
+      set(_obj, callback) { if (callback) callback(); },
+      remove(_keys, callback) { if (callback) callback(); },
+    },
+  },
+  identity: { launchWebAuthFlow() {} },
+};
+globalThis.browser = browser;
+globalThis.chrome = browser;
 const DEFAULT_API_URL = 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1';
 
 function rehydrateAuthFromSubverisTabs() {
@@ -397,6 +413,63 @@ function addDetectedSubscription(serviceName, domain) {
       }
       console.log('[Background] ✅ Added detected subscription:', serviceName);
       syncDetectedSubscriptions(subs);
+    });
+  });
+}
+
+function approveReviewedSubscription(serviceName, callback = () => {}) {
+  if (!serviceName) {
+    callback({ success: false, error: 'Missing service name' });
+    return;
+  }
+
+  browser.storage.local.get(['detectedSubscriptions'], (result) => {
+    const subs = result.detectedSubscriptions || {};
+    const item = subs[serviceName];
+
+    if (!item) {
+      callback({ success: false, error: 'Review item not found' });
+      return;
+    }
+
+    subs[serviceName] = {
+      ...item,
+      requiresReview: false,
+      isDetectedCandidate: false,
+      source: item.source === 'gmail-metadata-candidate' ? 'gmail-metadata-approved' : (item.source || 'manual-review'),
+      lastSeen: Date.now(),
+      detectedAt: item.detectedAt || Date.now(),
+      lastVisit: item.lastVisit || Date.now(),
+    };
+
+    browser.storage.local.set({ detectedSubscriptions: subs }, () => {
+      if (browser.runtime.lastError) {
+        callback({ success: false, error: browser.runtime.lastError.message });
+        return;
+      }
+      console.log('[Background] ✅ Approved Gmail review item:', serviceName);
+      syncDetectedSubscriptions(subs);
+      callback({ success: true });
+    });
+  });
+}
+
+function dismissReviewedSubscription(serviceName, callback = () => {}) {
+  if (!serviceName) {
+    callback({ success: false, error: 'Missing service name' });
+    return;
+  }
+
+  browser.storage.local.get(['detectedSubscriptions'], (result) => {
+    const subs = result.detectedSubscriptions || {};
+    delete subs[serviceName];
+    browser.storage.local.set({ detectedSubscriptions: subs }, () => {
+      if (browser.runtime.lastError) {
+        callback({ success: false, error: browser.runtime.lastError.message });
+        return;
+      }
+      console.log('[Background] Dismissed Gmail review item:', serviceName);
+      callback({ success: true });
     });
   });
 }
@@ -942,6 +1015,16 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === 'APPROVE_REVIEWED_SUBSCRIPTION') {
+    approveReviewedSubscription(request.serviceName, sendResponse);
+    return true;
+  }
+
+  if (request.type === 'DISMISS_REVIEWED_SUBSCRIPTION') {
+    dismissReviewedSubscription(request.serviceName, sendResponse);
+    return true;
+  }
+
   if (request.type === 'MARK_SUBSCRIPTION_CANCELLED') {
     markSubscriptionCancelled(request.subscriptionId, sendResponse);
     return true;
@@ -1068,6 +1151,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 gmailTokenExpiry: Date.now() + (tokenData.expires_in * 1000)
               }, () => {
                 console.log('[Background] ✅ Gmail authorized successfully');
+                scanGmailForSubscriptions(true);
                 sendResponse({ success: true });
               });
             }).catch(err => {
@@ -1091,8 +1175,167 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Email scanning: detect subscription receipts from Gmail
-function scanGmailForSubscriptions() {
-  browser.storage.local.get(['gmailAuthToken', 'lastGmailScan', 'subscription_status'], (result) => {
+function getGmailMessageAgeDays(msgData) {
+  const rawInternalDate = msgData?.internalDate;
+  const headerDate = msgData?.payload?.headers?.find((header) => header.name?.toLowerCase() === 'date')?.value;
+  const rawDate = rawInternalDate || headerDate;
+
+  if (!rawDate) {
+    return null;
+  }
+
+  const ms = Number(rawDate);
+  const timestamp = Number.isFinite(ms) ? ms : Date.parse(rawDate);
+
+  if (!Number.isFinite(timestamp)) {
+    return null;
+  }
+
+  return Math.floor((Date.now() - timestamp) / 86400000);
+}
+
+function extractGmailAmount(text) {
+  if (!text) {
+    return null;
+  }
+
+  const normalized = text.replace(/,/g, '.');
+  const matches = [...normalized.matchAll(/(?:total|amount|charged|payment|renewal|membership|subscription|receipt|invoice|charge)[^\d]{0,20}(?:[$€£¥])?\s*(\d+(?:\.\d{1,2})?)/gi)];
+  const directMatches = [...normalized.matchAll(/(?:[$€£¥])\s*(\d+(?:\.\d{1,2})?)/g)];
+  const candidateMatches = matches.length ? matches : directMatches;
+  if (!candidateMatches.length) {
+    return null;
+  }
+
+  const firstValue = candidateMatches[0]?.[1];
+  if (!firstValue) {
+    return null;
+  }
+
+  const numeric = Number.parseFloat(firstValue);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function extractGmailRenewalDate(text) {
+  if (!text) {
+    return null;
+  }
+
+  const datePatterns = [
+    /(\d{1,2}[-/\s]\d{1,2}[-/\s]\d{2,4})/g,
+    /(\d{4}[-/]\d{1,2}[-/]\d{1,2})/g,
+    /(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2}),?\s+(\d{4})/gi,
+    /(renew(?:al|s)?|billing|next charge|expires?)[^\d]{0,20}(\d{1,2}[-/\s]\d{1,2}[-/\s]\d{2,4})/gi,
+  ];
+
+  for (const pattern of datePatterns) {
+    const match = text.match(pattern);
+    if (!match || !match[0]) continue;
+
+    const candidateText = match[0];
+    const parsed = new Date(candidateText.replace(/\s+/g, ' '));
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  }
+
+  return null;
+}
+
+function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
+  const fullText = `${subject || ''} ${from || ''} ${snippet || ''}`.trim();
+  if (!fullText) {
+    return null;
+  }
+
+  const servicePatterns = {
+    Netflix: ['netflix', 'netflix subscription charge'],
+    'Spotify Premium': ['spotify', 'spotify premium membership'],
+    'Amazon Prime': ['amazon prime', 'prime membership'],
+    'Disney Plus': ['disney', 'disneyplus', 'disney+'],
+    'YouTube Premium': ['youtube premium'],
+    'HBO Max': ['hbo', 'hbomax'],
+    Hulu: ['hulu'],
+    'Apple Music': ['apple music', 'itunes'],
+    'Microsoft 365': ['microsoft 365', 'office 365'],
+    Adobe: ['adobe', 'creative cloud'],
+    Dropbox: ['dropbox'],
+    OneDrive: ['onedrive'],
+    iCloud: ['icloud'],
+    'LinkedIn Premium': ['linkedin premium', 'linkedin plus'],
+    'Tinder Gold': ['tinder', 'gold', 'plus'],
+    Uber: ['uber', 'pass'],
+    DoorDash: ['doordash'],
+    Audible: ['audible', 'audiobook'],
+    Coursera: ['coursera', 'plus'],
+    MasterClass: ['masterclass'],
+    'Duolingo Plus': ['duolingo', 'plus'],
+    'HelloFresh': ['hellofresh', 'meal plan'],
+    NordVPN: ['nordvpn'],
+    ExpressVPN: ['expressvpn'],
+    Grammarly: ['grammarly'],
+    Slack: ['slack'],
+    Zoom: ['zoom'],
+    Asana: ['asana'],
+    Notion: ['notion'],
+    'Canva Pro': ['canva', 'pro'],
+    Figma: ['figma'],
+    Discord: ['discord', 'nitro'],
+    'Twitch Prime': ['twitch', 'prime'],
+    'PlayStation Plus': ['playstation plus', 'ps plus'],
+    'Xbox Game Pass': ['xbox game pass', 'xbox live'],
+    'Nintendo Switch Online': ['nintendo switch online'],
+    Calm: ['calm'],
+    Headspace: ['headspace'],
+    Peloton: ['peloton'],
+    Fitbit: ['fitbit'],
+    ClassPass: ['classpass'],
+    Scribd: ['scribd'],
+    'Kindle Unlimited': ['kindle unlimited'],
+  };
+
+  const lowerText = fullText.toLowerCase();
+  let serviceName = null;
+  for (const [name, patterns] of Object.entries(servicePatterns)) {
+    const match = patterns.some((pattern) => lowerText.includes(pattern.toLowerCase()));
+    if (match) {
+      serviceName = name;
+      break;
+    }
+  }
+
+  if (!serviceName) {
+    return null;
+  }
+
+  const amount = extractGmailAmount(fullText);
+  const renewalDate = extractGmailRenewalDate(fullText);
+  const isLowConfidence = amount === null && renewalDate === null;
+
+  return {
+    serviceName,
+    domain: null,
+    amount,
+    currency: 'USD',
+    frequency: 'monthly',
+    status: 'active',
+    detectedRenewalDate: renewalDate,
+    requiresReview: isLowConfidence,
+    isDetectedCandidate: true,
+    source: 'gmail-metadata-candidate',
+    detectedAt: Date.now(),
+    lastSeen: Date.now(),
+    messageAgeDays: getGmailMessageAgeDays(msgData),
+  };
+}
+
+globalThis.buildGmailSubscriptionCandidate = buildGmailSubscriptionCandidate;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { buildGmailSubscriptionCandidate };
+}
+
+function scanGmailForSubscriptions(force = false) {
+  browser.storage.local.get(['gmailAuthToken', 'lastGmailScan', 'subscription_status', 'detectedSubscriptions'], (result) => {
     if (!isTierAllowed(String(result.subscription_status || 'free').toLowerCase())) {
       console.log('[Background] Gmail scanning requires Premium or Family plan');
       return;
@@ -1103,9 +1346,9 @@ function scanGmailForSubscriptions() {
       return;
     }
 
-    // Only scan every 1 hour to avoid rate limits
     const lastScan = result.lastGmailScan || 0;
-    if (Date.now() - lastScan < 60 * 60 * 1000) {
+    if (!force && Date.now() - lastScan < 60 * 60 * 1000) {
+      console.log('[Background] Gmail scan skipped because it was run within the last hour');
       return;
     }
 
@@ -1144,21 +1387,32 @@ function scanGmailForSubscriptions() {
               const from = msgData.payload?.headers?.find(h => h.name === 'From')?.value || '';
               const fullText = `${subject} ${from} ${msgData.snippet || ''}`.toLowerCase();
 
-              const serviceMatch = fullText.match(/(netflix|spotify|adobe|microsoft|apple|amazon|disney|hbo|youtube|hulu|canva|duolingo|audible|xbox|playstation|nordvpn|linkedin)/i);
-              if (serviceMatch) {
-                const serviceName = serviceMatch[0].charAt(0).toUpperCase() + serviceMatch[0].slice(1);
-                const amountMatch = fullText.match(/(\$|€|£)?\s*(\d+\.?\d*)/);
-                const amount = amountMatch ? parseFloat(amountMatch[2]) : null;
+              const candidate = buildGmailSubscriptionCandidate(subject, from, msgData.snippet || '', msgData);
+              if (candidate) {
+                const ageInDays = candidate.messageAgeDays;
+                const existingSubs = result.detectedSubscriptions || {};
+                const duplicate = Object.values(existingSubs).find((sub) =>
+                  sub && sub.serviceName && String(sub.serviceName).toLowerCase() === candidate.serviceName.toLowerCase() &&
+                  !sub.requiresReview && !sub.markedCancelled
+                );
 
-                detectedSubs[serviceName] = {
-                  serviceName,
-                  domain: null,
-                  detectedAt: Date.now(),
-                  lastSeen: Date.now(),
-                  source: 'gmail-metadata',
-                  amount
-                };
-                console.log('[Background] ✅ Detected from Gmail metadata:', serviceName, amount ? `($${amount})` : '');
+                if (ageInDays === null || ageInDays > 90 || duplicate) {
+                  console.log('[Background] Gmail candidate skipped as stale or duplicate:', candidate.serviceName, { ageInDays, duplicate: Boolean(duplicate) });
+                } else {
+                  detectedSubs[candidate.serviceName] = {
+                    ...candidate,
+                    serviceName: candidate.serviceName,
+                    domain: candidate.domain || null,
+                    requiresReview: Boolean(candidate.requiresReview),
+                    isDetectedCandidate: true,
+                  };
+                  console.log('[Background] ✅ Suggested Gmail candidate:', candidate.serviceName, {
+                    ageInDays,
+                    amount: candidate.amount,
+                    detectedRenewalDate: candidate.detectedRenewalDate,
+                    requiresReview: candidate.requiresReview,
+                  });
+                }
               }
 
               if (processedCount === data.messages.length) {

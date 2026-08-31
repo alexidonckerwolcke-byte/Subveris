@@ -73,13 +73,75 @@ document.addEventListener('DOMContentLoaded', () => {
     'Adobe': 'cancel-adobe'
   };
 
+  function renderReviewQueue(detectedSubscriptions) {
+    const reviewSection = document.getElementById('review-section');
+    const reviewList = document.getElementById('review-list');
+    if (!reviewSection || !reviewList) return;
+
+    const items = Object.values(detectedSubscriptions || {})
+      .filter((subscription) => subscription && subscription.serviceName && subscription.requiresReview)
+      .sort((left, right) => (right.detectedAt || 0) - (left.detectedAt || 0));
+
+    if (!items.length) {
+      reviewSection.style.display = 'none';
+      return;
+    }
+
+    reviewSection.style.display = 'block';
+    reviewList.replaceChildren();
+
+    items.forEach((subscription) => {
+      const row = document.createElement('div');
+      row.className = 'review-item';
+
+      const name = document.createElement('div');
+      name.className = 'subscription-name';
+      name.textContent = subscription.serviceName;
+
+      const meta = document.createElement('div');
+      meta.className = 'subscription-meta';
+      meta.textContent = subscription.amount ? `~€${Number(subscription.amount).toFixed(2)} · Gmail suggestion` : 'Gmail suggestion';
+
+      const actions = document.createElement('div');
+      actions.className = 'review-actions';
+
+      const approveButton = document.createElement('button');
+      approveButton.type = 'button';
+      approveButton.className = 'approve';
+      approveButton.textContent = 'Approve';
+      approveButton.addEventListener('click', () => {
+        browser.runtime.sendMessage({ type: 'APPROVE_REVIEWED_SUBSCRIPTION', serviceName: subscription.serviceName }, (response) => {
+          if (response?.success) {
+            window.location.reload();
+          }
+        });
+      });
+
+      const dismissButton = document.createElement('button');
+      dismissButton.type = 'button';
+      dismissButton.className = 'dismiss';
+      dismissButton.textContent = 'Dismiss';
+      dismissButton.addEventListener('click', () => {
+        browser.runtime.sendMessage({ type: 'DISMISS_REVIEWED_SUBSCRIPTION', serviceName: subscription.serviceName }, (response) => {
+          if (response?.success) {
+            window.location.reload();
+          }
+        });
+      });
+
+      actions.append(approveButton, dismissButton);
+      row.append(name, meta, actions);
+      reviewList.appendChild(row);
+    });
+  }
+
   function renderDashboard(detectedSubscriptions) {
     const dashboard = document.getElementById('dashboard');
     const list = document.getElementById('subscription-list');
     if (!dashboard || !list) return;
 
     const subscriptions = Object.values(detectedSubscriptions || {})
-      .filter((subscription) => subscription && subscription.serviceName)
+      .filter((subscription) => subscription && subscription.serviceName && !subscription.requiresReview)
       .sort((left, right) => (right.lastVisit || 0) - (left.lastVisit || 0));
     const now = Date.now();
     const withUsage = subscriptions.map((subscription) => ({
@@ -190,6 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
         detectedSubscriptionCount: Object.keys(result.detectedSubscriptions || {}).length,
       });
       renderDashboard(result.detectedSubscriptions || {});
+      renderReviewQueue(result.detectedSubscriptions || {});
       const isFreeTier = !['premium', 'family'].includes((result.subscription_status || 'free').toLowerCase());
       
       if (result.supabaseUserUUID && result.authToken) {

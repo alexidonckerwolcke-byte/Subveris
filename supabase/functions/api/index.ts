@@ -1869,8 +1869,39 @@ runtimeDeno?.serve?.(async (req: Request) => {
             continue;
           }
 
-          // A login cookie alone is not proof of a paid subscription. New rows
-          // are created only by the pricing/renewal evidence flow below.
+          const createdName = serviceName || domain || "Unknown subscription";
+          const createdAmount = Number(detected?.amount ?? detected?.detectedPrice ?? detected?.price ?? 0);
+          const createdCurrency = typeof detected?.currency === "string" && detected.currency.trim()
+            ? detected.currency.trim().toUpperCase()
+            : "USD";
+          const createdFrequency = typeof detected?.frequency === "string" && detected.frequency.trim()
+            ? detected.frequency.trim().toLowerCase()
+            : "monthly";
+          const createdStatus = typeof detected?.status === "string" && detected.status.trim()
+            ? detected.status.trim().toLowerCase()
+            : "detected_pending_verification";
+          const createdRenewal = typeof detected?.detectedRenewalDate === "string" && detected.detectedRenewalDate.trim()
+            ? detected.detectedRenewalDate.trim()
+            : null;
+
+          const { error: insertError } = await supabase
+            .from("subscriptions")
+            .insert({
+              id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+              user_id: userId,
+              name: createdName,
+              amount: Number.isFinite(createdAmount) ? createdAmount : 0,
+              currency: createdCurrency,
+              frequency: createdFrequency,
+              status: createdStatus,
+              website_domain: domain || null,
+              is_detected: true,
+              next_billing_at: createdRenewal || null,
+              description: typeof detected?.planName === 'string' && detected.planName.trim() ? detected.planName.trim() : null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+          if (!insertError) persisted += 1;
         }
 
         return sendJson({
