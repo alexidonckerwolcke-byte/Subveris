@@ -33,6 +33,7 @@ export default function Settings() {
   const [weeklyDigest, setWeeklyDigest] = useState(true);
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailExtensionAuthorized, setGmailExtensionAuthorized] = useState(false);
   const [gmailConnecting, setGmailConnecting] = useState(false);
   const { user, hasPassword } = useAuth();
   const { tier } = useSubscription();
@@ -52,7 +53,7 @@ export default function Settings() {
     const handleExtensionStatus = (event: MessageEvent) => {
       if (event.source !== window || event.origin !== window.location.origin) return;
       if (event.data?.type !== "SUBVERIS_GMAIL_STATUS_RESULT" || event.data.requestId !== extensionRequestId) return;
-      setGmailConnected(Boolean(event.data.authorized));
+      setGmailExtensionAuthorized(Boolean(event.data.authorized));
     };
     window.addEventListener("message", handleExtensionStatus);
     window.postMessage({ type: "SUBVERIS_GMAIL_STATUS", requestId: extensionRequestId }, window.location.origin);
@@ -105,7 +106,7 @@ export default function Settings() {
   };
 
   const handleConnectGmail = async () => {
-    if (gmailConnected || gmailConnecting) {
+    if (gmailExtensionAuthorized || gmailConnecting) {
       return;
     }
 
@@ -129,6 +130,7 @@ export default function Settings() {
       });
 
       if (!result.success) throw new Error(result.error || "Gmail authorization failed");
+      setGmailExtensionAuthorized(true);
       setGmailConnected(true);
       toast({
         title: "Gmail connected!",
@@ -153,6 +155,7 @@ export default function Settings() {
       });
       if (response.ok) {
         setGmailConnected(false);
+        setGmailExtensionAuthorized(false);
         toast({
           title: "Gmail disconnected",
           description: "Your Gmail account has been disconnected.",
@@ -252,9 +255,11 @@ export default function Settings() {
                 <p className="text-sm text-muted-foreground">
                   {!gmailAllowed
                     ? "Premium feature - connect Gmail to scan receipts automatically"
-                    : gmailConnected
+                    : gmailConnected && gmailExtensionAuthorized
                     ? "Connected - Inbox scanned every 5 minutes"
-                    : "Connect to auto-detect subscriptions from email receipts"}
+                    : gmailConnected
+                      ? "Gmail account connected - authorize the extension to scan receipts"
+                      : "Connect to auto-detect subscriptions from email receipts"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -265,16 +270,18 @@ export default function Settings() {
                   </div>
                 )}
                 <Button
-                  variant={gmailConnected ? "outline" : "default"}
+                  variant={gmailConnected && gmailExtensionAuthorized ? "outline" : "default"}
                   size="sm"
-                  onClick={gmailConnected ? handleDisconnectGmail : handleConnectGmail}
+                  onClick={gmailConnected && gmailExtensionAuthorized ? handleDisconnectGmail : handleConnectGmail}
                   disabled={gmailConnecting || (!gmailConnected && !gmailAllowed)}
                 >
                   {gmailConnecting
                     ? "Connecting..."
-                    : gmailConnected
+                    : gmailConnected && gmailExtensionAuthorized
                       ? "Disconnect"
-                      : gmailAllowed ? "Connect Gmail" : "Premium required"}
+                      : gmailConnected
+                        ? "Authorize extension"
+                        : gmailAllowed ? "Connect Gmail" : "Premium required"}
                 </Button>
               </div>
             </div>
