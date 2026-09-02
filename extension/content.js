@@ -46,17 +46,21 @@ function isTierAllowed(status) {
 
 function isSubverisPage() {
   const hostname = window.location.hostname.replace(/^www\./i, '').toLowerCase();
-  return hostname === 'subveris.com' || hostname.endsWith('.subveris.com');
+  return hostname === 'subveris.com' || hostname.endsWith('.subveris.com') || hostname === 'localhost';
 }
 
 // Inject script to capture auth token from page context.
 // Some pages or stale extension loads may not expose the resource, so fail softly.
 function getInjectScriptUrl() {
   try {
-    if (!browser || !browser.runtime || typeof browser.runtime.getURL !== 'function') {
+    if (!browser || !browser.runtime || !browser.runtime.id || browser.runtime.id === 'invalid' || typeof browser.runtime.getURL !== 'function') {
       return null;
     }
-    return browser.runtime.getURL('inject.js');
+    const injectUrl = browser.runtime.getURL('inject.js');
+    if (!injectUrl || injectUrl.includes('chrome-extension://invalid/') || injectUrl.includes('moz-extension://invalid/')) {
+      return null;
+    }
+    return injectUrl;
   } catch (error) {
     if (!isExtensionContextInvalidated(error)) {
       console.warn('[Extension] Failed to resolve inject.js URL:', error);
@@ -260,7 +264,9 @@ function sendUsageTracking(domain, timeSpent) {
       }
       return;
     }
-    if (!response?.success) {
+    if (response?.skipped) {
+      console.info('[Extension] Usage tracking skipped because this domain is not in Subveris yet:', domain);
+    } else if (!response?.success) {
       console.warn('[Extension] ⚠️ TRACK_USAGE was not accepted by the API:', response?.error || response);
     } else {
       console.log('[Extension] ✅ Usage tracking successful for:', domain);

@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/lib/subscription-context";
 
 export default function Settings() {
-  const showGmailScanning = false;
+  const showGmailScanning = true;
   const { toast } = useToast();
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);

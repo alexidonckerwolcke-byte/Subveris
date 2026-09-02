@@ -872,8 +872,8 @@ function sendUsageTracking(domain, timeSpent, serviceName, serviceUrl, callback 
               }
 
               if (isExpectedMissingRoute) {
-                console.warn('[Background] All configured usage sync endpoints are unavailable; skipping usage tracking for now.');
-                callback({ success: false, error: 'Usage tracking endpoint unavailable.' });
+                console.info('[Background] No matching subscription for usage tracking domain; tracking skipped until it is added.');
+                callback({ success: true, skipped: true, reason: 'subscription_not_found' });
                 return;
               }
 
