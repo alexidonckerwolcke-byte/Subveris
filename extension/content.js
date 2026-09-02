@@ -128,6 +128,11 @@ function sendMessageToBackground(message, callback) {
 
 try {
   browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request?.type === 'GMAIL_SCAN_EVENT' && isSubverisPage()) {
+    console.info(`[Subveris Gmail Scan] ${request.event}`, request.details || {});
+    return false;
+  }
+
   if (!request || request.type !== 'GET_AUTH_TOKEN') {
     return false;
   }

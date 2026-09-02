@@ -40,6 +40,7 @@
     {
       "matches": [
         "https://subveris.com/*",
+        "http://localhost:5173/*",
         "https://*.netflix.com/*",
         "https://*.spotify.com/*",
         "https://*.amazon.com/*",

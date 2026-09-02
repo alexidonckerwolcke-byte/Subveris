@@ -50,7 +50,7 @@ export default function Privacy() {
                 <li>Billing and payment information for Premium purchases processed through Stripe.</li>
                 <li>Technical and security data generated when you use the service, such as IP address and request information in server logs, error logs, and authentication/session identifiers. We do not use this policy to claim collection of browser or device data that is not described elsewhere in the service.</li>
                 <li>Cookies and similar technologies used for authentication, security, preferences, and service operation.</li>
-                <li>Usage analytics and product insights to improve the service.</li>
+                <li>Limited technical and subscription-usage data necessary to provide, secure, and improve the app’s core subscription-management functionality.</li>
               </ul>
             </div>
 
@@ -67,7 +67,9 @@ export default function Privacy() {
             <div>
               <h2 className="text-lg font-semibold">How We Use Your Data</h2>
               <p className="mt-3 text-muted-foreground">
-                We use data to deliver and improve Subveris, provide insights, optimize recurring spend, and process payments.
+                We use data only to provide and improve the core functionality of Subveris: to identify subscriptions, track usage,
+                calculate recurring costs, and process payments. Google user data, including Gmail metadata, is used only for the
+                Gmail subscription-detection feature you explicitly authorize and to improve the accuracy and functionality of that feature.
                 We do not sell your personal data. We may share the minimum data needed with service providers that operate Subveris,
                 such as Supabase for database and authentication services and Stripe for payment processing.
               </p>
@@ -84,7 +86,7 @@ export default function Privacy() {
               </ul>
               <p className="mt-4 text-muted-foreground font-medium">How We Use Extension Data</p>
               <p className="mt-2 text-muted-foreground">
-                Extension data is used to: (1) automatically detect your subscriptions without manual entry, (2) track usage patterns across your subscription services, (3) identify unused or redundant subscriptions, and (4) provide recommendations for cost optimization. This data is synced to your Subveris account and subject to the same privacy protections as manually entered data.
+                Extension data is used only to: (1) automatically detect your subscriptions without manual entry, (2) track usage patterns across your subscription services, (3) identify unused or redundant subscriptions, and (4) provide recommendations for cost optimization within the Subveris product. This data is synced to your Subveris account and subject to the same privacy protections as manually entered data. Google user data is not used for advertising, profiling, or unrelated analytics outside the functionality of the app.
               </p>
               <p className="mt-4 text-muted-foreground font-medium">Privacy & Control</p>
               <ul className="mt-2 space-y-2 text-muted-foreground list-disc pl-6">

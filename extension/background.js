@@ -1388,21 +1388,45 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = { buildGmailSubscriptionCandidate };
 }
 
+function publishGmailScanEvent(event, details = {}) {
+  if (!browser.tabs?.query || !browser.tabs?.sendMessage) {
+    return;
+  }
+
+  browser.tabs.query({}, (tabs) => {
+    tabs.forEach((tab) => {
+      if (!tab.id) return;
+      browser.tabs.sendMessage(tab.id, {
+        type: 'GMAIL_SCAN_EVENT',
+        event,
+        details,
+      }, () => {
+        // Tabs without the content script are expected to reject this message.
+        if (browser.runtime.lastError) return;
+      });
+    });
+  });
+}
+
 function scanGmailForSubscriptions(force = false) {
   browser.storage.local.get(['gmailAuthToken', 'lastGmailScan', 'subscription_status', 'detectedSubscriptions'], (result) => {
+    publishGmailScanEvent('started', { forced: force });
     if (!isTierAllowed(String(result.subscription_status || 'free').toLowerCase())) {
       console.log('[Background] Gmail scanning requires Premium or Family plan');
+      publishGmailScanEvent('skipped', { reason: 'plan_required' });
       return;
     }
     const token = result.gmailAuthToken;
     if (!token) {
       console.log('[Background] Gmail not authorized, skipping email scan');
+      publishGmailScanEvent('skipped', { reason: 'gmail_not_authorized' });
       return;
     }
 
     const lastScan = result.lastGmailScan || 0;
     if (!force && Date.now() - lastScan < 60 * 60 * 1000) {
       console.log('[Background] Gmail scan skipped because it was run within the last hour');
+      publishGmailScanEvent('skipped', { reason: 'recent_scan' });
       return;
     }
 
@@ -1419,13 +1443,16 @@ function scanGmailForSubscriptions(force = false) {
       }
     }).then(response => response.json())
       .then(data => {
+        publishGmailScanEvent('messages_found', { count: data.messages?.length || 0 });
         if (!data.messages || data.messages.length === 0) {
           console.log('[Background] No new emails matching subscription patterns');
+          publishGmailScanEvent('completed', { processed: 0, candidates: 0 });
           return;
         }
 
         const detectedSubs = {};
         let processedCount = 0;
+        let candidateCount = 0;
 
         data.messages.forEach(msg => {
           fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject%2CFrom`, {
@@ -1453,6 +1480,7 @@ function scanGmailForSubscriptions(force = false) {
                 if (ageInDays === null || ageInDays > 90 || duplicate) {
                   console.log('[Background] Gmail candidate skipped as stale or duplicate:', candidate.serviceName, { ageInDays, duplicate: Boolean(duplicate) });
                 } else {
+                  candidateCount++;
                   detectedSubs[candidate.serviceName] = {
                     ...candidate,
                     serviceName: candidate.serviceName,
@@ -1464,6 +1492,13 @@ function scanGmailForSubscriptions(force = false) {
                   console.log('[Background] ✅ Suggested Gmail candidate pending approval:', candidate.serviceName, {
                     ageInDays,
                     amount: candidate.amount,
+                    detectedRenewalDate: candidate.detectedRenewalDate,
+                    requiresReview: true,
+                  });
+                  publishGmailScanEvent('candidate_found', {
+                    serviceName: candidate.serviceName,
+                    amount: candidate.amount,
+                    currency: candidate.currency,
                     detectedRenewalDate: candidate.detectedRenewalDate,
                     requiresReview: true,
                   });
@@ -1480,13 +1515,26 @@ function scanGmailForSubscriptions(force = false) {
                     // Gmail detections must be explicitly approved before they are added to the user's subscriptions.
                     if (browser.runtime.lastError) {
                       console.error('[Background] Failed to persist Gmail review queue:', browser.runtime.lastError);
+                      publishGmailScanEvent('failed', { reason: 'review_queue_persist_failed' });
+                    } else {
+                      publishGmailScanEvent('completed', {
+                        processed: processedCount,
+                        candidates: candidateCount,
+                        pendingApproval: true,
+                      });
                     }
                   });
                 });
               }
-            }).catch(err => console.error('[Background] Error fetching email:', err));
+            }).catch(err => {
+              console.error('[Background] Error fetching email:', err);
+              publishGmailScanEvent('failed', { reason: 'message_fetch_failed' });
+            });
         });
-      }).catch(err => console.log('[Background] Gmail API error (likely auth needed):', err.message));
+      }).catch(err => {
+        console.log('[Background] Gmail API error (likely auth needed):', err.message);
+        publishGmailScanEvent('failed', { reason: 'gmail_api_error' });
+      });
   });
 }
 
