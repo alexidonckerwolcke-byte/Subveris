@@ -1019,6 +1019,9 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
             runCookieSessionScan();
             loadKnownSubscriptions();
+            // Start Gmail evaluation immediately after the extension session is ready.
+            // The scan will report a skipped event when Gmail has not been authorized in the extension.
+            scanGmailForSubscriptions(true);
             sendResponse({ success: true, stored: true, sessionId, csrfToken, sessionToken: opaqueToken, status });
           });
         }
