@@ -101,50 +101,29 @@ export default function Settings() {
 
     setGmailConnecting(true);
     try {
-      // Step 1: Get Gmail OAuth URL from backend
-      const urlResponse = await apiFetch("/api/auth/gmail-oauth-url", {
-        method: "POST",
+      const requestId = crypto.randomUUID();
+      const result = await new Promise<{ success?: boolean; error?: string }>((resolve, reject) => {
+        const timeout = window.setTimeout(() => {
+          window.removeEventListener("message", handleResult);
+          reject(new Error("The extension is not available. Open the Subveris extension and try again."));
+        }, 30000);
+        const handleResult = (event: MessageEvent) => {
+          if (event.source !== window || event.origin !== window.location.origin) return;
+          if (event.data?.type !== "SUBVERIS_CONNECT_GMAIL_RESULT" || event.data.requestId !== requestId) return;
+          window.clearTimeout(timeout);
+          window.removeEventListener("message", handleResult);
+          resolve(event.data.response || {});
+        };
+        window.addEventListener("message", handleResult);
+        window.postMessage({ type: "SUBVERIS_CONNECT_GMAIL", requestId }, window.location.origin);
       });
-      if (!urlResponse.ok) throw new Error("Failed to get OAuth URL");
 
-      const { oauthUrl } = await urlResponse.json();
-
-      // Step 2: Open OAuth flow in new window
-      const width = 500;
-      const height = 600;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
-
-      const authWindow = window.open(
-        oauthUrl,
-        "Gmail Authorization",
-        `width=${width},height=${height},left=${left},top=${top}`
-      );
-
-      // Step 3: Poll for authorization completion
-      const checkInterval = setInterval(async () => {
-        try {
-          const statusResponse = await apiFetch("/api/auth/gmail-status");
-          if (statusResponse.ok) {
-            const data = await statusResponse.json();
-            if (data.connected) {
-              setGmailConnected(true);
-              authWindow?.close();
-              clearInterval(checkInterval);
-              toast({
-                title: "Gmail connected!",
-                description:
-                  "Your inbox will be scanned for subscriptions every 5 minutes.",
-              });
-            }
-          }
-        } catch (error) {
-          console.error("Failed to check Gmail status:", error);
-        }
-      }, 1000);
-
-      // Clear interval after 5 minutes
-      setTimeout(() => clearInterval(checkInterval), 5 * 60 * 1000);
+      if (!result.success) throw new Error(result.error || "Gmail authorization failed");
+      setGmailConnected(true);
+      toast({
+        title: "Gmail connected!",
+        description: "Your inbox will now be scanned for subscription receipts.",
+      });
     } catch (error) {
       toast({
         title: "Connection failed",

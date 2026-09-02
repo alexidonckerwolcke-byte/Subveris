@@ -179,6 +179,17 @@ window.addEventListener('message', (event) => {
   if (event.source !== window) return;
   if (!event.data) return;
 
+  if (event.data.type === 'SUBVERIS_CONNECT_GMAIL' && isSubverisPage()) {
+    sendMessageToBackground({ type: 'authorizeGmail' }, (response, error) => {
+      window.postMessage({
+        type: 'SUBVERIS_CONNECT_GMAIL_RESULT',
+        requestId: event.data.requestId || null,
+        response: response || { success: false, error: error?.message || 'Extension authorization failed' },
+      }, window.location.origin);
+    });
+    return;
+  }
+
   if (event.data.type === 'SUBVERIS_AUTH_LOGOUT') {
     const loggedOutUserId = event.data.userId || null;
     cachedAuthToken = null;
