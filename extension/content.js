@@ -137,6 +137,13 @@ try {
     return false;
   }
 
+  if (request?.type === 'GET_GMAIL_STATUS' && isSubverisPage()) {
+    browser.storage.local.get(['gmailAuthToken'], (result) => {
+      sendResponse({ authorized: Boolean(result.gmailAuthToken) });
+    });
+    return true;
+  }
+
   if (!request || request.type !== 'GET_AUTH_TOKEN') {
     return false;
   }
@@ -179,8 +186,22 @@ window.addEventListener('message', (event) => {
   if (event.source !== window) return;
   if (!event.data) return;
 
+  if (event.data.type === 'SUBVERIS_GMAIL_STATUS' && isSubverisPage()) {
+    sendMessageToBackground({ type: 'GET_GMAIL_STATUS' }, (response, error) => {
+      window.postMessage({
+        type: 'SUBVERIS_GMAIL_STATUS_RESULT',
+        requestId: event.data.requestId || null,
+        authorized: Boolean(response?.authorized),
+        error: error?.message || null,
+      }, window.location.origin);
+    });
+    return;
+  }
+
   if (event.data.type === 'SUBVERIS_CONNECT_GMAIL' && isSubverisPage()) {
+    console.info('[Subveris Gmail] Authorization requested from Settings');
     sendMessageToBackground({ type: 'authorizeGmail' }, (response, error) => {
+      console.info('[Subveris Gmail] Authorization result:', response?.success ? 'authorized' : (response?.error || error?.message || 'failed'));
       window.postMessage({
         type: 'SUBVERIS_CONNECT_GMAIL_RESULT',
         requestId: event.data.requestId || null,

@@ -48,6 +48,15 @@ export default function Settings() {
 
   // Check Gmail connection status
   useEffect(() => {
+    const extensionRequestId = crypto.randomUUID();
+    const handleExtensionStatus = (event: MessageEvent) => {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      if (event.data?.type !== "SUBVERIS_GMAIL_STATUS_RESULT" || event.data.requestId !== extensionRequestId) return;
+      setGmailConnected(Boolean(event.data.authorized));
+    };
+    window.addEventListener("message", handleExtensionStatus);
+    window.postMessage({ type: "SUBVERIS_GMAIL_STATUS", requestId: extensionRequestId }, window.location.origin);
+
     const checkGmailStatus = async () => {
       try {
         const response = await apiFetch("/api/auth/gmail-status");
@@ -60,6 +69,7 @@ export default function Settings() {
       }
     };
     checkGmailStatus();
+    return () => window.removeEventListener("message", handleExtensionStatus);
   }, []);
 
   // Refs for modal triggers
