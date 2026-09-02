@@ -16,6 +16,7 @@ import {
   User,
   Palette,
   Zap,
+  CheckCircle2,
 } from "lucide-react";
 import { CurrencySelector } from '@/components/currency-selector';
 import { useState, useRef, useEffect } from "react";
@@ -94,6 +95,10 @@ export default function Settings() {
   };
 
   const handleConnectGmail = async () => {
+    if (gmailConnected || gmailConnecting) {
+      return;
+    }
+
     setGmailConnecting(true);
     try {
       // Step 1: Get Gmail OAuth URL from backend
@@ -263,18 +268,26 @@ export default function Settings() {
                     : "Connect to auto-detect subscriptions from email receipts"}
                 </p>
               </div>
-              <Button
-                variant={gmailConnected ? "destructive" : "default"}
-                size="sm"
-                onClick={gmailConnected ? handleDisconnectGmail : handleConnectGmail}
-                disabled={gmailConnecting || (!gmailConnected && !gmailAllowed)}
-              >
-                {gmailConnecting
-                  ? "Connecting..."
-                  : gmailConnected
-                    ? "Disconnect"
-                    : gmailAllowed ? "Connect" : "Premium required"}
-              </Button>
+              <div className="flex items-center gap-2">
+                {gmailConnected && (
+                  <div className="flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                    Connected
+                  </div>
+                )}
+                <Button
+                  variant={gmailConnected ? "outline" : "default"}
+                  size="sm"
+                  onClick={gmailConnected ? handleDisconnectGmail : handleConnectGmail}
+                  disabled={gmailConnecting || (!gmailConnected && !gmailAllowed)}
+                >
+                  {gmailConnecting
+                    ? "Connecting..."
+                    : gmailConnected
+                      ? "Disconnect"
+                      : gmailAllowed ? "Connect Gmail" : "Premium required"}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
