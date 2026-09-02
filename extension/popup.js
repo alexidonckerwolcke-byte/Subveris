@@ -434,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const openDownloadsBtn = document.getElementById('open-downloads');
   const gmailStatus = document.getElementById('gmail-status');
   
-  browser.storage.local.get(['supabaseUserUUID', 'gmailAuthToken'], (result) => {
+  browser.storage.local.get(['supabaseUserUUID', 'gmailAuthToken', 'subscription_status'], (result) => {
     if (result.supabaseUserUUID && !['premium', 'family'].includes((result.subscription_status || 'free').toLowerCase()) && discoverySection) {
       discoverySection.style.display = 'none';
     } else if (result.supabaseUserUUID && discoverySection) {
