@@ -1158,7 +1158,12 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
       // Request OAuth URL from backend
-      fetch(`${apiUrl}/api/auth/gmail-oauth-url`, {
+      const redirectUri = typeof browser.identity?.getRedirectURL === 'function'
+        ? browser.identity.getRedirectURL()
+        : null;
+      const oauthUrlRequest = `${apiUrl}/api/auth/gmail-oauth-url${redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : ''}`;
+      console.info('[Background] Requesting Gmail OAuth consent flow', { redirectUri: redirectUri || 'default' });
+      fetch(oauthUrlRequest, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -1196,7 +1201,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
               },
-              body: JSON.stringify({ code })
+              body: JSON.stringify({ code, redirect_uri: redirectUri })
             }).then(r => r.json()).then(tokenData => {
               if (!tokenData.access_token) {
                 throw new Error('No access token received');

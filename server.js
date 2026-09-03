@@ -1730,7 +1730,14 @@ const server = http.createServer(async (req, res) => {
 
     const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
     const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
-    const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
+    const defaultRedirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
+    const requestedRedirectUri = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams.get('redirect_uri');
+    const redirectUri = requestedRedirectUri || defaultRedirectUri;
+    if (redirectUri !== defaultRedirectUri && !/^https:\/\/[a-z0-9]{32}\.chromiumapp\.org\/?$/.test(redirectUri)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid Gmail OAuth redirect URI' }));
+      return;
+    }
 
     if (!googleClientId) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -1772,7 +1779,13 @@ const server = http.createServer(async (req, res) => {
 
     const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
     const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
-    const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
+    const defaultRedirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
+    const redirectUri = body.redirect_uri || defaultRedirectUri;
+    if (redirectUri !== defaultRedirectUri && !/^https:\/\/[a-z0-9]{32}\.chromiumapp\.org\/?$/.test(redirectUri)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid Gmail OAuth redirect URI' }));
+      return;
+    }
 
     if (!googleClientId || !googleClientSecret) {
       res.writeHead(400, { 'Content-Type': 'application/json' });

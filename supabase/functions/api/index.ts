@@ -1552,10 +1552,14 @@ function buildCalendarEvents(subscriptions: any[]) {
 }
 
 // Gmail OAuth helpers
-function generateGmailOAuthUrl(userId: string): string {
+function isAllowedGmailRedirectUri(redirectUri: string): boolean {
+  return redirectUri === GOOGLE_REDIRECT_URI || /^https:\/\/[a-z0-9]{32}\.chromiumapp\.org\/?$/.test(redirectUri);
+}
+
+function generateGmailOAuthUrl(userId: string, redirectUri = GOOGLE_REDIRECT_URI): string {
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: GOOGLE_REDIRECT_URI,
+    redirect_uri: redirectUri,
     response_type: "code",
     scope: "https://www.googleapis.com/auth/gmail.metadata",
     state: userId, // Use userId as state for validation
@@ -1565,13 +1569,13 @@ function generateGmailOAuthUrl(userId: string): string {
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
-async function exchangeGmailCodeForToken(code: string): Promise<any> {
+async function exchangeGmailCodeForToken(code: string, redirectUri = GOOGLE_REDIRECT_URI): Promise<any> {
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     client_secret: GOOGLE_CLIENT_SECRET,
     code,
     grant_type: "authorization_code",
-    redirect_uri: GOOGLE_REDIRECT_URI,
+    redirect_uri: redirectUri,
   });
 
   const response = await fetch("https://oauth2.googleapis.com/token", {
@@ -1736,7 +1740,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
-        const oauthUrl = generateGmailOAuthUrl(userId);
+        const requestedRedirectUri = new URL(req.url).searchParams.get("redirect_uri") || GOOGLE_REDIRECT_URI;
+        if (!isAllowedGmailRedirectUri(requestedRedirectUri)) {
+          return sendJson({ error: "Invalid Gmail OAuth redirect URI" }, { status: 400 });
+        }
+
+        const oauthUrl = generateGmailOAuthUrl(userId, requestedRedirectUri);
         return sendJson({ oauthUrl });
       } catch (err) {
         console.error("[Gmail] Error generating OAuth URL:", err);
@@ -1767,8 +1776,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
-        const body = await req.json() as { code: string };
+        const body = await req.json() as { code: string; redirect_uri?: string };
         const { code } = body;
+        const redirectUri = body.redirect_uri || GOOGLE_REDIRECT_URI;
+
+        if (!isAllowedGmailRedirectUri(redirectUri)) {
+          return sendJson({ error: "Invalid Gmail OAuth redirect URI" }, { status: 400 });
+        }
 
         if (!code) {
           return sendJson(
@@ -1785,7 +1799,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           );
         }
 
-        const tokenData = await exchangeGmailCodeForToken(code);
+        const tokenData = await exchangeGmailCodeForToken(code, redirectUri);
 
         // Optionally store in database (users table or separate table)
         if (supabase) {

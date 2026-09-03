@@ -2,9 +2,12 @@
 // Safari 15+, Firefox, and Edge use 'browser' global
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
 const browser = globalThis.browser || globalThis.chrome;
+const EXTENSION_BUILD = '1.2.8';
 
 let startTime = Date.now();
 let cachedAuthToken = null;
+let lastForwardedAuthKey = null;
+let authForwardInFlightKey = null;
 let pricingScanTimer = null;
 let pricingObserver = null;
 
@@ -107,8 +110,12 @@ function sendMessageToBackground(message, callback) {
     browser.runtime.sendMessage(message, (response) => {
       try {
         if (browser.runtime.lastError) {
-          if (!isExtensionContextInvalidated(browser.runtime.lastError)) {
+          const message = String(browser.runtime.lastError.message || browser.runtime.lastError);
+          const isClosedPort = message.toLowerCase().includes('message port closed');
+          if (!isExtensionContextInvalidated(browser.runtime.lastError) && !isClosedPort) {
             console.warn('[Extension] Background message error:', browser.runtime.lastError);
+          } else if (isClosedPort) {
+            console.info('[Extension] Background message ended during extension reload or duplicate auth update.');
           }
           if (callback) callback(null, browser.runtime.lastError);
           return;
@@ -233,9 +240,15 @@ window.addEventListener('message', (event) => {
 
   const csrfToken = crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   const apiUrl = localStorage.getItem('subverisApiUrl') || null;
+  const authKey = `${userId || ''}:${token || ''}:${apiUrl || ''}`;
+  if (authKey === lastForwardedAuthKey || authKey === authForwardInFlightKey) {
+    return;
+  }
+  authForwardInFlightKey = authKey;
 
   setTimeout(() => {
     const success = sendMessageToBackground({ type: 'SUBVERIS_AUTH_TOKEN', token, userId, apiUrl, csrfToken }, (response, err) => {
+      authForwardInFlightKey = null;
       if (err) {
         if (isExtensionContextInvalidated(err)) {
           console.info('[Extension] Auth token sync skipped because the extension context was reloaded.');
@@ -243,6 +256,7 @@ window.addEventListener('message', (event) => {
           console.error('[Extension] ❌ SUBVERIS_AUTH_TOKEN message failed:', err.message || err);
         }
       } else {
+        if (response?.success) lastForwardedAuthKey = authKey;
         console.log('[Extension] Background script storage response:', response);
       }
     });
@@ -587,7 +601,7 @@ function observePricingChanges() {
 }
 
 // Log when script starts
-console.log('[Extension] Content script loaded on:', window.location.hostname);
+console.log(`[Extension] Content script loaded on: ${window.location.hostname} (build ${EXTENSION_BUILD})`);
 
 // Initialize auth token immediately
 getAuthToken().then((token) => {

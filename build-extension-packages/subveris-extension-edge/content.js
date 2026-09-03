@@ -2,9 +2,12 @@
 // Safari 15+, Firefox, and Edge use 'browser' global
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
 const browser = globalThis.browser || globalThis.chrome;
+const EXTENSION_BUILD = '1.2.8';
 
 let startTime = Date.now();
 let cachedAuthToken = null;
+let lastForwardedAuthKey = null;
+let authForwardInFlightKey = null;
 let pricingScanTimer = null;
 let pricingObserver = null;
 
@@ -46,17 +49,21 @@ function isTierAllowed(status) {
 
 function isSubverisPage() {
   const hostname = window.location.hostname.replace(/^www\./i, '').toLowerCase();
-  return hostname === 'subveris.com' || hostname.endsWith('.subveris.com');
+  return hostname === 'subveris.com' || hostname.endsWith('.subveris.com') || hostname === 'localhost';
 }
 
 // Inject script to capture auth token from page context.
 // Some pages or stale extension loads may not expose the resource, so fail softly.
 function getInjectScriptUrl() {
   try {
-    if (!browser || !browser.runtime || typeof browser.runtime.getURL !== 'function') {
+    if (!browser || !browser.runtime || !browser.runtime.id || browser.runtime.id === 'invalid' || typeof browser.runtime.getURL !== 'function') {
       return null;
     }
-    return browser.runtime.getURL('inject.js');
+    const injectUrl = browser.runtime.getURL('inject.js');
+    if (!injectUrl || injectUrl.includes('chrome-extension://invalid/') || injectUrl.includes('moz-extension://invalid/')) {
+      return null;
+    }
+    return injectUrl;
   } catch (error) {
     if (!isExtensionContextInvalidated(error)) {
       console.warn('[Extension] Failed to resolve inject.js URL:', error);
@@ -67,18 +74,7 @@ function getInjectScriptUrl() {
 
 const injectScriptUrl = getInjectScriptUrl();
 
-function canInjectAuthBridge() {
-  if (!injectScriptUrl) return false;
-
-  const protocol = window.location?.protocol?.toLowerCase() || '';
-  if (protocol === 'file:' || protocol === 'chrome-extension:' || protocol === 'moz-extension:' || protocol === 'edge-extension:') {
-    return false;
-  }
-
-  return true;
-}
-
-if (canInjectAuthBridge()) {
+if (injectScriptUrl && window.location.protocol !== 'file:') {
   try {
     const script = document.createElement('script');
     script.src = injectScriptUrl;
@@ -114,8 +110,12 @@ function sendMessageToBackground(message, callback) {
     browser.runtime.sendMessage(message, (response) => {
       try {
         if (browser.runtime.lastError) {
-          if (!isExtensionContextInvalidated(browser.runtime.lastError)) {
+          const message = String(browser.runtime.lastError.message || browser.runtime.lastError);
+          const isClosedPort = message.toLowerCase().includes('message port closed');
+          if (!isExtensionContextInvalidated(browser.runtime.lastError) && !isClosedPort) {
             console.warn('[Extension] Background message error:', browser.runtime.lastError);
+          } else if (isClosedPort) {
+            console.info('[Extension] Background message ended during extension reload or duplicate auth update.');
           }
           if (callback) callback(null, browser.runtime.lastError);
           return;
@@ -139,6 +139,18 @@ function sendMessageToBackground(message, callback) {
 
 try {
   browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request?.type === 'GMAIL_SCAN_EVENT' && isSubverisPage()) {
+    console.info(`[Subveris Gmail Scan] ${request.event}`, request.details || {});
+    return false;
+  }
+
+  if (request?.type === 'GET_GMAIL_STATUS' && isSubverisPage()) {
+    browser.storage.local.get(['gmailAuthToken'], (result) => {
+      sendResponse({ authorized: Boolean(result.gmailAuthToken) });
+    });
+    return true;
+  }
+
   if (!request || request.type !== 'GET_AUTH_TOKEN') {
     return false;
   }
@@ -181,6 +193,31 @@ window.addEventListener('message', (event) => {
   if (event.source !== window) return;
   if (!event.data) return;
 
+  if (event.data.type === 'SUBVERIS_GMAIL_STATUS' && isSubverisPage()) {
+    sendMessageToBackground({ type: 'GET_GMAIL_STATUS' }, (response, error) => {
+      window.postMessage({
+        type: 'SUBVERIS_GMAIL_STATUS_RESULT',
+        requestId: event.data.requestId || null,
+        authorized: Boolean(response?.authorized),
+        error: error?.message || null,
+      }, window.location.origin);
+    });
+    return;
+  }
+
+  if (event.data.type === 'SUBVERIS_CONNECT_GMAIL' && isSubverisPage()) {
+    console.info('[Subveris Gmail] Authorization requested from Settings');
+    sendMessageToBackground({ type: 'authorizeGmail' }, (response, error) => {
+      console.info('[Subveris Gmail] Authorization result:', response?.success ? 'authorized' : (response?.error || error?.message || 'failed'));
+      window.postMessage({
+        type: 'SUBVERIS_CONNECT_GMAIL_RESULT',
+        requestId: event.data.requestId || null,
+        response: response || { success: false, error: error?.message || 'Extension authorization failed' },
+      }, window.location.origin);
+    });
+    return;
+  }
+
   if (event.data.type === 'SUBVERIS_AUTH_LOGOUT') {
     const loggedOutUserId = event.data.userId || null;
     cachedAuthToken = null;
@@ -203,9 +240,15 @@ window.addEventListener('message', (event) => {
 
   const csrfToken = crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   const apiUrl = localStorage.getItem('subverisApiUrl') || null;
+  const authKey = `${userId || ''}:${token || ''}:${apiUrl || ''}`;
+  if (authKey === lastForwardedAuthKey || authKey === authForwardInFlightKey) {
+    return;
+  }
+  authForwardInFlightKey = authKey;
 
   setTimeout(() => {
     const success = sendMessageToBackground({ type: 'SUBVERIS_AUTH_TOKEN', token, userId, apiUrl, csrfToken }, (response, err) => {
+      authForwardInFlightKey = null;
       if (err) {
         if (isExtensionContextInvalidated(err)) {
           console.info('[Extension] Auth token sync skipped because the extension context was reloaded.');
@@ -213,6 +256,7 @@ window.addEventListener('message', (event) => {
           console.error('[Extension] ❌ SUBVERIS_AUTH_TOKEN message failed:', err.message || err);
         }
       } else {
+        if (response?.success) lastForwardedAuthKey = authKey;
         console.log('[Extension] Background script storage response:', response);
       }
     });
@@ -266,7 +310,9 @@ function sendUsageTracking(domain, timeSpent) {
       }
       return;
     }
-    if (!response?.success) {
+    if (response?.skipped) {
+      console.info('[Extension] Usage tracking skipped because this domain is not in Subveris yet:', domain);
+    } else if (!response?.success) {
       console.warn('[Extension] ⚠️ TRACK_USAGE was not accepted by the API:', response?.error || response);
     } else {
       console.log('[Extension] ✅ Usage tracking successful for:', domain);
@@ -555,7 +601,7 @@ function observePricingChanges() {
 }
 
 // Log when script starts
-console.log('[Extension] Content script loaded on:', window.location.hostname);
+console.log(`[Extension] Content script loaded on: ${window.location.hostname} (build ${EXTENSION_BUILD})`);
 
 // Initialize auth token immediately
 getAuthToken().then((token) => {

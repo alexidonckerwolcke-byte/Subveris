@@ -1,7 +1,23 @@
 // Cross-browser compatibility shim
 // Safari 15+, Firefox, and Edge use 'browser' global
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
-const browser = globalThis.browser || globalThis.chrome;
+const browser = globalThis.browser || globalThis.chrome || {
+  runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, lastError: undefined },
+  alarms: { create() {}, onAlarm: { addListener() {} } },
+  tabs: { query() {}, onActivated: { addListener() {} }, onUpdated: { addListener() {} }, sendMessage() {} },
+  cookies: { getAll() { return []; } },
+  downloads: { onChanged: { addListener() {} }, search() { return []; } },
+  storage: {
+    local: {
+      get(_keys, callback) { if (callback) callback({}); },
+      set(_obj, callback) { if (callback) callback(); },
+      remove(_keys, callback) { if (callback) callback(); },
+    },
+  },
+  identity: { launchWebAuthFlow() {} },
+};
+globalThis.browser = browser;
+globalThis.chrome = browser;
 const DEFAULT_API_URL = 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1';
 
 function rehydrateAuthFromSubverisTabs() {
@@ -377,7 +393,10 @@ function addDetectedSubscription(serviceName, domain) {
         lastSeen: now,
         lastVisit: now,
         visitCount: 1,
-        monthlyPrice: MONTHLY_PRICES[serviceName] || null
+        monthlyPrice: MONTHLY_PRICES[serviceName] || null,
+        requiresReview: true,
+        approvedForSync: false,
+        isDetectedCandidate: true,
       };
     } else {
       subs[serviceName].lastSeen = now;
@@ -385,6 +404,9 @@ function addDetectedSubscription(serviceName, domain) {
       subs[serviceName].domain = domain || subs[serviceName].domain;
       subs[serviceName].serviceUrl = subs[serviceName].serviceUrl || `https://${domain}/`;
       subs[serviceName].visitCount = (existing.visitCount || 0) + 1;
+      subs[serviceName].requiresReview = true;
+      subs[serviceName].approvedForSync = false;
+      subs[serviceName].isDetectedCandidate = true;
       if (!subs[serviceName].monthlyPrice && MONTHLY_PRICES[serviceName]) {
         subs[serviceName].monthlyPrice = MONTHLY_PRICES[serviceName];
       }
@@ -395,8 +417,100 @@ function addDetectedSubscription(serviceName, domain) {
         console.error('[Background] Failed to store detected subscription:', browser.runtime.lastError);
         return;
       }
-      console.log('[Background] ✅ Added detected subscription:', serviceName);
+      console.log('[Background] ✅ Added detected subscription pending approval:', serviceName);
+    });
+  });
+}
+
+function approveReviewedSubscription(serviceName, callback = () => {}) {
+  if (!serviceName) {
+    callback({ success: false, error: 'Missing service name' });
+    return;
+  }
+
+  browser.storage.local.get(['detectedSubscriptions'], (result) => {
+    const subs = result.detectedSubscriptions || {};
+    const item = subs[serviceName];
+
+    if (!item) {
+      callback({ success: false, error: 'Review item not found' });
+      return;
+    }
+
+    subs[serviceName] = {
+      ...item,
+      requiresReview: false,
+      approvedForSync: true,
+      isDetectedCandidate: false,
+      source: item.source === 'gmail-metadata-candidate' ? 'gmail-metadata-approved' : (item.source || 'manual-review'),
+      lastSeen: Date.now(),
+      detectedAt: item.detectedAt || Date.now(),
+      lastVisit: item.lastVisit || Date.now(),
+    };
+
+    browser.storage.local.set({ detectedSubscriptions: subs }, () => {
+      if (browser.runtime.lastError) {
+        callback({ success: false, error: browser.runtime.lastError.message });
+        return;
+      }
+      console.log('[Background] ✅ Approved Gmail review item:', serviceName);
       syncDetectedSubscriptions(subs);
+      callback({ success: true });
+    });
+  });
+}
+
+const DETECTED_DISMISS_GRACE_MS = 24 * 60 * 60 * 1000;
+
+function pruneExpiredDismissedSubscriptions(subscriptions) {
+  const now = Date.now();
+  const cleaned = {};
+
+  Object.entries(subscriptions || {}).forEach(([key, item]) => {
+    if (!item) return;
+    if (item.dismissedAt && now - item.dismissedAt >= DETECTED_DISMISS_GRACE_MS) {
+      return;
+    }
+    cleaned[key] = item;
+  });
+
+  return cleaned;
+}
+
+function dismissReviewedSubscription(serviceName, callback = () => {}) {
+  if (!serviceName) {
+    callback({ success: false, error: 'Missing service name' });
+    return;
+  }
+
+  browser.storage.local.get(['detectedSubscriptions'], (result) => {
+    const subs = pruneExpiredDismissedSubscriptions(result.detectedSubscriptions || {});
+    const item = subs[serviceName] || (result.detectedSubscriptions || {})[serviceName];
+
+    if (!item) {
+      callback({ success: false, error: 'Review item not found' });
+      return;
+    }
+
+    subs[serviceName] = {
+      ...item,
+      requiresReview: false,
+      approvedForSync: false,
+      isDetectedCandidate: false,
+      dismissedAt: Date.now(),
+      dismissedUntil: Date.now() + DETECTED_DISMISS_GRACE_MS,
+      source: item.source || 'manual-review',
+      lastSeen: Date.now(),
+      lastVisit: item.lastVisit || Date.now(),
+    };
+
+    browser.storage.local.set({ detectedSubscriptions: subs }, () => {
+      if (browser.runtime.lastError) {
+        callback({ success: false, error: browser.runtime.lastError.message });
+        return;
+      }
+      console.log('[Background] Dismissed review item for grace period:', serviceName);
+      callback({ success: true });
     });
   });
 }
@@ -411,8 +525,21 @@ function syncDetectedSubscriptions(subscriptions) {
       return;
     }
 
+    const approvedSubscriptions = Object.values(subscriptions || {}).filter((item) => {
+      if (!item || !item.serviceName) return false;
+      if (item.markedCancelled) return false;
+      if (item.approvedForSync === true) return true;
+      if (item.source === 'gmail-metadata-approved') return true;
+      return false;
+    });
+
+    if (!approvedSubscriptions.length) {
+      console.log('[Background] No approved detected subscriptions to sync.');
+      return;
+    }
+
     const payload = JSON.stringify({
-      subscriptions: Object.values(subscriptions),
+      subscriptions: approvedSubscriptions,
       syncedAt: Date.now()
     });
 
@@ -745,8 +872,8 @@ function sendUsageTracking(domain, timeSpent, serviceName, serviceUrl, callback 
               }
 
               if (isExpectedMissingRoute) {
-                console.warn('[Background] All configured usage sync endpoints are unavailable; skipping usage tracking for now.');
-                callback({ success: false, error: 'Usage tracking endpoint unavailable.' });
+                console.info('[Background] No matching subscription for usage tracking domain; tracking skipped until it is added.');
+                callback({ success: true, skipped: true, reason: 'subscription_not_found' });
                 return;
               }
 
@@ -892,6 +1019,9 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
             runCookieSessionScan();
             loadKnownSubscriptions();
+            // Start Gmail evaluation immediately after the extension session is ready.
+            // The scan will report a skipped event when Gmail has not been authorized in the extension.
+            scanGmailForSubscriptions(true);
             sendResponse({ success: true, stored: true, sessionId, csrfToken, sessionToken: opaqueToken, status });
           });
         }
@@ -939,6 +1069,16 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'REQUEST_GUIDED_CANCELLATION') {
     requestGuidedCancellation(request.subscription).then(sendResponse);
+    return true;
+  }
+
+  if (request.type === 'APPROVE_REVIEWED_SUBSCRIPTION') {
+    approveReviewedSubscription(request.serviceName, sendResponse);
+    return true;
+  }
+
+  if (request.type === 'DISMISS_REVIEWED_SUBSCRIPTION') {
+    dismissReviewedSubscription(request.serviceName, sendResponse);
     return true;
   }
 
@@ -1018,7 +1158,12 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
       // Request OAuth URL from backend
-      fetch(`${apiUrl}/api/auth/gmail-oauth-url`, {
+      const redirectUri = typeof browser.identity?.getRedirectURL === 'function'
+        ? browser.identity.getRedirectURL()
+        : null;
+      const oauthUrlRequest = `${apiUrl}/api/auth/gmail-oauth-url${redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : ''}`;
+      console.info('[Background] Requesting Gmail OAuth consent flow', { redirectUri: redirectUri || 'default' });
+      fetch(oauthUrlRequest, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -1056,7 +1201,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
               },
-              body: JSON.stringify({ code })
+              body: JSON.stringify({ code, redirect_uri: redirectUri })
             }).then(r => r.json()).then(tokenData => {
               if (!tokenData.access_token) {
                 throw new Error('No access token received');
@@ -1068,6 +1213,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 gmailTokenExpiry: Date.now() + (tokenData.expires_in * 1000)
               }, () => {
                 console.log('[Background] ✅ Gmail authorized successfully');
+                scanGmailForSubscriptions(true);
                 sendResponse({ success: true });
               });
             }).catch(err => {
@@ -1091,21 +1237,204 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Email scanning: detect subscription receipts from Gmail
-function scanGmailForSubscriptions() {
-  browser.storage.local.get(['gmailAuthToken', 'lastGmailScan', 'subscription_status'], (result) => {
+function getGmailMessageAgeDays(msgData) {
+  const rawInternalDate = msgData?.internalDate;
+  const headerDate = msgData?.payload?.headers?.find((header) => header.name?.toLowerCase() === 'date')?.value;
+  const rawDate = rawInternalDate || headerDate;
+
+  if (!rawDate) {
+    return null;
+  }
+
+  const ms = Number(rawDate);
+  const timestamp = Number.isFinite(ms) ? ms : Date.parse(rawDate);
+
+  if (!Number.isFinite(timestamp)) {
+    return null;
+  }
+
+  return Math.floor((Date.now() - timestamp) / 86400000);
+}
+
+function extractGmailAmount(text) {
+  if (!text) {
+    return null;
+  }
+
+  const normalized = text.replace(/,/g, '.');
+  const matches = [...normalized.matchAll(/(?:total|amount|charged|payment|renewal|membership|subscription|receipt|invoice|charge)[^\d]{0,20}(?:[$€£¥])?\s*(\d+(?:\.\d{1,2})?)/gi)];
+  const directMatches = [...normalized.matchAll(/(?:[$€£¥])\s*(\d+(?:\.\d{1,2})?)/g)];
+  const candidateMatches = matches.length ? matches : directMatches;
+  if (!candidateMatches.length) {
+    return null;
+  }
+
+  const firstValue = candidateMatches[0]?.[1];
+  if (!firstValue) {
+    return null;
+  }
+
+  const numeric = Number.parseFloat(firstValue);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function extractGmailRenewalDate(text) {
+  if (!text) {
+    return null;
+  }
+
+  const datePatterns = [
+    /(\d{1,2}[-/\s]\d{1,2}[-/\s]\d{2,4})/g,
+    /(\d{4}[-/]\d{1,2}[-/]\d{1,2})/g,
+    /(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2}),?\s+(\d{4})/gi,
+    /(renew(?:al|s)?|billing|next charge|expires?)[^\d]{0,20}(\d{1,2}[-/\s]\d{1,2}[-/\s]\d{2,4})/gi,
+  ];
+
+  for (const pattern of datePatterns) {
+    const match = text.match(pattern);
+    if (!match || !match[0]) continue;
+
+    const candidateText = match[0];
+    const parsed = new Date(candidateText.replace(/\s+/g, ' '));
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  }
+
+  return null;
+}
+
+function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
+  const fullText = `${subject || ''} ${from || ''} ${snippet || ''}`.trim();
+  if (!fullText) {
+    return null;
+  }
+
+  const servicePatterns = {
+    Netflix: ['netflix', 'netflix subscription charge'],
+    'Spotify Premium': ['spotify', 'spotify premium membership'],
+    'Amazon Prime': ['amazon prime', 'prime membership'],
+    'Disney Plus': ['disney', 'disneyplus', 'disney+'],
+    'YouTube Premium': ['youtube premium'],
+    'HBO Max': ['hbo', 'hbomax'],
+    Hulu: ['hulu'],
+    'Apple Music': ['apple music', 'itunes'],
+    'Microsoft 365': ['microsoft 365', 'office 365'],
+    Adobe: ['adobe', 'creative cloud'],
+    Dropbox: ['dropbox'],
+    OneDrive: ['onedrive'],
+    iCloud: ['icloud'],
+    'LinkedIn Premium': ['linkedin premium', 'linkedin plus'],
+    'Tinder Gold': ['tinder', 'gold', 'plus'],
+    Uber: ['uber', 'pass'],
+    DoorDash: ['doordash'],
+    Audible: ['audible', 'audiobook'],
+    Coursera: ['coursera', 'plus'],
+    MasterClass: ['masterclass'],
+    'Duolingo Plus': ['duolingo', 'plus'],
+    'HelloFresh': ['hellofresh', 'meal plan'],
+    NordVPN: ['nordvpn'],
+    ExpressVPN: ['expressvpn'],
+    Grammarly: ['grammarly'],
+    Slack: ['slack'],
+    Zoom: ['zoom'],
+    Asana: ['asana'],
+    Notion: ['notion'],
+    'Canva Pro': ['canva', 'pro'],
+    Figma: ['figma'],
+    Discord: ['discord', 'nitro'],
+    'Twitch Prime': ['twitch', 'prime'],
+    'PlayStation Plus': ['playstation plus', 'ps plus'],
+    'Xbox Game Pass': ['xbox game pass', 'xbox live'],
+    'Nintendo Switch Online': ['nintendo switch online'],
+    Calm: ['calm'],
+    Headspace: ['headspace'],
+    Peloton: ['peloton'],
+    Fitbit: ['fitbit'],
+    ClassPass: ['classpass'],
+    Scribd: ['scribd'],
+    'Kindle Unlimited': ['kindle unlimited'],
+  };
+
+  const lowerText = fullText.toLowerCase();
+  let serviceName = null;
+  for (const [name, patterns] of Object.entries(servicePatterns)) {
+    const match = patterns.some((pattern) => lowerText.includes(pattern.toLowerCase()));
+    if (match) {
+      serviceName = name;
+      break;
+    }
+  }
+
+  if (!serviceName) {
+    return null;
+  }
+
+  const amount = extractGmailAmount(fullText);
+  const renewalDate = extractGmailRenewalDate(fullText);
+  const isLowConfidence = amount === null && renewalDate === null;
+
+  return {
+    serviceName,
+    domain: null,
+    amount,
+    currency: 'USD',
+    frequency: 'monthly',
+    status: 'active',
+    detectedRenewalDate: renewalDate,
+    requiresReview: true,
+    isDetectedCandidate: true,
+    source: 'gmail-metadata-candidate',
+    detectedAt: Date.now(),
+    lastSeen: Date.now(),
+    messageAgeDays: getGmailMessageAgeDays(msgData),
+  };
+}
+
+globalThis.buildGmailSubscriptionCandidate = buildGmailSubscriptionCandidate;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { buildGmailSubscriptionCandidate };
+}
+
+function publishGmailScanEvent(event, details = {}) {
+  if (!browser.tabs?.query || !browser.tabs?.sendMessage) {
+    return;
+  }
+
+  browser.tabs.query({}, (tabs) => {
+    tabs.forEach((tab) => {
+      if (!tab.id) return;
+      browser.tabs.sendMessage(tab.id, {
+        type: 'GMAIL_SCAN_EVENT',
+        event,
+        details,
+      }, () => {
+        // Tabs without the content script are expected to reject this message.
+        if (browser.runtime.lastError) return;
+      });
+    });
+  });
+}
+
+function scanGmailForSubscriptions(force = false) {
+  browser.storage.local.get(['gmailAuthToken', 'lastGmailScan', 'subscription_status', 'detectedSubscriptions'], (result) => {
+    publishGmailScanEvent('started', { forced: force });
     if (!isTierAllowed(String(result.subscription_status || 'free').toLowerCase())) {
       console.log('[Background] Gmail scanning requires Premium or Family plan');
+      publishGmailScanEvent('skipped', { reason: 'plan_required' });
       return;
     }
     const token = result.gmailAuthToken;
     if (!token) {
       console.log('[Background] Gmail not authorized, skipping email scan');
+      publishGmailScanEvent('skipped', { reason: 'gmail_not_authorized' });
       return;
     }
 
-    // Only scan every 1 hour to avoid rate limits
     const lastScan = result.lastGmailScan || 0;
-    if (Date.now() - lastScan < 60 * 60 * 1000) {
+    if (!force && Date.now() - lastScan < 60 * 60 * 1000) {
+      console.log('[Background] Gmail scan skipped because it was run within the last hour');
+      publishGmailScanEvent('skipped', { reason: 'recent_scan' });
       return;
     }
 
@@ -1114,7 +1443,7 @@ function scanGmailForSubscriptions() {
       /(netflix|spotify|adobe|microsoft|amazon|disney|hbo|youtube|hulu|canva|duolingo)/i
     ];
 
-    fetch('https://www.googleapis.com/gmail/v1/users/me/messages?q=subject:(receipt OR invoice OR renewal OR confirmation) is:unread', {
+    fetch('https://www.googleapis.com/gmail/v1/users/me/messages?format=metadata&metadataHeaders=Subject%2CFrom&q=subject:(receipt OR invoice OR renewal OR confirmation) is:unread', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1122,16 +1451,19 @@ function scanGmailForSubscriptions() {
       }
     }).then(response => response.json())
       .then(data => {
+        publishGmailScanEvent('messages_found', { count: data.messages?.length || 0 });
         if (!data.messages || data.messages.length === 0) {
           console.log('[Background] No new emails matching subscription patterns');
+          publishGmailScanEvent('completed', { processed: 0, candidates: 0 });
           return;
         }
 
         const detectedSubs = {};
         let processedCount = 0;
+        let candidateCount = 0;
 
         data.messages.forEach(msg => {
-          fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+          fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject%2CFrom`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -1140,37 +1472,47 @@ function scanGmailForSubscriptions() {
           }).then(r => r.json())
             .then(msgData => {
               processedCount++;
-              const subject = msgData.payload?.headers?.find(h => h.name === 'Subject')?.value || '';
-              const body = msgData.payload?.parts?.find(p => p.mimeType === 'text/plain')?.body?.data || '';
-              
-              let decodedBody = '';
-              try {
-                decodedBody = atob(body);
-              } catch (e) {
-                decodedBody = body;
+              const subject = msgData.payload?.headers?.find(h => h.name === 'Subject')?.value || msgData.snippet || '';
+              const from = msgData.payload?.headers?.find(h => h.name === 'From')?.value || '';
+              const fullText = `${subject} ${from} ${msgData.snippet || ''}`.toLowerCase();
+
+              const candidate = buildGmailSubscriptionCandidate(subject, from, msgData.snippet || '', msgData);
+              if (candidate) {
+                const ageInDays = candidate.messageAgeDays;
+                const existingSubs = result.detectedSubscriptions || {};
+                const duplicate = Object.values(existingSubs).find((sub) =>
+                  sub && sub.serviceName && String(sub.serviceName).toLowerCase() === candidate.serviceName.toLowerCase() &&
+                  !sub.requiresReview && !sub.markedCancelled
+                );
+
+                if (ageInDays === null || ageInDays > 90 || duplicate) {
+                  console.log('[Background] Gmail candidate skipped as stale or duplicate:', candidate.serviceName, { ageInDays, duplicate: Boolean(duplicate) });
+                } else {
+                  candidateCount++;
+                  detectedSubs[candidate.serviceName] = {
+                    ...candidate,
+                    serviceName: candidate.serviceName,
+                    domain: candidate.domain || null,
+                    requiresReview: true,
+                    approvedForSync: false,
+                    isDetectedCandidate: true,
+                  };
+                  console.log('[Background] ✅ Suggested Gmail candidate pending approval:', candidate.serviceName, {
+                    ageInDays,
+                    amount: candidate.amount,
+                    detectedRenewalDate: candidate.detectedRenewalDate,
+                    requiresReview: true,
+                  });
+                  publishGmailScanEvent('candidate_found', {
+                    serviceName: candidate.serviceName,
+                    amount: candidate.amount,
+                    currency: candidate.currency,
+                    detectedRenewalDate: candidate.detectedRenewalDate,
+                    requiresReview: true,
+                  });
+                }
               }
 
-              const fullText = (subject + ' ' + decodedBody).toLowerCase();
-
-              // Extract service name
-              const serviceMatch = fullText.match(/(netflix|spotify|adobe|microsoft|apple|amazon|disney|hbo|youtube|hulu|canva|duolingo|audible|xbox|playstation|nordvpn|linkedin)/i);
-              if (serviceMatch) {
-                const serviceName = serviceMatch[0].charAt(0).toUpperCase() + serviceMatch[0].slice(1);
-                const amountMatch = fullText.match(/(\$|€|£)?\s*(\d+\.?\d*)/);
-                const amount = amountMatch ? parseFloat(amountMatch[2]) : null;
-
-                detectedSubs[serviceName] = {
-                  serviceName,
-                  domain: null,
-                  detectedAt: Date.now(),
-                  lastSeen: Date.now(),
-                  source: 'gmail-receipt',
-                  amount
-                };
-                console.log('[Background] ✅ Detected from Gmail:', serviceName, amount ? `($${amount})` : '');
-              }
-
-              // If processed all messages, save and sync
               if (processedCount === data.messages.length) {
                 browser.storage.local.get(['detectedSubscriptions'], (existing) => {
                   const merged = { ...existing.detectedSubscriptions || {}, ...detectedSubs };
@@ -1178,15 +1520,29 @@ function scanGmailForSubscriptions() {
                     detectedSubscriptions: merged,
                     lastGmailScan: Date.now()
                   }, () => {
-                    if (Object.keys(detectedSubs).length > 0) {
-                      syncDetectedSubscriptions(merged);
+                    // Gmail detections must be explicitly approved before they are added to the user's subscriptions.
+                    if (browser.runtime.lastError) {
+                      console.error('[Background] Failed to persist Gmail review queue:', browser.runtime.lastError);
+                      publishGmailScanEvent('failed', { reason: 'review_queue_persist_failed' });
+                    } else {
+                      publishGmailScanEvent('completed', {
+                        processed: processedCount,
+                        candidates: candidateCount,
+                        pendingApproval: true,
+                      });
                     }
                   });
                 });
               }
-            }).catch(err => console.error('[Background] Error fetching email:', err));
+            }).catch(err => {
+              console.error('[Background] Error fetching email:', err);
+              publishGmailScanEvent('failed', { reason: 'message_fetch_failed' });
+            });
         });
-      }).catch(err => console.log('[Background] Gmail API error (likely auth needed):', err.message));
+      }).catch(err => {
+        console.log('[Background] Gmail API error (likely auth needed):', err.message);
+        publishGmailScanEvent('failed', { reason: 'gmail_api_error' });
+      });
   });
 }
 
@@ -1254,7 +1610,10 @@ function monitorDownloadsForCSV() {
                 lastSeen: Date.now(),
                 source: 'csv-import',
                 amount: !isNaN(amount) ? amount : null,
-                frequency: frequency || 'monthly'
+                frequency: frequency || 'monthly',
+                requiresReview: true,
+                approvedForSync: false,
+                isDetectedCandidate: true,
               };
               console.log('[Background] ✅ Parsed from CSV:', name, amount ? `($${amount})` : '');
             }
@@ -1264,7 +1623,7 @@ function monitorDownloadsForCSV() {
             browser.storage.local.get(['detectedSubscriptions'], (existing) => {
               const merged = { ...existing.detectedSubscriptions || {}, ...detectedSubs };
               browser.storage.local.set({ detectedSubscriptions: merged }, () => {
-                syncDetectedSubscriptions(merged);
+                // pending approvals are not synced until the user explicitly approves them
               });
             });
           }

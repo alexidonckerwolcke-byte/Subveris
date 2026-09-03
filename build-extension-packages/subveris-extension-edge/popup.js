@@ -4,6 +4,22 @@
 const browser = globalThis.browser || globalThis.chrome;
 const SUPABASE_URL = 'https://xuilgccacufwinvkocfl.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1aWxnY2NhY3Vmd2ludmtvY2ZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NzY4OTYsImV4cCI6MjA4MTU1Mjg5Nn0.f0xa0hY6VDht7Qeqfbc0UaKpZLzCB43CXwOlfxDJ93M';
+const DETECTED_DISMISS_GRACE_MS = 24 * 60 * 60 * 1000;
+
+function isDismissedRecently(item) {
+  if (!item || !item.dismissedAt) return false;
+  return Date.now() - item.dismissedAt < DETECTED_DISMISS_GRACE_MS;
+}
+
+function pruneExpiredDismissedItems(subscriptions) {
+  const now = Date.now();
+  return Object.fromEntries(
+    Object.entries(subscriptions || {}).filter(([_, item]) => {
+      if (!item || !item.dismissedAt) return true;
+      return now - item.dismissedAt < DETECTED_DISMISS_GRACE_MS;
+    })
+  );
+}
 
 // Detect which browser is running
 function detectBrowser() {
@@ -73,13 +89,86 @@ document.addEventListener('DOMContentLoaded', () => {
     'Adobe': 'cancel-adobe'
   };
 
+  function renderReviewQueue(detectedSubscriptions) {
+    const reviewSection = document.getElementById('review-section');
+    const reviewList = document.getElementById('review-list');
+    if (!reviewSection || !reviewList) return;
+
+    const items = Object.values(pruneExpiredDismissedItems(detectedSubscriptions || {}))
+      .filter((subscription) => subscription && subscription.serviceName && (subscription.requiresReview || isDismissedRecently(subscription)))
+      .sort((left, right) => (right.detectedAt || 0) - (left.detectedAt || 0));
+
+    if (!items.length) {
+      reviewSection.style.display = 'none';
+      return;
+    }
+
+    reviewSection.style.display = 'block';
+    reviewList.replaceChildren();
+
+    items.forEach((subscription) => {
+      const row = document.createElement('div');
+      row.className = 'review-item';
+
+      const name = document.createElement('div');
+      name.className = 'subscription-name';
+      name.textContent = subscription.serviceName;
+
+      const meta = document.createElement('div');
+      meta.className = 'subscription-meta';
+      const isDismissed = isDismissedRecently(subscription);
+      meta.textContent = isDismissed
+        ? 'Dismissed — hidden for 24 hours'
+        : (subscription.amount ? `~€${Number(subscription.amount).toFixed(2)} · Gmail suggestion` : 'Gmail suggestion');
+
+      const actions = document.createElement('div');
+      actions.className = 'review-actions';
+
+      if (!isDismissed) {
+        const approveButton = document.createElement('button');
+        approveButton.type = 'button';
+        approveButton.className = 'approve';
+        approveButton.textContent = 'Approve';
+        approveButton.addEventListener('click', () => {
+          browser.runtime.sendMessage({ type: 'APPROVE_REVIEWED_SUBSCRIPTION', serviceName: subscription.serviceName }, (response) => {
+            if (response?.success) {
+              window.location.reload();
+            }
+          });
+        });
+
+        const dismissButton = document.createElement('button');
+        dismissButton.type = 'button';
+        dismissButton.className = 'dismiss';
+        dismissButton.textContent = 'Dismiss';
+        dismissButton.addEventListener('click', () => {
+          browser.runtime.sendMessage({ type: 'DISMISS_REVIEWED_SUBSCRIPTION', serviceName: subscription.serviceName }, (response) => {
+            if (response?.success) {
+              window.location.reload();
+            }
+          });
+        });
+
+        actions.append(approveButton, dismissButton);
+      } else {
+        const dismissedBadge = document.createElement('span');
+        dismissedBadge.className = 'muted';
+        dismissedBadge.textContent = 'Dismissed';
+        actions.appendChild(dismissedBadge);
+      }
+
+      row.append(name, meta, actions);
+      reviewList.appendChild(row);
+    });
+  }
+
   function renderDashboard(detectedSubscriptions) {
     const dashboard = document.getElementById('dashboard');
     const list = document.getElementById('subscription-list');
     if (!dashboard || !list) return;
 
-    const subscriptions = Object.values(detectedSubscriptions || {})
-      .filter((subscription) => subscription && subscription.serviceName)
+    const subscriptions = Object.values(pruneExpiredDismissedItems(detectedSubscriptions || {}))
+      .filter((subscription) => subscription && subscription.serviceName && !subscription.requiresReview && !isDismissedRecently(subscription))
       .sort((left, right) => (right.lastVisit || 0) - (left.lastVisit || 0));
     const now = Date.now();
     const withUsage = subscriptions.map((subscription) => ({
@@ -190,6 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
         detectedSubscriptionCount: Object.keys(result.detectedSubscriptions || {}).length,
       });
       renderDashboard(result.detectedSubscriptions || {});
+      renderReviewQueue(result.detectedSubscriptions || {});
       const isFreeTier = !['premium', 'family'].includes((result.subscription_status || 'free').toLowerCase());
       
       if (result.supabaseUserUUID && result.authToken) {
@@ -344,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const openDownloadsBtn = document.getElementById('open-downloads');
   const gmailStatus = document.getElementById('gmail-status');
   
-  browser.storage.local.get(['supabaseUserUUID', 'gmailAuthToken'], (result) => {
+  browser.storage.local.get(['supabaseUserUUID', 'gmailAuthToken', 'subscription_status'], (result) => {
     if (result.supabaseUserUUID && !['premium', 'family'].includes((result.subscription_status || 'free').toLowerCase()) && discoverySection) {
       discoverySection.style.display = 'none';
     } else if (result.supabaseUserUUID && discoverySection) {
