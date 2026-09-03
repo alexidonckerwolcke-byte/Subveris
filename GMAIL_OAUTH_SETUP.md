@@ -33,7 +33,9 @@ Three environment secrets:
    ```
    https://subveris.com/auth/callback
    ```
-   (Or use localhost:5000/auth/callback for local testing)
+   For the Chrome extension, also add the exact URI shown after `redirect_uri_mismatch` in the Google error. It has this form:
+   `https://YOUR_EXTENSION_ID.chromiumapp.org/`
+   Copy it exactly, including the trailing slash. Each unpacked extension ID can differ, so do not use an ID from a different installation.
 
 6. Click "Create"
 7. **Important:** Click "Copy" to copy credentials or download JSON
