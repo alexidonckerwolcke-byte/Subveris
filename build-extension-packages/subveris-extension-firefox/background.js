@@ -1524,6 +1524,8 @@ function scanGmailForSubscriptions(force = false) {
         let candidateCount = 0;
         let noServiceMatchCount = 0;
         let staleOrDuplicateCount = 0;
+        let failedMessageCount = 0;
+        let bodyUnavailable = false;
 
         data.messages.forEach(msg => {
           fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`, {
@@ -1534,6 +1536,19 @@ function scanGmailForSubscriptions(force = false) {
             }
           }).then(async (response) => {
             if (!response.ok) {
+              if (response.status === 403) {
+                bodyUnavailable = true;
+                const metadataResponse = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject%2CFrom`, {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                  }
+                });
+                if (metadataResponse.ok) {
+                  return metadataResponse.json();
+                }
+              }
               throw new Error(`Gmail message API returned ${response.status}`);
             }
             return response.json();
@@ -1606,6 +1621,8 @@ function scanGmailForSubscriptions(force = false) {
                         candidates: candidateCount,
                         noServiceMatch: noServiceMatchCount,
                         staleOrDuplicate: staleOrDuplicateCount,
+                        bodyUnavailable,
+                        reauthorizationRequired: bodyUnavailable,
                         pendingApproval: true,
                       });
                     }
@@ -1613,8 +1630,14 @@ function scanGmailForSubscriptions(force = false) {
                 });
               }
             }).catch(err => {
-              console.error('[Background] Error fetching email:', err);
-              publishGmailScanEvent('failed', { reason: 'message_fetch_failed' });
+              failedMessageCount++;
+              console.error('[Background] Error fetching Gmail message:', err.message);
+              if (failedMessageCount === data.messages.length - processedCount) {
+                publishGmailScanEvent('failed', {
+                  reason: 'message_fetch_failed',
+                  failedMessages: failedMessageCount,
+                });
+              }
             });
         });
       }).catch(err => {

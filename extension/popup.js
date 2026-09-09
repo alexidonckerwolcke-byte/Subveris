@@ -444,10 +444,10 @@ document.addEventListener('DOMContentLoaded', () => {
       discoverySection.style.display = 'block';
       
       if (result.gmailAuthToken) {
-        gmailStatus.textContent = '✅ Gmail authorized - Inbox scanned every 5 minutes';
+        gmailStatus.textContent = '✅ Gmail authorized - click Reauthorize to enable email-body price and date extraction';
         gmailStatus.style.color = '#28a745';
-        authorizeGmailBtn.textContent = '✅ Gmail Connected';
-        authorizeGmailBtn.disabled = true;
+        authorizeGmailBtn.textContent = '🔄 Reauthorize Gmail';
+        authorizeGmailBtn.disabled = false;
       } else {
         gmailStatus.textContent = gmailRedirectUri
           ? `⏳ Not connected - authorize Gmail. Redirect: ${gmailRedirectUri}`
