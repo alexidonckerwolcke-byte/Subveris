@@ -1438,8 +1438,9 @@ function scanGmailForSubscriptions(force = false) {
       return;
     }
 
-    const gmailSearchQuery = 'newer_than:90d {receipt invoice renewal confirmation billing charge subscription membership}';
-    fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=25&format=metadata&metadataHeaders=Subject%2CFrom&q=${encodeURIComponent(gmailSearchQuery)}`, {
+    // gmail.metadata does not allow Gmail search queries on messages.list.
+    // Read the newest message IDs, then filter subjects/senders/snippets locally.
+    fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=25', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1448,8 +1449,9 @@ function scanGmailForSubscriptions(force = false) {
     }).then(async (response) => {
         if (!response.ok) {
           const errorBody = await response.json().catch(() => ({}));
-          publishGmailScanEvent('failed', { reason: 'gmail_api_error', status: response.status });
-          throw new Error(errorBody.error?.message || `Gmail API returned ${response.status}`);
+          const error = new Error(errorBody.error?.message || `Gmail API returned ${response.status}`);
+          error.status = response.status;
+          throw error;
         }
         return response.json();
       })
@@ -1544,7 +1546,7 @@ function scanGmailForSubscriptions(force = false) {
         });
       }).catch(err => {
         console.log('[Background] Gmail API error (likely auth needed):', err.message);
-        publishGmailScanEvent('failed', { reason: 'gmail_api_error' });
+        publishGmailScanEvent('failed', { reason: 'gmail_api_error', status: err.status });
       });
   });
 }
