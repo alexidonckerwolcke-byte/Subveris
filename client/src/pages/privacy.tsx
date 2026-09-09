@@ -86,7 +86,7 @@ export default function Privacy() {
               </ul>
               <p className="mt-4 text-muted-foreground font-medium">How We Use Extension Data</p>
               <p className="mt-2 text-muted-foreground">
-                Extension data is used only to: (1) automatically detect your subscriptions without manual entry, (2) track usage patterns across your subscription services, (3) identify unused or redundant subscriptions, and (4) provide recommendations for cost optimization within the Subveris product. This data is synced to your Subveris account and subject to the same privacy protections as manually entered data. Google user data is not used for advertising, profiling, or unrelated analytics outside the functionality of the app.
+                Extension data is used only to: (1) automatically detect your subscriptions without manual entry, (2) track usage patterns across your subscription services, (3) identify unused or redundant subscriptions, and (4) provide recommendations for cost optimization within the Subveris product. Gmail message content is processed to identify subscription services, prices, and renewal dates and is not intentionally stored as full email content. This data is synced to your Subveris account and subject to the same privacy protections as manually entered data. Google user data is not used for advertising, profiling, or unrelated analytics outside the functionality of the app.
               </p>
               <p className="mt-4 text-muted-foreground font-medium">Privacy & Control</p>
               <ul className="mt-2 space-y-2 text-muted-foreground list-disc pl-6">

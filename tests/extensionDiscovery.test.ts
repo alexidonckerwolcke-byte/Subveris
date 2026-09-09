@@ -107,4 +107,36 @@ describe('buildDiscoverySyncPayload', () => {
       isDetectedCandidate: true,
     });
   });
+
+  it('keeps an unknown billing email in the manual review queue', async () => {
+    const candidate = globalThis.buildGmailSubscriptionCandidate(
+      'Test subscription receipt',
+      'billing@acme.test',
+      'Your payment was $4.99',
+      { internalDate: Date.now().toString() }
+    );
+
+    expect(candidate).toMatchObject({
+      serviceName: 'Acme',
+      amount: 4.99,
+      requiresReview: true,
+      source: 'gmail-inferred-review-candidate',
+    });
+  });
+
+  it('extracts Adobe price and renewal date from a renewal email body', async () => {
+    const candidate = globalThis.buildGmailSubscriptionCandidate(
+      'Your renewal is complete',
+      'message@adobe.com',
+      'Adobe Creative Cloud renewal. Amount charged: $59.99. Next renewal: September 30, 2026.',
+      { internalDate: Date.now().toString() }
+    );
+
+    expect(candidate).toMatchObject({
+      serviceName: 'Adobe',
+      amount: 59.99,
+      detectedRenewalDate: '2026-09-30',
+      requiresReview: true,
+    });
+  });
 });

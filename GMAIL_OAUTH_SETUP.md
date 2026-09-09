@@ -3,6 +3,8 @@
 ## 🎯 Goal
 Configure Supabase with Google OAuth credentials so the backend can generate OAuth URLs and exchange authorization codes for access tokens.
 
+The Gmail integration uses the restricted `gmail.readonly` scope to read receipt and renewal message content for subscription names, prices, and renewal dates. Users must reauthorize Gmail after this scope changes.
+
 ## 📋 What You Need
 
 Three environment secrets:

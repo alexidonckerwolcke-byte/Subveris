@@ -1561,7 +1561,7 @@ function generateGmailOAuthUrl(userId: string, redirectUri = GOOGLE_REDIRECT_URI
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/gmail.metadata",
+    scope: "https://www.googleapis.com/auth/gmail.readonly",
     state: userId, // Use userId as state for validation
     access_type: "offline",
     prompt: "select_account consent",

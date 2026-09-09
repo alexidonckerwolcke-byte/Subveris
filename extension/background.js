@@ -1305,6 +1305,13 @@ function extractGmailRenewalDate(text) {
     if (!match || !match[0]) continue;
 
     const candidateText = match[0];
+    const namedMonthMatch = candidateText.match(/(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2}),?\s+(\d{4})/i);
+    if (namedMonthMatch) {
+      const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+      const month = String(months.indexOf(namedMonthMatch[1].toLowerCase()) + 1).padStart(2, '0');
+      const day = namedMonthMatch[2].padStart(2, '0');
+      return `${namedMonthMatch[3]}-${month}-${day}`;
+    }
     const parsed = new Date(candidateText.replace(/\s+/g, ' '));
     if (!Number.isNaN(parsed.getTime())) {
       return parsed.toISOString().slice(0, 10);
@@ -1312,6 +1319,43 @@ function extractGmailRenewalDate(text) {
   }
 
   return null;
+}
+
+function decodeGmailBody(data) {
+  if (!data) return '';
+  try {
+    const normalized = data.replace(/-/g, '+').replace(/_/g, '/');
+    const binary = atob(normalized);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch (error) {
+    console.warn('[Background] Could not decode Gmail body part:', error);
+    return '';
+  }
+}
+
+function extractGmailBody(payload) {
+  if (!payload) return '';
+  const parts = Array.isArray(payload.parts) ? payload.parts : [];
+  const ownBody = payload.body?.data ? decodeGmailBody(payload.body.data) : '';
+  const childBodies = parts.map((part) => extractGmailBody(part)).filter(Boolean).join('\n');
+  return [ownBody, childBodies].filter(Boolean).join('\n');
+}
+
+function inferGmailServiceName(subject, from) {
+  const emailMatch = String(from || '').match(/<[^@>]+@([^>]+)>|\b[^\s@]+@([^\s>]+)\b/);
+  const senderDomain = emailMatch?.[1] || emailMatch?.[2] || '';
+  const domainName = senderDomain
+    .replace(/^mail\.|^email\.|^billing\.|^hello\.|^support\./i, '')
+    .split('.')[0]
+    .replace(/[-_]+/g, ' ')
+    .trim();
+  if (domainName && !/^(gmail|google|outlook|hotmail|yahoo|example)$/i.test(domainName)) {
+    return domainName.replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  const subjectMatch = String(subject || '').match(/(?:from|at|with)\s+([A-Za-z][A-Za-z0-9 &.'-]{2,40})/i);
+  return subjectMatch?.[1]?.trim() || 'Unrecognized subscription';
 }
 
 function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
@@ -1376,16 +1420,18 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
     }
   }
 
-  if (!serviceName) {
+  const amount = extractGmailAmount(fullText);
+  const renewalDate = extractGmailRenewalDate(fullText);
+  const hasBillingSignal = /receipt|invoice|renewal|billing|charge|subscription|membership|payment/i.test(fullText);
+  if (!serviceName && (!hasBillingSignal || (amount === null && renewalDate === null))) {
     return null;
   }
 
-  const amount = extractGmailAmount(fullText);
-  const renewalDate = extractGmailRenewalDate(fullText);
+  const detectedServiceName = serviceName || inferGmailServiceName(subject, from);
   const isLowConfidence = amount === null && renewalDate === null;
 
   return {
-    serviceName,
+    serviceName: detectedServiceName,
     domain: null,
     amount,
     currency: 'USD',
@@ -1394,7 +1440,7 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
     detectedRenewalDate: renewalDate,
     requiresReview: true,
     isDetectedCandidate: true,
-    source: 'gmail-metadata-candidate',
+    source: serviceName ? 'gmail-metadata-candidate' : 'gmail-inferred-review-candidate',
     detectedAt: Date.now(),
     lastSeen: Date.now(),
     messageAgeDays: getGmailMessageAgeDays(msgData),
@@ -1480,7 +1526,7 @@ function scanGmailForSubscriptions(force = false) {
         let staleOrDuplicateCount = 0;
 
         data.messages.forEach(msg => {
-          fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject%2CFrom`, {
+          fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -1496,9 +1542,10 @@ function scanGmailForSubscriptions(force = false) {
               processedCount++;
               const subject = msgData.payload?.headers?.find(h => h.name?.toLowerCase() === 'subject')?.value || msgData.snippet || '';
               const from = msgData.payload?.headers?.find(h => h.name?.toLowerCase() === 'from')?.value || '';
-              const fullText = `${subject} ${from} ${msgData.snippet || ''}`.toLowerCase();
+              const bodyText = extractGmailBody(msgData.payload);
+              const fullText = `${subject} ${from} ${msgData.snippet || ''} ${bodyText}`.toLowerCase();
 
-              const candidate = buildGmailSubscriptionCandidate(subject, from, msgData.snippet || '', msgData);
+              const candidate = buildGmailSubscriptionCandidate(subject, from, `${msgData.snippet || ''} ${bodyText}`, msgData);
               if (candidate) {
                 const ageInDays = candidate.messageAgeDays;
                 const existingSubs = result.detectedSubscriptions || {};
