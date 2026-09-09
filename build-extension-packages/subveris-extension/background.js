@@ -1476,6 +1476,8 @@ function scanGmailForSubscriptions(force = false) {
         const detectedSubs = {};
         let processedCount = 0;
         let candidateCount = 0;
+        let noServiceMatchCount = 0;
+        let staleOrDuplicateCount = 0;
 
         data.messages.forEach(msg => {
           fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject%2CFrom`, {
@@ -1484,11 +1486,16 @@ function scanGmailForSubscriptions(force = false) {
               'Authorization': `Bearer ${token}`,
               'Accept': 'application/json'
             }
-          }).then(r => r.json())
+          }).then(async (response) => {
+            if (!response.ok) {
+              throw new Error(`Gmail message API returned ${response.status}`);
+            }
+            return response.json();
+          })
             .then(msgData => {
               processedCount++;
-              const subject = msgData.payload?.headers?.find(h => h.name === 'Subject')?.value || msgData.snippet || '';
-              const from = msgData.payload?.headers?.find(h => h.name === 'From')?.value || '';
+              const subject = msgData.payload?.headers?.find(h => h.name?.toLowerCase() === 'subject')?.value || msgData.snippet || '';
+              const from = msgData.payload?.headers?.find(h => h.name?.toLowerCase() === 'from')?.value || '';
               const fullText = `${subject} ${from} ${msgData.snippet || ''}`.toLowerCase();
 
               const candidate = buildGmailSubscriptionCandidate(subject, from, msgData.snippet || '', msgData);
@@ -1501,7 +1508,12 @@ function scanGmailForSubscriptions(force = false) {
                 );
 
                 if (ageInDays === null || ageInDays > 90 || duplicate) {
+                  staleOrDuplicateCount++;
                   console.log('[Background] Gmail candidate skipped as stale or duplicate:', candidate.serviceName, { ageInDays, duplicate: Boolean(duplicate) });
+                  publishGmailScanEvent('candidate_skipped', {
+                    reason: duplicate ? 'duplicate' : 'stale_or_missing_date',
+                    serviceName: candidate.serviceName,
+                  });
                 } else {
                   candidateCount++;
                   detectedSubs[candidate.serviceName] = {
@@ -1526,6 +1538,8 @@ function scanGmailForSubscriptions(force = false) {
                     requiresReview: true,
                   });
                 }
+              } else {
+                noServiceMatchCount++;
               }
 
               if (processedCount === data.messages.length) {
@@ -1543,6 +1557,8 @@ function scanGmailForSubscriptions(force = false) {
                       publishGmailScanEvent('completed', {
                         processed: processedCount,
                         candidates: candidateCount,
+                        noServiceMatch: noServiceMatchCount,
+                        staleOrDuplicate: staleOrDuplicateCount,
                         pendingApproval: true,
                       });
                     }
