@@ -1494,12 +1494,11 @@ function scanGmailForSubscriptions(force = false) {
       return;
     }
 
-    // gmail.metadata does not allow Gmail search queries on messages.list.
-    // Read the newest message IDs, then filter subjects/senders/snippets locally.
-    fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=25', {
+    // Read the newest message IDs, then filter message content locally.
+    const scanWithToken = (activeToken) => fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=25', {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${activeToken}`,
         'Accept': 'application/json'
       }
     }).then(async (response) => {
@@ -1531,7 +1530,7 @@ function scanGmailForSubscriptions(force = false) {
           fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': `Bearer ${activeToken}`,
               'Accept': 'application/json'
             }
           }).then(async (response) => {
@@ -1541,7 +1540,7 @@ function scanGmailForSubscriptions(force = false) {
                 const metadataResponse = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject%2CFrom`, {
                   method: 'GET',
                   headers: {
-                    'Authorization': `Bearer ${token}`,
+                  'Authorization': `Bearer ${activeToken}`,
                     'Accept': 'application/json'
                   }
                 });
@@ -1640,10 +1639,31 @@ function scanGmailForSubscriptions(force = false) {
               }
             });
         });
-      }).catch(err => {
-        console.log('[Background] Gmail API error (likely auth needed):', err.message);
+      }).catch(async (err) => {
+        if (err.status === 401) {
+          console.info('[Background] Gmail access token expired; requesting refresh.');
+          browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl'], (authState) => {
+            const apiUrl = authState.subverisApiUrl || DEFAULT_API_URL;
+            const authToken = authState.supabaseAuthToken || authState.authToken;
+            fetch(`${apiUrl}/api/auth/gmail-refresh`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${authToken}` },
+            }).then(async (response) => {
+              const body = await response.json().catch(() => ({}));
+              if (!response.ok || !body.access_token) throw new Error(body.error || 'Gmail reauthorization required');
+              browser.storage.local.set({
+                gmailAuthToken: body.access_token,
+                gmailTokenExpiry: Date.now() + Number(body.expires_in || 3600) * 1000,
+              }, () => scanWithToken(body.access_token));
+            }).catch(() => publishGmailScanEvent('skipped', { reason: 'gmail_reauthorization_required' }));
+          });
+          return;
+        }
+        console.log('[Background] Gmail API error:', err.message);
         publishGmailScanEvent('failed', { reason: 'gmail_api_error', status: err.status });
       });
+
+    scanWithToken(token);
   });
 }
 
