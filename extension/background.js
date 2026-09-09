@@ -1179,14 +1179,24 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
           url: data.oauthUrl,
           interactive: true
         }, (redirectUrl) => {
+          const launchError = browser.runtime.lastError;
           if (!redirectUrl) {
-            sendResponse({ success: false, error: 'User cancelled' });
+            const errorMessage = launchError?.message || 'OAuth flow ended without a callback';
+            console.error('[Background] Gmail OAuth did not return a callback:', errorMessage);
+            sendResponse({ success: false, error: errorMessage });
             return;
           }
 
           // Extract authorization code from redirect URL
           try {
             const url = new URL(redirectUrl);
+            const oauthError = url.searchParams.get('error');
+            if (oauthError) {
+              const errorDescription = url.searchParams.get('error_description') || oauthError;
+              console.error('[Background] Gmail OAuth provider error:', errorDescription);
+              sendResponse({ success: false, error: errorDescription });
+              return;
+            }
             const code = url.searchParams.get('code');
             
             if (!code) {
