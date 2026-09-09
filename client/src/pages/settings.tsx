@@ -53,7 +53,11 @@ export default function Settings() {
     const handleExtensionStatus = (event: MessageEvent) => {
       if (event.source !== window || event.origin !== window.location.origin) return;
       if (event.data?.type !== "SUBVERIS_GMAIL_STATUS_RESULT" || event.data.requestId !== extensionRequestId) return;
-      setGmailExtensionAuthorized(Boolean(event.data.authorized));
+      const extensionAuthorized = Boolean(event.data.authorized);
+      setGmailExtensionAuthorized(extensionAuthorized);
+      if (extensionAuthorized) {
+        setGmailConnected(true);
+      }
       console.info("[Subveris Gmail] Extension status:", event.data.authorized ? "authorized" : "not authorized");
     };
     window.addEventListener("message", handleExtensionStatus);
