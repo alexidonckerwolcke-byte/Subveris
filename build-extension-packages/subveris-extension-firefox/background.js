@@ -1438,18 +1438,21 @@ function scanGmailForSubscriptions(force = false) {
       return;
     }
 
-    const subscriptionPatterns = [
-      /(?:order|receipt|invoice|confirmation|renewal|billing|charge)/i,
-      /(netflix|spotify|adobe|microsoft|amazon|disney|hbo|youtube|hulu|canva|duolingo)/i
-    ];
-
-    fetch('https://www.googleapis.com/gmail/v1/users/me/messages?format=metadata&metadataHeaders=Subject%2CFrom&q=subject:(receipt OR invoice OR renewal OR confirmation) is:unread', {
+    const gmailSearchQuery = 'newer_than:90d {receipt invoice renewal confirmation billing charge subscription membership}';
+    fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=25&format=metadata&metadataHeaders=Subject%2CFrom&q=${encodeURIComponent(gmailSearchQuery)}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json'
       }
-    }).then(response => response.json())
+    }).then(async (response) => {
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => ({}));
+          publishGmailScanEvent('failed', { reason: 'gmail_api_error', status: response.status });
+          throw new Error(errorBody.error?.message || `Gmail API returned ${response.status}`);
+        }
+        return response.json();
+      })
       .then(data => {
         publishGmailScanEvent('messages_found', { count: data.messages?.length || 0 });
         if (!data.messages || data.messages.length === 0) {

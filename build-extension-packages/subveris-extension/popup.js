@@ -433,6 +433,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const authorizeGmailBtn = document.getElementById('authorize-gmail');
   const openDownloadsBtn = document.getElementById('open-downloads');
   const gmailStatus = document.getElementById('gmail-status');
+  const gmailRedirectUri = typeof browser.identity?.getRedirectURL === 'function'
+    ? browser.identity.getRedirectURL()
+    : null;
   
   browser.storage.local.get(['supabaseUserUUID', 'gmailAuthToken', 'subscription_status'], (result) => {
     if (result.supabaseUserUUID && !['premium', 'family'].includes((result.subscription_status || 'free').toLowerCase()) && discoverySection) {
@@ -446,7 +449,9 @@ document.addEventListener('DOMContentLoaded', () => {
         authorizeGmailBtn.textContent = '✅ Gmail Connected';
         authorizeGmailBtn.disabled = true;
       } else {
-        gmailStatus.textContent = '⏳ Not yet connected - Click button to authorize';
+        gmailStatus.textContent = gmailRedirectUri
+          ? `⏳ Not connected - authorize Gmail. Redirect: ${gmailRedirectUri}`
+          : '⏳ Not yet connected - Click button to authorize';
         gmailStatus.style.color = '#ff9800';
       }
     }
