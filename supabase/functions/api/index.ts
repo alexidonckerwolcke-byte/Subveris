@@ -1890,10 +1890,6 @@ runtimeDeno?.serve?.(async (req: Request) => {
         let persisted = 0;
         for (const detected of subscriptions) {
           const isApprovedForSync = detected?.approvedForSync === true || detected?.source === "gmail-metadata-approved" || detected?.requiresReview === false;
-          if (!isApprovedForSync) {
-            console.log("[Extension] skipping unapproved detected subscription:", detected?.serviceName || detected?.name || "unknown");
-            continue;
-          }
 
           const domain = normalizeDomain(typeof detected?.domain === "string" ? detected.domain : null);
           const serviceName = typeof detected?.serviceName === "string" && detected.serviceName.trim()
@@ -1938,8 +1934,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
           const createdFrequency = typeof detected?.frequency === "string" && detected.frequency.trim()
             ? detected.frequency.trim().toLowerCase()
             : "monthly";
-          const createdStatus = typeof detected?.status === "string" && detected.status.trim()
-            ? detected.status.trim().toLowerCase()
+          const createdStatus = isApprovedForSync
+            ? (typeof detected?.status === "string" && detected.status.trim() ? detected.status.trim().toLowerCase() : "active")
             : "detected_pending_verification";
           const createdRenewal = typeof detected?.detectedRenewalDate === "string" && detected.detectedRenewalDate.trim()
             ? detected.detectedRenewalDate.trim()

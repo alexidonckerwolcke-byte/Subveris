@@ -525,21 +525,19 @@ function syncDetectedSubscriptions(subscriptions) {
       return;
     }
 
-    const approvedSubscriptions = Object.values(subscriptions || {}).filter((item) => {
+    const syncableSubscriptions = Object.values(subscriptions || {}).filter((item) => {
       if (!item || !item.serviceName) return false;
       if (item.markedCancelled) return false;
-      if (item.approvedForSync === true) return true;
-      if (item.source === 'gmail-metadata-approved') return true;
-      return false;
+      return item.approvedForSync === true || item.requiresReview === true || item.source === 'gmail-metadata-approved';
     });
 
-    if (!approvedSubscriptions.length) {
-      console.log('[Background] No approved detected subscriptions to sync.');
+    if (!syncableSubscriptions.length) {
+      console.log('[Background] No detected subscriptions to sync.');
       return;
     }
 
     const payload = JSON.stringify({
-      subscriptions: approvedSubscriptions,
+      subscriptions: syncableSubscriptions,
       syncedAt: Date.now()
     });
 
@@ -1587,14 +1585,18 @@ function scanGmailForSubscriptions(force = false) {
                 const existingSubs = result.detectedSubscriptions || {};
                 const duplicate = Object.values(existingSubs).find((sub) =>
                   sub && sub.serviceName && String(sub.serviceName).toLowerCase() === candidate.serviceName.toLowerCase() &&
-                  !sub.requiresReview && !sub.markedCancelled
+                  !sub.markedCancelled
                 );
 
                 if (ageInDays === null || ageInDays > 90 || duplicate) {
                   staleOrDuplicateCount++;
-                  console.log('[Background] Gmail candidate skipped as stale or duplicate:', candidate.serviceName, { ageInDays, duplicate: Boolean(duplicate) });
+                  console.log('[Background] Gmail candidate skipped as stale or duplicate:', candidate.serviceName, {
+                    ageInDays,
+                    duplicate: Boolean(duplicate),
+                    alreadyPendingApproval: Boolean(duplicate?.requiresReview),
+                  });
                   publishGmailScanEvent('candidate_skipped', {
-                    reason: duplicate ? 'duplicate' : 'stale_or_missing_date',
+                    reason: duplicate ? (duplicate.requiresReview ? 'already_pending_approval' : 'duplicate') : 'stale_or_missing_date',
                     serviceName: candidate.serviceName,
                   });
                 } else {
