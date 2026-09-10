@@ -1551,6 +1551,38 @@ function scanGmailForSubscriptions(force = false) {
         let failedMessageCount = 0;
         let bodyUnavailable = false;
         const seenCandidateServices = new Set();
+        let scanFinalized = false;
+
+        const finalizeGmailScan = () => {
+          if (scanFinalized || processedCount + failedMessageCount < data.messages.length) return;
+          scanFinalized = true;
+          browser.storage.local.get(['detectedSubscriptions'], (existing) => {
+            const existingSubscriptions = existing.detectedSubscriptions || {};
+            const retained = Object.fromEntries(Object.entries(existingSubscriptions).filter(([serviceName, item]) => {
+              const isGmailReviewItem = item?.source === 'gmail-metadata-candidate' || item?.source === 'gmail-inferred-review-candidate';
+              return !isGmailReviewItem || Boolean(detectedSubs[serviceName]);
+            }));
+            const merged = { ...retained, ...detectedSubs };
+            browser.storage.local.set({ detectedSubscriptions: merged, lastGmailScan: Date.now() }, () => {
+              if (browser.runtime.lastError) {
+                publishGmailScanEvent('failed', { reason: 'review_queue_persist_failed' });
+                return;
+              }
+              syncDetectedSubscriptions(merged);
+              publishGmailScanEvent('review_queue_synced', { pending: candidateCount });
+              publishGmailScanEvent('completed', {
+                processed: processedCount,
+                failedMessages: failedMessageCount,
+                candidates: candidateCount,
+                noServiceMatch: noServiceMatchCount,
+                staleOrDuplicate: staleOrDuplicateCount,
+                bodyUnavailable,
+                reauthorizationRequired: bodyUnavailable,
+                pendingApproval: true,
+              });
+            });
+          });
+        };
 
         data.messages.forEach(msg => {
           fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`, {
@@ -1637,49 +1669,11 @@ function scanGmailForSubscriptions(force = false) {
                 noServiceMatchCount++;
               }
 
-              if (processedCount === data.messages.length) {
-                browser.storage.local.get(['detectedSubscriptions'], (existing) => {
-                  const existingSubscriptions = existing.detectedSubscriptions || {};
-                  const retained = Object.fromEntries(Object.entries(existingSubscriptions).filter(([serviceName, item]) => {
-                    const isGmailReviewItem = item?.source === 'gmail-metadata-candidate' || item?.source === 'gmail-inferred-review-candidate';
-                    return !isGmailReviewItem || Boolean(detectedSubs[serviceName]);
-                  }));
-                  const merged = { ...retained, ...detectedSubs };
-                  browser.storage.local.set({
-                    detectedSubscriptions: merged,
-                    lastGmailScan: Date.now()
-                  }, () => {
-                    // Gmail detections must be explicitly approved before they are added to the user's subscriptions.
-                    if (browser.runtime.lastError) {
-                      console.error('[Background] Failed to persist Gmail review queue:', browser.runtime.lastError);
-                      publishGmailScanEvent('failed', { reason: 'review_queue_persist_failed' });
-                    } else {
-                      syncDetectedSubscriptions(merged);
-                      publishGmailScanEvent('review_queue_synced', {
-                        pending: Object.values(detectedSubs).filter((item) => item?.requiresReview).length,
-                      });
-                      publishGmailScanEvent('completed', {
-                        processed: processedCount,
-                        candidates: candidateCount,
-                        noServiceMatch: noServiceMatchCount,
-                        staleOrDuplicate: staleOrDuplicateCount,
-                        bodyUnavailable,
-                        reauthorizationRequired: bodyUnavailable,
-                        pendingApproval: true,
-                      });
-                    }
-                  });
-                });
-              }
+              finalizeGmailScan();
             }).catch(err => {
               failedMessageCount++;
               console.error('[Background] Error fetching Gmail message:', err.message);
-              if (failedMessageCount === data.messages.length - processedCount) {
-                publishGmailScanEvent('failed', {
-                  reason: 'message_fetch_failed',
-                  failedMessages: failedMessageCount,
-                });
-              }
+              finalizeGmailScan();
             });
         });
       }).catch(async (err) => {
