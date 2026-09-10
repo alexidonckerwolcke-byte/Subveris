@@ -1645,6 +1645,10 @@ function scanGmailForSubscriptions(force = false) {
                       console.error('[Background] Failed to persist Gmail review queue:', browser.runtime.lastError);
                       publishGmailScanEvent('failed', { reason: 'review_queue_persist_failed' });
                     } else {
+                      syncDetectedSubscriptions(merged);
+                      publishGmailScanEvent('review_queue_synced', {
+                        pending: Object.values(detectedSubs).filter((item) => item?.requiresReview).length,
+                      });
                       publishGmailScanEvent('completed', {
                         processed: processedCount,
                         candidates: candidateCount,
