@@ -540,6 +540,7 @@ function syncDetectedSubscriptions(subscriptions) {
       subscriptions: syncableSubscriptions,
       syncedAt: Date.now()
     });
+    publishGmailScanEvent('review_queue_sync_started', { count: syncableSubscriptions.length });
 
     fetch(`${apiUrl}/api/extension/detected-subscriptions`, {
       method: 'POST',
@@ -557,11 +558,19 @@ function syncDetectedSubscriptions(subscriptions) {
           return;
         }
         console.warn('[Background] Failed to sync subscriptions:', response.status);
+        publishGmailScanEvent('review_queue_sync_failed', { status: response.status });
         return;
       }
-      console.log('[Background] ✅ Subscriptions synced successfully');
+      response.json().catch(() => ({})).then((body) => {
+        console.log('[Background] ✅ Subscriptions synced successfully:', body);
+        publishGmailScanEvent('review_queue_sync_succeeded', {
+          received: body.received,
+          persisted: body.persisted,
+        });
+      });
     }).catch((error) => {
       console.error('[Background] Failed to sync subscriptions:', error);
+      publishGmailScanEvent('review_queue_sync_failed', { reason: 'network_error' });
     });
   });
 }
