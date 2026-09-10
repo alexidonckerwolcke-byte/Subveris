@@ -139,4 +139,15 @@ describe('buildDiscoverySyncPayload', () => {
       requiresReview: true,
     });
   });
+
+  it('ignores a known service mentioned in unrelated email body text', async () => {
+    const candidate = globalThis.buildGmailSubscriptionCandidate(
+      'Weekly product news',
+      'newsletter@news.example',
+      'This article mentions Adobe, Canva, and Spotify. No payment or renewal details.',
+      { internalDate: Date.now().toString() }
+    );
+
+    expect(candidate).toBeNull();
+  });
 });

@@ -1358,6 +1358,11 @@ function inferGmailServiceName(subject, from) {
   return subjectMatch?.[1]?.trim() || 'Unrecognized subscription';
 }
 
+function getGmailSenderDomain(from) {
+  const emailMatch = String(from || '').match(/<[^@>]+@([^>]+)>|\b[^\s@]+@([^\s>]+)\b/);
+  return (emailMatch?.[1] || emailMatch?.[2] || '').toLowerCase();
+}
+
 function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
   const fullText = `${subject || ''} ${from || ''} ${snippet || ''}`.trim();
   if (!fullText) {
@@ -1412,9 +1417,10 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
 
   const lowerText = fullText.toLowerCase();
   let serviceName = null;
+  let matchedPatterns = [];
   for (const [name, patterns] of Object.entries(servicePatterns)) {
-    const match = patterns.some((pattern) => lowerText.includes(pattern.toLowerCase()));
-    if (match) {
+    matchedPatterns = patterns.filter((pattern) => lowerText.includes(pattern.toLowerCase()));
+    if (matchedPatterns.length) {
       serviceName = name;
       break;
     }
@@ -1423,7 +1429,16 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
   const amount = extractGmailAmount(fullText);
   const renewalDate = extractGmailRenewalDate(fullText);
   const hasBillingSignal = /receipt|invoice|renewal|billing|charge|subscription|membership|payment/i.test(fullText);
+  const subjectText = String(subject || '').toLowerCase();
+  const senderDomain = getGmailSenderDomain(from);
+  const senderMatchesService = Boolean(serviceName && matchedPatterns.some((pattern) => senderDomain.includes(pattern.toLowerCase().replace(/\s+/g, ''))));
+  const subjectMatchesService = Boolean(serviceName && matchedPatterns.some((pattern) => subjectText.includes(pattern.toLowerCase())));
+  const hasFinancialEvidence = amount !== null || renewalDate !== null;
+  const hasStrongContext = senderMatchesService || subjectMatchesService;
   if (!serviceName && (!hasBillingSignal || (amount === null && renewalDate === null))) {
+    return null;
+  }
+  if (serviceName && (!hasBillingSignal || !hasStrongContext || (!hasFinancialEvidence && !senderMatchesService))) {
     return null;
   }
 
@@ -1525,6 +1540,7 @@ function scanGmailForSubscriptions(force = false) {
         let staleOrDuplicateCount = 0;
         let failedMessageCount = 0;
         let bodyUnavailable = false;
+        const seenCandidateServices = new Set();
 
         data.messages.forEach(msg => {
           fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`, {
@@ -1561,6 +1577,9 @@ function scanGmailForSubscriptions(force = false) {
 
               const candidate = buildGmailSubscriptionCandidate(subject, from, `${msgData.snippet || ''} ${bodyText}`, msgData);
               if (candidate) {
+                const duplicateInScan = seenCandidateServices.has(candidate.serviceName.toLowerCase());
+                if (!duplicateInScan) {
+                seenCandidateServices.add(candidate.serviceName.toLowerCase());
                 const ageInDays = candidate.messageAgeDays;
                 const existingSubs = result.detectedSubscriptions || {};
                 const duplicate = Object.values(existingSubs).find((sub) =>
@@ -1599,13 +1618,19 @@ function scanGmailForSubscriptions(force = false) {
                     requiresReview: true,
                   });
                 }
+                }
               } else {
                 noServiceMatchCount++;
               }
 
               if (processedCount === data.messages.length) {
                 browser.storage.local.get(['detectedSubscriptions'], (existing) => {
-                  const merged = { ...existing.detectedSubscriptions || {}, ...detectedSubs };
+                  const existingSubscriptions = existing.detectedSubscriptions || {};
+                  const retained = Object.fromEntries(Object.entries(existingSubscriptions).filter(([serviceName, item]) => {
+                    const isGmailReviewItem = item?.source === 'gmail-metadata-candidate' || item?.source === 'gmail-inferred-review-candidate';
+                    return !isGmailReviewItem || Boolean(detectedSubs[serviceName]);
+                  }));
+                  const merged = { ...retained, ...detectedSubs };
                   browser.storage.local.set({
                     detectedSubscriptions: merged,
                     lastGmailScan: Date.now()
