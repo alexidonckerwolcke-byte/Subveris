@@ -1384,13 +1384,13 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
     OneDrive: ['onedrive'],
     iCloud: ['icloud'],
     'LinkedIn Premium': ['linkedin premium', 'linkedin plus'],
-    'Tinder Gold': ['tinder', 'gold', 'plus'],
+    'Tinder Gold': ['tinder gold', 'tinder'],
     Uber: ['uber', 'pass'],
     DoorDash: ['doordash'],
     Audible: ['audible', 'audiobook'],
     Coursera: ['coursera', 'plus'],
     MasterClass: ['masterclass'],
-    'Duolingo Plus': ['duolingo', 'plus'],
+    'Duolingo Plus': ['duolingo'],
     'HelloFresh': ['hellofresh', 'meal plan'],
     NordVPN: ['nordvpn'],
     ExpressVPN: ['expressvpn'],
@@ -1399,12 +1399,12 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
     Zoom: ['zoom'],
     Asana: ['asana'],
     Notion: ['notion'],
-    'Canva Pro': ['canva', 'pro'],
+    'Canva Pro': ['canva pro', 'canva'],
     Figma: ['figma'],
     Discord: ['discord', 'nitro'],
-    'Twitch Prime': ['twitch', 'prime'],
-    'PlayStation Plus': ['playstation plus', 'ps plus'],
-    'Xbox Game Pass': ['xbox game pass', 'xbox live'],
+    'Twitch Prime': ['twitch prime', 'twitch'],
+    'PlayStation Plus': ['playstation plus', 'playstation'],
+    'Xbox Game Pass': ['xbox game pass', 'xbox live', 'xbox'],
     'Nintendo Switch Online': ['nintendo switch online'],
     Calm: ['calm'],
     Headspace: ['headspace'],
@@ -1416,10 +1416,15 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
   };
 
   const lowerText = fullText.toLowerCase();
+  const lowerSubject = String(subject || '').toLowerCase();
+  const senderDomain = getGmailSenderDomain(from);
   let serviceName = null;
   let matchedPatterns = [];
   for (const [name, patterns] of Object.entries(servicePatterns)) {
-    matchedPatterns = patterns.filter((pattern) => lowerText.includes(pattern.toLowerCase()));
+    matchedPatterns = patterns.filter((pattern) => {
+      const normalizedPattern = pattern.toLowerCase();
+      return lowerSubject.includes(normalizedPattern) || senderDomain.includes(normalizedPattern.replace(/\s+/g, ''));
+    });
     if (matchedPatterns.length) {
       serviceName = name;
       break;
@@ -1429,16 +1434,14 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
   const amount = extractGmailAmount(fullText);
   const renewalDate = extractGmailRenewalDate(fullText);
   const hasBillingSignal = /receipt|invoice|renewal|billing|charge|subscription|membership|payment/i.test(fullText);
-  const subjectText = String(subject || '').toLowerCase();
-  const senderDomain = getGmailSenderDomain(from);
   const senderMatchesService = Boolean(serviceName && matchedPatterns.some((pattern) => senderDomain.includes(pattern.toLowerCase().replace(/\s+/g, ''))));
-  const subjectMatchesService = Boolean(serviceName && matchedPatterns.some((pattern) => subjectText.includes(pattern.toLowerCase())));
+  const subjectMatchesService = Boolean(serviceName && matchedPatterns.some((pattern) => lowerSubject.includes(pattern.toLowerCase())));
   const hasFinancialEvidence = amount !== null || renewalDate !== null;
   const hasStrongContext = senderMatchesService || subjectMatchesService;
   if (!serviceName && (!hasBillingSignal || (amount === null && renewalDate === null))) {
     return null;
   }
-  if (serviceName && (!hasBillingSignal || !hasStrongContext || (!hasFinancialEvidence && !senderMatchesService))) {
+  if (serviceName && (!hasBillingSignal || !hasStrongContext || (!hasFinancialEvidence && !senderMatchesService && !subjectMatchesService))) {
     return null;
   }
 

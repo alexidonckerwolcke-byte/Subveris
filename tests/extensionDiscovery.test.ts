@@ -150,4 +150,40 @@ describe('buildDiscoverySyncPayload', () => {
 
     expect(candidate).toBeNull();
   });
+
+  it('does not classify Canva from unrelated Adobe email text', async () => {
+    const candidate = globalThis.buildGmailSubscriptionCandidate(
+      'Adobe renewal complete',
+      'message@adobe.com',
+      'Your Adobe renewal was processed. This email was created with Canva Pro templates. Amount charged: $16.00.',
+      { internalDate: Date.now().toString() }
+    );
+
+    expect(candidate?.serviceName).toBe('Adobe');
+  });
+
+  it('does not classify any known service from body-only mentions', async () => {
+    const candidate = globalThis.buildGmailSubscriptionCandidate(
+      'Adobe renewal complete',
+      'message@adobe.com',
+      'Your renewal was processed. This email mentions Netflix, Spotify, HBO, Uber, and Canva for comparison only. Amount charged: $16.00.',
+      { internalDate: Date.now().toString() }
+    );
+
+    expect(candidate?.serviceName).toBe('Adobe');
+  });
+
+  it('detects an Adobe renewal from the subject when body fields are unavailable', async () => {
+    const candidate = globalThis.buildGmailSubscriptionCandidate(
+      'Adobe renewal confirmation',
+      'notifications@billing.example',
+      'Your renewal details are available in your Adobe account.',
+      { internalDate: Date.now().toString() }
+    );
+
+    expect(candidate).toMatchObject({
+      serviceName: 'Adobe',
+      requiresReview: true,
+    });
+  });
 });
