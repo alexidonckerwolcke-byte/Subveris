@@ -1556,32 +1556,42 @@ function scanGmailForSubscriptions(force = false) {
         const finalizeGmailScan = () => {
           if (scanFinalized || processedCount + failedMessageCount < data.messages.length) return;
           scanFinalized = true;
-          browser.storage.local.get(['detectedSubscriptions'], (existing) => {
-            const existingSubscriptions = existing.detectedSubscriptions || {};
-            const retained = Object.fromEntries(Object.entries(existingSubscriptions).filter(([serviceName, item]) => {
-              const isGmailReviewItem = item?.source === 'gmail-metadata-candidate' || item?.source === 'gmail-inferred-review-candidate';
-              return !isGmailReviewItem || Boolean(detectedSubs[serviceName]);
-            }));
-            const merged = { ...retained, ...detectedSubs };
-            browser.storage.local.set({ detectedSubscriptions: merged, lastGmailScan: Date.now() }, () => {
-              if (browser.runtime.lastError) {
-                publishGmailScanEvent('failed', { reason: 'review_queue_persist_failed' });
-                return;
+          try {
+            browser.storage.local.get(['detectedSubscriptions'], (existing = {}) => {
+              try {
+                const existingSubscriptions = existing.detectedSubscriptions || {};
+                const retained = Object.fromEntries(Object.entries(existingSubscriptions).filter(([serviceName, item]) => {
+                  const isGmailReviewItem = item?.source === 'gmail-metadata-candidate' || item?.source === 'gmail-inferred-review-candidate';
+                  return !isGmailReviewItem || Boolean(detectedSubs[serviceName]);
+                }));
+                const merged = { ...retained, ...detectedSubs };
+                browser.storage.local.set({ detectedSubscriptions: merged, lastGmailScan: Date.now() }, () => {
+                  if (browser.runtime.lastError) {
+                    publishGmailScanEvent('failed', { reason: 'review_queue_persist_failed' });
+                    return;
+                  }
+                  syncDetectedSubscriptions(merged);
+                  publishGmailScanEvent('review_queue_synced', { pending: candidateCount });
+                  publishGmailScanEvent('completed', {
+                    processed: processedCount,
+                    failedMessages: failedMessageCount,
+                    candidates: candidateCount,
+                    noServiceMatch: noServiceMatchCount,
+                    staleOrDuplicate: staleOrDuplicateCount,
+                    bodyUnavailable,
+                    reauthorizationRequired: bodyUnavailable,
+                    pendingApproval: true,
+                  });
+                });
+              } catch (error) {
+                console.error('[Background] Failed to finalize Gmail scan:', error);
+                publishGmailScanEvent('failed', { reason: 'scan_finalize_failed' });
               }
-              syncDetectedSubscriptions(merged);
-              publishGmailScanEvent('review_queue_synced', { pending: candidateCount });
-              publishGmailScanEvent('completed', {
-                processed: processedCount,
-                failedMessages: failedMessageCount,
-                candidates: candidateCount,
-                noServiceMatch: noServiceMatchCount,
-                staleOrDuplicate: staleOrDuplicateCount,
-                bodyUnavailable,
-                reauthorizationRequired: bodyUnavailable,
-                pendingApproval: true,
-              });
             });
-          });
+          } catch (error) {
+            console.error('[Background] Failed to access extension storage while finalizing Gmail scan:', error);
+            publishGmailScanEvent('failed', { reason: 'scan_finalize_failed' });
+          }
         };
 
         data.messages.forEach(msg => {
@@ -1672,8 +1682,12 @@ function scanGmailForSubscriptions(force = false) {
               finalizeGmailScan();
             }).catch(err => {
               failedMessageCount++;
-              console.error('[Background] Error fetching Gmail message:', err.message);
-              finalizeGmailScan();
+              console.error('[Background] Error fetching Gmail message:', err?.message || String(err));
+              try {
+                finalizeGmailScan();
+              } catch (finalizeError) {
+                console.error('[Background] Gmail scan finalizer callback failed:', finalizeError);
+              }
             });
         });
       }).catch(async (err) => {
