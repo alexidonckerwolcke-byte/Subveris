@@ -10,7 +10,7 @@ import { useFamilyDataMode } from "@/hooks/use-family-data";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
 import { Sparkles, ExternalLink, Plus, ArrowRight } from "lucide-react";
 import type { Subscription } from "@shared/schema";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +50,17 @@ export default function DetectedSubscriptions() {
     refetchInterval: false,
     refetchOnWindowFocus: false,
   });
+
+  useEffect(() => {
+    const handleDetectedUpdate = (event: MessageEvent) => {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      if (event.data?.type === "SUBVERIS_DETECTED_SUBSCRIPTIONS_UPDATED") {
+        queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
+      }
+    };
+    window.addEventListener("message", handleDetectedUpdate);
+    return () => window.removeEventListener("message", handleDetectedUpdate);
+  }, [queryClient]);
 
   const visibleSubscriptions = showFamilyData
     ? getVisibleFamilySubscriptions(familyData, user?.id)
