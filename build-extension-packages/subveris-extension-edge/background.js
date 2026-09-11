@@ -532,7 +532,7 @@ function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
     // The opaque extension session is held in process memory and may not survive
     // routing to another Edge Function instance.
     const token = result.supabaseAuthToken || result.authToken;
-    const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
+    const apiUrl = normalizeApiUrl(result.subverisApiUrl || DEFAULT_API_URL);
 
     if (!token) {
       console.warn('[Background] No auth token available to sync detected subscriptions');
