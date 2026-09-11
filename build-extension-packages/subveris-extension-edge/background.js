@@ -557,21 +557,34 @@ function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
     });
     publishGmailScanEvent('review_queue_sync_started', { count: syncableSubscriptions.length });
 
-    fetch(`${apiUrl}/api/extension/detected-subscriptions`, {
+    const sendSyncRequest = (activeToken, retried = false) => fetch(`${apiUrl}/api/extension/detected-subscriptions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${activeToken}`
       },
       body: payload,
       keepalive: true
     }).then((response) => {
       if (!response.ok) {
         if (response.status === 401) {
-          console.warn('[Background] Stale or invalid extension session detected while syncing subscriptions; refreshing the opaque session instead of logging out the user.');
-          refreshOpaqueSessionFromStoredRawToken(() => {});
-          clearTimeout(timeoutId);
-          finish({ success: false, reason: 'unauthorized', status: response.status });
+          if (retried) {
+            console.warn('[Background] Detected-subscription sync remained unauthorized after session refresh.');
+            publishGmailScanEvent('review_queue_sync_failed', { reason: 'unauthorized_after_refresh', status: response.status });
+            clearTimeout(timeoutId);
+            finish({ success: false, reason: 'unauthorized_after_refresh', status: response.status });
+            return;
+          }
+          console.warn('[Background] Refreshing the opaque extension session before retrying detected-subscription sync.');
+          refreshOpaqueSessionFromStoredRawToken((refreshed) => {
+            if (!refreshed) {
+              publishGmailScanEvent('review_queue_sync_failed', { reason: 'session_refresh_failed', status: response.status });
+              clearTimeout(timeoutId);
+              finish({ success: false, reason: 'session_refresh_failed', status: response.status });
+              return;
+            }
+            browser.storage.local.get(['authToken'], (current) => sendSyncRequest(current.authToken, true));
+          });
           return;
         }
         console.warn('[Background] Failed to sync subscriptions:', response.status);
@@ -595,6 +608,7 @@ function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
       clearTimeout(timeoutId);
       finish({ success: false, reason: 'network_error' });
     });
+    sendSyncRequest(token);
   });
 }
 

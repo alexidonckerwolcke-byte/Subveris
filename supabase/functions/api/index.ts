@@ -1888,6 +1888,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         console.log(`[Extension] Received ${subscriptions.length} detected subscriptions from browser`);
 
         let persisted = 0;
+        const errors: string[] = [];
         for (const detected of subscriptions) {
           const isApprovedForSync = detected?.approvedForSync === true || detected?.source === "gmail-metadata-approved" || detected?.requiresReview === false;
 
@@ -1904,6 +1905,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             .neq("status", "deleted");
           if (lookupError) {
             console.warn("[Extension] Failed to find detected subscription match:", lookupError);
+              errors.push(String(lookupError.message || "subscription lookup failed"));
             continue;
           }
 
@@ -1930,6 +1932,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
               .eq("id", existing.id)
               .eq("user_id", userId);
             if (!updateError) persisted += 1;
+            else errors.push(String(updateError.message || "subscription update failed"));
             continue;
           }
 
@@ -1966,12 +1969,23 @@ runtimeDeno?.serve?.(async (req: Request) => {
               updated_at: new Date().toISOString(),
             });
           if (!insertError) persisted += 1;
+          else errors.push(String(insertError.message || "subscription insert failed"));
+        }
+
+        if (subscriptions.length > 0 && persisted === 0) {
+          return sendJson({
+            error: "No detected subscriptions were persisted",
+            received: subscriptions.length,
+            persisted,
+            errors: errors.slice(0, 5),
+          }, { status: 500 });
         }
 
         return sendJson({
           success: true,
           received: subscriptions.length,
           persisted,
+          errors: errors.slice(0, 5),
           message: "Detected subscriptions received"
         });
       } catch (err) {
