@@ -527,8 +527,11 @@ function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
     publishGmailScanEvent('review_queue_sync_failed', { reason: 'timeout' });
   }, 15000);
 
-  browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
-    const token = result.authToken;
+  browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl'], (result) => {
+    // Use the persisted Supabase JWT for this stateless Edge Function route.
+    // The opaque extension session is held in process memory and may not survive
+    // routing to another Edge Function instance.
+    const token = result.supabaseAuthToken || result.authToken;
     const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
 
     if (!token) {
