@@ -1888,6 +1888,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         console.log(`[Extension] Received ${subscriptions.length} detected subscriptions from browser`);
 
         let persisted = 0;
+        let skipped = 0;
         const errors: string[] = [];
         for (const detected of subscriptions) {
           const isApprovedForSync = detected?.approvedForSync === true || detected?.source === "gmail-metadata-approved" || detected?.requiresReview === false;
@@ -1920,6 +1921,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             // Do not turn an existing active subscription into a pending detection.
             // Pending Gmail candidates should only create or update detected rows.
             if (!isApprovedForSync && existing.is_detected !== true) {
+              skipped += 1;
               continue;
             }
 
@@ -1973,11 +1975,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
           else errors.push(String(insertError.message || "subscription insert failed"));
         }
 
-        if (subscriptions.length > 0 && persisted === 0) {
+        if (subscriptions.length > 0 && persisted === 0 && skipped === 0) {
           return sendJson({
             error: "No detected subscriptions were persisted",
             received: subscriptions.length,
             persisted,
+            skipped,
             errors: errors.slice(0, 5),
           }, { status: 500 });
         }
@@ -1986,6 +1989,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           success: true,
           received: subscriptions.length,
           persisted,
+          skipped,
           errors: errors.slice(0, 5),
           message: "Detected subscriptions received"
         });
