@@ -1615,7 +1615,9 @@ function scanGmailForSubscriptions(force = false) {
                 const existingSubscriptions = existing.detectedSubscriptions || {};
                 const retained = Object.fromEntries(Object.entries(existingSubscriptions).filter(([serviceName, item]) => {
                   const isGmailReviewItem = item?.source === 'gmail-metadata-candidate' || item?.source === 'gmail-inferred-review-candidate';
-                  return !isGmailReviewItem || Boolean(detectedSubs[serviceName]);
+                    // Keep pending items when this scan sees the same candidate again.
+                    // Deduplication must not remove the item before it is synced to the web queue.
+                    return !isGmailReviewItem || Boolean(detectedSubs[serviceName]) || item?.requiresReview === true;
                 }));
                 const merged = { ...retained, ...detectedSubs };
                 browser.storage.local.set({ detectedSubscriptions: merged, lastGmailScan: Date.now() }, () => {
