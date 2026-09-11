@@ -600,7 +600,9 @@ const server = http.createServer(async (req, res) => {
               .from('subscriptions')
               .insert({
                 ...record,
-                status: String(item.status || item.detectedStatus || 'detected_pending_verification').toLowerCase() || 'detected_pending_verification',
+                status: isApprovedForSync
+                  ? (String(item.status || item.detectedStatus || 'active').toLowerCase() || 'active')
+                  : 'active',
               })
               .select();
             if (error) {

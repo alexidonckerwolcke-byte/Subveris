@@ -1946,9 +1946,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
           const createdFrequency = typeof detected?.frequency === "string" && detected.frequency.trim()
             ? detected.frequency.trim().toLowerCase()
             : "monthly";
+          // Use the standard status value for pending rows; is_detected is the
+          // approval gate and avoids relying on a custom database status value.
           const createdStatus = isApprovedForSync
             ? (typeof detected?.status === "string" && detected.status.trim() ? detected.status.trim().toLowerCase() : "active")
-            : "detected_pending_verification";
+            : "active";
           const createdRenewal = typeof detected?.detectedRenewalDate === "string" && detected.detectedRenewalDate.trim()
             ? detected.detectedRenewalDate.trim()
             : null;
