@@ -1129,15 +1129,16 @@ function normalizeSubscriptionRow(sub: any) {
   };
 }
 
-async function loadSubscriptions(userId: string, page = 1, perPage = 1000) {
+async function loadSubscriptions(userId: string, page = 1, perPage = 1000, excludeDetected = false) {
   const rangeStart = (page - 1) * perPage;
   const rangeEnd = page * perPage - 1;
-  const { data, count, error } = await supabase
+  let query = supabase
     .from("subscriptions")
     .select("*", { count: "exact" })
     .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .range(rangeStart, rangeEnd);
+    .order("created_at", { ascending: false });
+  if (excludeDetected) query = query.eq("is_detected", false);
+  const { data, count, error } = await query.range(rangeStart, rangeEnd);
 
   if (error) {
     throw error;
@@ -2083,9 +2084,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
 
       const page = Number(url.searchParams.get("page") || "1");
       const perPage = Number(url.searchParams.get("perPage") || "1000");
+      const excludeDetected = url.searchParams.get("excludeDetected") === "true";
 
       try {
-        const { subscriptions, count } = await loadSubscriptions(userId, page, perPage);
+        const { subscriptions, count } = await loadSubscriptions(userId, page, perPage, excludeDetected);
         return sendJson(subscriptions, {
           headers: {
             "x-total-count": String(count),

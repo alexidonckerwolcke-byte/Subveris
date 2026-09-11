@@ -129,7 +129,7 @@ export default function Subscriptions() {
     queryKey: ["/api/subscriptions", PER_PAGE],
     initialPageParam: 1,
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await apiRequest("GET", `/api/subscriptions?page=${pageParam}&perPage=${PER_PAGE}`);
+      const res = await apiRequest("GET", `/api/subscriptions?page=${pageParam}&perPage=${PER_PAGE}&excludeDetected=true`);
       const items: Subscription[] = await res.json();
       const total = parseInt(res.headers.get("x-total-count") || "0", 10);
       return { items, total };
@@ -172,6 +172,7 @@ export default function Subscriptions() {
     const map = new Map<string, Subscription>();
     for (const s of rawSubscriptions) {
       if (!s || !s.id) continue;
+      if ((s as any).isDetected === true || (s as any).is_detected === true) continue;
       if (!map.has(s.id)) map.set(s.id, s);
     }
     const result = Array.from(map.values());
