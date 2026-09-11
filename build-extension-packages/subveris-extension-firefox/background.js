@@ -568,7 +568,7 @@ function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
       },
       body: payload,
       keepalive: true
-    }).then((response) => {
+    }).then(async (response) => {
       if (!response.ok) {
         if (response.status === 401) {
           if (retried) {
@@ -590,8 +590,13 @@ function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
           });
           return;
         }
-        console.warn('[Background] Failed to sync subscriptions:', response.status);
-        publishGmailScanEvent('review_queue_sync_failed', { status: response.status });
+        const errorBody = await response.json().catch(() => ({}));
+        console.warn('[Background] Failed to sync subscriptions:', response.status, errorBody);
+        publishGmailScanEvent('review_queue_sync_failed', {
+          status: response.status,
+          error: errorBody.error || 'sync_failed',
+          details: errorBody.errors,
+        });
         clearTimeout(timeoutId);
         finish({ success: false, reason: 'http_error', status: response.status });
         return;

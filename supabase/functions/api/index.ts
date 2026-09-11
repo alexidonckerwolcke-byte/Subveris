@@ -1957,6 +1957,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
               id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
               user_id: userId,
               name: createdName,
+              category: "other",
               amount: Number.isFinite(createdAmount) ? createdAmount : 0,
               currency: createdCurrency,
               frequency: createdFrequency,
