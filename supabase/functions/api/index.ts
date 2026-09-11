@@ -1954,6 +1954,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           const createdRenewal = typeof detected?.detectedRenewalDate === "string" && detected.detectedRenewalDate.trim()
             ? detected.detectedRenewalDate.trim()
             : null;
+          const fallbackRenewal = createdRenewal || toIsoDateString(new Date(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()));
 
           const { error: insertError } = await supabase
             .from("subscriptions")
@@ -1968,7 +1969,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
               status: createdStatus,
               website_domain: domain || null,
               is_detected: true,
-              next_billing_at: createdRenewal || null,
+              next_billing_at: fallbackRenewal,
               description: typeof detected?.planName === 'string' && detected.planName.trim() ? detected.planName.trim() : null,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),

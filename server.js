@@ -549,6 +549,7 @@ const server = http.createServer(async (req, res) => {
           const frequency = String(item.frequency || item.detectedBillingCycle || item.billingCycle || 'monthly').toLowerCase();
           const status = String(item.status || 'active').toLowerCase();
           const nextBillingAt = item.detectedRenewalDate || item.next_billing_at || item.nextBillingDate || item.renewal_date || null;
+          const resolvedNextBillingAt = nextBillingAt || new Date(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()).toISOString().slice(0, 10);
 
           if (!serviceName && !normalizedDomain) continue;
 
@@ -565,7 +566,7 @@ const server = http.createServer(async (req, res) => {
             is_detected: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            next_billing_at: nextBillingAt,
+            next_billing_at: resolvedNextBillingAt,
           };
 
           const { data: existingRows, error: lookupError } = await supabase
