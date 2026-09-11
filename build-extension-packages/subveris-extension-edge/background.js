@@ -1001,6 +1001,13 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === 'DISCONNECT_GMAIL') {
+    browser.storage.local.remove(['gmailAuthToken', 'gmailTokenExpiry'], () => {
+      sendResponse({ success: !browser.runtime.lastError });
+    });
+    return true;
+  }
+
   if (request.type === 'GET_AUTH_TOKEN') {
     browser.storage.local.get(['authToken'], (result) => {
       console.log('[Background] Sending auth token:', result.authToken ? 'FOUND' : 'NOT FOUND');

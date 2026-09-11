@@ -208,6 +208,17 @@ window.addEventListener('message', (event) => {
     return;
   }
 
+  if (event.data.type === 'SUBVERIS_DISCONNECT_GMAIL' && isSubverisPage()) {
+    sendMessageToBackground({ type: 'DISCONNECT_GMAIL' }, (response) => {
+      window.postMessage({
+        type: 'SUBVERIS_DISCONNECT_GMAIL_RESULT',
+        requestId: event.data.requestId || null,
+        response: response || { success: false },
+      }, window.location.origin);
+    });
+    return;
+  }
+
   if (event.data.type === 'SUBVERIS_CONNECT_GMAIL' && isSubverisPage()) {
     console.info('[Subveris Gmail] Authorization requested from Settings');
     sendMessageToBackground({ type: 'authorizeGmail' }, (response, error) => {

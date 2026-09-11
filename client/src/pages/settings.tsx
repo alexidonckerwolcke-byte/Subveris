@@ -69,7 +69,9 @@ export default function Settings() {
         const response = await apiFetch("/api/auth/gmail-status");
         if (response.ok) {
           const data = await response.json();
-          setGmailConnected(data.connected || false);
+          // The extension token is the scanner's durable source of truth. Do not
+          // let a slower backend status response overwrite a connected state.
+          setGmailConnected((currentlyConnected) => currentlyConnected || Boolean(data.connected));
         }
       } catch (error) {
         console.error("Failed to check Gmail status:", error);
@@ -160,6 +162,10 @@ export default function Settings() {
         method: "POST",
       });
       if (response.ok) {
+        window.postMessage({
+          type: "SUBVERIS_DISCONNECT_GMAIL",
+          requestId: crypto.randomUUID(),
+        }, window.location.origin);
         setGmailConnected(false);
         setGmailExtensionAuthorized(false);
         toast({
