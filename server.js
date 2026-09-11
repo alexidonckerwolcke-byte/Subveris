@@ -535,14 +535,10 @@ const server = http.createServer(async (req, res) => {
         const body = await parseBody(req);
         const items = Array.isArray(body.subscriptions) ? body.subscriptions : [];
         const saved = [];
+        let skipped = 0;
 
         for (const item of items) {
           const isApprovedForSync = item?.approvedForSync === true || item?.source === 'gmail-metadata-approved' || item?.requiresReview === false;
-          if (!isApprovedForSync) {
-            console.log('[Extension Sync] skipping unapproved detected subscription:', item?.serviceName || item?.name || 'unknown');
-            continue;
-          }
-
           const serviceName = String(item.serviceName || item.name || item.service_name || item.provider || item.title || '').trim();
           const domainRaw = item.domain || item.website_domain || item.website || item.websiteDomain || item.domainName || '';
           const normalizedDomain = String(domainRaw || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '').toLowerCase();
@@ -559,6 +555,7 @@ const server = http.createServer(async (req, res) => {
           const record = {
             user_id: user.id,
             name,
+            category: 'other',
             amount: Number.isFinite(amountValue) ? amountValue : 0,
             currency: normalizedCurrency,
             frequency,
@@ -584,6 +581,10 @@ const server = http.createServer(async (req, res) => {
 
           let resolved = null;
           if (existingRows && existingRows.length > 0) {
+            if (!isApprovedForSync) {
+              skipped += 1;
+              continue;
+            }
             const { data, error } = await supabase
               .from('subscriptions')
               .update(record)
@@ -613,7 +614,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, saved: saved.length, subscriptions: saved }));
+        res.end(JSON.stringify({ success: true, received: items.length, persisted: saved.length, skipped, subscriptions: saved }));
       } catch (error) {
         console.error('Error syncing detected subscriptions:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });

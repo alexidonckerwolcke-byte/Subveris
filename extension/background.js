@@ -558,6 +558,7 @@ function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
       subscriptions: syncableSubscriptions,
       syncedAt: Date.now()
     });
+    console.info('[Background] Gmail review sync endpoint:', `${apiUrl}/api/extension/detected-subscriptions`);
     publishGmailScanEvent('review_queue_sync_started', { count: syncableSubscriptions.length });
 
     const sendSyncRequest = (activeToken, retried = false) => fetch(`${apiUrl}/api/extension/detected-subscriptions`, {
@@ -992,6 +993,13 @@ function sendUsageTrackingFallback(domain, timeSpent, token, apiUrl, serviceName
 // Listen for messages from content script
 browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('[Background] Received message:', request.type, 'from:', sender.url);
+
+  if (request.type === 'GET_GMAIL_STATUS') {
+    browser.storage.local.get(['gmailAuthToken'], (result) => {
+      sendResponse({ authorized: Boolean(result.gmailAuthToken) });
+    });
+    return true;
+  }
 
   if (request.type === 'GET_AUTH_TOKEN') {
     browser.storage.local.get(['authToken'], (result) => {
@@ -1698,6 +1706,8 @@ function scanGmailForSubscriptions(force = false) {
                     ageInDays,
                     duplicate: Boolean(duplicate),
                     alreadyPendingApproval: Boolean(duplicate?.requiresReview),
+                    existingSource: duplicate?.source || null,
+                    existingSubscriptionId: duplicate?.subscriptionId || null,
                   });
                   publishGmailScanEvent('candidate_skipped', {
                     reason: duplicate ? (duplicate.requiresReview ? 'already_pending_approval' : 'duplicate') : 'stale_or_missing_date',
