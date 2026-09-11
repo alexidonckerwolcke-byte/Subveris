@@ -515,13 +515,14 @@ function dismissReviewedSubscription(serviceName, callback = () => {}) {
   });
 }
 
-function syncDetectedSubscriptions(subscriptions) {
+function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
   browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
     const token = result.authToken;
     const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
 
     if (!token) {
       console.warn('[Background] No auth token available to sync detected subscriptions');
+      onComplete({ success: false, reason: 'missing_auth_token' });
       return;
     }
 
@@ -533,6 +534,7 @@ function syncDetectedSubscriptions(subscriptions) {
 
     if (!syncableSubscriptions.length) {
       console.log('[Background] No detected subscriptions to sync.');
+      onComplete({ success: false, reason: 'no_syncable_subscriptions' });
       return;
     }
 
@@ -555,10 +557,12 @@ function syncDetectedSubscriptions(subscriptions) {
         if (response.status === 401) {
           console.warn('[Background] Stale or invalid extension session detected while syncing subscriptions; refreshing the opaque session instead of logging out the user.');
           refreshOpaqueSessionFromStoredRawToken(() => {});
+          onComplete({ success: false, reason: 'unauthorized', status: response.status });
           return;
         }
         console.warn('[Background] Failed to sync subscriptions:', response.status);
         publishGmailScanEvent('review_queue_sync_failed', { status: response.status });
+        onComplete({ success: false, reason: 'http_error', status: response.status });
         return;
       }
       response.json().catch(() => ({})).then((body) => {
@@ -567,10 +571,12 @@ function syncDetectedSubscriptions(subscriptions) {
           received: body.received,
           persisted: body.persisted,
         });
+        onComplete({ success: true, received: body.received, persisted: body.persisted });
       });
     }).catch((error) => {
       console.error('[Background] Failed to sync subscriptions:', error);
       publishGmailScanEvent('review_queue_sync_failed', { reason: 'network_error' });
+      onComplete({ success: false, reason: 'network_error' });
     });
   });
 }
@@ -1570,8 +1576,15 @@ function scanGmailForSubscriptions(force = false) {
                     publishGmailScanEvent('failed', { reason: 'review_queue_persist_failed' });
                     return;
                   }
-                  syncDetectedSubscriptions(merged);
-                  publishGmailScanEvent('review_queue_synced', { pending: candidateCount });
+                  syncDetectedSubscriptions(merged, (syncResult) => {
+                    if (syncResult.success) {
+                      publishGmailScanEvent('review_queue_synced', {
+                        pending: candidateCount,
+                        received: syncResult.received,
+                        persisted: syncResult.persisted,
+                      });
+                    }
+                  });
                   publishGmailScanEvent('completed', {
                     processed: processedCount,
                     failedMessages: failedMessageCount,
