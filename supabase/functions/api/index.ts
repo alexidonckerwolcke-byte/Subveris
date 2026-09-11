@@ -1915,7 +1915,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
           });
 
           if (existing) {
-            const updatePayload: Record<string, any> = { is_detected: true };
+            // Do not turn an existing active subscription into a pending detection.
+            // Pending Gmail candidates should only create or update detected rows.
+            if (!isApprovedForSync && existing.is_detected !== true) {
+              continue;
+            }
+
+            const updatePayload: Record<string, any> = { is_detected: !isApprovedForSync };
+            if (isApprovedForSync) updatePayload.status = "active";
             if (domain && normalizeDomain(existing.website_domain) !== domain) updatePayload.website_domain = domain;
             const { error: updateError } = await supabase
               .from("subscriptions")

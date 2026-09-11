@@ -516,13 +516,25 @@ function dismissReviewedSubscription(serviceName, callback = () => {}) {
 }
 
 function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
+  let completed = false;
+  const finish = (result) => {
+    if (completed) return;
+    completed = true;
+    onComplete(result);
+  };
+  const timeoutId = setTimeout(() => {
+    finish({ success: false, reason: 'sync_timeout' });
+    publishGmailScanEvent('review_queue_sync_failed', { reason: 'timeout' });
+  }, 15000);
+
   browser.storage.local.get(['authToken', 'subverisApiUrl'], (result) => {
     const token = result.authToken;
     const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
 
     if (!token) {
       console.warn('[Background] No auth token available to sync detected subscriptions');
-      onComplete({ success: false, reason: 'missing_auth_token' });
+      clearTimeout(timeoutId);
+      finish({ success: false, reason: 'missing_auth_token' });
       return;
     }
 
@@ -534,7 +546,8 @@ function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
 
     if (!syncableSubscriptions.length) {
       console.log('[Background] No detected subscriptions to sync.');
-      onComplete({ success: false, reason: 'no_syncable_subscriptions' });
+      clearTimeout(timeoutId);
+      finish({ success: false, reason: 'no_syncable_subscriptions' });
       return;
     }
 
@@ -557,12 +570,14 @@ function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
         if (response.status === 401) {
           console.warn('[Background] Stale or invalid extension session detected while syncing subscriptions; refreshing the opaque session instead of logging out the user.');
           refreshOpaqueSessionFromStoredRawToken(() => {});
-          onComplete({ success: false, reason: 'unauthorized', status: response.status });
+          clearTimeout(timeoutId);
+          finish({ success: false, reason: 'unauthorized', status: response.status });
           return;
         }
         console.warn('[Background] Failed to sync subscriptions:', response.status);
         publishGmailScanEvent('review_queue_sync_failed', { status: response.status });
-        onComplete({ success: false, reason: 'http_error', status: response.status });
+        clearTimeout(timeoutId);
+        finish({ success: false, reason: 'http_error', status: response.status });
         return;
       }
       response.json().catch(() => ({})).then((body) => {
@@ -571,12 +586,14 @@ function syncDetectedSubscriptions(subscriptions, onComplete = () => {}) {
           received: body.received,
           persisted: body.persisted,
         });
-        onComplete({ success: true, received: body.received, persisted: body.persisted });
+        clearTimeout(timeoutId);
+        finish({ success: true, received: body.received, persisted: body.persisted });
       });
     }).catch((error) => {
       console.error('[Background] Failed to sync subscriptions:', error);
       publishGmailScanEvent('review_queue_sync_failed', { reason: 'network_error' });
-      onComplete({ success: false, reason: 'network_error' });
+      clearTimeout(timeoutId);
+      finish({ success: false, reason: 'network_error' });
     });
   });
 }
@@ -1584,16 +1601,17 @@ function scanGmailForSubscriptions(force = false) {
                         persisted: syncResult.persisted,
                       });
                     }
-                  });
-                  publishGmailScanEvent('completed', {
-                    processed: processedCount,
-                    failedMessages: failedMessageCount,
-                    candidates: candidateCount,
-                    noServiceMatch: noServiceMatchCount,
-                    staleOrDuplicate: staleOrDuplicateCount,
-                    bodyUnavailable,
-                    reauthorizationRequired: bodyUnavailable,
-                    pendingApproval: true,
+                    publishGmailScanEvent('completed', {
+                      processed: processedCount,
+                      failedMessages: failedMessageCount,
+                      candidates: candidateCount,
+                      noServiceMatch: noServiceMatchCount,
+                      staleOrDuplicate: staleOrDuplicateCount,
+                      bodyUnavailable,
+                      reauthorizationRequired: bodyUnavailable,
+                      pendingApproval: true,
+                      sync: syncResult,
+                    });
                   });
                 });
               } catch (error) {
