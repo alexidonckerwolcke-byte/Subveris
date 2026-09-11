@@ -49,11 +49,13 @@ describe('DetectedSubscriptions', () => {
     vi.clearAllMocks();
   });
 
-  it('shows an approved state after approving a detection', async () => {
+  it('hides a detection after approving it and keeps it hidden on stale refetches', async () => {
     const mockApiRequest = vi.mocked(apiRequest);
+    let fetchCount = 0;
 
     mockApiRequest.mockImplementation(async (method: string, url: string) => {
       if (method === 'GET' && url === '/api/subscriptions') {
+        fetchCount += 1;
         return {
           ok: true,
           json: async () => [
@@ -63,7 +65,7 @@ describe('DetectedSubscriptions', () => {
               category: 'streaming',
               amount: 15.99,
               frequency: 'monthly',
-              isDetected: true,
+              isDetected: fetchCount <= 2,
               status: 'active',
             },
           ],
@@ -99,7 +101,8 @@ describe('DetectedSubscriptions', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Approved')).toBeInTheDocument();
+      expect(screen.queryByText('Netflix')).not.toBeInTheDocument();
     });
   });
+
 });

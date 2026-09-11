@@ -71,11 +71,16 @@ export default function DetectedSubscriptions() {
 
     return (visibleSubscriptions || [])
       .filter((sub) => {
+        const itemState = actionState[sub.id];
+
         if (sub?.isDetected !== true && !(sub as any)?.is_detected) {
           return false;
         }
 
-        const itemState = actionState[sub.id];
+        if (itemState?.status === "approved") {
+          return false;
+        }
+
         if (itemState?.status === "dismissed" && itemState.dismissedAt) {
           return now - itemState.dismissedAt < 24 * 60 * 60 * 1000;
         }
