@@ -495,10 +495,15 @@ const server = http.createServer(async (req, res) => {
       }
 
       try {
-        const { data, error } = await supabase
+        const includeDetected = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams.get('includeDetected') === 'true';
+        let subscriptionsQuery = supabase
           .from('subscriptions')
           .select('*')
           .eq('user_id', user.id);
+        if (!includeDetected) {
+          subscriptionsQuery = subscriptionsQuery.eq('is_detected', false);
+        }
+        const { data, error } = await subscriptionsQuery;
 
         if (error) {
           console.log('Subscriptions error:', error.message);

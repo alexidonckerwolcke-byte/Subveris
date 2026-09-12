@@ -55,7 +55,7 @@ describe('DetectedSubscriptions', () => {
     let fetchCount = 0;
 
     mockApiRequest.mockImplementation(async (method: string, url: string) => {
-      if (method === 'GET' && url === '/api/subscriptions') {
+      if (method === 'GET' && url === '/api/subscriptions?includeDetected=true') {
         fetchCount += 1;
         return {
           ok: true,

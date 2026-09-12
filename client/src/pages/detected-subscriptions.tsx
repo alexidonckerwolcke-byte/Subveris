@@ -32,7 +32,7 @@ export default function DetectedSubscriptions() {
   const { data: subscriptions = [], isLoading } = useQuery<Subscription[]>({
     queryKey: ["/api/subscriptions"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/subscriptions");
+      const response = await apiRequest("GET", "/api/subscriptions?includeDetected=true");
       return response.json();
     },
     refetchInterval: false,

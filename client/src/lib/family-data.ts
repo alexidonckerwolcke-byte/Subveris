@@ -35,6 +35,10 @@ function normalizeFamilySubscription(sub: any): Subscription {
   return sub;
 }
 
+function isPendingDetectedSubscription(sub: any): boolean {
+  return Boolean(sub?.isDetected === true || sub?.is_detected === true);
+}
+
 function getSubscriptionCandidateFromShared(shared: any): Subscription | null {
   if (!shared) return null;
   if (shared.subscription && shared.subscription.id) {
@@ -53,11 +57,11 @@ export function getVisibleFamilySubscriptions(familyData: any, currentUserId?: s
   const subscriptions = Array.isArray(familyData?.subscriptions) ? familyData.subscriptions.map(normalizeFamilySubscription) : [];
   if (subscriptions.length === 0 && sharedSubscriptions.length === 0) return [];
 
-  const allSubs: Subscription[] = [...subscriptions];
+  const allSubs: Subscription[] = subscriptions.filter((sub: Subscription) => !isPendingDetectedSubscription(sub));
 
   for (const shared of sharedSubscriptions) {
     const candidate = getSubscriptionCandidateFromShared(shared);
-    if (candidate?.id) {
+    if (candidate?.id && !isPendingDetectedSubscription(candidate)) {
       allSubs.push(candidate);
     }
   }
