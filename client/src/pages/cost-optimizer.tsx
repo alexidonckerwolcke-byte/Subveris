@@ -26,6 +26,7 @@ import type { AIRecommendation, Subscription } from "@shared/schema";
 import {
   calculateMonthlyCost,
   dedupeByKey,
+  isSubscriptionDeleted,
 } from "@/lib/utils";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
 import {
@@ -87,6 +88,8 @@ function calculateHealthScore(sub: any): HealthScore {
 }
 
 function detectWaste(sub: any): WasteDetection | null {
+  if (isSubscriptionDeleted(sub)) return null;
+
   const health = calculateHealthScore(sub);
   
   // Calculate days since last use with better logic

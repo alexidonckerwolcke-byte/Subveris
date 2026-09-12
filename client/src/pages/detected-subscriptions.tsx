@@ -44,7 +44,7 @@ export default function DetectedSubscriptions() {
     enabled: !!familyGroupId,
     queryFn: async () => {
       if (!familyGroupId) return null;
-      const response = await apiRequest("GET", `/api/family-groups/${familyGroupId}/family-data`);
+      const response = await apiRequest("GET", `/api/family-groups/${familyGroupId}/family-data?includeDetected=true`);
       return response.json();
     },
     refetchInterval: false,
@@ -63,7 +63,7 @@ export default function DetectedSubscriptions() {
   }, [queryClient]);
 
   const visibleSubscriptions = showFamilyData
-    ? getVisibleFamilySubscriptions(familyData, user?.id)
+    ? getVisibleFamilySubscriptions(familyData, user?.id, true)
     : subscriptions;
 
   const detectedSubscriptions = useMemo(() => {

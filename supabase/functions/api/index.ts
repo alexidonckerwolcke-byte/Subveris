@@ -2244,6 +2244,9 @@ runtimeDeno?.serve?.(async (req: Request) => {
         if (body.status === "canceled") {
           statusUpdates.canceled_at = new Date().toISOString();
         }
+        if (body.status === "deleted") {
+          statusUpdates.deleted_at = new Date().toISOString();
+        }
         const updated = await updateSubscription(userId, subscriptionId, statusUpdates);
         if (!updated) {
           console.warn(`[API] PATCH /subscriptions/${subscriptionId}/status failed: no matching subscription for user ${userId}`);
@@ -3951,7 +3954,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
       const { data, error } = await supabase
         .from("subscriptions")
         .select("*")
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .eq("is_detected", false);
 
       if (error) {
         console.error("Error fetching metrics:", error);
@@ -5785,7 +5789,8 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           const { data: familySubscriptions, error } = await supabase
             .from('subscriptions')
             .select('*')
-            .in('user_id', memberIds);
+            .in('user_id', memberIds)
+            .eq('is_detected', false);
 
           if (error) {
             console.error('Error fetching family subscriptions for spending monthly:', error);
@@ -5815,7 +5820,8 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           const { data: personalSubscriptions, error } = await supabase
             .from('subscriptions')
             .select('*')
-            .eq('user_id', userId);
+            .eq('user_id', userId)
+            .eq('is_detected', false);
 
           if (error || !personalSubscriptions) {
             console.error('Error fetching subscriptions for spending monthly:', error);
@@ -6359,7 +6365,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       let totalMonthlySavings = 0;
 
       for (const sub of subscriptions) {
-        if (normalizeStatus(sub.status) !== "deleted") continue;
+        if (!isSubscriptionDeleted(sub)) continue;
         if (!isInCurrentMonth(sub.deleted_at || sub.updated_at)) continue;
 
         const monthlyAmount = convertToUSD(
@@ -6672,10 +6678,15 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         });
       }
 
-      const { data: allSubscriptions, error: subsError } = await supabase
+      const includeDetected = url.searchParams.get("includeDetected") === "true";
+      let allSubscriptionsQuery = supabase
         .from("subscriptions")
           .select("id, user_id, name, category, amount, currency, frequency, next_billing_at, billing_month, status, usage_count, monthly_usage_count, usage_month, total_active_seconds, last_used_at, logo_url, description, is_detected, scheduled_cancellation_date, cancellation_url, cancellation_confirmed_at, estimated_monthly_savings, estimated_annual_savings, deleted_at, website_domain, website_url")
         .in("user_id", memberIds);
+      if (!includeDetected) {
+        allSubscriptionsQuery = allSubscriptionsQuery.eq("is_detected", false);
+      }
+      const { data: allSubscriptions, error: subsError } = await allSubscriptionsQuery;
 
       if (subsError) {
         console.error("Error fetching family subscriptions:", subsError);
@@ -6992,7 +7003,8 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           const { data: familySubscriptions, error: familyError } = await supabase
             .from('subscriptions')
             .select('*')
-            .in('user_id', memberIds);
+            .in('user_id', memberIds)
+            .eq('is_detected', false);
 
           if (familyError) {
             console.error('Error fetching family subscriptions for spending category:', familyError);
@@ -7022,7 +7034,8 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           const { data: personalSubscriptions, error } = await supabase
             .from('subscriptions')
             .select('*')
-            .eq('user_id', userId);
+            .eq('user_id', userId)
+            .eq('is_detected', false);
 
           if (error || !personalSubscriptions) {
             console.error('Error fetching subscriptions for spending category:', error);

@@ -87,6 +87,16 @@ export default function Dashboard() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: detectedSubscriptionRows = [] } = useQuery<Subscription[]>({
+    queryKey: ["/api/subscriptions", "detected"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/subscriptions?includeDetected=true");
+      return response.json();
+    },
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+  });
+
   const { data: familyData } = useQuery<any>({
     queryKey: ["/api/family-groups", familyGroupId, "family-data"],
     enabled: !!familyGroupId,
@@ -152,7 +162,9 @@ export default function Dashboard() {
   const activeSubscriptions = (familyAwareMode
     ? familySubscriptions
     : (subscriptions || [])).filter((sub) => sub?.status === "active").length;
-  const detectedSubscriptions = (subscriptions || []).filter((sub) => sub?.isDetected === true || (sub as any)?.is_detected === true).length;
+  const detectedSubscriptions = (detectedSubscriptionRows || []).filter(
+    (sub) => sub?.isDetected === true || (sub as any)?.is_detected === true
+  ).length;
   const potentialSavings = useMemo(
     () => calculatePotentialSavings(subscriptions || []),
     [subscriptions]

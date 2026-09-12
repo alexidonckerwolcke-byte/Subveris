@@ -28,7 +28,7 @@ import {
 } from "recharts";
 import type { DashboardMetrics, MonthlySpending, Subscription } from "@shared/schema";
 import { useCurrency, type Currency } from "@/lib/currency-context";
-import { calculateMonthlyCost, calculateMonthlySpendingSeries, isSubscriptionBilledInMonth, normalizeMonthlySpendingSeries } from "@/lib/utils";
+import { calculateMonthlyCost, calculateMonthlySpendingSeries, isSubscriptionBilledInMonth, isSubscriptionDeleted, normalizeMonthlySpendingSeries } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
 import { calculatePotentialSavings } from "@/lib/health-score";
@@ -54,7 +54,7 @@ function getSubscriptionDeletedTimestamp(sub: Subscription) {
 }
 
 function isDeletedThisMonth(sub: Subscription) {
-  if (getSubscriptionStatus(sub) !== 'deleted') return false;
+  if (!isSubscriptionDeleted(sub)) return false;
   const ts = getSubscriptionDeletedTimestamp(sub);
   if (ts) {
     const date = new Date(ts);
@@ -150,7 +150,7 @@ function computeFamilySavingsBreakdown(
 
 function computeDeletedSubscriptionSavings(subscriptions: Subscription[]) {
   return subscriptions
-    .filter((sub) => getSubscriptionStatus(sub) === 'deleted' && isDeletedThisMonth(sub))
+    .filter((sub) => isSubscriptionDeleted(sub) && isDeletedThisMonth(sub))
     .reduce((total, sub) => {
       const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
       return total + monthlyAmount;
@@ -164,7 +164,7 @@ function resolveFamilySavingsValue(serverValue: unknown, fallbackValue?: number)
     return fallbackNumber;
   }
 
-  return numericServerValue;
+  return numericServerValue === 0 && fallbackNumber > 0 ? fallbackNumber : numericServerValue;
 }
 
 export default function Savings() {
@@ -235,7 +235,7 @@ export default function Savings() {
     const currentUserId = user?.id;
 
     const isDeletedThisMonth = (sub: Subscription) => {
-      if (getSubscriptionStatus(sub) !== 'deleted') return false;
+      if (!isSubscriptionDeleted(sub)) return false;
       const ts = getSubscriptionDeletedTimestamp(sub);
       if (!ts) return true;
       const date = new Date(ts);
@@ -366,7 +366,7 @@ export default function Savings() {
         const currentUserId = user?.id;
 
         const isDeletedThisMonth = (s: Subscription) => {
-          if (getSubscriptionStatus(s) !== 'deleted') return false;
+          if (!isSubscriptionDeleted(s)) return false;
           const ts = getSubscriptionDeletedTimestamp(s);
           if (ts) {
             const d = new Date(ts);

@@ -52,16 +52,22 @@ function getSubscriptionCandidateFromShared(shared: any): Subscription | null {
   return null;
 }
 
-export function getVisibleFamilySubscriptions(familyData: any, currentUserId?: string): Subscription[] {
+export function getVisibleFamilySubscriptions(
+  familyData: any,
+  currentUserId?: string,
+  includeDetected = false,
+): Subscription[] {
   const sharedSubscriptions = Array.isArray(familyData?.sharedSubscriptions) ? familyData.sharedSubscriptions : [];
   const subscriptions = Array.isArray(familyData?.subscriptions) ? familyData.subscriptions.map(normalizeFamilySubscription) : [];
   if (subscriptions.length === 0 && sharedSubscriptions.length === 0) return [];
 
-  const allSubs: Subscription[] = subscriptions.filter((sub: Subscription) => !isPendingDetectedSubscription(sub));
+  const allSubs: Subscription[] = includeDetected
+    ? subscriptions
+    : subscriptions.filter((sub: Subscription) => !isPendingDetectedSubscription(sub));
 
   for (const shared of sharedSubscriptions) {
     const candidate = getSubscriptionCandidateFromShared(shared);
-    if (candidate?.id && !isPendingDetectedSubscription(candidate)) {
+    if (candidate?.id && (includeDetected || !isPendingDetectedSubscription(candidate))) {
       allSubs.push(candidate);
     }
   }
