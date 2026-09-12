@@ -1673,20 +1673,23 @@ function scanGmailForSubscriptions(force = false) {
             }
           }).then(async (response) => {
             if (!response.ok) {
+              const statusError = new Error(`Gmail message API returned ${response.status}`);
+              statusError.status = response.status;
               if (response.status === 403) {
                 bodyUnavailable = true;
                 const metadataResponse = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject%2CFrom`, {
                   method: 'GET',
                   headers: {
-                  'Authorization': `Bearer ${activeToken}`,
+                    'Authorization': `Bearer ${activeToken}`,
                     'Accept': 'application/json'
                   }
                 });
                 if (metadataResponse.ok) {
                   return metadataResponse.json();
                 }
+                statusError.status = metadataResponse.status || response.status;
               }
-              throw new Error(`Gmail message API returned ${response.status}`);
+              throw statusError;
             }
             return response.json();
           })
@@ -1754,7 +1757,19 @@ function scanGmailForSubscriptions(force = false) {
               finalizeGmailScan();
             }).catch(err => {
               failedMessageCount++;
-              console.error('[Background] Error fetching Gmail message:', err?.message || String(err));
+              const status = Number(err?.status || 0);
+              const isRecoverableMessageIssue = status === 401 || status === 403 || status === 404 || /deleted|not found|forbidden|unauthorized/i.test(String(err?.message || err || ''));
+
+              if (isRecoverableMessageIssue) {
+                console.warn('[Background] Gmail message unavailable for this scan; skipping it.', {
+                  status,
+                  message: err?.message || String(err),
+                  messageId: msg?.id || null,
+                });
+              } else {
+                console.error('[Background] Error fetching Gmail message:', err?.message || String(err));
+              }
+
               try {
                 finalizeGmailScan();
               } catch (finalizeError) {
