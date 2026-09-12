@@ -1580,7 +1580,7 @@ function scanGmailForSubscriptions(force = false) {
     }
 
     // Read the newest message IDs, then filter message content locally.
-    const scanWithToken = (activeToken) => fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=25', {
+    const scanWithToken = (activeToken) => fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=10', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${activeToken}`,
@@ -1664,7 +1664,17 @@ function scanGmailForSubscriptions(force = false) {
           }
         };
 
-        data.messages.forEach(msg => {
+        const messageQueue = [...(data.messages || [])];
+        let messageIndex = 0;
+
+        const processNextMessage = () => {
+          if (messageIndex >= messageQueue.length) {
+            finalizeGmailScan();
+            return;
+          }
+
+          const msg = messageQueue[messageIndex++];
+
           fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`, {
             method: 'GET',
             headers: {
@@ -1704,61 +1714,61 @@ function scanGmailForSubscriptions(force = false) {
               if (candidate) {
                 const duplicateInScan = seenCandidateServices.has(candidate.serviceName.toLowerCase());
                 if (!duplicateInScan) {
-                seenCandidateServices.add(candidate.serviceName.toLowerCase());
-                const ageInDays = candidate.messageAgeDays;
-                const existingSubs = result.detectedSubscriptions || {};
-                const duplicate = Object.values(existingSubs).find((sub) =>
-                  sub && sub.serviceName && String(sub.serviceName).toLowerCase() === candidate.serviceName.toLowerCase() &&
-                  !sub.markedCancelled
-                );
+                  seenCandidateServices.add(candidate.serviceName.toLowerCase());
+                  const ageInDays = candidate.messageAgeDays;
+                  const existingSubs = result.detectedSubscriptions || {};
+                  const duplicate = Object.values(existingSubs).find((sub) =>
+                    sub && sub.serviceName && String(sub.serviceName).toLowerCase() === candidate.serviceName.toLowerCase() &&
+                    !sub.markedCancelled
+                  );
 
-                if (ageInDays === null || ageInDays > 90 || duplicate) {
-                  staleOrDuplicateCount++;
-                  console.log('[Background] Gmail candidate skipped as stale or duplicate:', candidate.serviceName, {
-                    ageInDays,
-                    duplicate: Boolean(duplicate),
-                    alreadyPendingApproval: Boolean(duplicate?.requiresReview),
-                    existingSource: duplicate?.source || null,
-                    existingSubscriptionId: duplicate?.subscriptionId || null,
-                  });
-                  publishGmailScanEvent('candidate_skipped', {
-                    reason: duplicate ? (duplicate.requiresReview ? 'already_pending_approval' : 'duplicate') : 'stale_or_missing_date',
-                    serviceName: candidate.serviceName,
-                  });
-                } else {
-                  candidateCount++;
-                  detectedSubs[candidate.serviceName] = {
-                    ...candidate,
-                    serviceName: candidate.serviceName,
-                    domain: candidate.domain || null,
-                    requiresReview: true,
-                    approvedForSync: false,
-                    isDetectedCandidate: true,
-                  };
-                  console.log('[Background] ✅ Suggested Gmail candidate pending approval:', candidate.serviceName, {
-                    ageInDays,
-                    amount: candidate.amount,
-                    detectedRenewalDate: candidate.detectedRenewalDate,
-                    requiresReview: true,
-                  });
-                  publishGmailScanEvent('candidate_found', {
-                    serviceName: candidate.serviceName,
-                    amount: candidate.amount,
-                    currency: candidate.currency,
-                    detectedRenewalDate: candidate.detectedRenewalDate,
-                    requiresReview: true,
-                  });
-                }
+                  if (ageInDays === null || ageInDays > 90 || duplicate) {
+                    staleOrDuplicateCount++;
+                    console.log('[Background] Gmail candidate skipped as stale or duplicate:', candidate.serviceName, {
+                      ageInDays,
+                      duplicate: Boolean(duplicate),
+                      alreadyPendingApproval: Boolean(duplicate?.requiresReview),
+                      existingSource: duplicate?.source || null,
+                      existingSubscriptionId: duplicate?.subscriptionId || null,
+                    });
+                    publishGmailScanEvent('candidate_skipped', {
+                      reason: duplicate ? (duplicate.requiresReview ? 'already_pending_approval' : 'duplicate') : 'stale_or_missing_date',
+                      serviceName: candidate.serviceName,
+                    });
+                  } else {
+                    candidateCount++;
+                    detectedSubs[candidate.serviceName] = {
+                      ...candidate,
+                      serviceName: candidate.serviceName,
+                      domain: candidate.domain || null,
+                      requiresReview: true,
+                      approvedForSync: false,
+                      isDetectedCandidate: true,
+                    };
+                    console.log('[Background] ✅ Suggested Gmail candidate pending approval:', candidate.serviceName, {
+                      ageInDays,
+                      amount: candidate.amount,
+                      detectedRenewalDate: candidate.detectedRenewalDate,
+                      requiresReview: true,
+                    });
+                    publishGmailScanEvent('candidate_found', {
+                      serviceName: candidate.serviceName,
+                      amount: candidate.amount,
+                      currency: candidate.currency,
+                      detectedRenewalDate: candidate.detectedRenewalDate,
+                      requiresReview: true,
+                    });
+                  }
                 }
               } else {
                 noServiceMatchCount++;
               }
 
-              finalizeGmailScan();
+              setTimeout(processNextMessage, 150);
             }).catch(err => {
               failedMessageCount++;
               const status = Number(err?.status || 0);
-              const isRecoverableMessageIssue = status === 401 || status === 403 || status === 404 || /deleted|not found|forbidden|unauthorized/i.test(String(err?.message || err || ''));
+              const isRecoverableMessageIssue = status === 401 || status === 403 || status === 404 || status === 429 || /deleted|not found|forbidden|unauthorized|rate limit|too many requests/i.test(String(err?.message || err || ''));
 
               if (isRecoverableMessageIssue) {
                 console.warn('[Background] Gmail message unavailable for this scan; skipping it.', {
@@ -1770,13 +1780,15 @@ function scanGmailForSubscriptions(force = false) {
                 console.error('[Background] Error fetching Gmail message:', err?.message || String(err));
               }
 
-              try {
-                finalizeGmailScan();
-              } catch (finalizeError) {
-                console.error('[Background] Gmail scan finalizer callback failed:', finalizeError);
-              }
+              setTimeout(processNextMessage, 150);
             });
-        });
+        };
+
+        if (messageQueue.length > 0) {
+          processNextMessage();
+        } else {
+          finalizeGmailScan();
+        }
       }).catch(async (err) => {
         if (err.status === 401) {
           console.info('[Background] Gmail access token expired; requesting refresh.');
