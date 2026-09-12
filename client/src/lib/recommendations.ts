@@ -34,13 +34,19 @@ function createRecommendation(rec: AIRecommendation): AIRecommendation {
   };
 }
 
+function isPendingDetectedSubscription(sub: any): boolean {
+  return Boolean(sub?.isDetected === true || sub?.is_detected === true);
+}
+
 export function generateRecommendationsFromSubscriptions(subs: any[] | undefined): AIRecommendation[] {
   if (!subs || subs.length === 0) return [];
 
-  // Only generate recommendations for subscriptions that are unused or
-  // already flagged to cancel. We do not surface recommendations for
-  // active subscriptions here per product requirement.
-  const cleaned = subs.filter(Boolean).filter((sub) => sub.status !== "deleted");
+  // Pending detected rows are not approved subscriptions and should not be
+  // treated as active spend for AI optimization recommendations.
+  const cleaned = subs
+    .filter(Boolean)
+    .filter((sub) => sub.status !== "deleted")
+    .filter((sub) => !isPendingDetectedSubscription(sub));
   if (cleaned.length === 0) return [];
 
   const targetSubs = cleaned.filter(

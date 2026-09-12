@@ -587,8 +587,13 @@ function isSubscriptionCanceled(sub: any): boolean {
   return normalizeSubscriptionStatus(sub.status) === 'canceled';
 }
 
+function isPendingDetectedSubscription(sub: any): boolean {
+  return Boolean(sub?.is_detected === true || sub?.isDetected === true);
+}
+
 function isSubscriptionVisible(sub: any): boolean {
   if (isSubscriptionDeleted(sub) || isSubscriptionCanceled(sub)) return false;
+  if (isPendingDetectedSubscription(sub)) return false;
   const status = normalizeSubscriptionStatus(sub.status);
   return status === 'active' || status === 'unused' || status === 'to-cancel';
 }

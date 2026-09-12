@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DetectedSubscriptions from './detected-subscriptions';
 import { apiRequest } from '@/lib/queryClient';
+import { generateRecommendationsFromSubscriptions } from '@/lib/recommendations';
 
 vi.mock('@/components/premium-gate', () => ({
   PremiumGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -103,6 +104,31 @@ describe('DetectedSubscriptions', () => {
     await waitFor(() => {
       expect(screen.queryByText('Netflix')).not.toBeInTheDocument();
     });
+  });
+
+  it('excludes pending detected subscriptions from AI recommendations', () => {
+    const recommendations = generateRecommendationsFromSubscriptions([
+      {
+        id: 'sub-detected',
+        name: 'Netflix',
+        category: 'streaming',
+        amount: 15.99,
+        frequency: 'monthly',
+        status: 'unused',
+        isDetected: true,
+      },
+      {
+        id: 'sub-approved',
+        name: 'Spotify',
+        category: 'music',
+        amount: 10.99,
+        frequency: 'monthly',
+        status: 'unused',
+        isDetected: false,
+      },
+    ]);
+
+    expect(recommendations.map((row) => row.subscriptionId)).toEqual(['sub-approved']);
   });
 
 });
