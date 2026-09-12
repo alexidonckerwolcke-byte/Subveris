@@ -133,7 +133,7 @@ export function FamilySharing() {
   // owner has enabled family data and the server returns a `subscriptions`
   // array; otherwise fall back to personal subscriptions.
   const allSubscriptions: Subscription[] = isOwner && effectiveShowFamilyData
-    ? (familyData?.subscriptions ?? personalSubscriptions)
+    ? (familyData?.subscriptions ?? personalSubscriptions).filter((sub: any) => !sub?.isDetected && !sub?.is_detected)
     : personalSubscriptions;
 
   // Fetch shared subscriptions separately so owners can unshare even when
@@ -193,7 +193,12 @@ export function FamilySharing() {
   );
 
   const filteredFamilyDataSubscriptions = effectiveShowFamilyData
-    ? (familyData?.subscriptions || []).filter((sub: any) => !isSubscriptionDeleted(sub) && !sharedSubscriptionIds.has(sub.id))
+    ? (familyData?.subscriptions || []).filter((sub: any) =>
+        !isSubscriptionDeleted(sub) &&
+        !sub?.isDetected &&
+        !sub?.is_detected &&
+        !sharedSubscriptionIds.has(sub.id)
+      )
     : [];
 
   // compute list of subscriptions that can be shared (excludes already-shared)

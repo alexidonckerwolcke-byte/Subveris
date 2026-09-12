@@ -58,10 +58,12 @@ export function computeFamilyMetrics(familyData: any): FamilyMetrics {
     };
   };
 
-  const subs = (familyData?.subscriptions || []).filter((s: any) => isSubscriptionActiveLike(s));
+  const isPendingDetected = (sub: any) =>
+    sub?.isDetected === true || sub?.is_detected === true || sub?.isDetected === "true" || sub?.is_detected === "true";
+  const subs = (familyData?.subscriptions || []).filter((s: any) => !isPendingDetected(s) && isSubscriptionActiveLike(s));
   const sharedRaw = (familyData?.sharedSubscriptions || [])
     .map(unwrapSharedItem)
-    .filter((item: any) => item && isSubscriptionActiveLike(item));
+    .filter((item: any) => item && !isPendingDetected(item) && isSubscriptionActiveLike(item));
 
   // Deduplicate: don't count a shared subscription twice if it already
   // appears in the main subscriptions list (common when owner shares their own)

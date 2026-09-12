@@ -36,7 +36,7 @@ function normalizeFamilySubscription(sub: any): Subscription {
 }
 
 function isPendingDetectedSubscription(sub: any): boolean {
-  return Boolean(sub?.isDetected === true || sub?.is_detected === true);
+  return sub?.isDetected === true || sub?.is_detected === true || sub?.isDetected === "true" || sub?.is_detected === "true";
 }
 
 function getSubscriptionCandidateFromShared(shared: any): Subscription | null {

@@ -6693,7 +6693,9 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         return sendJson({ error: "Failed to load family subscriptions" }, { status: 500 });
       }
 
-      const allSubs = (allSubscriptions || []).map(normalizeSubscriptionRow);
+      const allSubs = (allSubscriptions || [])
+        .map(normalizeSubscriptionRow)
+        .filter((sub: any) => includeDetected || !isPendingDetectedSubscription(sub));
 
       const { data: sharedRecords, error: sharedError } = await supabase
         .from('shared_subscriptions')
@@ -6879,7 +6881,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         percentage: totalAmount > 0 ? Math.round((entry.amount / totalAmount) * 100) : 0,
       }));
 
-      const payloadSubscriptions = isOwner ? allSubsRaw : visibleSubscriptions;
+      const payloadSubscriptions = isOwner ? allSubs : visibleSubscriptions;
       const sharedSubscriptionsWithCostSplits = (filteredSharedRecords || []).map((record: any) => ({
         ...record,
         costSplits: costSplitsBySharedId.get(String(record.id)) || [],
