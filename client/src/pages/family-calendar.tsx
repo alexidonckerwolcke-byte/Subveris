@@ -10,7 +10,7 @@ import { useFamilyDataMode } from "@/hooks/use-family-data";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
-import { dedupeById, formatDateLocal, parseDateOnlyLocal } from "@/lib/utils";
+import { dedupeById, formatDateLocal, isSubscriptionDeleted, parseDateOnlyLocal } from "@/lib/utils";
 import type { Subscription, CalendarEvent } from "@shared/schema";
 
 export default function FamilyCalendarPage() {
@@ -54,7 +54,9 @@ export default function FamilyCalendarPage() {
   }, [showFamilyData, familyData, personalSubscriptions, user?.id]);
 
   const normalizedSubscriptions = useMemo<Subscription[]>(() => {
-    return subscriptions.map((sub: any) => {
+    return subscriptions.filter((sub: any) =>
+      sub && !isSubscriptionDeleted(sub) && sub.isDetected !== true && (sub as any).is_detected !== true
+    ).map((sub: any) => {
       const nextBillingDate = sub.nextBillingDate
         || sub.next_billing_date
         || sub.next_billing_at
@@ -83,9 +85,14 @@ export default function FamilyCalendarPage() {
   const loading = subsLoading || eventsLoading;
 
   const familyCalendarEvents = useMemo(() => {
+    const approvedSubscriptionIds = new Set(normalizedSubscriptions.map((subscription) => String(subscription.id)));
+    const approvedCalendarEvents = calendarEvents.filter((event) =>
+      !event.subscriptionId || approvedSubscriptionIds.has(String(event.subscriptionId))
+    );
+
     if (showFamilyData === true) {
       const renewalEvents = normalizedSubscriptions
-        .filter((sub) => sub && (sub.status === 'active' || sub.status === 'unused') && sub.nextBillingDate)
+        .filter((sub) => sub && !isSubscriptionDeleted(sub) && sub.isDetected !== true && (sub as any).is_detected !== true && (sub.status === 'active' || sub.status === 'unused') && sub.nextBillingDate)
         .map((sub) => {
           const eventDate = typeof sub.nextBillingDate === 'string'
             ? sub.nextBillingDate.split('T')[0]
@@ -104,10 +111,10 @@ export default function FamilyCalendarPage() {
           } as CalendarEvent;
         });
 
-      const merged = [...renewalEvents, ...calendarEvents];
+      const merged = [...renewalEvents, ...approvedCalendarEvents];
       return dedupeById(merged);
     }
-    return calendarEvents;
+    return approvedCalendarEvents;
   }, [showFamilyData, normalizedSubscriptions, calendarEvents]);
 
   return (

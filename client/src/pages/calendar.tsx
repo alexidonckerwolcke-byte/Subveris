@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { apiRequest } from "@/lib/queryClient";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
-import { advanceDateByFrequency, dedupeById, formatDateLocal, getAdvancedRenewalDateIfNeeded, parseDateOnlyLocal } from "@/lib/utils";
+import { advanceDateByFrequency, dedupeById, formatDateLocal, getAdvancedRenewalDateIfNeeded, isSubscriptionDeleted, parseDateOnlyLocal } from "@/lib/utils";
 
 export default function Calendar() {
   const queryClient = useQueryClient();
@@ -39,7 +39,9 @@ export default function Calendar() {
   }
 
   // Normalize subscription objects to ensure `nextBillingDate` is available
-  subscriptions = subscriptions.map((s: any) => {
+  subscriptions = subscriptions.filter((s: any) =>
+    s && !isSubscriptionDeleted(s) && s.isDetected !== true && s.is_detected !== true
+  ).map((s: any) => {
     if (!s) return s;
     const nextBillingDate = s.nextBillingDate || s.next_billing_date || s.next_billing_at || s.next_billing || s.next_billingDate || null;
     return {
@@ -62,7 +64,10 @@ export default function Calendar() {
     },
   });
 
-  const calendarEvents = personalCalendarEvents; // Calendar events are personal by nature
+  const approvedSubscriptionIds = new Set(subscriptions.map((subscription) => String(subscription.id)));
+  const calendarEvents = personalCalendarEvents.filter((event) =>
+    !event.subscriptionId || approvedSubscriptionIds.has(String(event.subscriptionId))
+  );
 
   // Update renewal date for a subscription
   const updateRenewalDateMutation = useMutation({

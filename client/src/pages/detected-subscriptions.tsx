@@ -40,7 +40,7 @@ export default function DetectedSubscriptions() {
   });
 
   const { data: familyData } = useQuery<any>({
-    queryKey: ["/api/family-groups", familyGroupId, "family-data"],
+    queryKey: ["/api/family-groups", familyGroupId, "family-data", "detected"],
     enabled: !!familyGroupId,
     queryFn: async () => {
       if (!familyGroupId) return null;

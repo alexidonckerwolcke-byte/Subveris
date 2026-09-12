@@ -85,7 +85,7 @@ export default function Insights() {
     if (!subs || subs.length === 0) return [];
     // Strictly filter only unused and to-cancel, never active
     return subs
-      .filter(s => s && (
+      .filter(s => s && !s.deleted_at && !s.deletedAt && s.status !== 'deleted' && s.isDetected !== true && s.is_detected !== true && (
         (s.status === 'unused' || s.status === 'to-cancel') ||
         (s.subStatus === 'unused' || s.subStatus === 'to-cancel')
       ))
@@ -105,18 +105,25 @@ export default function Insights() {
   }
 
   const computedFamilyBehavioral = showFamilyData ? computeBehavioralFromSubs(familyData?.subscriptions || []) : [];
+  const approvedInsightIds = new Set(
+    (showFamilyData ? familySubscriptions : personalSubscriptions)
+      .filter((sub: any) => sub && sub.status !== 'deleted' && !sub.deleted_at && !sub.deletedAt && sub.isDetected !== true && sub.is_detected !== true)
+      .map((sub: any) => String(sub.id))
+  );
+  const filterBehavioralInsights = (items: any[] | undefined) =>
+    (items || []).filter((item: any) => !item?.subscriptionId || approvedInsightIds.has(String(item.subscriptionId)));
   const behavioralInsights = showFamilyData
-    ? ((familyBehavioralInsights && familyBehavioralInsights.length > (computedFamilyBehavioral.length || 0))
-        ? familyBehavioralInsights
+    ? ((filterBehavioralInsights(familyBehavioralInsights).length > (computedFamilyBehavioral.length || 0))
+        ? filterBehavioralInsights(familyBehavioralInsights)
         : computedFamilyBehavioral)
     : (
-        (personalBehavioralInsights || []).filter((i: any) =>
+        filterBehavioralInsights(personalBehavioralInsights).filter((i: any) =>
           i && (
             (i.subStatus === 'unused' || i.subStatus === 'to-cancel') ||
             (i.status === 'unused' || i.status === 'to-cancel')
           )
         ).length > 0
-          ? (personalBehavioralInsights || []).filter((i: any) =>
+          ? filterBehavioralInsights(personalBehavioralInsights).filter((i: any) =>
               i && (
                 (i.subStatus === 'unused' || i.subStatus === 'to-cancel') ||
                 (i.status === 'unused' || i.status === 'to-cancel')
@@ -186,9 +193,12 @@ export default function Insights() {
   const costAnalysis: CostPerUseAnalysis[] | undefined = showFamilyData
     ? (dedupeByKey([...(baseAnalysis || []), ...perMemberAnalyses], 'subscriptionId') as CostPerUseAnalysis[])
     : (baseAnalysis?.length ? baseAnalysis : computeCostPerUseFromSubs(personalSubscriptions));
+  const approvedCostAnalysis = (costAnalysis || []).filter((analysis: any) =>
+    !analysis?.subscriptionId || approvedInsightIds.has(String(analysis.subscriptionId))
+  );
   const displayCostAnalysis = !showFamilyData && tier === "free"
-    ? (costAnalysis?.slice(0, limits.maxCostPerUseSubscriptions) ?? [])
-    : costAnalysis;
+    ? approvedCostAnalysis.slice(0, limits.maxCostPerUseSubscriptions)
+    : approvedCostAnalysis;
 
   // Personal insights
   const { data: personalInsights, isLoading: personalInsightsLoading, refetch: refetchInsights } = useQuery<Insight[]>({
@@ -209,11 +219,16 @@ export default function Insights() {
     priority: recommendation.priority ?? (recommendation.confidence >= 0.9 ? 1 : 2),
     isRead: false,
   }));
+  const filteredPersonalInsights = filterBehavioralInsights(personalInsights as any[] | undefined);
+  const filterFinalInsights = (items: any[] | undefined) =>
+    (items || []).filter((item: any) =>
+      !item?.subscriptionId || approvedInsightIds.has(String(item.subscriptionId))
+    );
   const insights = showFamilyData
-    ? familyData?.insights
-    : personalInsights?.length
-      ? personalInsights
-      : generatedInsights;
+    ? filterFinalInsights(familyData?.insights)
+    : filteredPersonalInsights.length
+      ? filteredPersonalInsights
+      : filterFinalInsights(generatedInsights);
   const insightsLoading = showFamilyData
     ? familyDataLoading
     : personalInsightsLoading || recommendationsLoading;

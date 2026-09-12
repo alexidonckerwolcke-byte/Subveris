@@ -588,7 +588,7 @@ function isSubscriptionCanceled(sub: any): boolean {
 }
 
 function isPendingDetectedSubscription(sub: any): boolean {
-  return Boolean(sub?.is_detected === true || sub?.isDetected === true);
+  return sub?.is_detected === true || sub?.isDetected === true || sub?.is_detected === "true" || sub?.isDetected === "true";
 }
 
 function isSubscriptionVisible(sub: any): boolean {
@@ -1535,7 +1535,7 @@ function buildHealthScore(subscriptions: any[]) {
 
 function buildCalendarEvents(subscriptions: any[]) {
   return (subscriptions || [])
-    .filter(sub => sub && sub.status !== 'deleted')
+    .filter(sub => isSubscriptionVisible(sub))
     .map((sub: any) => {
       const rawDate = normalizeSubscriptionDate(sub);
       if (!rawDate) return null;
@@ -5972,7 +5972,8 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
             const { data: allSubscriptions, error: allSubscriptionsError } = await supabase
               .from("subscriptions")
               .select("*")
-              .in("user_id", allMemberIds);
+              .in("user_id", allMemberIds)
+              .eq("is_detected", false);
             if (allSubscriptionsError) {
               throw allSubscriptionsError;
             }
@@ -6032,7 +6033,8 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           const { data: personalSubscriptions, error: personalSubscriptionsError } = await supabase
             .from("subscriptions")
             .select("*")
-            .eq("user_id", userId);
+            .eq("user_id", userId)
+            .eq("is_detected", false);
           if (personalSubscriptionsError) {
             throw personalSubscriptionsError;
           }
@@ -6040,6 +6042,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         }
 
         const behavioralInsights = (subscriptions || [])
+          .filter((sub: any) => !isSubscriptionDeleted(sub) && !isPendingDetectedSubscription(sub))
           .filter((sub: any) => sub.status === 'unused' || sub.status === 'to-cancel')
           .map((sub: any) => {
             const monthlyAmount = sub.frequency === 'yearly' ? sub.amount / 12 : 
