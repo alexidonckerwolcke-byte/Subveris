@@ -12,7 +12,7 @@ export default function Privacy() {
           This page explains what we collect, why we collect it, and the controls available to you.
         </p>
         <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5 text-sm text-slate-300 shadow-lg shadow-slate-950/20">
-          Effective date: August 20, 2026
+          Effective date: September 13, 2026
         </div>
       </div>
 
@@ -28,9 +28,9 @@ export default function Privacy() {
             <div>
               <h2 className="text-lg font-semibold">Data Controller</h2>
               <p className="mt-3 text-muted-foreground">
-                The data controller is <strong>Subveris</strong>.
+                The data controller and developer is <strong>Subveris</strong>.
                 Our contact email is <a href="mailto:help.subveris@gmail.com" className="font-medium text-primary underline">help.subveris@gmail.com</a>.
-                Our registered address is <strong>[INSERT YOUR REGISTERED BUSINESS ADDRESS]</strong>. Replace the bracketed details before publishing this policy.
+                Subveris is the application and brand responsible for the processing described in this policy.
               </p>
             </div>
 
@@ -46,6 +46,7 @@ export default function Privacy() {
               <ul className="mt-3 space-y-2 text-muted-foreground list-disc pl-6">
                 <li>Account information such as name and email when you sign up.</li>
                 <li>Subscription details you enter manually and automatically detected subscriptions from our browser extension (website visits, Gmail receipts, CSV imports, and authentication cookies).</li>
+                <li><strong>Google user data accessed through Gmail:</strong> when you connect Gmail, Subveris accesses Gmail messages and related metadata needed to identify subscription receipts, invoices, renewals, charges, service names, prices, currencies, and billing dates. Subveris does not access unrelated mailbox data beyond what is needed for this feature.</li>
                 <li>Usage data from our browser extension including time spent on subscription service websites and zero-usage patterns.</li>
                 <li>Billing and payment information for Premium purchases processed through Stripe.</li>
                 <li>Technical and security data generated when you use the service, such as IP address and request information in server logs, error logs, and authentication/session identifiers. We do not use this policy to claim collection of browser or device data that is not described elsewhere in the service.</li>
@@ -68,10 +69,14 @@ export default function Privacy() {
               <h2 className="text-lg font-semibold">How We Use Your Data</h2>
               <p className="mt-3 text-muted-foreground">
                 We use data only to provide and improve the core functionality of Subveris: to identify subscriptions, track usage,
-                calculate recurring costs, and process payments. Google user data, including Gmail metadata, is used only for the
-                Gmail subscription-detection feature you explicitly authorize and to improve the accuracy and functionality of that feature.
-                We do not sell your personal data. We may share the minimum data needed with service providers that operate Subveris,
-                such as Supabase for database and authentication services and Stripe for payment processing.
+                calculate recurring costs, and process payments. Google user data, including Gmail message content and metadata, is used
+                only to find subscription-related information, create pending detection candidates, and improve the accuracy and functionality
+                of the Gmail scanning feature you explicitly authorize. Detected candidates remain pending until you approve them.
+                We do not use Google user data for advertising, profiling, credit decisions, lending, data brokerage, or unrelated analytics.
+                We do not sell Google user data or use it to create advertising databases. We do not use Google user data to develop, improve,
+                or train generalized or non-personalized artificial intelligence or machine-learning models.
+                We may share the minimum data needed with service providers that operate Subveris, such as Supabase for database and authentication
+                services and Stripe for payment processing, solely to provide or improve Subveris features requested by you.
               </p>
             </div>
 
@@ -86,7 +91,7 @@ export default function Privacy() {
               </ul>
               <p className="mt-4 text-muted-foreground font-medium">How We Use Extension Data</p>
               <p className="mt-2 text-muted-foreground">
-                Extension data is used only to: (1) automatically detect your subscriptions without manual entry, (2) track usage patterns across your subscription services, (3) identify unused or redundant subscriptions, and (4) provide recommendations for cost optimization within the Subveris product. Gmail message content is processed to identify subscription services, prices, and renewal dates and is not intentionally stored as full email content. This data is synced to your Subveris account and subject to the same privacy protections as manually entered data. Google user data is not used for advertising, profiling, or unrelated analytics outside the functionality of the app.
+                Extension data is used only to: (1) automatically detect your subscriptions without manual entry, (2) track usage patterns across your subscription services, (3) identify unused or redundant subscriptions, and (4) provide recommendations for cost optimization within the Subveris product. Gmail message content is processed to identify subscription services, prices, currencies, and renewal dates and is not intentionally stored as full email content. Extracted subscription candidates are synced to your Subveris account and remain pending until you approve them. This data is subject to the same privacy protections as manually entered data. Google user data is not used for advertising, profiling, unrelated analytics, generalized AI/ML training, or any purpose outside providing or improving the user-facing functionality of Subveris.
               </p>
               <p className="mt-4 text-muted-foreground font-medium">Privacy & Control</p>
               <ul className="mt-2 space-y-2 text-muted-foreground list-disc pl-6">
@@ -103,7 +108,8 @@ export default function Privacy() {
               <p className="mt-3 text-muted-foreground">
                 We use Stripe to process payments and Supabase for authentication, database storage, and hosted API functions.
                 Extension usage records are associated with your Subveris account rather than being anonymous. These providers process data
-                under their own privacy terms.
+                under their own privacy terms. We do not transfer, disclose, or provide Google user data to third parties except to the
+                limited service providers described below when necessary to provide or improve a Subveris feature requested by you.
               </p>
             </div>
 
@@ -114,14 +120,15 @@ export default function Privacy() {
                 <li><strong>Supabase:</strong> authentication, database hosting, backups, and hosted API infrastructure.</li>
                 <li><strong>Stripe:</strong> payment processing, customer records, invoices, and subscription billing. Stripe receives the payment and billing information required to process your purchase.</li>
                 <li><strong>Google:</strong> Gmail API access only when you authorize Gmail scanning through OAuth.</li>
-                <li>We do not sell personal data. Any additional processor will be identified in an updated version of this policy where applicable.</li>
+                <li>We do not sell, rent, or disclose Google user data for advertising, data brokerage, credit decisions, lending, or generalized AI/ML training. Any additional processor will be identified in an updated version of this policy where applicable.</li>
               </ul>
             </div>
 
             <div>
               <h2 className="text-lg font-semibold">How We Store Data</h2>
               <p className="mt-3 text-muted-foreground">
-                Your data is stored in Supabase Postgres. Stripe secret keys and Supabase service-role credentials are intended to remain
+                Your data is stored in Supabase Postgres. Google user data is transmitted over HTTPS/TLS and access is restricted to the
+                Subveris service and authorized service providers needed to operate the Gmail scanning feature. Stripe secret keys and Supabase service-role credentials are intended to remain
                 in server-side environment variables and are not required by the browser. The extension stores its session token in browser
                 extension storage so it can sync data, and that local storage should be protected by the browser account and device security.
               </p>
@@ -131,7 +138,8 @@ export default function Privacy() {
               <h2 className="text-lg font-semibold">Retention</h2>
               <ul className="mt-3 space-y-2 text-muted-foreground list-disc pl-6">
                 <li>Account, subscription, and extension usage records are retained while your account is active. The account-deletion action removes the application-controlled records immediately; any temporary application copy under Subveris control is removed within 30 days, except where retention is required by law or necessary to resolve disputes.</li>
-                <li>Gmail OAuth tokens are stored for Gmail scanning and are deleted when you disconnect Gmail or delete your account. Extracted subscription details remain subject to the account retention period; full email content is not intentionally stored by the current Gmail integration.</li>
+                <li>Gmail OAuth tokens are stored only for Gmail scanning and are deleted when you disconnect Gmail or delete your account. Extracted subscription details remain subject to the account retention period; full email content is not intentionally stored by the current Gmail integration.</li>
+                <li>When you disconnect Gmail, Subveris stops future Gmail scans and deletes the stored Gmail OAuth token. You may request deletion of extracted Gmail-derived subscription data by contacting us or deleting your Subveris account. Current pending detection candidates are also removed through the account deletion process.</li>
                 <li>Application-owned local cron logs and A/B event logs are pruned to retain no more than 30 days of entries. Supabase, hosting, and other provider-managed logs may have separate retention periods under their policies.</li>
                 <li>Supabase, Stripe, and Google may retain information under their own policies and legal obligations. This policy does not claim a 30-day deletion period for provider-managed backups or logs.</li>
               </ul>
