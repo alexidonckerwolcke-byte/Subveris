@@ -39,6 +39,7 @@ const Support = lazy(() => import("./pages/support.js"));
 const Files = lazy(() => import("./pages/files.js"));
 const HomePage = lazy(() => import("./pages/home.js"));
 const Privacy = lazy(() => import("./pages/privacy.js"));
+const Login = lazy(() => import("./pages/login.js"));
 const Cookies = lazy(() => import("./pages/cookies.js"));
 const CancelNetflixPage = lazy(() => import("./pages/cancel-netflix.js"));
 const CancelAmazonPrimePage = lazy(() => import("./pages/cancel-amazon-prime.js"));
@@ -88,6 +89,7 @@ function Router({ user }: { user: any }) {
     <Route key="settings" path="/settings" component={Settings} />,
     <Route key="pricing" path="/pricing" component={Pricing} />,
     <Route key="privacy" path="/privacy" component={Privacy} />,
+    <Route key="login" path="/login" component={Login} />,
     <Route key="cookies" path="/cookies" component={Cookies} />,
     <Route key="terms" path="/terms" component={Terms} />,
     <Route key="security" path="/security" component={Security} />,

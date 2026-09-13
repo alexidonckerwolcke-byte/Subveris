@@ -13,6 +13,7 @@ const Support = lazy(() => import("./pages/support.js"));
 const Files = lazy(() => import("./pages/files.js"));
 const HomePage = lazy(() => import("./pages/home.js"));
 const Privacy = lazy(() => import("./pages/privacy.js"));
+const Login = lazy(() => import("./pages/login.js"));
 const Cookies = lazy(() => import("./pages/cookies.js"));
 const CancelNetflixPage = lazy(() => import("./pages/cancel-netflix.js"));
 const CancelAmazonPrimePage = lazy(() => import("./pages/cancel-amazon-prime.js"));
@@ -104,6 +105,7 @@ export function Router({ user }: { user: any }) {
         ) : (
           <>
             <Route path="/" component={HomePage} />
+            <Route path="/login" component={Login} />
             <Route path="/privacy" component={Privacy} />
             <Route path="/cookies" component={Cookies} />
             <Route path="/terms" component={Terms} />
