@@ -12,6 +12,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Configuration - adjust thresholds to taste
 const DAYS_TO_CANCEL = 60; // if unused for this many days, move to 'to-cancel'
 
+function getStartOfCurrentMonth(): string {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+}
+
 function daysSince(dateString?: string | null) {
   if (!dateString) return Infinity;
   const d = new Date(dateString);
@@ -22,6 +27,42 @@ function daysSince(dateString?: string | null) {
 
 async function run() {
   console.log('Starting subscription status reconciliation...');
+
+  const monthStart = getStartOfCurrentMonth();
+
+  // Keep deleted rows through the month they were deleted so savings and
+  // monthly reports can include them. Purge them on the next month boundary.
+  const { data: deletableSubscriptions, error: deletedFetchError } = await supabase
+    .from('subscriptions')
+    .select('id, name, status, deleted_at')
+    .or('status.eq.deleted,deleted_at.not.is.null');
+
+  if (deletedFetchError) {
+    console.error('Failed to find expired deleted subscriptions:', deletedFetchError);
+    process.exit(1);
+  }
+
+  const expiredDeletedIds = (deletableSubscriptions || [])
+    .filter((subscription) => {
+      if (subscription.status === 'deleted' && !subscription.deleted_at) return true;
+      return Boolean(subscription.deleted_at && subscription.deleted_at < monthStart);
+    })
+    .map((subscription) => subscription.id)
+    .filter(Boolean);
+
+  if (expiredDeletedIds.length > 0) {
+    const { error: purgeError } = await supabase
+      .from('subscriptions')
+      .delete()
+      .in('id', expiredDeletedIds);
+
+    if (purgeError) {
+      console.error('Failed to purge expired deleted subscriptions:', purgeError);
+      process.exit(1);
+    }
+
+    console.log(`Purged ${expiredDeletedIds.length} subscription(s) deleted before ${monthStart}.`);
+  }
 
   // Get current month in YYYY-MM format
   const currentMonth = new Date().toISOString().slice(0, 7);
