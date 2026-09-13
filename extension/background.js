@@ -360,7 +360,10 @@ function loadKnownSubscriptions() {
           domain: domain || existingSubs[key]?.domain || null,
           detectedAt: existingSubs[key]?.detectedAt || Date.now(),
           lastSeen: existingSubs[key]?.lastSeen || Date.now(),
-          source: 'api-subscriptions'
+          source: 'api-subscriptions',
+          requiresReview: false,
+          approvedForSync: false,
+          isDetectedCandidate: false,
         };
       });
 
@@ -384,6 +387,10 @@ function addDetectedSubscription(serviceName, domain) {
     const subs = result.detectedSubscriptions || {};
     const now = Date.now();
     const existing = subs[serviceName];
+    if (existing?.subscriptionId && existing.source === 'api-subscriptions') {
+      console.log('[Background] Skipping detection; subscription is already tracked:', serviceName);
+      return;
+    }
     if (!subs[serviceName]) {
       subs[serviceName] = {
         serviceName,
@@ -1509,6 +1516,12 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
     return null;
   }
   if (serviceName && (!hasBillingSignal || !hasStrongContext || (!hasFinancialEvidence && !senderMatchesService && !subjectMatchesService))) {
+    return null;
+  }
+
+  // A provider notification without a positive charge or renewal date is not
+  // enough evidence of a paid subscription; free-plan messages are common.
+  if (amount === null && renewalDate === null) {
     return null;
   }
 

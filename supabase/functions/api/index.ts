@@ -1917,16 +1917,32 @@ runtimeDeno?.serve?.(async (req: Request) => {
           }
 
           const normalizedName = serviceName?.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() || "";
-          const existing = (existingRows || []).find((subscription: any) => {
+          const matchesExistingSubscription = (subscription: any) => {
             const existingDomain = normalizeDomain(subscription.website_domain);
             const existingName = String(subscription.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
             return (domain && existingDomain === domain) || (normalizedName && existingName === normalizedName);
-          });
+          };
+          const matchingRows = (existingRows || []).filter(matchesExistingSubscription);
+          const existing = matchingRows.find((subscription: any) => subscription.is_detected !== true) || matchingRows[0];
 
           if (existing) {
             // Do not turn an existing active subscription into a pending detection.
             // Pending Gmail candidates should only create or update detected rows.
             if (!isApprovedForSync && existing.is_detected !== true) {
+              const duplicateDetectedIds = matchingRows
+                .filter((subscription: any) => subscription.is_detected === true && subscription.id !== existing.id)
+                .map((subscription: any) => subscription.id)
+                .filter(Boolean);
+              if (duplicateDetectedIds.length > 0) {
+                const { error: duplicateDeleteError } = await supabase
+                  .from("subscriptions")
+                  .delete()
+                  .in("id", duplicateDetectedIds)
+                  .eq("user_id", userId);
+                if (duplicateDeleteError) {
+                  errors.push(String(duplicateDeleteError.message || "duplicate detected subscription cleanup failed"));
+                }
+              }
               skipped += 1;
               continue;
             }

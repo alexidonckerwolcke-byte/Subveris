@@ -47,6 +47,18 @@ function isTierAllowed(status) {
   return status === 'premium' || status === 'family';
 }
 
+function pageShowsFreePlan() {
+  const text = String(document.body?.innerText || document.body?.textContent || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (!text) return false;
+
+  return /(?:current|your|selected|active)\s+(?:plan|tier)\s*[:\-]?\s*(?:free|basic)\b/.test(text)
+    || /\b(?:free|basic)\s+(?:plan|tier)\s*(?:active|enabled|selected|account)?\b/.test(text)
+    || /\bplan\s*[:\-]\s*(?:free|basic)\b/.test(text);
+}
+
 function isSubverisPage() {
   const hostname = window.location.hostname.replace(/^www\./i, '').toLowerCase();
   return hostname === 'subveris.com' || hostname.endsWith('.subveris.com') || hostname === 'localhost';
@@ -379,6 +391,10 @@ function getServiceNameFromDomain(domain) {
 
 function detectAndTrackSubscription() {
   if (isSubverisPage()) return;
+  if (pageShowsFreePlan()) {
+    console.log('[Extension] Skipping detection; provider account is on a free plan.');
+    return;
+  }
   getSubscriptionStatus((status) => {
     if (!isTierAllowed(status)) {
       return;
