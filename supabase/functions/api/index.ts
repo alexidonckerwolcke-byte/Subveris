@@ -507,6 +507,39 @@ async function sendCancellationNoticeEmail(userEmail: string, subscriptionDetail
   }
 }
 
+async function sendFamilyInvitationEmail(recipientEmail: string, groupName: string): Promise<void> {
+  const subject = `You have been invited to join ${groupName} on Subveris`;
+  const html = `
+    <h2>Family invitation</h2>
+    <p>You have been invited to join <strong>${groupName}</strong> on Subveris.</p>
+    <p>Sign in to Subveris to review and accept or decline this invitation. You will not be added to the family group until you accept it.</p>
+    <p><a href="https://subveris.com/family-sharing">Review invitation</a></p>
+  `;
+  const RESEND_API_KEY = Deno?.env?.get("RESEND_API_KEY")?.trim();
+  const SENDGRID_API_KEY = Deno?.env?.get("SENDGRID_API_KEY")?.trim();
+
+  if (RESEND_API_KEY) {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: "noreply@subveris.com", to: [recipientEmail], subject, html }),
+    });
+    return;
+  }
+
+  if (SENDGRID_API_KEY) {
+    await fetch("https://api.sendgrid.com/v3/mail/send", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${SENDGRID_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: recipientEmail }], subject }],
+        from: { email: "noreply@subveris.com" },
+        content: [{ type: "text/html", value: html }],
+      }),
+    });
+  }
+}
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -4524,6 +4557,90 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       }
     }
 
+    if (pathname === "/family-invitations" && req.method === "GET") {
+      const userId = extractUserId(req);
+      if (!userId) return sendJson({ error: "Unauthorized" }, { status: 401 });
+
+      const { data: invitations, error } = await supabase
+        .from("family_group_invitations")
+        .select("id, family_group_id, inviter_user_id, invitee_email, status, created_at, family_groups(name)")
+        .eq("invitee_user_id", userId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching family invitations:", error);
+        return sendJson({ error: "Failed to fetch family invitations" }, { status: 500 });
+      }
+
+      return sendJson((invitations || []).map((invitation: any) => ({
+        id: invitation.id,
+        familyGroupId: invitation.family_group_id,
+        inviterUserId: invitation.inviter_user_id,
+        inviteeEmail: invitation.invitee_email,
+        status: invitation.status,
+        createdAt: invitation.created_at,
+        groupName: invitation.family_groups?.name || "Family group",
+      })));
+    }
+
+    if (pathname.match(/^\/family-invitations\/[^/]+\/(accept|decline)$/) && req.method === "POST") {
+      const match = pathname.match(/^\/family-invitations\/([^/]+)\/(accept|decline)$/);
+      const invitationId = match?.[1];
+      const action = match?.[2];
+      const userId = extractUserId(req);
+      if (!invitationId || !action) return sendJson({ error: "Invalid invitation" }, { status: 400 });
+      if (!userId) return sendJson({ error: "Unauthorized" }, { status: 401 });
+
+      const { data: invitation, error: invitationError } = await supabase
+        .from("family_group_invitations")
+        .select("id, family_group_id, inviter_user_id, invitee_user_id, invitee_email, status")
+        .eq("id", invitationId)
+        .eq("invitee_user_id", userId)
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (invitationError || !invitation) return sendJson({ error: "Invitation not found or already handled" }, { status: 404 });
+
+      if (action === "decline") {
+        const { error } = await supabase
+          .from("family_group_invitations")
+          .update({ status: "declined", responded_at: new Date().toISOString() })
+          .eq("id", invitationId)
+          .eq("invitee_user_id", userId);
+        if (error) return sendJson({ error: "Failed to decline invitation" }, { status: 500 });
+        return sendJson({ success: true, status: "declined" });
+      }
+
+      const { data: existingMember } = await supabase
+        .from("family_group_members")
+        .select("id")
+        .eq("family_group_id", invitation.family_group_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!existingMember) {
+        const { error: memberError } = await supabase
+          .from("family_group_members")
+          .insert({
+            family_group_id: invitation.family_group_id,
+            user_id: userId,
+            role: "member",
+            email: invitation.invitee_email,
+          });
+        if (memberError) return sendJson({ error: "Failed to accept family invitation" }, { status: 500 });
+      }
+
+      const { error: acceptError } = await supabase
+        .from("family_group_invitations")
+        .update({ status: "accepted", responded_at: new Date().toISOString() })
+        .eq("id", invitationId)
+        .eq("invitee_user_id", userId);
+      if (acceptError) return sendJson({ error: "Family membership was added but invitation status failed to update" }, { status: 500 });
+
+      return sendJson({ success: true, status: "accepted", familyGroupId: invitation.family_group_id });
+    }
+
     if (pathname.match(/^\/family-groups\/[^/]+\/members$/) && req.method === "POST") {
       const match = pathname.match(/^\/family-groups\/([^/]+)\/members$/);
       const groupId = match?.[1];
@@ -4631,30 +4748,43 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           console.error('Error fetching member email:', err);
         }
 
-        const { data: insertData, error: insertError } = await supabase
-          .from('family_group_members')
+        const { data: invitationData, error: invitationError } = await supabase
+          .from('family_group_invitations')
           .insert({
             family_group_id: groupId,
-            user_id: memberUserId,
-            role: 'member',
-            email: memberEmail,
+            inviter_user_id: userId,
+            invitee_user_id: memberUserId,
+            invitee_email: memberEmail || rawIdentifier.toLowerCase(),
+            status: 'pending',
           })
           .select()
           .single();
 
-        if (insertError) {
-          console.error('Error inserting family member:', insertError);
-          return sendJson({ error: 'Failed to add family member' }, { status: 500 });
+        if (invitationError) {
+          if (String(invitationError.code) === '23505') {
+            return sendJson({ error: 'A pending invitation already exists for this user' }, { status: 409 });
+          }
+          console.error('Error creating family invitation:', invitationError);
+          return sendJson({ error: 'Failed to send family invitation' }, { status: 500 });
         }
 
+        const { data: groupDetails } = await supabase
+          .from('family_groups')
+          .select('name')
+          .eq('id', groupId)
+          .maybeSingle();
+        await sendFamilyInvitationEmail(
+          memberEmail || rawIdentifier.toLowerCase(),
+          String(groupDetails?.name || 'a Subveris family group'),
+        );
+
         return sendJson({
-          id: insertData.id,
-          familyGroupId: insertData.family_group_id,
-          userId: insertData.user_id,
-          role: insertData.role,
-          joinedAt: insertData.joined_at,
-          email: insertData.email || memberEmail,
-        }, { status: 201 });
+          id: invitationData.id,
+          familyGroupId: invitationData.family_group_id,
+          inviteeUserId: invitationData.invitee_user_id,
+          status: invitationData.status,
+          email: invitationData.invitee_email,
+        }, { status: 202 });
       } catch (error) {
         console.error('Error in POST /family-groups/:id/members:', error);
         return sendJson({ error: 'Failed to add family member' }, { status: 500 });
@@ -4774,6 +4904,29 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           return sendJson({ error: 'Only group owner can remove members' }, { status: 403 });
         }
 
+        const { data: removedMember, error: memberLookupError } = await supabase
+          .from('family_group_members')
+          .select('user_id')
+          .eq('id', memberId)
+          .eq('family_group_id', groupId)
+          .maybeSingle();
+
+        if (memberLookupError || !removedMember) {
+          return sendJson({ error: 'Family member not found' }, { status: 404 });
+        }
+
+        const { data: memberShares } = await supabase
+          .from('shared_subscriptions')
+          .select('id')
+          .eq('family_group_id', groupId)
+          .eq('shared_with_user_id', removedMember.user_id);
+        const shareIds = (memberShares || []).map((share: any) => share.id).filter(Boolean);
+
+        if (shareIds.length > 0) {
+          await supabase.from('cost_splits').delete().in('shared_subscription_id', shareIds);
+          await supabase.from('shared_subscriptions').delete().in('id', shareIds);
+        }
+
         const { error: deleteError } = await supabase
           .from('family_group_members')
           .delete()
@@ -4844,8 +4997,15 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         filteredSharedSubs = filteredSharedSubs.filter((sub: any) => sub.shared_with_user_id === userId);
       }
       // Owners see all shared subscriptions in their group
-
-      return sendJson(filteredSharedSubs);
+      const subscriptionIds = filteredSharedSubs.map((shared: any) => shared.subscription_id).filter(Boolean);
+      const { data: sharedSubscriptionRows } = subscriptionIds.length > 0
+        ? await supabase.from('subscriptions').select('*').in('id', subscriptionIds)
+        : { data: [] };
+      const subscriptionById = new Map((sharedSubscriptionRows || []).map((subscription: any) => [String(subscription.id), subscription]));
+      return sendJson(filteredSharedSubs.map((shared: any) => ({
+        ...shared,
+        subscription: subscriptionById.get(String(shared.subscription_id)) || null,
+      })));
     }
 
     if (pathname.match(/^\/family-groups\/[^/]+\/share-subscription$/) && req.method === "POST") {
@@ -4943,6 +5103,20 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           return sendJson({ error: `Failed to share subscription with member ${memberId}` }, { status: 500 });
         }
 
+        const defaultPercentage = Math.round((100 / memberIds.length) * 100) / 100;
+        const { error: splitInsertError } = await supabase
+          .from('cost_splits')
+          .upsert({
+            shared_subscription_id: newShare.id,
+            user_id: memberId,
+            percentage: defaultPercentage,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'shared_subscription_id,user_id' });
+        if (splitInsertError) {
+          console.error('Error creating default cost split:', splitInsertError);
+          return sendJson({ error: `Failed to initialize cost split for member ${memberId}` }, { status: 500 });
+        }
+
         sharedRecords.push(newShare);
       }
 
@@ -5026,7 +5200,35 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       if (req.method === 'GET') {
         const { data, error } = await supabase.from('cost_splits').select('*').eq('shared_subscription_id', sharedId);
         if (error) return sendJson({ error: 'Failed to fetch cost splits' }, { status: 500 });
-        return sendJson((data || []).map((split: any) => ({ ...split, userId: split.user_id })));
+        let normalizedSplits = (data || []).map((split: any) => ({ ...split, userId: split.user_id }));
+        if (normalizedSplits.length === 0) {
+          const { data: recipient } = await supabase
+            .from('shared_subscriptions')
+            .select('shared_with_user_id')
+            .eq('id', sharedId)
+            .eq('family_group_id', groupId)
+            .maybeSingle();
+          if (recipient?.shared_with_user_id) {
+            normalizedSplits = [{
+              shared_subscription_id: sharedId,
+              user_id: recipient.shared_with_user_id,
+              userId: recipient.shared_with_user_id,
+              percentage: 100,
+            }];
+          }
+        }
+        const { data: groupMembers } = await supabase
+          .from('family_group_members')
+          .select('user_id, email, role')
+          .eq('family_group_id', groupId);
+        return sendJson({
+          splits: normalizedSplits,
+          members: (groupMembers || []).map((member: any) => ({
+            userId: member.user_id,
+            email: member.email || null,
+            role: member.role,
+          })),
+        });
       }
 
       if (groupRow.owner_id !== userId) return sendJson({ error: 'Only the group owner can decide cost splits' }, { status: 403 });
@@ -6757,6 +6959,16 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           userId: split.user_id,
           sharedSubscriptionId: split.shared_subscription_id,
         }));
+        for (const record of sharesForVisibleRecords) {
+          const recordId = String(record.id);
+          if (!visibleCostSplits.some((split: any) => String(split.sharedSubscriptionId) === recordId)) {
+            visibleCostSplits.push({
+              sharedSubscriptionId: record.id,
+              userId: record.shared_with_user_id,
+              percentage: 100,
+            });
+          }
+        }
       }
 
       const costSplitsBySharedId = new Map<string, any[]>();
@@ -6905,6 +7117,17 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         ...record,
         costSplits: costSplitsBySharedId.get(String(record.id)) || [],
       }));
+      const assignedFamilyCost = isOwner ? 0 : (filteredSharedRecords || []).reduce((total: number, record: any) => {
+        const subscription = allSubsRaw.find((sub: any) => String(sub.id) === String(record.subscription_id));
+        if (!subscription) return total;
+        const memberSplits = (costSplitsBySharedId.get(String(record.id)) || [])
+          .filter((split: any) => String(split.userId || split.user_id) === String(userId));
+        return total + memberSplits.reduce((splitTotal: number, split: any) => {
+          const amount = Number(subscription.amount) || 0;
+          const percentage = Number(split.percentage) || 0;
+          return splitTotal + convertToUSD((amount * percentage) / 100, subscription.currency);
+        }, 0);
+      }, 0);
 
       return sendJson({
         subscriptions: payloadSubscriptions,
@@ -6922,6 +7145,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           totalMonthlySpending: totalMonthlySpending,
           memberCount: memberIds.length,
           thisMonthSavings: thisMonthSavings,
+          assignedFamilyCost: Math.round(assignedFamilyCost * 100) / 100,
         },
         spending,
         byCategory: byCategoryWithPercentages,

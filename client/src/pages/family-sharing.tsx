@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { FamilyPlanGate } from "@/components/family-plan-gate";
-import { FamilySharing } from "@/components/family-sharing";
+import { FamilyInvitations, FamilySharing } from "@/components/family-sharing";
 
 export default function FamilySharingPage() {
   const [location] = useLocation();
@@ -40,6 +40,7 @@ export default function FamilySharingPage() {
           You need to delete your family group before you can downgrade your plan.
         </div>
       )}
+      <FamilyInvitations />
       <FamilyPlanGate feature="Family Sharing" showBlurred={false}>
         <FamilySharing />
       </FamilyPlanGate>

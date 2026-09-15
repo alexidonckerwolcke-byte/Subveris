@@ -158,6 +158,29 @@ export default function Dashboard() {
   }, [familyAwareMode, familyData, monthlySpendingData]);
 
   const totalMonthlySpend = familyAwareMode ? familyCurrentMonthSpend : (metrics?.totalMonthlySpend ?? 0);
+  const calculatedAssignedFamilyCost = useMemo(() => {
+    if (!familyAwareMode || !user?.id) return 0;
+    const subscriptions = Array.isArray(familyData?.subscriptions) ? familyData.subscriptions : [];
+    const sharedSubscriptions = Array.isArray(familyData?.sharedSubscriptions) ? familyData.sharedSubscriptions : [];
+    const splits = Array.isArray(familyData?.costSplits) ? familyData.costSplits : [];
+
+    return splits.reduce((total: number, split: any) => {
+      const splitUserId = String(split?.userId || split?.user_id || "");
+      if (splitUserId !== String(user.id)) return total;
+
+      const shared = sharedSubscriptions.find((item: any) => String(item?.id) === String(split?.sharedSubscriptionId || split?.shared_subscription_id));
+      const subscriptionId = shared?.subscription_id || shared?.subscription?.id;
+      const subscription = subscriptions.find((item: any) => String(item?.id) === String(subscriptionId));
+      if (!subscription) return total;
+
+      const amount = Number(subscription.amount) || 0;
+      const percentage = Number(split?.percentage) || 0;
+      return total + convertAmount((amount * percentage) / 100, subscription.currency || "USD", "USD");
+    }, 0);
+  }, [convertAmount, familyAwareMode, familyData, user?.id]);
+  const assignedFamilyCost = familyAwareMode
+    ? Number(familyData?.metrics?.assignedFamilyCost ?? calculatedAssignedFamilyCost) || 0
+    : 0;
   const annualProjection = Math.round(totalMonthlySpend * 12 * 100) / 100;
   const activeSubscriptions = (familyAwareMode
     ? familySubscriptions
@@ -203,6 +226,13 @@ export default function Dashboard() {
       Icon: Sparkles,
       iconClass: "text-amber-500",
     },
+    ...(familyAwareMode ? [{
+      label: "Your family cost",
+      value: formatAmount(assignedFamilyCost),
+      helper: "assigned share",
+      Icon: DollarSign,
+      iconClass: "text-rose-500",
+    }] : []),
   ];
 
   const upcomingRenewals = useMemo(() => getUpcomingRenewals(subscriptions), [subscriptions]);

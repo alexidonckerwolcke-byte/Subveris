@@ -36,6 +36,51 @@ import { useCurrency, type Currency } from "@/lib/currency-context";
 import { useAuth } from "@/lib/auth-context";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
 
+export function FamilyInvitations() {
+  const { toast } = useToast();
+  const { data: invitations = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/family-invitations"],
+  });
+  const respondMutation = useMutation({
+    mutationFn: async ({ id, action }: { id: string; action: "accept" | "decline" }) => {
+      const response = await apiRequest("POST", `/api/family-invitations/${id}/${action}`);
+      return response.json();
+    },
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/family-invitations"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/family-groups"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/family-groups/me/membership"] });
+      toast({ title: variables.action === "accept" ? "Invitation accepted" : "Invitation declined" });
+    },
+    onError: (error: any) => toast({ title: "Invitation error", description: error?.message || "Could not respond to the invitation.", variant: "destructive" }),
+  });
+
+  if (isLoading || invitations.length === 0) return null;
+
+  return (
+    <Card className="border-amber-200 bg-amber-50/60">
+      <CardHeader>
+        <CardTitle className="text-base">Family invitations</CardTitle>
+        <CardDescription>Accept an invitation before joining a family group.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {invitations.map((invitation: any) => (
+          <div key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 rounded border bg-background p-3">
+            <div>
+              <p className="text-sm font-medium">{invitation.groupName}</p>
+              <p className="text-xs text-muted-foreground">Invitation for {invitation.inviteeEmail}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => respondMutation.mutate({ id: invitation.id, action: "accept" })} disabled={respondMutation.isPending}>Accept</Button>
+              <Button size="sm" variant="outline" onClick={() => respondMutation.mutate({ id: invitation.id, action: "decline" })} disabled={respondMutation.isPending}>Decline</Button>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function FamilySharing() {
   const { toast } = useToast();
   const { formatAmount } = useCurrency();
@@ -61,18 +106,34 @@ export function FamilySharing() {
     queryKey: ["/api/family-groups"],
   });
 
+  const { data: familyInvitations = [] } = useQuery<any[]>({
+    queryKey: ["/api/family-invitations"],
+  });
+
+  const respondToInvitationMutation = useMutation({
+    mutationFn: async ({ invitationId, action }: { invitationId: string; action: "accept" | "decline" }) => {
+      const response = await apiRequest("POST", `/api/family-invitations/${invitationId}/${action}`);
+      return response.json();
+    },
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/family-invitations"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/family-groups"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/family-groups/me/membership"] });
+      toast({
+        title: variables.action === "accept" ? "Invitation accepted" : "Invitation declined",
+        description: variables.action === "accept" ? "You are now a member of the family group." : "The family invitation was declined.",
+      });
+    },
+    onError: (error: any) => toast({ title: "Invitation error", description: error?.message || "Could not respond to the invitation.", variant: "destructive" }),
+  });
+
   // Fetch family members for selected group
   const { data: members = [], isLoading: membersLoading } = useQuery<FamilyGroupMember[]>({
     queryKey: ["/api/family-groups", selectedGroupId, "members"],
     enabled: !!selectedGroupId,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
-
-  // Create a member lookup map for efficient owner lookup
-  const memberLookup = members.reduce((acc, member) => {
-    const uid = (member as any).userId ?? (member as any).user_id;
-    if (uid) acc[uid] = member;
-    return acc;
-  }, {} as Record<string, any>);
 
   const getMemberDisplayName = (member: any, includeYou = true) => {
     const memberId = member?.userId ?? member?.user_id;
@@ -149,14 +210,14 @@ export function FamilySharing() {
 
   const sharedSubscriptionsWithDetails = (sharedSubscriptions || []).map((shared) => ({
     ...shared,
-    subscription: allSubscriptions.find((sub) => sub.id === shared.subscription_id) || null,
+    subscription: shared.subscription || allSubscriptions.find((sub) => sub.id === shared.subscription_id) || null,
   }));
 
   // Also include any shared subscriptions returned inside the `familyData`
   // payload (some endpoints return them together). Merge both sources.
   const sharedFromFamilyData = (effectiveShowFamilyData ? (familyData?.sharedSubscriptions || []) : []).map((shared: any) => ({
     ...shared,
-    subscription: allSubscriptions.find((sub) => sub.id === shared.subscription_id) || null,
+    subscription: shared.subscription || allSubscriptions.find((sub) => sub.id === shared.subscription_id) || null,
   }));
 
   // Combine all shared subscriptions from both API sources (deduplicate by id)
@@ -171,18 +232,24 @@ export function FamilySharing() {
     return true;
   });
 
-  const { data: costSplits = [] } = useQuery<any[]>({
+  const { data: costSplitResponses = [] } = useQuery<any[]>({
     queryKey: ["/api/family-groups", selectedGroupId, "cost-splits", allSharedSubscriptions.map((s: any) => s.id).join(',')],
     enabled: !!selectedGroupId && allSharedSubscriptions.length > 0,
     queryFn: async () => {
       const rows = await Promise.all(allSharedSubscriptions.map(async (shared: any) => {
         const response = await apiRequest('GET', `/api/family-groups/${selectedGroupId}/shared-subscriptions/${shared.id}/cost-splits`);
-        const splits = await response.json();
-        return (splits || []).map((split: any) => ({ ...split, sharedSubscriptionId: shared.id }));
+        const payload = await response.json();
+        return {
+          sharedSubscriptionId: shared.id,
+          splits: (payload?.splits || []).map((split: any) => ({ ...split, sharedSubscriptionId: shared.id })),
+          members: payload?.members || [],
+        };
       }));
-      return rows.flat();
+      return rows;
     },
   });
+  const costSplits = costSplitResponses.flatMap((response: any) => response.splits || []);
+  const costSplitMembers = costSplitResponses.flatMap((response: any) => response.members || []);
 
   // debug: log combined shared ids when running tests
   // eslint-disable-next-line no-console
@@ -312,8 +379,8 @@ export function FamilySharing() {
       queryClient.invalidateQueries({ queryKey: ["/api/family-groups", selectedGroupId, "members"] });
       setNewMemberEmail("");
       toast({
-        title: "Member added",
-        description: "Family member has been added successfully.",
+        title: "Invitation sent",
+        description: "The user must accept the invitation before joining the family group.",
       });
     },
     onError: (error: any) => {
@@ -333,6 +400,11 @@ export function FamilySharing() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/family-groups", selectedGroupId, "members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/family-groups", selectedGroupId, "family-data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/spending/monthly"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/spending/category"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar-events"] });
       toast({
         title: "Member removed",
         description: "Family member has been removed.",
@@ -446,22 +518,85 @@ export function FamilySharing() {
   const ownedGroups = groups.filter((g) => g.ownerId === user?.id);
   const canCreateGroup = ownedGroups.length < 1;
   const canAddMember = members.length < 5;
-  const familyMembers = members.length > 0 ? members : (familyData?.members || []);
+  const familyMembers = Array.from(new Map(
+    [
+      ...members,
+      ...(familyData?.members || []),
+      ...allSharedSubscriptions
+        .map((shared: any) => shared?.shared_with_user_id || shared?.sharedWithUserId)
+        .filter(Boolean)
+        .map((memberId: string) => ({ userId: memberId })),
+      ...costSplits
+        .map((split: any) => split?.userId || split?.user_id)
+        .filter(Boolean)
+        .map((memberId: string) => ({ userId: memberId })),
+      ...costSplitMembers,
+    ]
+      .map((member: any) => [member?.userId || member?.user_id, member] as const)
+      .filter(([memberId]) => Boolean(memberId))
+  ).values());
+  const memberLookup = familyMembers.reduce((acc, member: any) => {
+    const uid = member.userId ?? member.user_id;
+    if (uid) acc[uid] = member;
+    return acc;
+  }, {} as Record<string, any>);
+  const splitMemberIds = new Set<string>();
+  if (splitDialogShared?.subscription?.id) {
+    allSharedSubscriptions
+      .filter((shared: any) => String(shared.subscription_id) === String(splitDialogShared.subscription.id))
+      .map((shared: any) => shared.shared_with_user_id || shared.sharedWithUserId)
+      .filter(Boolean)
+      .forEach((memberId: string) => splitMemberIds.add(String(memberId)));
+    costSplits
+      .filter((split: any) => String(split.sharedSubscriptionId) === String(splitDialogShared.id))
+      .map((split: any) => split.userId || split.user_id)
+      .filter(Boolean)
+      .forEach((memberId: string) => splitMemberIds.add(String(memberId)));
+  }
+  const splitMembers = Array.from(splitMemberIds).map((memberId) =>
+    memberLookup[memberId] || { userId: memberId }
+  );
   const costDashboard = allSharedSubscriptions.map((shared: any) => {
     const subscription = shared.subscription;
     const splits = costSplits.filter((split: any) => split.sharedSubscriptionId === shared.id);
     return { shared, subscription, splits };
   }).filter((row: any) => row.subscription && row.splits.length > 0);
   const memberCostTotals = familyMembers.reduce((totals: Record<string, number>, member: any) => {
-    totals[member.userId || member.user_id] = 0;
+    const memberId = member.userId || member.user_id;
+    if (memberId) totals[String(memberId)] = 0;
     return totals;
   }, {});
   costDashboard.forEach(({ subscription, splits }) => splits.forEach((split: any) => {
-    if (Object.prototype.hasOwnProperty.call(memberCostTotals, split.userId)) memberCostTotals[split.userId] += Number(subscription.amount || 0) * Number(split.percentage || 0) / 100;
+    const splitUserId = split.userId || split.user_id;
+    if (splitUserId && Object.prototype.hasOwnProperty.call(memberCostTotals, String(splitUserId))) {
+      memberCostTotals[String(splitUserId)] += Number(subscription.amount || 0) * Number(split.percentage || 0) / 100;
+    }
   }));
 
   return (
     <div className="space-y-4">
+      {familyInvitations.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/60">
+          <CardHeader>
+            <CardTitle className="text-base">Family invitations</CardTitle>
+            <CardDescription>Accept an invitation before joining a family group.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {familyInvitations.map((invitation: any) => (
+              <div key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 rounded border bg-background p-3">
+                <div>
+                  <p className="text-sm font-medium">{invitation.groupName}</p>
+                  <p className="text-xs text-muted-foreground">Invitation for {invitation.inviteeEmail}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => respondToInvitationMutation.mutate({ invitationId: invitation.id, action: "accept" })} disabled={respondToInvitationMutation.isPending}>Accept</Button>
+                  <Button size="sm" variant="outline" onClick={() => respondToInvitationMutation.mutate({ invitationId: invitation.id, action: "decline" })} disabled={respondToInvitationMutation.isPending}>Decline</Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
       {/* Create New Group */}
       <Card>
         <CardHeader>
@@ -583,7 +718,7 @@ export function FamilySharing() {
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {familyMembers.map((member: any) => {
                   const memberId = member.userId || member.user_id;
-                  return <div key={memberId} className="rounded-lg border bg-muted/30 p-3"><div className="text-sm font-medium">{getMemberDisplayName(member)}</div><div className="mt-1 text-lg font-semibold">{formatAmount(memberCostTotals[memberId] || 0)}</div><div className="text-xs text-muted-foreground">Assigned shared costs</div></div>;
+                  return <div key={memberId} className="rounded-lg border bg-muted/30 p-3"><div className="text-sm font-medium">{getMemberDisplayName(member)}</div><div className="mt-1 text-lg font-semibold">{formatAmount(memberCostTotals[String(memberId)] || 0)}</div><div className="text-xs text-muted-foreground">Assigned shared costs</div></div>;
                 })}
               </div>
               {costDashboard.length === 0 ? <p className="text-sm text-muted-foreground">Share a subscription to start assigning costs.</p> : <div className="space-y-2">{costDashboard.map(({ shared, subscription, splits }: any) => <div key={shared.id} className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border p-3"><div className="min-w-0"><div className="break-words text-sm font-medium">{subscription.name}</div><div className="text-xs text-muted-foreground">{formatAmount(subscription.amount || 0, subscription.currency as Currency)} total</div></div><div className="flex flex-wrap items-center gap-2 text-xs">{splits.length === 0 ? <span className="text-muted-foreground">Not assigned</span> : splits.map((split: any) => <Badge key={split.userId}>{getMemberDisplayName(memberLookup[split.userId] || { userId: split.userId }, false)} {split.percentage}%</Badge>)}{isOwner && <Button size="sm" variant="outline" onClick={() => { setSplitDialogShared({ ...shared, subscription }); setSplitValues(Object.fromEntries(splits.map((split: any) => [split.userId, String(split.percentage)]))); }}>Edit split</Button>}</div></div>)}</div>}
@@ -599,7 +734,7 @@ export function FamilySharing() {
                 <Alert className="bg-blue-50 border-blue-200">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-blue-900 text-sm">
-                  <strong>Note:</strong> Family members must create an account first before you can add them to your family group.
+                  <strong>Note:</strong> The user must already have an account and accept the invitation before they join your family group.
                 </AlertDescription>
               </Alert>
 
@@ -1123,11 +1258,11 @@ export function FamilySharing() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Share with family members:</label>
               <div className="space-y-2 max-h-40 overflow-y-auto">
-                {members
+                {familyMembers
                   .filter((member) => {
                     const mid = (member as any).userId ?? (member as any).user_id;
                     const subOwnerId = (subscriptionToShare as any)?.userId ?? (subscriptionToShare as any)?.user_id;
-                    return mid !== subOwnerId && mid !== selectedGroup?.ownerId;
+                    return String(mid) !== String(subOwnerId) && String(mid) !== String(selectedGroup?.ownerId);
                   })
                   .map((member, index) => {
                     const mid = (member as any).userId ?? (member as any).user_id;
@@ -1195,7 +1330,7 @@ export function FamilySharing() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-4">
-            {familyMembers.map((member: any) => {
+            {splitMembers.map((member: any) => {
               const memberId = member.userId || member.user_id;
               return <div key={memberId} className="flex items-center gap-3"><span className="min-w-0 flex-1 break-words text-sm">{getMemberDisplayName(member)}</span><Input className="w-24" type="number" min="0" max="100" step="1" value={splitValues[memberId] ?? ''} onChange={(event) => setSplitValues((current) => ({ ...current, [memberId]: event.target.value }))} /><span className="text-sm text-muted-foreground">%</span></div>;
             })}
