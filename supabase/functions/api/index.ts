@@ -1424,6 +1424,17 @@ async function getSubscriptionById(userId: string, subscriptionId: string) {
     return subscription;
   }
 
+  const { data: sharedAccess } = await supabase
+    .from('shared_subscriptions')
+    .select('id')
+    .eq('subscription_id', subscriptionId)
+    .eq('shared_with_user_id', userId)
+    .limit(1)
+    .maybeSingle();
+  if (sharedAccess) {
+    return subscription;
+  }
+
   return null;
 }
 
@@ -3288,6 +3299,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }
 
         let matchingSubscription: any = null;
+        let matchingSharedSubscriptionId: string | null = null;
         const normalizedDomain = normalizeDomain(typeof body.domain === "string" ? body.domain : null);
         const serviceUrl = typeof body.serviceUrl === "string" && body.serviceUrl.trim()
           ? body.serviceUrl.trim()
@@ -3295,11 +3307,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
             ? body.websiteUrl.trim()
             : null;
         if (normalizedDomain) {
-          const subscriptionLookupUserIds = familyTrackableUserIds.length > 0 ? familyTrackableUserIds : [userId];
           const { data: matchingSubscriptions, error: matchingError } = await supabase
             .from("subscriptions")
             .select("*")
-            .in("user_id", subscriptionLookupUserIds)
+              .eq("user_id", userId)
             .neq("status", "deleted");
 
           if (!matchingError && matchingSubscriptions?.length) {
@@ -3316,6 +3327,31 @@ runtimeDeno?.serve?.(async (req: Request) => {
                   normalizedServiceName.includes(subscriptionName)
                 ));
             }) || null;
+
+          if (!matchingSubscription) {
+            const { data: sharedRows } = await supabase
+              .from('shared_subscriptions')
+              .select('id, subscription_id')
+              .eq('shared_with_user_id', userId);
+            const sharedSubscriptionIds = (sharedRows || []).map((row: any) => row.subscription_id).filter(Boolean);
+            if (sharedSubscriptionIds.length > 0) {
+              const { data: sharedSubscriptions } = await supabase
+                .from('subscriptions')
+                .select('*')
+                .in('id', sharedSubscriptionIds)
+                .neq('status', 'deleted');
+              const normalizedServiceName = String(body.serviceName || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+              const sharedMatch = (sharedSubscriptions || []).find((subscription: any) => {
+                const subscriptionDomain = normalizeDomain(subscription.website_domain);
+                const subscriptionName = String(subscription.name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+                return subscriptionDomain === normalizedDomain || (normalizedServiceName && (subscriptionName === normalizedServiceName || subscriptionName.includes(normalizedServiceName) || normalizedServiceName.includes(subscriptionName)));
+              });
+              if (sharedMatch) {
+                matchingSubscription = sharedMatch;
+                matchingSharedSubscriptionId = String((sharedRows || []).find((row: any) => String(row.subscription_id) === String(sharedMatch.id))?.id || '');
+              }
+            }
+          }
           }
         }
 
