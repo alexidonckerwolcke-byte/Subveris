@@ -75,6 +75,9 @@ export default function Privacy() {
                 We do not use Google user data for advertising, profiling, credit decisions, lending, data brokerage, or unrelated analytics.
                 We do not sell Google user data or use it to create advertising databases. We do not use Google user data to develop, improve,
                 or train generalized or non-personalized artificial intelligence or machine-learning models.
+                The use of raw or derived user data received from Google Workspace APIs will adhere to the Google User Data Policy,
+                including the Limited Use requirements. Gmail-derived data is used only for the requesting user&apos;s personalized,
+                user-facing subscription-detection and subscription-management features.
                 We may share the minimum data needed with service providers that operate Subveris, such as Supabase for database and authentication
                 services and Stripe for payment processing, solely to provide or improve Subveris features requested by you.
               </p>
