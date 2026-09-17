@@ -125,6 +125,7 @@ function Router({ user }: { user: any }) {
 
   const publicRoutes = [
     <Route key="home" path="/" component={HomePage} />,
+    <Route key="login" path="/login" component={Login} />,
     <Route key="privacy" path="/privacy" component={Privacy} />,
     <Route key="cookies" path="/cookies" component={Cookies} />,
     <Route key="terms" path="/terms" component={Terms} />,
