@@ -335,7 +335,7 @@ function loadKnownSubscriptions() {
         return;
       }
 
-      const merged = { ...existingSubs };
+      const merged = {};
 
       subscriptions.forEach((sub) => {
         const isStripeBillingSubscription =
@@ -383,50 +383,7 @@ function loadKnownSubscriptions() {
 function addDetectedSubscription(serviceName, domain) {
   if (!serviceName) return;
 
-  browser.storage.local.get(['detectedSubscriptions'], (result) => {
-    const subs = result.detectedSubscriptions || {};
-    const now = Date.now();
-    const existing = subs[serviceName];
-    if (existing?.subscriptionId && existing.source === 'api-subscriptions') {
-      console.log('[Background] Skipping detection; subscription is already tracked:', serviceName);
-      return;
-    }
-    if (!subs[serviceName]) {
-      subs[serviceName] = {
-        serviceName,
-        domain,
-        serviceUrl: `https://${domain}/`,
-        detectedAt: now,
-        lastSeen: now,
-        lastVisit: now,
-        visitCount: 1,
-        monthlyPrice: MONTHLY_PRICES[serviceName] || null,
-        requiresReview: true,
-        approvedForSync: false,
-        isDetectedCandidate: true,
-      };
-    } else {
-      subs[serviceName].lastSeen = now;
-      subs[serviceName].lastVisit = now;
-      subs[serviceName].domain = domain || subs[serviceName].domain;
-      subs[serviceName].serviceUrl = subs[serviceName].serviceUrl || `https://${domain}/`;
-      subs[serviceName].visitCount = (existing.visitCount || 0) + 1;
-      subs[serviceName].requiresReview = true;
-      subs[serviceName].approvedForSync = false;
-      subs[serviceName].isDetectedCandidate = true;
-      if (!subs[serviceName].monthlyPrice && MONTHLY_PRICES[serviceName]) {
-        subs[serviceName].monthlyPrice = MONTHLY_PRICES[serviceName];
-      }
-    }
-
-    browser.storage.local.set({ detectedSubscriptions: subs }, () => {
-      if (browser.runtime.lastError) {
-        console.error('[Background] Failed to store detected subscription:', browser.runtime.lastError);
-        return;
-      }
-      console.log('[Background] ✅ Added detected subscription pending approval:', serviceName);
-    });
-  });
+  console.log('[Background] Skipping unauthorised subscription candidate; usage requires an existing Subveris subscription:', serviceName);
 }
 
 function approveReviewedSubscription(serviceName, callback = () => {}) {
@@ -786,7 +743,6 @@ function runCookieSessionScan() {
 
     browser.cookies.getAll({}, (cookies) => {
       const domains = [];
-      const detectedServices = {};
       const seenDomains = new Set();
       const keywordPattern = /(sess|auth|uid)/i;
 
@@ -803,25 +759,12 @@ function runCookieSessionScan() {
         if (domain && !seenDomains.has(domain)) {
           seenDomains.add(domain);
           domains.push(domain);
-
-          // Try to map this domain to a subscription service
-          const serviceName = getServiceNameFromDomain(domain);
-          if (serviceName) {
-            detectedServices[serviceName] = {
-              serviceName,
-              domain,
-              detectedAt: Date.now(),
-              lastSeen: Date.now()
-            };
-            console.log('[Background] Detected subscription from cookie:', serviceName, 'on', domain);
-          }
         }
       });
 
       browser.storage.local.set({
         cookieScanCompleted: true,
-        lastCookieScanAt: Date.now(),
-        detectedSubscriptions: detectedServices
+        lastCookieScanAt: Date.now()
       }, () => {
         if (browser.runtime.lastError) {
           console.error('[Background] Failed to persist cookie scan state:', browser.runtime.lastError);
@@ -840,10 +783,8 @@ function runCookieSessionScan() {
           return;
         }
 
-        // Sync detected services instead of raw domains
         const payload = JSON.stringify({
           domains,
-          detectedSubscriptions: Object.values(detectedServices),
           source: 'cookie-session-scan',
           scannedAt: Date.now()
         });
@@ -1129,14 +1070,13 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'DETECT_SUBSCRIPTION') {
     const { serviceName, domain, detectedAt } = request;
-    console.log('[Background] DETECT_SUBSCRIPTION request for:', serviceName);
+    console.log('[Background] Ignoring authenticated-session detection without an existing Subveris subscription:', serviceName);
     ensureTierAccess((allowed, status) => {
       if (!allowed) {
         sendResponse({ success: false, error: `Extension requires an active Premium or Family plan (current: ${status || 'unknown'}).` });
         return;
       }
-      addDetectedSubscription(serviceName, domain);
-      sendResponse({ success: true, detected: serviceName });
+      sendResponse({ success: false, skipped: true, error: 'An authenticated website session is not proof of a subscription.' });
     });
     return true;
   }
@@ -1256,8 +1196,18 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
           const launchError = browser.runtime.lastError;
           if (!redirectUrl) {
             const errorMessage = launchError?.message || 'OAuth flow ended without a callback';
-            console.error('[Background] Gmail OAuth did not return a callback:', errorMessage);
-            sendResponse({ success: false, error: errorMessage });
+            const userDidNotApprove = /did not approve|access was denied|cancelled|canceled|aborted/i.test(errorMessage);
+            if (userDidNotApprove) {
+              console.info('[Background] Gmail OAuth was not completed because access was not approved.');
+              sendResponse({
+                success: false,
+                cancelled: true,
+                error: 'Gmail access was not approved. Select Allow on the Google consent screen to connect Gmail.'
+              });
+            } else {
+              console.error('[Background] Gmail OAuth did not return a callback:', errorMessage);
+              sendResponse({ success: false, error: errorMessage });
+            }
             return;
           }
 

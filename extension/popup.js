@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!dashboard || !list) return;
 
     const subscriptions = Object.values(pruneExpiredDismissedItems(detectedSubscriptions || {}))
-      .filter((subscription) => subscription && subscription.serviceName && !subscription.requiresReview && !isDismissedRecently(subscription))
+      .filter((subscription) => subscription && subscription.serviceName && subscription.subscriptionId && subscription.source === 'api-subscriptions' && !subscription.requiresReview && !isDismissedRecently(subscription))
       .sort((left, right) => (right.lastVisit || 0) - (left.lastVisit || 0));
     const now = Date.now();
     const withUsage = subscriptions.map((subscription) => ({
@@ -480,7 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
               authorizeGmailBtn.textContent = '📧 Reauthorize Gmail';
             }, 5000);
           } else {
-            gmailStatus.textContent = '❌ Authorization failed. Try again?';
+            gmailStatus.textContent = response?.error || '❌ Authorization failed. Try again?';
             gmailStatus.style.color = '#dc3545';
             authorizeGmailBtn.disabled = false;
             authorizeGmailBtn.textContent = '📧 Connect Gmail Account';

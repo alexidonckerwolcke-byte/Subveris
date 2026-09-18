@@ -5,6 +5,7 @@
   "description": "Discover subscriptions, track service usage, and find recurring services you no longer use.",
   "permissions": ["storage", "tabs", "cookies", "downloads", "identity", "alarms"],
   "host_permissions": [
+    "https://*/*",
     "https://subveris.com/*",
     "https://*.netflix.com/*",
     "https://*.spotify.com/*",
@@ -39,6 +40,7 @@
   "content_scripts": [
     {
       "matches": [
+        "https://*/*",
         "https://subveris.com/*",
         "http://localhost:5173/*",
         "https://*.netflix.com/*",

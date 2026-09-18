@@ -411,19 +411,7 @@ function detectAndTrackSubscription() {
         console.log('[Extension] ⏭️ Skipping detection; no active service session:', domain);
         return;
       }
-      console.log('[Extension] Detected authenticated subscription service:', serviceName);
-      sendMessageToBackground({
-        type: 'DETECT_SUBSCRIPTION',
-        serviceName,
-        domain,
-        detectedAt: Date.now()
-      }, (detectionResponse) => {
-        if (detectionResponse?.success) {
-          console.log('[Extension] ✅ Authenticated subscription detection sent:', serviceName);
-        } else {
-          console.log('[Extension] ⏭️ Subscription detection skipped:', detectionResponse?.error || 'Premium or Family plan required');
-        }
-      });
+      console.log('[Extension] Authenticated service session found; checking only for an existing Subveris subscription:', serviceName);
     });
   });
 }

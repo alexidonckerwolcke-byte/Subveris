@@ -1174,8 +1174,12 @@ async function loadSubscriptions(userId: string, page = 1, perPage = 1000, exclu
     .from("subscriptions")
     .select("*", { count: "exact" })
     .eq("user_id", userId)
+    .neq("status", "deleted")
     .order("created_at", { ascending: false });
-  if (excludeDetected) query = query.eq("is_detected", false);
+  if (excludeDetected) {
+    query = query.eq("is_detected", false).gt("amount", 0);
+  }
+  else query = query.gt("amount", 0);
   const { data, count, error } = await query.range(rangeStart, rangeEnd);
 
   if (error) {
@@ -1949,9 +1953,9 @@ runtimeDeno?.serve?.(async (req: Request) => {
             : null;
           if (!domain && !serviceName) continue;
 
-          const { data: existingRows, error: lookupError } = await supabase
+          const { data: ownRows, error: lookupError } = await supabase
             .from("subscriptions")
-            .select("id, name, website_domain, is_detected")
+            .select("id, user_id, name, website_domain, is_detected")
             .eq("user_id", userId)
             .neq("status", "deleted");
           if (lookupError) {
@@ -1959,6 +1963,20 @@ runtimeDeno?.serve?.(async (req: Request) => {
               errors.push(String(lookupError.message || "subscription lookup failed"));
             continue;
           }
+
+          const { data: sharedRows } = await supabase
+            .from("shared_subscriptions")
+            .select("subscription_id")
+            .eq("shared_with_user_id", userId);
+          const sharedSubscriptionIds = (sharedRows || []).map((row: any) => row.subscription_id).filter(Boolean);
+          const { data: sharedSubscriptions } = sharedSubscriptionIds.length > 0
+            ? await supabase
+              .from("subscriptions")
+              .select("id, user_id, name, website_domain, is_detected")
+              .in("id", sharedSubscriptionIds)
+              .neq("status", "deleted")
+            : { data: [] };
+          const existingRows = [...(ownRows || []), ...(sharedSubscriptions || [])];
 
           const normalizedName = serviceName?.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() || "";
           const matchesExistingSubscription = (subscription: any) => {
@@ -1997,8 +2015,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             const { error: updateError } = await supabase
               .from("subscriptions")
               .update(updatePayload)
-              .eq("id", existing.id)
-              .eq("user_id", userId);
+              .eq("id", existing.id);
             if (!updateError) persisted += 1;
             else errors.push(String(updateError.message || "subscription update failed"));
             continue;
@@ -6942,6 +6959,8 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         .in("user_id", memberIds);
       if (!includeDetected) {
         allSubscriptionsQuery = allSubscriptionsQuery.eq("is_detected", false);
+      } else {
+        allSubscriptionsQuery = allSubscriptionsQuery.gt("amount", 0);
       }
       const { data: allSubscriptions, error: subsError } = await allSubscriptionsQuery;
 

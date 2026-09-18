@@ -135,6 +135,7 @@ export default function DetectedSubscriptions() {
   const dismissDetectedMutation = useMutation({
     mutationFn: async (subscriptionId: string) => {
       const res = await apiRequest("PATCH", `/api/subscriptions/${subscriptionId}`, {
+        status: "deleted",
         isDetected: false,
       });
       const data = await res.json();
