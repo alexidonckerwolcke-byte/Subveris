@@ -84,11 +84,27 @@ export default function Privacy() {
             </div>
 
             <div>
+              <h2 className="text-lg font-semibold">Google User Data and Gmail Limited Use</h2>
+              <p className="mt-3 text-muted-foreground">
+                When you choose Connect Gmail, Subveris uses Google OAuth to access the Gmail account you authorize. The Gmail integration accesses message search results, message headers, message dates, sender information, subjects, and the limited message content needed to identify subscription receipts, invoices, renewals, charges, service names, prices, currencies, and billing dates. It does not access Gmail unless you authorize the connection, and it does not intentionally access unrelated messages.
+              </p>
+              <p className="mt-3 text-muted-foreground">
+                Subveris uses this Google user data only to provide and improve the user-facing Gmail subscription discovery, subscription tracking, renewal, cost, and account-management features you request. It is not used for advertising, profiling, credit or lending decisions, data brokerage, unrelated analytics, or generalized artificial-intelligence or machine-learning training.
+              </p>
+              <p className="mt-3 text-muted-foreground">
+                Extracted subscription information is stored with your Subveris account in Supabase so the application can show subscription candidates and user-approved subscriptions. Full Gmail message content is not intentionally retained after processing. Gmail OAuth credentials are stored only as needed for the authorized Gmail scan, are not sold or shared for unrelated purposes, and are deleted when you disconnect Gmail or delete your account. You can request deletion of Gmail-derived subscription data by deleting your account or contacting Subveris.
+              </p>
+              <p className="mt-3 text-muted-foreground">
+                Google user data is disclosed only to Subveris personnel and service providers necessary to operate the requested feature, primarily Supabase for authentication, database storage, and hosted API functions. It is not sold, rented, or transferred to advertising networks or other unrelated third parties. All use and transfer of Google user data follows the Google User Data Policy, including the Limited Use requirements.
+              </p>
+            </div>
+
+            <div>
               <h2 className="text-lg font-semibold">Browser Extension Data Collection</h2>
               <p className="mt-3 text-muted-foreground font-medium">What the Extension Collects</p>
               <ul className="mt-2 space-y-2 text-muted-foreground list-disc pl-6">
                 <li><strong>Website Visits:</strong> We track when you visit subscription service websites (Netflix, Spotify, Adobe, etc.) and measure time spent on each site to understand your usage patterns.</li>
-                <li><strong>Authentication Cookies:</strong> On first login, the extension scans for authentication session cookies to identify which services you're logged into.</li>
+                <li><strong>Authentication Cookies:</strong> On first login, the extension may inspect authentication session cookies to identify active website sessions. Being logged into a website is not treated as proof that you pay for a subscription, and these session signals do not create or count a Subveris subscription by themselves.</li>
                 <li><strong>Gmail Receipts:</strong> With your permission via OAuth, we scan your Gmail inbox for subscription-related emails (receipts, invoices, renewals) and extract service names and amounts. This scan runs periodically and we retain only the extracted subscription information, not the full email content.</li>
                 <li><strong>CSV Imports:</strong> The extension automatically detects subscription list CSV files in your Downloads folder and parses them to extract subscription data.</li>
               </ul>

@@ -449,6 +449,15 @@ export default function Settings() {
                 Export
               </Button>
             </div>
+            <div className="flex items-center justify-between p-4 rounded-lg border border-border">
+              <div>
+                <p className="font-medium">Privacy Policy</p>
+                <p className="text-sm text-muted-foreground">Review how Subveris accesses, uses, stores, and shares data</p>
+              </div>
+              <Button asChild variant="outline" size="sm">
+                <a href="/privacy">View</a>
+              </Button>
+            </div>
             <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/30 bg-destructive/5">
               <div>
                 <p className="font-medium text-destructive">Delete Account</p>
