@@ -10,6 +10,26 @@ let lastForwardedAuthKey = null;
 let authForwardInFlightKey = null;
 let pricingScanTimer = null;
 let pricingObserver = null;
+let usageSessionActive = null;
+
+const USAGE_SESSION_INACTIVITY_MS = 30 * 60 * 1000;
+
+function initializeUsageSession() {
+  if (isSubverisPage()) return;
+  const domain = getRootDomain(window.location.hostname);
+  const key = `subveris-usage-activity:${domain}`;
+  const now = Date.now();
+
+  try {
+    browser.storage.local.get([key], (result) => {
+      const lastActivity = Number(result?.[key] || 0);
+      usageSessionActive = !lastActivity || now - lastActivity >= USAGE_SESSION_INACTIVITY_MS;
+      browser.storage.local.set({ [key]: now });
+    });
+  } catch {
+    usageSessionActive = true;
+  }
+}
 
 function isExtensionContextInvalidated(error) {
   return String(error?.message || error || '').toLowerCase().includes('extension context invalidated');
@@ -622,6 +642,7 @@ function observePricingChanges() {
 console.log(`[Extension] Content script loaded on: ${window.location.hostname} (build ${EXTENSION_BUILD})`);
 
 // Initialize auth token immediately
+initializeUsageSession();
 getAuthToken().then((token) => {
   if (token) {
     console.log('[Extension] ✅ Auth token loaded on page load');
@@ -632,9 +653,14 @@ getAuthToken().then((token) => {
 
 function trackUsageIfNeeded() {
   if (window.__subverisUsageSent || isSubverisPage()) return;
+  if (usageSessionActive !== true) {
+    console.log('[Extension] Skipping repeat usage while the domain session is still active.');
+    return;
+  }
 
   const endTime = Date.now();
   const timeSpent = Math.round((endTime - startTime) / 1000);
+  const domain = getRootDomain(window.location.hostname);
 
   console.log(`[Extension] Page unload detected. Time spent: ${timeSpent}s on ${window.location.hostname}`);
 
@@ -644,7 +670,6 @@ function trackUsageIfNeeded() {
   }
 
   window.__subverisUsageSent = true;
-  const domain = getRootDomain(window.location.hostname);
   console.log(`[Extension] 📊 Tracking usage for domain: ${domain}`);
   // The background worker performs the authoritative plan check and can refresh stale status.
   sendUsageTracking(domain, timeSpent);

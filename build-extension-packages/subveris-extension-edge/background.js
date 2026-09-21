@@ -1393,6 +1393,12 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
     return null;
   }
 
+  const senderDomain = getGmailSenderDomain(from);
+  const lowerSubject = String(subject || '').toLowerCase();
+  if (senderDomain === 'subveris.com' || /\bsubveris\b/i.test(lowerSubject)) {
+    return null;
+  }
+
   const servicePatterns = {
     Netflix: ['netflix', 'netflix subscription charge'],
     'Spotify Premium': ['spotify', 'spotify premium membership'],
@@ -1440,8 +1446,6 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
   };
 
   const lowerText = fullText.toLowerCase();
-  const lowerSubject = String(subject || '').toLowerCase();
-  const senderDomain = getGmailSenderDomain(from);
   let serviceName = null;
   let matchedPatterns = [];
   for (const [name, patterns] of Object.entries(servicePatterns)) {
