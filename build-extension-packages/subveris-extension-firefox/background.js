@@ -635,15 +635,21 @@ function isTierAllowed(status) {
 }
 
 function refreshSubscriptionStatus(callback = () => {}) {
-  browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl'], (result) => {
+  browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl', 'subscription_status'], (result) => {
     const token = result.authToken;
     const planToken = result.supabaseAuthToken || token;
+    const cachedStatus = String(result.subscription_status || 'free').toLowerCase();
     const configuredApiUrl = normalizeApiUrl(result.subverisApiUrl);
     const apiUrls = configuredApiUrl === DEFAULT_API_URL
       ? [DEFAULT_API_URL]
       : [configuredApiUrl, DEFAULT_API_URL];
     if (!token) {
-      browser.storage.local.set({ subscription_status: 'free', trackingPaused: true }, () => callback('free'));
+      if (isTierAllowed(cachedStatus)) {
+        console.info('[Background] Offline/no session token; preserving cached paid plan:', cachedStatus);
+        callback(cachedStatus);
+      } else {
+        browser.storage.local.set({ subscription_status: 'free', trackingPaused: true }, () => callback('free'));
+      }
       return;
     }
 
@@ -669,7 +675,12 @@ function refreshSubscriptionStatus(callback = () => {}) {
           return;
         }
         console.warn('[Background] Failed to refresh subscription status:', error);
-        callback(null, error);
+        if (isTierAllowed(cachedStatus)) {
+          console.info('[Background] Offline plan check; preserving cached paid plan:', cachedStatus);
+          callback(cachedStatus, error);
+        } else {
+          callback(null, error);
+        }
       });
     };
 
