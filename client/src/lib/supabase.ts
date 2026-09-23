@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { navigatorLock } from '@supabase/auth-js';
 
 function readEnvValue(...names: string[]) {
   const env = import.meta.env as Record<string, string | undefined>;
@@ -64,6 +65,17 @@ function createSupabaseStub(): any {
 
 const { supabaseUrl, supabaseAnonKey, hasConfig } = resolveSupabaseConfig();
 
+async function supabaseLock<R>(name: string, acquireTimeout: number, fn: () => Promise<R>) {
+  try {
+    return await navigatorLock(name, acquireTimeout, fn);
+  } catch (error) {
+    if (acquireTimeout === 0 && (error as { isAcquireTimeout?: boolean })?.isAcquireTimeout) {
+      return undefined as R;
+    }
+    throw error;
+  }
+}
+
 if (!hasConfig) {
   console.warn('Missing Supabase credentials. Some features may not work.');
 }
@@ -72,6 +84,7 @@ export const supabase = hasConfig
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         detectSessionInUrl: true,
+        lock: supabaseLock,
       },
     })
   : createSupabaseStub();
