@@ -2,7 +2,7 @@
 // Safari 15+, Firefox, and Edge use 'browser' global
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
 const browser = globalThis.browser || globalThis.chrome;
-const EXTENSION_BUILD = '1.2.8';
+const EXTENSION_BUILD = '1.2.9';
 
 let startTime = Date.now();
 let cachedAuthToken = null;
@@ -303,7 +303,11 @@ window.addEventListener('message', (event) => {
         }
       } else {
         if (response?.success) lastForwardedAuthKey = authKey;
-        console.log('[Extension] Background script storage response:', response);
+        console.log('[Extension] Background script storage response:', {
+          success: response?.success === true,
+          stored: response?.stored === true,
+          status: response?.status || null,
+        });
       }
     });
 
