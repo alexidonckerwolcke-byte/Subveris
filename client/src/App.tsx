@@ -243,11 +243,7 @@ function AppContent() {
                         <DropdownMenuTrigger asChild>
                           <button className="flex items-center gap-2 rounded px-2 py-1 hover:bg-accent">
                             <Avatar className="h-8 w-8">
-                              {user?.user_metadata?.avatar_url ? (
-                                <AvatarImage src={user.user_metadata.avatar_url} alt={user.email} />
-                              ) : (
-                                <AvatarFallback>{(user.email || "U").charAt(0).toUpperCase()}</AvatarFallback>
-                              )}
+                              <AvatarFallback>{(user.email || "U").charAt(0).toUpperCase()}</AvatarFallback>
                             </Avatar>
                           </button>
                         </DropdownMenuTrigger>
