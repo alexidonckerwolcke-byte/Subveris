@@ -7172,16 +7172,26 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         ...record,
         costSplits: costSplitsBySharedId.get(String(record.id)) || [],
       }));
-      const assignedFamilyCost = isOwner ? 0 : (filteredSharedRecords || []).reduce((total: number, record: any) => {
+      const assignedFamilyCost = (filteredSharedRecords || []).reduce((total: number, record: any) => {
         const subscription = allSubsRaw.find((sub: any) => String(sub.id) === String(record.subscription_id));
         if (!subscription) return total;
-        const memberSplits = (costSplitsBySharedId.get(String(record.id)) || [])
-          .filter((split: any) => String(split.userId || split.user_id) === String(userId));
-        return total + memberSplits.reduce((splitTotal: number, split: any) => {
-          const amount = Number(subscription.amount) || 0;
-          const percentage = Number(split.percentage) || 0;
-          return splitTotal + convertToUSD((amount * percentage) / 100, subscription.currency);
-        }, 0);
+
+        const relevantSplits = costSplitsBySharedId.get(String(record.id)) || [];
+        const memberSplits = relevantSplits.filter((split: any) => String(split.userId || split.user_id) === String(userId));
+
+        if (memberSplits.length > 0) {
+          return total + memberSplits.reduce((splitTotal: number, split: any) => {
+            const amount = Number(subscription.amount) || 0;
+            const percentage = Number(split.percentage) || 0;
+            return splitTotal + convertToUSD((amount * percentage) / 100, subscription.currency);
+          }, 0);
+        }
+
+        if (String(record.shared_with_user_id || record.sharedWithUserId || '') === String(userId) && relevantSplits.length === 0) {
+          return total + convertToUSD(Number(subscription.amount) || 0, subscription.currency);
+        }
+
+        return total;
       }, 0);
 
       return sendJson({

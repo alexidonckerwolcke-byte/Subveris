@@ -164,22 +164,38 @@ export default function Dashboard() {
     const sharedSubscriptions = Array.isArray(familyData?.sharedSubscriptions) ? familyData.sharedSubscriptions : [];
     const splits = Array.isArray(familyData?.costSplits) ? familyData.costSplits : [];
 
-    return splits.reduce((total: number, split: any) => {
-      const splitUserId = String(split?.userId || split?.user_id || "");
-      if (splitUserId !== String(user.id)) return total;
-
-      const shared = sharedSubscriptions.find((item: any) => String(item?.id) === String(split?.sharedSubscriptionId || split?.shared_subscription_id));
-      const subscriptionId = shared?.subscription_id || shared?.subscription?.id;
-      const subscription = subscriptions.find((item: any) => String(item?.id) === String(subscriptionId));
+    return sharedSubscriptions.reduce((total: number, shared: any) => {
+      const sharedId = String(shared?.id || "");
+      const userId = String(user.id);
+      const subscriptionId = String(shared?.subscription_id || shared?.subscription?.id || "");
+      const subscription = subscriptions.find((item: any) => String(item?.id) === subscriptionId);
       if (!subscription) return total;
 
-      const amount = Number(subscription.amount) || 0;
-      const percentage = Number(split?.percentage) || 0;
-      return total + convertAmount((amount * percentage) / 100, subscription.currency || "USD", "USD");
+      const relevantSplits = splits.filter((split: any) => {
+        const splitSharedId = String(split?.sharedSubscriptionId || split?.shared_subscription_id || "");
+        return splitSharedId === sharedId;
+      });
+
+      const userSplit = relevantSplits.find((split: any) => String(split?.userId || split?.user_id || "") === userId);
+      if (userSplit) {
+        const amount = Number(subscription.amount) || 0;
+        const percentage = Number(userSplit?.percentage) || 0;
+        return total + convertAmount((amount * percentage) / 100, subscription.currency || "USD", "USD");
+      }
+
+      const defaultRecipientId = String(shared?.shared_with_user_id || shared?.sharedWithUserId || "");
+      const hasExplicitSplit = relevantSplits.length > 0;
+      if (!hasExplicitSplit && defaultRecipientId === userId) {
+        const amount = Number(subscription.amount) || 0;
+        return total + convertAmount(amount, subscription.currency || "USD", "USD");
+      }
+
+      return total;
     }, 0);
   }, [convertAmount, familyAwareMode, familyData, user?.id]);
+
   const assignedFamilyCost = familyAwareMode
-    ? Number(familyData?.metrics?.assignedFamilyCost ?? calculatedAssignedFamilyCost) || 0
+    ? (Number(familyData?.metrics?.assignedFamilyCost) || calculatedAssignedFamilyCost || 0)
     : 0;
   const annualProjection = Math.round(totalMonthlySpend * 12 * 100) / 100;
   const activeSubscriptions = (familyAwareMode
