@@ -3,6 +3,36 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
+const preloadRecoveryKey = "subveris-preload-recovery";
+let hasRetriedPreload = false;
+const recoveryStorage = (() => {
+	try {
+		return window.sessionStorage;
+	} catch {
+		return null;
+	}
+})();
+
+window.addEventListener("vite:preloadError", (event) => {
+	event.preventDefault();
+
+	const lastRecovery = Number(recoveryStorage?.getItem(preloadRecoveryKey) || 0);
+	if (hasRetriedPreload || Date.now() - lastRecovery < 30_000) {
+		recoveryStorage?.removeItem(preloadRecoveryKey);
+		return;
+	}
+
+	hasRetriedPreload = true;
+	recoveryStorage?.setItem(preloadRecoveryKey, String(Date.now()));
+	const url = new URL(window.location.href);
+	url.searchParams.set("_asset_reload", String(Date.now()));
+	window.location.replace(url.toString());
+});
+
+if (new URL(window.location.href).searchParams.has("_asset_reload")) {
+	window.setTimeout(() => recoveryStorage?.removeItem(preloadRecoveryKey), 30_000);
+}
+
 // Runtime diagnostics: log React version and dispatcher presence to browser console
 try {
 	// some React internals are intentionally private — use defensively
