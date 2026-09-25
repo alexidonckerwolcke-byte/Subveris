@@ -1587,7 +1587,6 @@ function scanGmailForSubscriptions(force = false) {
         let noServiceMatchCount = 0;
         let staleOrDuplicateCount = 0;
         let failedMessageCount = 0;
-        let bodyUnavailable = false;
         const seenCandidateServices = new Set();
         let scanFinalized = false;
 
@@ -1624,8 +1623,6 @@ function scanGmailForSubscriptions(force = false) {
                       candidates: candidateCount,
                       noServiceMatch: noServiceMatchCount,
                       staleOrDuplicate: staleOrDuplicateCount,
-                      bodyUnavailable,
-                      reauthorizationRequired: bodyUnavailable,
                       pendingApproval: true,
                       sync: syncResult,
                     });
@@ -1653,7 +1650,7 @@ function scanGmailForSubscriptions(force = false) {
 
           const msg = messageQueue[messageIndex++];
 
-          fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`, {
+          fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject%2CFrom%2CDate`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${activeToken}`,
@@ -1663,20 +1660,6 @@ function scanGmailForSubscriptions(force = false) {
             if (!response.ok) {
               const statusError = new Error(`Gmail message API returned ${response.status}`);
               statusError.status = response.status;
-              if (response.status === 403) {
-                bodyUnavailable = true;
-                const metadataResponse = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject%2CFrom`, {
-                  method: 'GET',
-                  headers: {
-                    'Authorization': `Bearer ${activeToken}`,
-                    'Accept': 'application/json'
-                  }
-                });
-                if (metadataResponse.ok) {
-                  return metadataResponse.json();
-                }
-                statusError.status = metadataResponse.status || response.status;
-              }
               throw statusError;
             }
             return response.json();
@@ -1685,10 +1668,9 @@ function scanGmailForSubscriptions(force = false) {
               processedCount++;
               const subject = msgData.payload?.headers?.find(h => h.name?.toLowerCase() === 'subject')?.value || msgData.snippet || '';
               const from = msgData.payload?.headers?.find(h => h.name?.toLowerCase() === 'from')?.value || '';
-              const bodyText = extractGmailBody(msgData.payload);
-              const fullText = `${subject} ${from} ${msgData.snippet || ''} ${bodyText}`.toLowerCase();
+              const metadataText = `${subject} ${from} ${msgData.snippet || ''}`;
 
-              const candidate = buildGmailSubscriptionCandidate(subject, from, `${msgData.snippet || ''} ${bodyText}`, msgData);
+              const candidate = buildGmailSubscriptionCandidate(subject, from, metadataText, msgData);
               if (candidate) {
                 const duplicateInScan = seenCandidateServices.has(candidate.serviceName.toLowerCase());
                 if (!duplicateInScan) {
