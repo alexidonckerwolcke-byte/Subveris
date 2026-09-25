@@ -228,6 +228,14 @@ Or run manually:
 npm run update-statuses
 ```
 
+If scheduling `public.reconcile_subscription_statuses()` directly with Supabase Cron, invoke it as a function:
+
+```sql
+SELECT public.reconcile_subscription_statuses();
+```
+
+Do not use `CALL public.reconcile_subscription_statuses();`; this database object is a PostgreSQL function, not a procedure.
+
 ## Development
 
 - Frontend: React with TypeScript
