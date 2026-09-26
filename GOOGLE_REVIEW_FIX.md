@@ -56,32 +56,43 @@ Replace the placeholders with an active, dedicated test account before sending:
 
 Never put passwords, OAuth client secrets, refresh tokens, or API keys in this repository or in a public video.
 
-## 1) Demo video requirements
+## 1) Replacement demo video: recording plan
 
-Create a short demo video (30-60 seconds) that clearly shows the OAuth consent flow and the actual app functionality.
+Record a clear, continuous screen capture of the production Subveris app and installed extension. Aim for 2-4 minutes; do not compress or edit out OAuth screens. Use readable browser zoom and keep the app name/branding visible at the beginning and end. The video link must open for anyone with the link, without a sign-in or access-request wall.
 
-### What the video must show
+### Before recording
 
-1. The user opens the Subveris app and goes to Settings.
-2. The user clicks Connect Gmail.
-3. The Google OAuth consent screen appears.
-4. The user selects the Google account and approves the requested Gmail access.
-5. The app redirects back to the app and shows Gmail connected.
-6. The app begins scanning for subscription-related emails.
-7. A matching receipt or renewal email is detected and shown as a pending subscription candidate.
-8. The user reviews and approves the detected subscription.
-9. The approved item appears in the subscription list / dashboard and is associated with the account.
+- Deploy the metadata-only OAuth code and verify Google Cloud **Data Access** lists exactly `https://www.googleapis.com/auth/gmail.metadata` for this feature. Remove `gmail.readonly` if present.
+- Use the production Subveris brand/app that was submitted for verification, not a mockup or a differently named staging app.
+- Prepare an active Premium or Family Subveris test account and a dedicated Google test account. Avoid accounts blocked by payment, phone verification, or other reviewer-only checks.
+- Put a genuine subscription receipt/renewal test message in the Google test inbox. Use a sender and subject/snippet that the current metadata scanner can identify; do not rely on body-only details because the app requests metadata, not message bodies.
+- Revoke Subveris access from the test Google account before recording, or use a fresh test account, so the full first-consent flow is visible.
+- Confirm Settings and the installed extension popup both show the current metadata-only wording and are signed into the same Subveris test account.
+- Close unrelated tabs and notifications. Set the Google consent page language to **English** using the language control at the bottom-left before recording.
 
-### Suggested script
+### Record these scenes in order
 
-"I sign in to Subveris, open Settings, and click Connect Gmail. Google asks me to allow restricted read-only access to Gmail messages so Subveris can detect subscription receipts. I select my Google account and approve the request. Subveris redirects me back, shows Gmail connected, and begins scanning my inbox for billing or renewal emails. The app identifies a pending subscription from a receipt email, shows the candidate details, and I approve it. The subscription then appears in my Subveris dashboard where I can track billing, spending, and recommendations."
+1. **Identify the submitted app.** Show the browser address bar at `https://subveris.com`, Subveris branding, and the signed-in test account (mask the address if desired, but keep enough context to identify the account).
+2. **Start from Settings.** Open **Settings → Connected Services → Gmail**. Briefly show that Gmail is not connected, then click **Connect Gmail**.
+3. **Capture the complete first OAuth consent flow.** Record account selection and every consent step without cuts. On the consent page, keep the English language setting visible, expand **Show all services** if offered, and pause on the complete permission list so the Gmail metadata permission is readable. Do not obscure the Google app name or permission description. Approve the request.
+4. **Show the return and connection.** Keep recording as Google returns to the Subveris extension flow. Show the success state in the extension and the connected state in Subveris Settings.
+5. **Show the extension-popup entry point too.** Open the Subveris browser extension popup and show its Gmail authorization status. If this popup offers a separate **Connect/Reauthorize Gmail** action, initiate it and record the full consent screen and approval for this entry point as well. Both entry points should visibly request the same metadata permission. If the popup only reports the already-connected state, show that state and explain in narration that its authorization action uses the same extension OAuth flow initiated from Settings; do not imply that a second grant happened when it did not.
+6. **Demonstrate the requested scope in use.** Show the test Gmail inbox and identify the test receipt by sender, subject, and date. Return to the extension scan status and show the scan processing message metadata. Do not display unrelated email or personal content.
+7. **Show the user-facing result.** Open Subveris detected subscriptions, show the candidate and the available metadata-derived details, then review and approve it. Show the approved subscription in the subscription list/dashboard.
+8. **Show the source account remains unchanged.** Return to the test Gmail inbox and show that the source message remains present and unchanged. State that this integration does not write, delete, send, or label email.
+9. **Close with scope and app identity.** Return to Subveris and leave the branded app visible while stating the exact requested scope and that no other Gmail scopes are requested.
 
-### Best practice for the upload
+### Suggested narration
 
-- Use a real user flow, not a mock screen.
-- Make sure the consent screen is visible and readable.
-- Keep the app in focus so reviewers can see the redirect back and the connected state.
-- Show a real detected subscription after OAuth approval, not just the button.
+"This is Subveris, the application submitted for verification. I am signed in with a Premium test account and opening Settings, then Connected Services. I select Connect Gmail. This is the complete Google OAuth consent flow for Subveris. The consent page is in English, and the expanded permission list shows Gmail metadata access. The app requests `https://www.googleapis.com/auth/gmail.metadata` only. I approve it and return to Subveris, where Gmail is connected. The extension popup is another entry point to the same Gmail authorization flow. Now I’ll show the test receipt in Gmail and the scan result. Subveris uses the message metadata, including its headers, date, and available snippet, to create a pending subscription candidate. I review and approve it, and it appears in my Subveris subscription list. The original Gmail message remains unchanged. Subveris does not request full message bodies or Gmail write permissions. This video shows the complete OAuth grant and all user-facing functionality that uses the requested Gmail metadata scope. There are no additional Gmail scopes or Gmail data-access features to demonstrate."
+
+### Final video quality/access check
+
+- Watch the exported video once before sending. Confirm the full consent flow is legible, uninterrupted, in English, and shows the same submitted app and requested permission.
+- Confirm the Gmail API scope shown/configured is exactly `gmail.metadata`; the OAuth scope URI may be visible in the URL only briefly, so also show the complete permission description on the consent screen.
+- Confirm each actual OAuth initiation method is represented and do not claim a flow or result that was not recorded.
+- Upload to YouTube as **Unlisted** or Google Drive with **Anyone with the link can view**. Open the link in a signed-out/private browser window to verify reviewer access.
+- Replace `[INSERT VIDEO LINK]` in the reply with the tested link.
 
 ---
 

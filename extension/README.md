@@ -43,10 +43,11 @@ After installation:
 ## How It Works
 
 ### 📧 Gmail Receipt Scanning
-- Scans your Gmail inbox for subscription receipts and confirmations
-- Requires one-time OAuth login (read-only access)
-- Runs automatically every 5 minutes
-- Extracts service name, amount, and frequency from emails
+- Checks recent Gmail message metadata for likely subscription receipts and renewals
+- Requires explicit OAuth authorization for `https://www.googleapis.com/auth/gmail.metadata`
+- Uses message IDs, selected headers, dates, and Gmail-provided snippets; it does not request full message bodies
+- Presents likely matches as pending candidates for user review and approval
+- Runs periodically, with at least one hour between automatic Gmail scans
 
 ### 🌐 Website Visit Tracking
 - Detects when you visit Netflix, Spotify, Disney+, and 20+ other services

@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
       discoverySection.style.display = 'block';
       
       if (result.gmailAuthToken) {
-        gmailStatus.textContent = '✅ Gmail authorized - click Reauthorize to enable email-body price and date extraction';
+        gmailStatus.textContent = '✅ Gmail metadata access authorized';
         gmailStatus.style.color = '#28a745';
         authorizeGmailBtn.textContent = '🔄 Reauthorize Gmail';
         authorizeGmailBtn.disabled = false;
@@ -471,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
           type: 'authorizeGmail'
         }, (response) => {
           if (response?.success) {
-            gmailStatus.textContent = '✅ Gmail authorized! Scanning inbox starting in ~5 minutes';
+            gmailStatus.textContent = '✅ Gmail authorized! Metadata scan started';
             gmailStatus.style.color = '#28a745';
             authorizeGmailBtn.textContent = '✅ Gmail Connected';
             authorizeGmailBtn.disabled = true;

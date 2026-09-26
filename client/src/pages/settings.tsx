@@ -268,7 +268,7 @@ export default function Settings() {
                   {!gmailAllowed
                     ? "Premium feature - connect Gmail to scan receipts automatically"
                     : gmailConnected && gmailExtensionAuthorized
-                    ? "Connected - Inbox scanned every 5 minutes"
+                    ? "Connected - Gmail metadata is checked periodically"
                     : gmailConnected
                       ? "Gmail account connected - authorize the extension to scan receipts"
                       : "Connect to auto-detect subscriptions from email receipts"}
