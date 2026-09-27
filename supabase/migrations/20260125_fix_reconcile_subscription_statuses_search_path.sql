@@ -11,19 +11,19 @@ COMMENT ON COLUMN public.subscriptions.scheduled_cancellation_date IS 'ISO 8601 
 DROP FUNCTION IF EXISTS public.reconcile_subscription_statuses();
 
 -- Recreate the function with proper search_path configuration
-CREATE FUNCTION public.reconcile_subscription_statuses()
+CREATE OR REPLACE FUNCTION public.reconcile_subscription_statuses()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  -- This function reconciles subscription statuses
-  -- Update subscriptions that have a scheduled cancellation date that has passed
+  -- This function reconciles subscription statuses.
+  -- scheduled_cancellation_date is stored as TEXT, so cast to DATE before comparing.
   UPDATE public.subscriptions
   SET status = 'deleted'
   WHERE scheduled_cancellation_date IS NOT NULL
-    AND scheduled_cancellation_date <= NOW()
+    AND scheduled_cancellation_date::DATE <= CURRENT_DATE
     AND status != 'deleted';
 END;
 $$;
