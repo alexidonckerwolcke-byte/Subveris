@@ -195,7 +195,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       .from("user_subscriptions")
       .select("user_id")
       .eq("stripe_customer_id", customerId)
-      .single();
+      .maybeSingle();
 
     if (existing?.user_id) {
       userId = existing.user_id;

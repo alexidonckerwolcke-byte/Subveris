@@ -375,7 +375,7 @@ const server = http.createServer(async (req, res) => {
           .from('user_subscriptions')
           .select('plan_type, status, cancel_at_period_end, current_period_end')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.log('No subscription found for user:', error.message);
@@ -398,7 +398,7 @@ const server = http.createServer(async (req, res) => {
             .from('users')
             .select('currency')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
 
           const rawCurrency = String(userRow?.currency || user.user_metadata?.currency || 'USD').toUpperCase();
           if (/^[A-Z]{3}$/.test(rawCurrency)) {
@@ -1864,7 +1864,7 @@ const server = http.createServer(async (req, res) => {
           .select('access_token')
           .eq('user_id', user.id)
           .eq('provider', 'gmail')
-          .single();
+          .maybeSingle();
 
         const connected = !error && data?.access_token;
         res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -96,7 +96,7 @@ export async function registerRoutes(server, app) {
         .from('family_groups')
         .select('*')
         .eq('id', groupId)
-        .single();
+        .maybeSingle();
 
       if (groupError || !group || group.owner_id !== userId) {
         return res.status(403).json({ error: 'Not authorized to modify this group' });
@@ -150,7 +150,7 @@ export async function registerRoutes(server, app) {
         .from('family_groups')
         .select('*')
         .eq('id', groupId)
-        .single();
+        .maybeSingle();
 
       if (groupError || !group || group.owner_id !== userId) {
         return res.status(403).json({ error: 'Not authorized to modify this group' });
@@ -225,8 +225,12 @@ export async function handleCostPerUse(req, res) {
   try {
     let userIds = [userId];
     if (familyGroupId) {
-        const fg = await client.from('family_groups').select('owner_id').eq('id', familyGroupId).single();
+        const fg = await client.from('family_groups').select('owner_id').eq('id', familyGroupId).maybeSingle();
       const ownerId = fg?.data?.owner_id || (fg && fg.owner_id) || null;
+      if (!fg || !ownerId) {
+        res.status(404).json({ error: 'Family group not found' });
+        return;
+      }
       const membersRes = await client.from('family_group_members').select('user_id').eq('family_group_id', familyGroupId);
       const membersData = membersRes?.data || membersRes || [];
       let members = Array.isArray(membersData) ? membersData.map((r) => r.user_id) : [];

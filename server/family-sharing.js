@@ -7,8 +7,9 @@ function client() {
 
 export async function addFamilyMember(familyGroupId, actorUserId, userIdToAdd) {
   const c = client();
-  const fg = await c.from('family_groups').select('owner_id').eq('id', familyGroupId).single();
+  const fg = await c.from('family_groups').select('owner_id').eq('id', familyGroupId).maybeSingle();
   const ownerId = fg?.data?.owner_id || fg?.owner_id;
+  if (!fg || !ownerId) throw new Error('Family group not found');
   if (ownerId !== actorUserId) throw new Error('Only group owner can add members');
 
   const insertRes = await c.from('family_group_members').insert({ family_group_id: familyGroupId, user_id: userIdToAdd, role: 'member' });
@@ -84,8 +85,9 @@ export async function unshareSubscription(sharedId) {
 
 export async function removeFamilyMember(familyGroupId, actorUserId, memberUserId) {
   const c = client();
-  const fg = await c.from('family_groups').select('owner_id').eq('id', familyGroupId).single();
+  const fg = await c.from('family_groups').select('owner_id').eq('id', familyGroupId).maybeSingle();
   const ownerId = fg?.data?.owner_id || fg?.owner_id;
+  if (!fg || !ownerId) throw new Error('Family group not found');
   if (ownerId !== actorUserId && actorUserId !== memberUserId) {
     throw new Error('Only group owner or the member themselves can remove');
   }
@@ -94,8 +96,9 @@ export async function removeFamilyMember(familyGroupId, actorUserId, memberUserI
 
 export async function deleteFamilyGroup(familyGroupId, actorUserId) {
   const c = client();
-  const fg = await c.from('family_groups').select('owner_id').eq('id', familyGroupId).single();
+  const fg = await c.from('family_groups').select('owner_id').eq('id', familyGroupId).maybeSingle();
   const ownerId = fg?.data?.owner_id || fg?.owner_id;
+  if (!fg || !ownerId) throw new Error('Family group not found');
   if (ownerId !== actorUserId) throw new Error('Only group owner can delete');
   await c.from('family_groups').delete().eq('id', familyGroupId);
 }

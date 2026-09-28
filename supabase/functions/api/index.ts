@@ -2250,9 +2250,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .select('next_billing_at, billing_month')
           .eq('id', subscriptionId)
           .eq('user_id', userId)
-          .single();
+          .maybeSingle();
 
-        if (!existingError && existingSub) {
+        if (existingError) {
+          console.warn(`[API] PATCH /subscriptions/${subscriptionId} existing subscription lookup error:`, existingError.message);
+        }
+
+        if (existingSub) {
           const parsedNewDate = toDateOnlyLocal(body.nextBillingDate);
           console.log(`[API] PATCH /subscriptions/${subscriptionId} parsedNewDate:`, parsedNewDate);
           const today = toDateOnlyLocal(new Date());
@@ -2272,6 +2276,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
             }
             console.log(`[API] PATCH /subscriptions/${subscriptionId} computed billing_month:`, updates.billing_month, { autoAdvanced: isAutoAdvance });
           }
+        } else {
+          console.warn(`[API] PATCH /subscriptions/${subscriptionId} no matching subscription found for user ${userId}; skipping billing_month recalculation.`);
         }
       }
 
@@ -2536,7 +2542,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .from("user_subscriptions")
           .select("stripe_subscription_id, stripe_price_id, plan_type, status, current_period_end, cancel_at_period_end")
           .eq("user_id", userId)
-          .single();
+          .maybeSingle();
 
         if (userError || !userData) {
           console.log("No subscription found for user:", userId);
@@ -2578,7 +2584,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
             .from('users')
             .select('currency')
             .eq('id', userId)
-            .single();
+            .maybeSingle();
 
           const rawCurrency = String(userRow?.currency || "USD").toUpperCase();
           if (/^[A-Z]{3}$/.test(rawCurrency)) {
@@ -2622,7 +2628,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           .from("notification_preferences")
           .select("email_notifications, push_notifications, weekly_digest")
           .eq("user_id", userId)
-          .single();
+          .maybeSingle();
 
         if (error || !data) {
           // Return defaults for new users
@@ -5193,7 +5199,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         .from('family_groups')
         .select('owner_id')
         .eq('id', groupId)
-        .single();
+        .maybeSingle();
 
       if (groupRowError || !groupRow) {
         return sendJson({ error: 'Family group not found' }, { status: 404 });
@@ -5208,7 +5214,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           .select('shared_with_user_id')
           .eq('id', sharedId)
           .eq('family_group_id', groupId)
-          .single();
+          .maybeSingle();
 
         if (!sharedCheckError && sharedRecord && sharedRecord.shared_with_user_id === userId) {
           canUnshare = true;
@@ -5241,13 +5247,13 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       if (!groupId || !sharedId) return sendJson({ error: 'Invalid request' }, { status: 400 });
       if (!userId) return sendJson({ error: 'Unauthorized' }, { status: 401 });
 
-      const { data: groupRow } = await supabase.from('family_groups').select('owner_id').eq('id', groupId).single();
+      const { data: groupRow } = await supabase.from('family_groups').select('owner_id').eq('id', groupId).maybeSingle();
       const { data: sharedRow } = await supabase
         .from('shared_subscriptions')
         .select('id, family_group_id')
         .eq('id', sharedId)
         .eq('family_group_id', groupId)
-        .single();
+        .maybeSingle();
       if (!groupRow || !sharedRow) return sendJson({ error: 'Shared subscription not found' }, { status: 404 });
 
       if (req.method === 'GET') {
