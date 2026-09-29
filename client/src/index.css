@@ -9,7 +9,7 @@
   --opaque-button-border-intensity: -10;
   --elevate-1: rgba(17,24,39, .04);
   --elevate-2: rgba(17,24,39, .1);
-  --background: 210 29% 97%;
+  --background: 0 0% 100%;
   --foreground: 217 28% 13%;
   --surface: 0 0% 100%;
   --surface-border: 210 22% 90%;
@@ -178,9 +178,7 @@
 
   body {
     @apply font-sans antialiased text-foreground;
-    background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 28%),
-                radial-gradient(circle at bottom right, rgba(96, 165, 250, 0.12), transparent 28%),
-                linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
+    background: #ffffff;
     color: hsl(var(--foreground));
     min-height: 100vh;
     overflow-x: hidden;
@@ -189,7 +187,7 @@
   }
   #root {
     min-height: 100vh;
-    background: transparent;
+    background: #ffffff;
   }
   /* premium glass-style container defaults */
   .card,

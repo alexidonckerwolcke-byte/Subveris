@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +52,43 @@ export default function HomePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'signin' | 'signup'>('signup');
   const [expandedFAQ, setExpandedFAQ] = useState<number | string | null>(null);
+
+  const revealUp = {
+    hidden: { opacity: 1, y: 16, filter: "blur(0px)" },
+    visible: { opacity: 1, y: 0, filter: "blur(0px)" },
+  };
+
+  const revealViewport = { once: false, amount: 0.5 };
+  const revealTransition = { duration: 0.65, ease: [0.22, 1, 0.36, 1] };
+
+  function DirectionalReveal({
+    children,
+    className,
+    amount = 0.22,
+    delay = 0,
+    ...props
+  }: React.ComponentProps<typeof motion.section> & { amount?: number; delay?: number }) {
+    const ref = useRef<HTMLElement | null>(null);
+    const enterOffset = Math.min(0.95, 0.9 + delay * 0.1);
+    const settleOffset = Math.max(0.3, 0.45 - amount * 0.1);
+    const { scrollYProgress } = useScroll({
+      target: ref,
+      offset: [`start ${enterOffset * 100}%`, `start ${settleOffset * 100}%`],
+    });
+    const y = useTransform(scrollYProgress, [0, 1], [12, 0]);
+    const { style, ...sectionProps } = props;
+
+    return (
+      <motion.section
+        ref={ref}
+        style={{ ...style, y }}
+        className={className}
+        {...sectionProps}
+      >
+        {children}
+      </motion.section>
+    );
+  }
 
   useEffect(() => {
     document.documentElement.classList.remove("dark");
@@ -140,9 +178,14 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <motion.div
+      className="min-h-screen bg-white"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+    >
       {/* Header */}
-      <header className="border-b border-border/40 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-border/40 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div className="flex shrink-0 items-center gap-1 sm:gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden shadow-sm">
@@ -178,28 +221,34 @@ export default function HomePage() {
       </header>
 
       {/* 1️⃣ HERO SECTION */}
-      <section className="container mx-auto px-4 py-32 text-center relative overflow-hidden">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl -z-10 animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl -z-10 animate-pulse delay-1000" />
-        
-        <div className="max-w-4xl mx-auto">
+      <DirectionalReveal className="container mx-auto px-4 py-32 text-center relative overflow-hidden bg-white">
+        <div className="absolute inset-x-0 top-0 h-64 bg-white" />
+
+        <motion.div
+          className="mx-auto max-w-4xl relative z-10"
+          initial="hidden"
+          whileInView="visible"
+          viewport={revealViewport}
+          variants={revealUp}
+          transition={revealTransition}
+        >
           <Badge variant="secondary" className="mb-6 px-4 py-2 text-sm font-semibold">
             <Sparkles className="h-3 w-3 mr-2" />
             The Subscription Optimization Platform
           </Badge>
-          
+
           <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-8 leading-tight">
             Find the subscriptions you don't use
             <br />
             <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">before they renew again.</span>
           </h1>
-          
+
           <p className="text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed font-light">
             See your recurring spend, understand what each service costs per use, and review the subscriptions that may no longer earn their place in your budget.
             <br />
             <span className="font-semibold text-foreground">Start with the services you already pay for.</span>
           </p>
-          
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             <Button size="lg" className="text-lg px-12 py-7 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-700 shadow-2xl hover:shadow-[0_30px_120px_rgba(59,130,246,0.18)] transition-all duration-300" onClick={() => setAuthModalOpen(true)}>
               Get Started Free
@@ -207,7 +256,14 @@ export default function HomePage() {
             </Button>
           </div>
 
-          <div className="mx-auto flex flex-wrap justify-center items-center gap-6 rounded-full border border-slate-200/70 bg-white/80 px-6 py-4 shadow-lg shadow-slate-200/50 backdrop-blur-sm text-sm text-slate-600">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={revealViewport}
+            variants={revealUp}
+            transition={{ ...revealTransition, delay: 0.08 }}
+            className="mx-auto flex flex-wrap justify-center items-center gap-6 rounded-full border border-slate-200/70 bg-white px-6 py-4 shadow-lg shadow-slate-200/50 backdrop-blur-sm text-sm text-slate-600"
+          >
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-green-500" />
               <span>No bank connection required</span>
@@ -224,81 +280,76 @@ export default function HomePage() {
               <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
               <span>Simple setup</span>
             </div>
-          </div>
+          </motion.div>
 
           <div className="mt-16 grid gap-5 md:grid-cols-4 text-left">
-            <div className="rounded-3xl border border-border/40 bg-white/85 p-6 shadow-lg">
-              <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
-                <Shield className="h-5 w-5" />
-              </div>
-              <h3 className="mb-2 text-lg font-semibold">No bank data required</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Subveris does not require bank credentials, payment details, or account linking to help you track and optimize recurring services.
-              </p>
-            </div>
-            <div className="rounded-3xl border border-border/40 bg-white/85 p-6 shadow-lg">
-              <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
-                <Lock className="h-5 w-5" />
-              </div>
-              <h3 className="mb-2 text-lg font-semibold">Protected access</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Sensitive actions use authenticated sessions and CSRF checks so your account and billing-related requests are not treated as anonymous.
-              </p>
-            </div>
-            <div className="rounded-3xl border border-border/40 bg-white/85 p-6 shadow-lg">
-              <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
-                <Eye className="h-5 w-5" />
-              </div>
-              <h3 className="mb-2 text-lg font-semibold">You control the data</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                The product is built around the subscriptions you add and the usage signals you intentionally share, rather than hidden financial data collection.
-              </p>
-            </div>
-            <div className="rounded-3xl border border-border/40 bg-white/85 p-6 shadow-lg">
-              <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
-                <TargetIcon className="h-5 w-5" />
-              </div>
-              <h3 className="mb-2 text-lg font-semibold">Usage-based recommendations</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Recommendations are grounded in the subscriptions you maintain and the usage patterns you track, so decisions are based on real behavior.
-              </p>
-            </div>
+            {[{
+              icon: Shield,
+              title: 'No bank data required',
+              text: 'Subveris does not require bank credentials, payment details, or account linking to help you track and optimize recurring services.',
+              color: 'bg-emerald-100 text-emerald-700',
+            }, {
+              icon: Lock,
+              title: 'Protected access',
+              text: 'Sensitive actions use authenticated sessions and CSRF checks so your account and billing-related requests are not treated as anonymous.',
+              color: 'bg-blue-100 text-blue-700',
+            }, {
+              icon: Eye,
+              title: 'You control the data',
+              text: 'The product is built around the subscriptions you add and the usage signals you intentionally share, rather than hidden financial data collection.',
+              color: 'bg-violet-100 text-violet-700',
+            }, {
+              icon: TargetIcon,
+              title: 'Usage-based recommendations',
+              text: 'Recommendations are grounded in the subscriptions you maintain and the usage patterns you track, so decisions are based on real behavior.',
+              color: 'bg-amber-100 text-amber-700',
+            }].map((item, index) => (
+              <motion.div
+                key={item.title}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: false, amount: 0.7 }}
+                variants={revealUp}
+                transition={{ ...revealTransition, delay: 0.02 + index * 0.03 }}
+                className="rounded-3xl border border-border/40 bg-white/85 p-6 shadow-lg"
+              >
+                <div className={`mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl ${item.color}`}>
+                  <item.icon className="h-5 w-5" />
+                </div>
+                <h3 className="mb-2 text-lg font-semibold">{item.title}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">{item.text}</p>
+              </motion.div>
+            ))}
           </div>
 
           <div className="mt-16 grid gap-5 sm:grid-cols-3 text-left">
-            <div className="rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg">
-              <div className="inline-flex items-center justify-center rounded-2xl bg-primary/10 p-3 mb-4">
-                <DollarSign className="h-6 w-6 text-primary" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Cost Per Use Intelligence</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Understand the real value of every subscription and uncover exactly which services are worth keeping.
-              </p>
-            </div>
-            <div className="rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg">
-              <div className="inline-flex items-center justify-center rounded-2xl bg-blue-500/10 p-3 mb-4">
-                <BarChart3 className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Renewal Risk Intelligence</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Find subscriptions that are about to renew, flag services with low return, and keep your budget from leaking.
-              </p>
-            </div>
-            <div className="rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg">
-              <div className="inline-flex items-center justify-center rounded-2xl bg-green-500/10 p-3 mb-4">
-                <Sparkles className="h-6 w-6 text-green-600" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Optimization Workflows</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Turn insights into action with recommendations, plan change suggestions, and savings opportunities you can act on now.
-              </p>
-            </div>
+            {[
+              { icon: DollarSign, title: 'Cost Per Use Intelligence', text: 'Understand the real value of every subscription and uncover exactly which services are worth keeping.', color:'bg-primary/10 text-primary', iconColor:'text-primary' },
+              { icon: BarChart3, title: 'Renewal Risk Intelligence', text: 'Find subscriptions that are about to renew, flag services with low return, and keep your budget from leaking.', color:'bg-blue-500/10 text-blue-600', iconColor:'text-blue-600' },
+              { icon: Sparkles, title: 'Optimization Workflows', text: 'Turn insights into action with recommendations, plan change suggestions, and savings opportunities you can act on now.', color:'bg-green-500/10 text-green-600', iconColor:'text-green-600' },
+            ].map((item, index) => (
+              <motion.div
+                key={item.title}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: false, amount: 0.7 }}
+                variants={revealUp}
+                transition={{ ...revealTransition, delay: 0.02 + index * 0.03 }}
+                className="rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg"
+              >
+                <div className={`inline-flex items-center justify-center rounded-2xl p-3 mb-4 ${item.color}`}>
+                  <item.icon className={`h-6 w-6 ${item.iconColor}`} />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
+                <p className="text-muted-foreground leading-relaxed">{item.text}</p>
+              </motion.div>
+            ))}
           </div>
-        </div>
-      </section>
+        </motion.div>
+      </DirectionalReveal>
 
       {/* 2️⃣ PROBLEM SECTION */}
-      <section id="problem" className="bg-muted/30 py-28">
+      <DirectionalReveal id="problem" className="bg-white py-28" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">
@@ -311,28 +362,38 @@ export default function HomePage() {
 
           <div className="grid md:grid-cols-4 gap-8">
             {problems.map((item, index) => (
-              <div key={index} className="bg-white/90 p-8 rounded-[1.75rem] shadow-lg border border-slate-200/70 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(15,23,42,0.10)] transition-all duration-300 group">
+              <motion.div
+                key={item.text}
+                initial="hidden"
+                whileInView="visible"
+                viewport={revealViewport}
+                variants={revealUp}
+                transition={{ ...revealTransition, delay: index * 0.05 }}
+                className="bg-white p-8 rounded-[1.75rem] shadow-lg border border-slate-200/70 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(15,23,42,0.10)] transition-all duration-300 group"
+              >
                 <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors duration-300">
                   <item.icon className="h-6 w-6 text-primary" />
                 </div>
                 <p className="text-lg font-semibold leading-snug text-slate-800">{item.text}</p>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
-      </section>
+      </DirectionalReveal>
 
       {/* 3️⃣ FEATURES SECTION */}
-      <section id="features" className="container mx-auto px-4 py-28">
+      <DirectionalReveal id="features" className="container mx-auto px-4 py-28" amount={0.22} delay={0}>
         <div className="max-w-4xl mx-auto">
-          <Badge variant="outline" className="mb-6 max-w-full border-primary px-4 py-1 text-center text-primary whitespace-normal">Premium Features</Badge>
-          <h2 className="text-5xl font-bold mb-8 tracking-tight">Features designed for high-value spenders.</h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mb-12">
-            Subveris combines clear data handling with practical analytics so you can make better decisions about recurring spending.
-          </p>
-          <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-border/30 bg-slate-50 shadow-2xl shadow-slate-200/50 mb-12">
+          <div>
+            <Badge variant="outline" className="mb-6 max-w-full border-primary px-4 py-1 text-center text-primary whitespace-normal">Premium Features</Badge>
+            <h2 className="text-5xl font-bold mb-8 tracking-tight">Features designed for high-value spenders.</h2>
+            <p className="text-xl text-muted-foreground max-w-3xl mb-12">
+              Subveris combines clear data handling with practical analytics so you can make better decisions about recurring spending.
+            </p>
+          </div>
+          <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-border/30 bg-white shadow-2xl shadow-slate-200/50 mb-12">
             <div className="bg-white p-4 sm:p-6">
-              <div className="relative overflow-hidden rounded-[1.75rem] border border-border/20 bg-slate-50">
+              <div className="relative overflow-hidden rounded-[1.75rem] border border-border/20 bg-white">
                 <picture>
                   <source
                     type="image/jpeg"
@@ -354,7 +415,15 @@ export default function HomePage() {
           </div>
           <div className="grid md:grid-cols-3 gap-10">
             {featureHighlights.map((feature, index) => (
-              <div key={index} className="flex flex-col gap-6 rounded-3xl border border-border/40 bg-white/80 p-8 shadow-lg transition-transform hover:-translate-y-1 dark:bg-slate-900/70">
+              <motion.div
+                key={feature.title}
+                initial="hidden"
+                whileInView="visible"
+                viewport={revealViewport}
+                variants={revealUp}
+                transition={{ ...revealTransition, delay: index * 0.03 }}
+                className="flex flex-col gap-6 rounded-3xl border border-border/40 bg-white p-8 shadow-lg transition-transform hover:-translate-y-1 dark:bg-slate-900/70"
+              >
                 <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <feature.icon className="h-7 w-7 text-primary" />
                 </div>
@@ -362,14 +431,14 @@ export default function HomePage() {
                   <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
                   <p className="text-slate-600 leading-relaxed">{feature.description}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
-      </section>
+      </DirectionalReveal>
 
       {/* 4️⃣ COMPARISON SECTION */}
-      <section id="comparison" className="bg-muted/30 py-28">
+      <DirectionalReveal id="comparison" className="bg-white py-28" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">What Subveris shows you</h2>
@@ -378,76 +447,94 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto overflow-x-auto rounded-[2rem] shadow-2xl border border-slate-200/70 bg-white/95">
+          <div className="max-w-4xl mx-auto overflow-x-auto rounded-[2rem] shadow-2xl border border-slate-200/70 bg-white">
             <table className="min-w-[560px] w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-950/5 border-b border-slate-200/70">
+                <tr className="bg-white border-b border-slate-200/70">
                   <th className="p-8 text-lg font-bold text-slate-900">Capability</th>
-                  <th className="p-8 text-lg font-bold text-slate-900 text-center bg-primary/5">How it works</th>
+                  <th className="p-8 text-lg font-bold text-slate-900 text-center bg-white">How it works</th>
                 </tr>
               </thead>
               <tbody>
                 {comparison.map((item, index) => (
-                  <tr key={index} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                  <tr key={index} className="border-b border-border last:border-0 hover:bg-white transition-colors">
                     <td className="p-8 font-medium">{item.feature}</td>
-                    <td colSpan={1} className="p-8 text-center text-muted-foreground bg-primary/5">{item.details}</td>
+                    <td colSpan={1} className="p-8 text-center text-muted-foreground bg-white">{item.details}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
-      </section>
+      </DirectionalReveal>
 
       {/* 5️⃣ PRODUCT PROOF SECTION */}
-      <section className="container mx-auto px-4 py-28">
-        <div className="text-center mb-20">
-          <h2 className="text-5xl font-bold mb-6 tracking-tight">See what Subveris actually does</h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            No invented reviews or inflated numbers. These are the product capabilities you can try and verify for yourself.
-          </p>
-        </div>
+      <DirectionalReveal className="container mx-auto px-4 py-28" amount={0.22} delay={0}>
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: false, amount: 0.3 }} variants={revealUp} transition={{ ...revealTransition, duration: 0.65, delay: 0.05 }}>
+          <div className="text-center mb-20">
+            <h2 className="text-5xl font-bold mb-6 tracking-tight">See what Subveris actually does</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              No invented reviews or inflated numbers. These are the product capabilities you can try and verify for yourself.
+            </p>
+          </div>
+        </motion.div>
+
         <div className="grid md:grid-cols-3 gap-8">
-          <Card className="border-border/50 shadow-md hover:shadow-xl transition-all bg-white/80 dark:bg-slate-900/70">
-            <CardContent className="pt-8">
-              <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                <BarChart3 className="h-6 w-6 text-primary" />
-              </div>
-              <h3 className="mb-3 text-xl font-semibold">Start with your real spend</h3>
-              <p className="text-base leading-relaxed text-muted-foreground">
-                Add recurring services manually and see monthly totals, category spending, recent history, and a yearly projection based on your entries.
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-border/50 shadow-md hover:shadow-xl transition-all bg-white/80 dark:bg-slate-900/70">
-            <CardContent className="pt-8">
-              <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10">
-                <DollarSign className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="mb-3 text-xl font-semibold">Measure value by usage</h3>
-              <p className="text-base leading-relaxed text-muted-foreground">
-                Record how often you use a service and compare its monthly cost with sessions, recent activity, and cost per use.
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-border/50 shadow-md hover:shadow-xl transition-all bg-white/80 dark:bg-slate-900/70">
-            <CardContent className="pt-8">
-              <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10">
-                <CheckCircle className="h-6 w-6 text-emerald-600" />
-              </div>
-              <h3 className="mb-3 text-xl font-semibold">Choose the next action</h3>
-              <p className="text-base leading-relaxed text-muted-foreground">
-                Review recommendations and use the included cancellation guides when a service no longer earns its place in your budget.
-              </p>
-            </CardContent>
-          </Card>
+          {[
+            {
+              icon: BarChart3,
+              title: "Start with your real spend",
+              description: "Add recurring services manually and see monthly totals, category spending, recent history, and a yearly projection based on your entries.",
+              color: "bg-primary/10 text-primary",
+            },
+            {
+              icon: DollarSign,
+              title: "Measure value by usage",
+              description: "Record how often you use a service and compare its monthly cost with sessions, recent activity, and cost per use.",
+              color: "bg-blue-500/10 text-blue-600",
+            },
+            {
+              icon: CheckCircle,
+              title: "Choose the next action",
+              description: "Review recommendations and use the included cancellation guides when a service no longer earns its place in your budget.",
+              color: "bg-emerald-500/10 text-emerald-600",
+            },
+          ].map((item, index) => (
+            <motion.div
+              key={item.title}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: false, amount: 0.35 }}
+              variants={revealUp}
+              transition={{ ...revealTransition, duration: 0.65, delay: index * 0.08 }}
+            >
+              <Card className="border-border/50 shadow-md hover:shadow-xl transition-all bg-white dark:bg-slate-900/70 h-full">
+                <CardContent className="pt-8">
+                  <div className={`mb-6 inline-flex h-12 w-12 items-center justify-center rounded-2xl ${item.color}`}>
+                    <item.icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="mb-3 text-xl font-semibold">{item.title}</h3>
+                  <p className="text-base leading-relaxed text-muted-foreground">
+                    {item.description}
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </div>
-      </section>
+      </DirectionalReveal>
 
       {/* 8️⃣ BIG VISION SECTION */}
-      <section className="bg-gradient-to-r from-primary/5 via-blue-500/5 to-primary/5 py-28 border-y border-border/50">
+      <DirectionalReveal className="bg-white py-28 border-y border-border/50" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
+          <motion.div
+            className="max-w-3xl mx-auto text-center"
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: false, amount: 0.35 }}
+            variants={revealUp}
+            transition={{ ...revealTransition, duration: 0.65, delay: 0.05 }}
+          >
             <h2 className="text-5xl font-bold mb-8 tracking-tight">
               The Future of Recurring Spending
             </h2>
@@ -457,12 +544,12 @@ export default function HomePage() {
             <p className="text-lg text-foreground font-medium">
               We're not just a tool. We're building the future of financial awareness.
             </p>
-          </div>
+          </motion.div>
         </div>
-      </section>
+      </DirectionalReveal>
 
       {/* TRUSTED BY SECTION */}
-      <section className="bg-muted/30 py-16">
+      <DirectionalReveal className="bg-white py-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h3 className="text-2xl font-bold mb-4">Built for trust and clarity</h3>
@@ -472,17 +559,25 @@ export default function HomePage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-5 text-center">
-            <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-5 shadow-sm"><div className="text-sm text-muted-foreground">No bank link required</div></div>
-            <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-5 shadow-sm"><div className="text-sm text-muted-foreground">Usage-based insights</div></div>
-            <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-5 shadow-sm"><div className="text-sm text-muted-foreground">Account-level protection</div></div>
-            <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-5 shadow-sm"><div className="text-sm text-muted-foreground">Clear renewal visibility</div></div>
-            <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-5 shadow-sm"><div className="text-sm text-muted-foreground">Built around user control</div></div>
+            {['No bank link required','Usage-based insights','Account-level protection','Clear renewal visibility','Built around user control'].map((text, index) => (
+              <motion.div
+                key={text}
+                initial="hidden"
+                whileInView="visible"
+                viewport={revealViewport}
+                variants={revealUp}
+                transition={{ ...revealTransition, delay: index * 0.05 }}
+                className="rounded-2xl border border-border/60 bg-white px-4 py-5 shadow-sm"
+              >
+                <div className="text-sm text-muted-foreground">{text}</div>
+              </motion.div>
+            ))}
           </div>
         </div>
-      </section>
+      </DirectionalReveal>
 
       {/* PRICING SECTION */}
-      <section id="pricing" className="bg-muted/30 py-28">
+      <DirectionalReveal id="pricing" className="bg-white py-28" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">
@@ -495,7 +590,7 @@ export default function HomePage() {
 
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-16">
             {/* FREE PLAN */}
-            <Card className="relative flex flex-col transition-all border border-border/50 shadow-md hover:shadow-lg hover:border-primary/30 bg-white/80 dark:bg-slate-900/70">
+            <Card className="relative flex flex-col transition-all border border-border/50 shadow-md hover:shadow-lg hover:border-primary/30 bg-white dark:bg-slate-900/70">
               <CardHeader className="text-center pb-6 pt-8">
                 <CardTitle className="text-3xl font-bold">Free</CardTitle>
                 <div className="mt-6">
@@ -556,7 +651,7 @@ export default function HomePage() {
             </Card>
 
             {/* PREMIUM PLAN */}
-            <Card className="relative flex flex-col transition-all border-2 border-primary shadow-2xl scale-105 bg-gradient-to-br from-primary/5 to-blue-500/5 hover:shadow-2xl">
+            <Card className="relative flex flex-col transition-all border-2 border-primary shadow-2xl scale-105 bg-white hover:shadow-2xl">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <Badge className="bg-gradient-to-r from-primary to-blue-600 text-white px-4 py-2 font-semibold shadow-lg">
                   <Sparkles className="h-4 w-4 mr-2 fill-white" />
@@ -619,7 +714,7 @@ export default function HomePage() {
             </Card>
 
             {/* FAMILY PLAN */}
-            <Card className="relative flex flex-col transition-all border-2 border-purple-500/50 shadow-xl bg-gradient-to-br from-purple-500/5 to-pink-500/5 hover:shadow-xl hover:border-purple-500/80">
+            <Card className="relative flex flex-col transition-all border-2 border-purple-500/50 shadow-xl bg-white hover:shadow-xl hover:border-purple-500/80">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 font-semibold shadow-lg">
                   <Users className="h-4 w-4 mr-2" />
@@ -690,86 +785,100 @@ export default function HomePage() {
           </div>
 
           {/* Feature Comparison Table */}
-          <div className="max-w-6xl mx-auto">
+          <motion.div
+            className="max-w-6xl mx-auto"
+            initial="hidden"
+            whileInView="visible"
+            viewport={revealViewport}
+            variants={revealUp}
+            transition={revealTransition}
+          >
             <h3 className="text-2xl font-bold text-center mb-8">Detailed Feature Comparison</h3>
             <div className="max-w-full overflow-x-auto overscroll-x-contain">
               <table className="min-w-[620px] w-full text-sm border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-primary/20">
+                  <tr className="border-b-2 border-primary/20 bg-white">
                     <th className="text-left py-4 px-6 font-semibold">Feature</th>
                     <th className="text-center py-4 px-6 font-semibold text-muted-foreground">Free</th>
-                    <th className="text-center py-4 px-6 font-semibold text-primary bg-primary/5">Premium</th>
-                    <th className="text-center py-4 px-6 font-semibold text-purple-600 bg-purple-500/5">Family</th>
+                    <th className="text-center py-4 px-6 font-semibold text-primary bg-white">Premium</th>
+                    <th className="text-center py-4 px-6 font-semibold text-purple-600 bg-white">Family</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  <tr className="hover:bg-muted/30 transition-colors">
+                  <tr className="hover:bg-white transition-colors">
                     <td className="py-4 px-6 font-medium">Subscriptions Managed</td>
                     <td className="text-center py-4 px-6 text-muted-foreground">Up to 5</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Unlimited</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Unlimited</td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white">Unlimited</td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white">Unlimited</td>
                   </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
+                  <tr className="hover:bg-white transition-colors">
                     <td className="py-4 px-6 font-medium">Browser Extension Tracking</td>
                     <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
+                  <tr className="hover:bg-white transition-colors">
                     <td className="py-4 px-6 font-medium">Cost Per Use Analytics</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Yes, unlimited</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Yes, unlimited</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5">Yes, unlimited</td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white">Yes, unlimited</td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white">Yes, unlimited</td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white">Yes, unlimited</td>
                   </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
+                  <tr className="hover:bg-white transition-colors">
                     <td className="py-4 px-6 font-medium">Usage-Based Recommendations</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
+                  <tr className="hover:bg-white transition-colors">
                     <td className="py-4 px-6 font-medium">Behavioral Insights</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
+                  <tr className="hover:bg-white transition-colors">
                     <td className="py-4 px-6 font-medium">Savings Projections</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
+                  <tr className="hover:bg-white transition-colors">
                     <td className="py-4 px-6 font-medium">Export Reports</td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 font-semibold text-green-600 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                   </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
+                  <tr className="hover:bg-white transition-colors">
                     <td className="py-4 px-6 font-medium">Optimization Workflows</td>
                     <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-green-500/5"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-purple-500/5"><Check className="h-5 w-5 text-purple-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 bg-white"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 bg-white"><Check className="h-5 w-5 text-purple-600 mx-auto" /></td>
                   </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
+                  <tr className="hover:bg-white transition-colors">
                     <td className="py-4 px-6 font-medium">Family Sharing</td>
                     <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
                     <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-purple-500/5"><Check className="h-5 w-5 text-purple-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 bg-white"><Check className="h-5 w-5 text-purple-600 mx-auto" /></td>
                   </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
+                  <tr className="hover:bg-white transition-colors">
                     <td className="py-4 px-6 font-medium">Up to 5 Family Members</td>
                     <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
                     <td className="text-center py-4 px-6"><X className="h-5 w-5 text-red-500 mx-auto" /></td>
-                    <td className="text-center py-4 px-6 bg-purple-500/5"><Check className="h-5 w-5 text-purple-600 mx-auto" /></td>
+                    <td className="text-center py-4 px-6 bg-white"><Check className="h-5 w-5 text-purple-600 mx-auto" /></td>
                   </tr>
                 </tbody>
               </table>
             </div>
-          </div>
+          </motion.div>
 
           {/* FAQ for Pricing */}
-          <div className="mt-20 max-w-3xl mx-auto">
+          <motion.div
+            className="mt-20 max-w-3xl mx-auto"
+            initial="hidden"
+            whileInView="visible"
+            viewport={revealViewport}
+            variants={revealUp}
+            transition={{ ...revealTransition, delay: 0.04 }}
+          >
             <h3 className="text-2xl font-bold text-center mb-8">Pricing Questions</h3>
             <div className="space-y-4">
               <Card className="border border-border/50 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
@@ -829,19 +938,26 @@ export default function HomePage() {
                 )}
               </Card>
             </div>
-          </div>
+          </motion.div>
         </div>
-      </section>
+      </DirectionalReveal>
 
       {/* 9️⃣ FAQ SECTION */}
-      <section id="faq" className="container mx-auto px-4 py-28">
+      <DirectionalReveal id="faq" className="container mx-auto px-4 py-28" amount={0.6} delay={0}>
         <div className="text-center mb-20">
           <h2 className="text-5xl font-bold mb-6 tracking-tight">
             Common Questions
           </h2>
         </div>
 
-        <div className="max-w-3xl mx-auto space-y-4">
+        <motion.div
+          className="max-w-3xl mx-auto space-y-4"
+          initial="hidden"
+          whileInView="visible"
+          viewport={revealViewport}
+          variants={revealUp}
+          transition={{ ...revealTransition, delay: 0.08 }}
+        >
           {faqs.map((faq, index) => (
             <Card key={index} className="border border-border/50 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
               <button
@@ -862,11 +978,11 @@ export default function HomePage() {
               )}
             </Card>
           ))}
-        </div>
-      </section>
+        </motion.div>
+      </DirectionalReveal>
 
       {/* 🔟 FINAL CTA SECTION */}
-      <section className="bg-gradient-to-r from-primary/10 to-blue-500/10 py-32 border-y border-border/50">
+      <DirectionalReveal className="bg-white py-32 border-y border-border/50" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-6xl font-bold mb-8 tracking-tight">
@@ -876,7 +992,7 @@ export default function HomePage() {
               Start saving money and gain complete control over your recurring spending.
             </p>
 
-            <div className="bg-white/80 border border-border/50 rounded-lg p-6 mb-8 max-w-2xl mx-auto dark:bg-slate-900/70">
+            <div className="bg-white border border-border/50 rounded-lg p-6 mb-8 max-w-2xl mx-auto dark:bg-slate-900/70">
               <div className="flex items-center justify-center gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-green-500" />
@@ -913,10 +1029,10 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-      </section>
+      </DirectionalReveal>
 
       {/* CONTACT SECTION */}
-      <section className="bg-muted/30 py-20">
+      <DirectionalReveal className="bg-white py-20" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
@@ -951,7 +1067,7 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-      </section>
+      </DirectionalReveal>
 
       {/* Footer */}
       <footer className="bg-background border-t border-border/40 py-12">
@@ -979,6 +1095,6 @@ export default function HomePage() {
       </footer>
 
       <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} defaultTab={authDefaultTab} />
-    </div>
+    </motion.div>
   );
 }
