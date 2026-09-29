@@ -394,22 +394,14 @@ export default function HomePage() {
           <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-border/30 bg-white shadow-2xl shadow-slate-200/50 mb-12">
             <div className="bg-white p-4 sm:p-6">
               <div className="relative overflow-hidden rounded-[1.75rem] border border-border/20 bg-white">
-                <picture>
-                  <source
-                    type="image/jpeg"
-                    srcSet="/assets/dashboard-screenshot-800.jpg 800w, /assets/dashboard-screenshot-1200.jpg 1200w"
-                    sizes="(max-width: 768px) 100vw, 1200px"
-                  />
-                  <img
-                    src="/assets/dashboard-screenshot-1200.jpg"
-                    alt="Subveris dashboard screenshot"
-                    width={1200}
-                    height={682}
-                    decoding="async"
-                    className="w-full rounded-[1.75rem] object-cover"
-                  />
-                </picture>
-                <div className="pointer-events-none absolute inset-0 rounded-[1.75rem] bg-gradient-to-t from-slate-950/10 via-transparent to-transparent" />
+                <img
+                  src="/assets/dashboard-hero.png"
+                  alt="Subveris dashboard screenshot"
+                  width={3420}
+                  height={1970}
+                  decoding="async"
+                  className="w-full rounded-[1.75rem] object-cover"
+                />
               </div>
             </div>
           </div>
