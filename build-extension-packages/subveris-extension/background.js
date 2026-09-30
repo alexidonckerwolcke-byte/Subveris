@@ -220,6 +220,8 @@ function normalizeApiUrl(apiUrl) {
   return normalizedUrl;
 }
 
+const GMAIL_AUTH_KEYS = ['gmailAuthToken', 'gmailTokenExpiry', 'gmailTokenExpiresAt', 'gmailUserUUID'];
+
 const ACCOUNT_STATE_KEYS = [
   'authToken',
   'supabaseAuthToken',
@@ -231,8 +233,6 @@ const ACCOUNT_STATE_KEYS = [
   'detectedSubscriptions',
   'detectedSubscription',
   'lastDetectedSubscriptionAt',
-  'gmailAuthToken',
-  'gmailTokenExpiresAt',
   'trackingPaused',
   'upgradePrompt',
   'cookieScanCompleted',
@@ -247,14 +247,33 @@ function clearStoredAccountState(callback) {
   });
 }
 
+function clearGmailAuthorization(callback) {
+  browser.storage.local.remove(GMAIL_AUTH_KEYS, () => {
+    const error = browser.runtime.lastError;
+    if (error) {
+      console.warn('[Background] Failed to clear Gmail authorization:', error);
+    }
+    if (callback) callback(!error);
+  });
+}
+
 function clearStateForAccountSwitch(userId, callback) {
-  browser.storage.local.get(['supabaseUserUUID'], (result) => {
-    if (result.supabaseUserUUID && result.supabaseUserUUID !== userId) {
-      console.log('[Background] Account changed; clearing cached state for:', result.supabaseUserUUID);
-      clearStoredAccountState(callback);
+  browser.storage.local.get(['supabaseUserUUID', 'gmailUserUUID', 'gmailAuthToken'], (result) => {
+    const clearSessionIfNeeded = () => {
+      if (result.supabaseUserUUID && result.supabaseUserUUID !== userId) {
+        console.log('[Background] Account changed; clearing cached state for:', result.supabaseUserUUID);
+        clearStoredAccountState(callback);
+        return;
+      }
+      callback();
+    };
+
+    if ((result.gmailAuthToken || result.gmailUserUUID) && result.gmailUserUUID !== userId) {
+      console.log('[Background] Gmail authorization belongs to another account; clearing it.');
+      clearGmailAuthorization(clearSessionIfNeeded);
       return;
     }
-    callback();
+    clearSessionIfNeeded();
   });
 }
 
@@ -954,15 +973,16 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('[Background] Received message:', request.type, 'from:', sender.url);
 
   if (request.type === 'GET_GMAIL_STATUS') {
-    browser.storage.local.get(['gmailAuthToken'], (result) => {
-      sendResponse({ authorized: Boolean(result.gmailAuthToken) });
+    browser.storage.local.get(['gmailAuthToken', 'gmailUserUUID', 'supabaseUserUUID'], (result) => {
+      const authorized = Boolean(result.gmailAuthToken && result.gmailUserUUID && result.gmailUserUUID === result.supabaseUserUUID);
+      sendResponse({ authorized });
     });
     return true;
   }
 
   if (request.type === 'DISCONNECT_GMAIL') {
-    browser.storage.local.remove(['gmailAuthToken', 'gmailTokenExpiry'], () => {
-      sendResponse({ success: !browser.runtime.lastError });
+    clearGmailAuthorization((success) => {
+      sendResponse({ success });
     });
     return true;
   }
@@ -1173,11 +1193,11 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'authorizeGmail') {
     // Attempt Gmail authorization via backend OAuth endpoint
-      browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl'], (result) => {
+      browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl', 'supabaseUserUUID'], (result) => {
         const token = result.supabaseAuthToken || result.authToken;
       const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
 
-      if (!token) {
+      if (!token || !result.supabaseUserUUID) {
         sendResponse({ success: false, error: 'Not authenticated' });
         return;
       }
@@ -1255,7 +1275,8 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
               // Store Gmail token
               browser.storage.local.set({
                 gmailAuthToken: tokenData.access_token,
-                gmailTokenExpiry: Date.now() + (tokenData.expires_in * 1000)
+                gmailTokenExpiry: Date.now() + (tokenData.expires_in * 1000),
+                gmailUserUUID: result.supabaseUserUUID,
               }, () => {
                 console.log('[Background] ✅ Gmail authorized successfully');
                 scanGmailForSubscriptions(true);
@@ -1535,8 +1556,46 @@ function publishGmailScanEvent(event, details = {}) {
   });
 }
 
+function refreshGmailTokenForAccount(userId, callback) {
+  browser.storage.local.get(['authToken', 'supabaseAuthToken', 'supabaseUserUUID', 'subverisApiUrl'], (state) => {
+    const authToken = state.supabaseAuthToken || state.authToken;
+    if (!userId || state.supabaseUserUUID !== userId || !authToken) {
+      callback(null);
+      return;
+    }
+
+    const apiUrl = normalizeApiUrl(state.subverisApiUrl || DEFAULT_API_URL);
+    fetch(`${apiUrl}/api/auth/gmail-refresh`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${authToken}` },
+    }).then(async (response) => {
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.access_token) {
+        throw new Error(body.error || 'Gmail reauthorization required');
+      }
+      return body;
+    }).then((body) => {
+      browser.storage.local.set({
+        gmailAuthToken: body.access_token,
+        gmailTokenExpiry: Date.now() + Number(body.expires_in || 3600) * 1000,
+        gmailUserUUID: userId,
+      }, () => {
+        if (browser.runtime.lastError) {
+          callback(null);
+          return;
+        }
+        publishGmailScanEvent('authorization_restored');
+        callback(body.access_token);
+      });
+    }).catch((error) => {
+      console.info('[Background] Gmail authorization could not be restored automatically:', error.message);
+      callback(null);
+    });
+  });
+}
+
 function scanGmailForSubscriptions(force = false) {
-  browser.storage.local.get(['gmailAuthToken', 'lastGmailScan', 'subscription_status', 'detectedSubscriptions'], (result) => {
+  browser.storage.local.get(['gmailAuthToken', 'gmailUserUUID', 'supabaseUserUUID', 'lastGmailScan', 'subscription_status', 'detectedSubscriptions'], (result) => {
     publishGmailScanEvent('started', { forced: force });
     if (!isTierAllowed(String(result.subscription_status || 'free').toLowerCase())) {
       console.log('[Background] Gmail scanning requires Premium or Family plan');
@@ -1545,8 +1604,19 @@ function scanGmailForSubscriptions(force = false) {
     }
     const token = result.gmailAuthToken;
     if (!token) {
-      console.log('[Background] Gmail not authorized, skipping email scan');
-      publishGmailScanEvent('skipped', { reason: 'gmail_not_authorized' });
+      refreshGmailTokenForAccount(result.supabaseUserUUID, (restoredToken) => {
+        if (restoredToken) {
+          scanGmailForSubscriptions(force);
+        } else {
+          console.log('[Background] Gmail not authorized, skipping email scan');
+          publishGmailScanEvent('skipped', { reason: 'gmail_not_authorized' });
+        }
+      });
+      return;
+    }
+    if (!result.gmailUserUUID || result.gmailUserUUID !== result.supabaseUserUUID) {
+      console.warn('[Background] Gmail authorization does not match the signed-in account; skipping email scan.');
+      publishGmailScanEvent('skipped', { reason: 'gmail_account_mismatch' });
       return;
     }
 

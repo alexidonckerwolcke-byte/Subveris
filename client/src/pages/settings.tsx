@@ -38,6 +38,7 @@ export default function Settings() {
   const { user, hasPassword } = useAuth();
   const { tier } = useSubscription();
   const gmailAllowed = tier === "premium" || tier === "family";
+  const gmailIsConnected = gmailConnected || gmailExtensionAuthorized;
   const userEmail = user?.email ?? "";
 
   // Check if 2FA is enabled when user data loads
@@ -52,6 +53,11 @@ export default function Settings() {
     const extensionRequestId = crypto.randomUUID();
     const handleExtensionStatus = (event: MessageEvent) => {
       if (event.source !== window || event.origin !== window.location.origin) return;
+      if (event.data?.type === "SUBVERIS_GMAIL_AUTHORIZATION_RESTORED") {
+        setGmailExtensionAuthorized(true);
+        setGmailConnected(true);
+        return;
+      }
       if (event.data?.type !== "SUBVERIS_GMAIL_STATUS_RESULT" || event.data.requestId !== extensionRequestId) return;
       const extensionAuthorized = Boolean(event.data.authorized);
       setGmailExtensionAuthorized(extensionAuthorized);
@@ -157,22 +163,42 @@ export default function Settings() {
   };
 
   const handleDisconnectGmail = async () => {
+    if (gmailConnecting) return;
+    setGmailConnecting(true);
     try {
       const response = await apiFetch("/api/auth/gmail-disconnect", {
         method: "POST",
       });
-      if (response.ok) {
-        window.postMessage({
-          type: "SUBVERIS_DISCONNECT_GMAIL",
-          requestId: crypto.randomUUID(),
-        }, window.location.origin);
-        setGmailConnected(false);
-        setGmailExtensionAuthorized(false);
-        toast({
-          title: "Gmail disconnected",
-          description: "Your Gmail account has been disconnected.",
-        });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to disconnect Gmail");
       }
+
+      const requestId = crypto.randomUUID();
+      const extensionResult = await new Promise<{ success?: boolean }>((resolve) => {
+        const timeout = window.setTimeout(() => {
+          window.removeEventListener("message", handleResult);
+          resolve({ success: false });
+        }, 3000);
+        const handleResult = (event: MessageEvent) => {
+          if (event.source !== window || event.origin !== window.location.origin) return;
+          if (event.data?.type !== "SUBVERIS_DISCONNECT_GMAIL_RESULT" || event.data.requestId !== requestId) return;
+          window.clearTimeout(timeout);
+          window.removeEventListener("message", handleResult);
+          resolve(event.data.response || { success: false });
+        };
+        window.addEventListener("message", handleResult);
+        window.postMessage({ type: "SUBVERIS_DISCONNECT_GMAIL", requestId }, window.location.origin);
+      });
+
+      setGmailConnected(false);
+      setGmailExtensionAuthorized(false);
+      toast({
+        title: "Gmail disconnected",
+        description: extensionResult.success
+          ? "Gmail access was revoked and scanning has stopped."
+          : "Gmail access was revoked. Reopen the extension to clear its local authorization.",
+      });
     } catch (error) {
       toast({
         title: "Disconnection failed",
@@ -182,6 +208,8 @@ export default function Settings() {
             : "Failed to disconnect Gmail",
         variant: "destructive",
       });
+    } finally {
+      setGmailConnecting(false);
     }
   }
 
@@ -265,35 +293,33 @@ export default function Settings() {
               <div>
                 <p className="font-medium">📧 Gmail</p>
                 <p className="text-sm text-muted-foreground">
-                  {!gmailAllowed
+                  {!gmailAllowed && !gmailIsConnected
                     ? "Premium feature - connect Gmail to scan receipts automatically"
                     : gmailConnected && gmailExtensionAuthorized
                     ? "Connected - Gmail metadata is checked periodically"
-                    : gmailConnected
-                      ? "Gmail account connected - authorize the extension to scan receipts"
+                    : gmailIsConnected
+                      ? "Gmail access is connected; extension authorization needs attention"
                       : "Connect to auto-detect subscriptions from email receipts"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {gmailConnected && (
+                {gmailIsConnected && (
                   <div className="flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400">
                     <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                     Connected
                   </div>
                 )}
                 <Button
-                  variant={gmailConnected && gmailExtensionAuthorized ? "outline" : "default"}
+                  variant={gmailIsConnected ? "outline" : "default"}
                   size="sm"
-                  onClick={gmailConnected && gmailExtensionAuthorized ? handleDisconnectGmail : handleConnectGmail}
-                  disabled={gmailConnecting || (!gmailConnected && !gmailAllowed)}
+                  onClick={gmailIsConnected ? handleDisconnectGmail : handleConnectGmail}
+                  disabled={gmailConnecting || (!gmailIsConnected && !gmailAllowed)}
                 >
                   {gmailConnecting
-                    ? "Connecting..."
-                    : gmailConnected && gmailExtensionAuthorized
+                    ? "Please wait..."
+                    : gmailIsConnected
                       ? "Disconnect"
-                      : gmailConnected
-                        ? "Authorize extension"
-                        : gmailAllowed ? "Connect Gmail" : "Premium required"}
+                      : gmailAllowed ? "Connect Gmail" : "Premium required"}
                 </Button>
               </div>
             </div>

@@ -1807,6 +1807,47 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
     }
 
+    if (pathname === "/auth/gmail-disconnect" && req.method === "POST") {
+      const userId = extractUserId(req);
+      if (!userId) return sendJson({ error: "Unauthorized" }, { status: 401 });
+
+      try {
+        const { data: userData, error: selectError } = await supabase
+          .from("users")
+          .select("gmail_access_token, gmail_refresh_token")
+          .eq("id", userId)
+          .maybeSingle();
+        if (selectError) throw selectError;
+
+        const token = userData?.gmail_refresh_token || userData?.gmail_access_token;
+        if (token) {
+          try {
+            const revokeResponse = await fetch("https://oauth2.googleapis.com/revoke", {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({ token }),
+            });
+            if (!revokeResponse.ok) {
+              console.warn("[Gmail] Google token revocation returned", revokeResponse.status);
+            }
+          } catch (revokeError) {
+            console.warn("[Gmail] Google token revocation failed:", revokeError);
+          }
+        }
+
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({ gmail_access_token: null, gmail_refresh_token: null, gmail_token_expiry: null })
+          .eq("id", userId);
+        if (updateError) throw updateError;
+
+        return sendJson({ success: true });
+      } catch (error) {
+        console.error("[Gmail] Failed to disconnect Gmail:", error);
+        return sendJson({ error: "Failed to disconnect Gmail" }, { status: 500 });
+      }
+    }
+
     // Gmail OAuth URL generation
     if (pathname === "/auth/gmail-oauth-url" && (req.method === "GET" || req.method === "POST")) {
       const userId = extractUserId(req);

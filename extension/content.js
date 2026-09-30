@@ -173,6 +173,9 @@ try {
   browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request?.type === 'GMAIL_SCAN_EVENT' && isSubverisPage()) {
     console.info(`[Subveris Gmail Scan] ${request.event}`, request.details || {});
+    if (request.event === 'authorization_restored') {
+      window.postMessage({ type: 'SUBVERIS_GMAIL_AUTHORIZATION_RESTORED' }, window.location.origin);
+    }
     if (request.event === 'review_queue_sync_succeeded') {
       window.postMessage({ type: 'SUBVERIS_DETECTED_SUBSCRIPTIONS_UPDATED' }, window.location.origin);
     }
