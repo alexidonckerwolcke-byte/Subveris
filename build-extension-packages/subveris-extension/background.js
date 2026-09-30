@@ -1427,7 +1427,7 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
 
   const senderDomain = getGmailSenderDomain(from);
   const lowerSubject = String(subject || '').toLowerCase();
-  if (senderDomain === 'subveris.com' || /\bsubveris\b/i.test(lowerSubject)) {
+  if (senderDomain === 'subveris.com') {
     return null;
   }
 
@@ -1501,18 +1501,11 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
   if (!serviceName && (!hasBillingSignal || (amount === null && renewalDate === null))) {
     return null;
   }
-  if (serviceName && (!hasBillingSignal || !hasStrongContext || (!hasFinancialEvidence && !senderMatchesService && !subjectMatchesService))) {
-    return null;
-  }
-
-  // A provider notification without a positive charge or renewal date is not
-  // enough evidence of a paid subscription; free-plan messages are common.
-  if (amount === null && renewalDate === null) {
+  if (serviceName && (!hasBillingSignal || !hasStrongContext)) {
     return null;
   }
 
   const detectedServiceName = serviceName || inferGmailServiceName(subject, from);
-  const isLowConfidence = amount === null && renewalDate === null;
 
   return {
     serviceName: detectedServiceName,

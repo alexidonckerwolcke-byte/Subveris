@@ -5,6 +5,8 @@ import DetectedSubscriptions from './detected-subscriptions';
 import { apiRequest } from '@/lib/queryClient';
 import { generateRecommendationsFromSubscriptions } from '@/lib/recommendations';
 
+const { useFamilyDataModeMock } = vi.hoisted(() => ({ useFamilyDataModeMock: vi.fn() }));
+
 vi.mock('@/components/premium-gate', () => ({
   PremiumGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -22,7 +24,7 @@ vi.mock('@/lib/subscription-context', () => ({
 }));
 
 vi.mock('@/hooks/use-family-data', () => ({
-  useFamilyDataMode: () => ({ familyGroupId: null, showFamilyData: false }),
+  useFamilyDataMode: useFamilyDataModeMock,
 }));
 
 vi.mock('@/lib/family-data', () => ({
@@ -48,6 +50,7 @@ vi.mock('@/lib/queryClient', async () => {
 describe('DetectedSubscriptions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useFamilyDataModeMock.mockReturnValue({ familyGroupId: null, showFamilyData: false });
   });
 
   it('hides a detection after approving it and keeps it hidden on stale refetches', async () => {
@@ -129,6 +132,45 @@ describe('DetectedSubscriptions', () => {
     ]);
 
     expect(recommendations.map((row) => row.subscriptionId)).toEqual(['sub-approved']);
+  });
+
+  it('keeps personal Gmail candidates visible when family data cannot be loaded', async () => {
+    useFamilyDataModeMock.mockReturnValue({ familyGroupId: 'group-1', showFamilyData: true });
+    vi.mocked(apiRequest).mockImplementation(async (method: string, url: string) => {
+      if (method === 'GET' && url === '/api/subscriptions?includeDetected=true') {
+        return {
+          ok: true,
+          json: async () => [{
+            id: 'gmail-candidate-1',
+            name: 'Test Subscription',
+            category: 'other',
+            amount: 4.99,
+            frequency: 'monthly',
+            isDetected: true,
+            status: 'active',
+          }],
+        } as Response;
+      }
+      if (url.includes('/family-data')) {
+        throw new Error('Not authorized to view family data');
+      }
+      return { ok: true, json: async () => [] } as Response;
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DetectedSubscriptions />
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Test Subscription')).toBeInTheDocument();
   });
 
 });

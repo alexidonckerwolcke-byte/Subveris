@@ -124,6 +124,21 @@ describe('buildDiscoverySyncPayload', () => {
     });
   });
 
+  it('accepts a self-sent test receipt that mentions Subveris in the subject', async () => {
+    const candidate = globalThis.buildGmailSubscriptionCandidate(
+      'Subveris test subscription receipt',
+      'Test User <testuser@gmail.com>',
+      'Your payment was $4.99',
+      { internalDate: Date.now().toString() }
+    );
+
+    expect(candidate).toMatchObject({
+      amount: 4.99,
+      requiresReview: true,
+      source: 'gmail-inferred-review-candidate',
+    });
+  });
+
   it('extracts Adobe price and renewal date from a renewal email body', async () => {
     const candidate = globalThis.buildGmailSubscriptionCandidate(
       'Your renewal is complete',

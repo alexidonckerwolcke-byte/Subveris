@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/lib/currency-context";
 import { useAuth } from "@/lib/auth-context";
@@ -28,6 +29,7 @@ export default function DetectedSubscriptions() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [actionState, setActionState] = useState<Record<string, { status: "pending" | "approved" | "dismissed"; dismissedAt?: number }>>({});
+  const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
 
   const { data: subscriptions = [], isLoading } = useQuery<Subscription[]>({
     queryKey: ["/api/subscriptions"],
@@ -62,8 +64,15 @@ export default function DetectedSubscriptions() {
     return () => window.removeEventListener("message", handleDetectedUpdate);
   }, [queryClient]);
 
-  const visibleSubscriptions = showFamilyData
+  const familySubscriptions = showFamilyData
     ? getVisibleFamilySubscriptions(familyData, user?.id, true)
+    : [];
+  const familySubscriptionIds = new Set(familySubscriptions.map((sub) => sub.id));
+  const ownDetectedSubscriptions = subscriptions.filter((sub) =>
+    sub?.isDetected === true || (sub as any)?.is_detected === true
+  );
+  const visibleSubscriptions = showFamilyData
+    ? [...familySubscriptions, ...ownDetectedSubscriptions.filter((sub) => !familySubscriptionIds.has(sub.id))]
     : subscriptions;
 
   const detectedSubscriptions = useMemo(() => {
@@ -95,10 +104,11 @@ export default function DetectedSubscriptions() {
   const categories = Array.from(new Set(detectedSubscriptions.map((sub) => sub?.category || "other")));
 
   const approveDetectedMutation = useMutation({
-    mutationFn: async (subscriptionId: string) => {
+    mutationFn: async ({ subscriptionId, amount }: { subscriptionId: string; amount?: number }) => {
       const res = await apiRequest("PATCH", `/api/subscriptions/${subscriptionId}`, {
         status: "active",
         isDetected: false,
+        ...(amount !== undefined ? { amount } : {}),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -106,13 +116,13 @@ export default function DetectedSubscriptions() {
       }
       return data;
     },
-    onSuccess: (_, subscriptionId) => {
+    onSuccess: (_, { subscriptionId, amount }) => {
       setActionState((current) => ({ ...current, [subscriptionId]: { status: ACTION_APPROVED } }));
       queryClient.setQueryData(["/api/subscriptions"], (current: any) => {
         if (!Array.isArray(current)) return current;
         return current.map((sub: any) =>
           sub?.id === subscriptionId
-            ? { ...sub, isDetected: false, is_detected: false, status: "active" }
+            ? { ...sub, ...(amount !== undefined ? { amount } : {}), isDetected: false, is_detected: false, status: "active" }
             : sub
         );
       });
@@ -173,9 +183,18 @@ export default function DetectedSubscriptions() {
     navigate("/subscriptions");
   };
 
-  const handleApproveDetected = (subscriptionId: string) => {
-    setActionState((current) => ({ ...current, [subscriptionId]: { status: ACTION_PENDING } }));
-    approveDetectedMutation.mutate(subscriptionId);
+  const handleApproveDetected = (subscription: Subscription) => {
+    const amount = Number(subscription.amount) > 0 ? undefined : Number(amountDrafts[subscription.id]);
+    if (Number(subscription.amount) <= 0 && (!Number.isFinite(amount) || Number(amount) <= 0)) {
+      toast({
+        title: "Price required",
+        description: "Enter the subscription amount before approving this candidate.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setActionState((current) => ({ ...current, [subscription.id]: { status: ACTION_PENDING } }));
+    approveDetectedMutation.mutate({ subscriptionId: subscription.id, amount });
   };
 
   const handleDismissDetected = (subscriptionId: string) => {
@@ -328,12 +347,29 @@ export default function DetectedSubscriptions() {
                     <div className="flex flex-col lg:items-end gap-3">
                       <div className="text-right">
                         <p className="text-2xl font-semibold text-slate-900 dark:text-white">
-                          {formatAmount(sub.amount)}
+                          {Number(sub.amount) > 0 ? formatAmount(sub.amount) : "Price not detected"}
                         </p>
                         <p className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-[0.1em]">
                           {sub.frequency || "monthly"}
                         </p>
                       </div>
+                      {Number(sub.amount) <= 0 && (
+                        <div className="space-y-1">
+                          <label htmlFor={`detected-amount-${sub.id}`} className="text-xs text-muted-foreground">
+                            Enter amount to approve
+                          </label>
+                          <Input
+                            id={`detected-amount-${sub.id}`}
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={amountDrafts[sub.id] || ""}
+                            onChange={(event) => setAmountDrafts((current) => ({ ...current, [sub.id]: event.target.value }))}
+                            className="w-44"
+                          />
+                        </div>
+                      )}
 
                       {(actionState[sub.id]?.status || ACTION_PENDING) === ACTION_PENDING ? (
                         <div className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400">
@@ -362,10 +398,10 @@ export default function DetectedSubscriptions() {
                         <Button
                           size="sm"
                           className="rounded-full bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:text-white dark:hover:bg-emerald-400"
-                          onClick={() => handleApproveDetected(sub.id)}
-                          disabled={approveDetectedMutation.isPending || actionState[sub.id]?.status === ACTION_APPROVED || actionState[sub.id]?.status === ACTION_DISMISSED}
+                          onClick={() => handleApproveDetected(sub)}
+                          disabled={approveDetectedMutation.isPending || actionState[sub.id]?.status === ACTION_APPROVED || actionState[sub.id]?.status === ACTION_DISMISSED || (Number(sub.amount) <= 0 && !(Number(amountDrafts[sub.id]) > 0))}
                         >
-                          Approve
+                          {Number(sub.amount) > 0 ? "Approve" : "Add price & approve"}
                         </Button>
                         <Button
                           variant="outline"
