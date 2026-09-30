@@ -1206,18 +1206,37 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const redirectUri = typeof browser.identity?.getRedirectURL === 'function'
         ? browser.identity.getRedirectURL()
         : null;
-      const oauthUrlRequest = `${apiUrl}/api/auth/gmail-oauth-url${redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : ''}`;
-      console.info('[Background] Requesting Gmail OAuth consent flow', { redirectUri: redirectUri || 'default' });
+      if (!redirectUri) {
+        sendResponse({ success: false, error: 'This extension did not provide an OAuth redirect URI. Reload the installed extension and try again.' });
+        return;
+      }
+
+      const oauthUrlRequest = `${apiUrl}/api/auth/gmail-oauth-url?redirect_uri=${encodeURIComponent(redirectUri)}`;
+      console.info('[Background] Requesting Gmail OAuth consent flow', { redirectUri });
       fetch(oauthUrlRequest, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         }
-      }).then(r => r.json()).then(data => {
+      }).then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || `Gmail OAuth URL request failed (HTTP ${response.status})`);
+        }
         if (!data.oauthUrl) {
           throw new Error('No OAuth URL from backend');
         }
+        const authorizationUrl = new URL(data.oauthUrl);
+        const oauthClientId = authorizationUrl.searchParams.get('client_id');
+        const oauthRedirectUri = authorizationUrl.searchParams.get('redirect_uri');
+        if (authorizationUrl.origin !== 'https://accounts.google.com' || !oauthClientId || !oauthRedirectUri) {
+          throw new Error('The backend returned an invalid Google OAuth URL. Check the deployed Google OAuth client configuration.');
+        }
+        if (oauthRedirectUri !== redirectUri) {
+          throw new Error(`OAuth callback mismatch: extension requested ${redirectUri}, but backend returned ${oauthRedirectUri}.`);
+        }
+        console.info('[Background] Launching Google OAuth', { clientId: oauthClientId, redirectUri: oauthRedirectUri });
 
         // Open OAuth URL in a new window
         browser.identity.launchWebAuthFlow({
@@ -1226,7 +1245,10 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }, (redirectUrl) => {
           const launchError = browser.runtime.lastError;
           if (!redirectUrl) {
-            const errorMessage = launchError?.message || 'OAuth flow ended without a callback';
+            const runtimeMessage = launchError?.message || 'OAuth flow ended without a callback';
+            const errorMessage = /authorization page could not be loaded/i.test(runtimeMessage)
+              ? `Google could not load OAuth client ${oauthClientId} with callback ${oauthRedirectUri}. Confirm this exact callback is authorized on that client and that the OAuth client is enabled.`
+              : runtimeMessage;
             const userDidNotApprove = /did not approve|access was denied|cancelled|canceled|aborted/i.test(errorMessage);
             if (userDidNotApprove) {
               console.info('[Background] Gmail OAuth was not completed because access was not approved.');
