@@ -60,7 +60,6 @@ export function useFamilyDataMode() {
   const { data: familyGroups, isLoading: familyGroupsLoading } = useQuery<any[], Error>({
     queryKey: ["/api/family-groups"],
     enabled: !!user?.id,
-    initialData: cachedGroupId ? [{ id: cachedGroupId }] : undefined,
     staleTime: 60 * 1000,
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/family-groups');
@@ -82,9 +81,6 @@ export function useFamilyDataMode() {
   const { data: familySettings, isLoading: familySettingsLoading } = useQuery<any, Error>({
     queryKey: ["/api/family-groups", familyGroupId, "settings"],
     enabled: !!familyGroupId,
-    initialData: cachedGroupId === familyGroupId && cachedMode
-      ? { show_family_data: true, family_group_id: familyGroupId }
-      : undefined,
     staleTime: 60 * 1000,
     queryFn: async () => {
       if (!familyGroupId) return null;
