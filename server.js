@@ -1848,6 +1848,71 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (urlPath === '/api/auth/gmail-refresh' && req.method === 'POST') {
+    const user = await getUser(req.headers.authorization);
+    if (!user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
+    try {
+      const { data: oauthTokens, error } = await supabase
+        .from('user_oauth_tokens')
+        .select('refresh_token')
+        .eq('user_id', user.id)
+        .eq('provider', 'gmail')
+        .maybeSingle();
+      if (error) throw error;
+      if (!oauthTokens?.refresh_token) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Gmail reauthorization required' }));
+        return;
+      }
+
+      const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
+      const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
+      if (!googleClientId || !googleClientSecret) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Gmail OAuth not configured' }));
+        return;
+      }
+
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: googleClientId,
+          client_secret: googleClientSecret,
+          refresh_token: oauthTokens.refresh_token,
+          grant_type: 'refresh_token',
+        }),
+      });
+      const tokenData = await tokenResponse.json();
+      if (!tokenResponse.ok || !tokenData.access_token) {
+        throw new Error(tokenData.error_description || tokenData.error || 'Google token refresh failed');
+      }
+
+      await supabase
+        .from('user_oauth_tokens')
+        .update({
+          access_token: tokenData.access_token,
+          expires_at: new Date(Date.now() + Number(tokenData.expires_in || 3600) * 1000),
+          updated_at: new Date(),
+        })
+        .eq('user_id', user.id)
+        .eq('provider', 'gmail');
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ access_token: tokenData.access_token, expires_in: tokenData.expires_in || 3600, success: true }));
+    } catch (error) {
+      console.error('[Server] Gmail token refresh error:', error);
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Gmail reauthorization required' }));
+    }
+    return;
+  }
+
   // Check Gmail authorization status
   if (urlPath === '/api/auth/gmail-status' && req.method === 'GET') {
     const user = await getUser(req.headers.authorization);

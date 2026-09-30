@@ -1758,32 +1758,34 @@ runtimeDeno?.serve?.(async (req: Request) => {
       });
     }
 
+    // Refresh a stored Gmail grant after a Subveris login.
+    if (pathname === "/auth/gmail-refresh" && req.method === "POST") {
+      const userId = extractUserId(req);
+      if (!userId || !supabase) return sendJson({ error: "Unauthorized" }, { status: 401 });
+      try {
+        const { data: userData, error } = await supabase
+          .from("users")
+          .select("gmail_refresh_token")
+          .eq("id", userId)
+          .maybeSingle();
+        if (error) throw error;
+        if (!userData?.gmail_refresh_token) return sendJson({ error: "Gmail reauthorization required" }, { status: 401 });
+
+        const tokenData = await refreshGmailAccessToken(userData.gmail_refresh_token);
+        const { error: updateError } = await supabase.from("users").update({
+          gmail_access_token: tokenData.access_token,
+          gmail_token_expiry: new Date(Date.now() + Number(tokenData.expires_in || 3600) * 1000).toISOString(),
+        }).eq("id", userId);
+        if (updateError) throw updateError;
+        return sendJson({ access_token: tokenData.access_token, expires_in: tokenData.expires_in, success: true });
+      } catch (error) {
+        console.error("[Gmail] Refresh error:", error);
+        return sendJson({ error: "Gmail reauthorization required" }, { status: 401 });
+      }
+    }
+
     // Gmail connection status
     if (pathname === "/auth/gmail-status" && req.method === "GET") {
-
-          if (pathname === "/auth/gmail-refresh" && req.method === "POST") {
-            const userId = extractUserId(req);
-            if (!userId || !supabase) return sendJson({ error: "Unauthorized" }, { status: 401 });
-            try {
-              const { data: userData, error } = await supabase
-                .from("users")
-                .select("gmail_refresh_token")
-                .eq("id", userId)
-                .maybeSingle();
-              if (error) throw error;
-              if (!userData?.gmail_refresh_token) return sendJson({ error: "Gmail reauthorization required" }, { status: 401 });
-
-              const tokenData = await refreshGmailAccessToken(userData.gmail_refresh_token);
-              await supabase.from("users").update({
-                gmail_access_token: tokenData.access_token,
-                gmail_token_expiry: new Date(Date.now() + Number(tokenData.expires_in || 3600) * 1000).toISOString(),
-              }).eq("id", userId);
-              return sendJson({ access_token: tokenData.access_token, expires_in: tokenData.expires_in, success: true });
-            } catch (error) {
-              console.error("[Gmail] Refresh error:", error);
-              return sendJson({ error: "Gmail reauthorization required" }, { status: 401 });
-            }
-          }
       const userId = extractUserId(req);
       if (!userId) {
         return sendJson({ error: "Unauthorized" }, { status: 401 });
