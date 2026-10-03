@@ -43,9 +43,10 @@ After installation:
 ## How It Works
 
 ### 📧 Gmail Receipt Scanning
-- Checks recent Gmail message metadata for likely subscription receipts and renewals
-- Requires explicit OAuth authorization for `https://www.googleapis.com/auth/gmail.metadata`
-- Uses message IDs, selected headers, dates, and Gmail-provided snippets; it does not request full message bodies
+- Checks recent Gmail messages for likely subscription receipts and renewals
+- Requires explicit OAuth authorization for the restricted read-only scope `https://www.googleapis.com/auth/gmail.readonly`
+- Scans headers and decoded text message parts locally; email bodies and attachments are not synced to Subveris
+- Known providers get friendly names; other providers are inferred from the sender when subscription or renewal language is present
 - Presents likely matches as pending candidates for user review and approval
 - Runs periodically, with at least one hour between automatic Gmail scans
 

@@ -116,7 +116,7 @@
    - ✅ Begins email scanning after 5 minutes
 
 3. **Gmail API Integration** ✅
-   - ✅ Metadata-only scope: `gmail.metadata`
+   - ✅ Restricted read-only scope: `gmail.readonly`; message text is scanned locally
    - ✅ Manifest permissions: `https://www.googleapis.com/*`
    - ✅ Proper authorization header format
    - ✅ Error handling for expired tokens

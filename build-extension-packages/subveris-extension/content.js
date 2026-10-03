@@ -2,7 +2,7 @@
 // Safari 15+, Firefox, and Edge use 'browser' global
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
 const browser = globalThis.browser || globalThis.chrome;
-const EXTENSION_BUILD = '1.2.9';
+const EXTENSION_BUILD = '1.3.0';
 
 let startTime = Date.now();
 let cachedAuthToken = null;
@@ -175,6 +175,9 @@ try {
     console.info(`[Subveris Gmail Scan] ${request.event}`, request.details || {});
     if (request.event === 'authorization_restored') {
       window.postMessage({ type: 'SUBVERIS_GMAIL_AUTHORIZATION_RESTORED' }, window.location.origin);
+    }
+    if (request.event === 'reauthorization_required') {
+      window.postMessage({ type: 'SUBVERIS_GMAIL_REAUTHORIZATION_REQUIRED', details: request.details || {} }, window.location.origin);
     }
     if (request.event === 'review_queue_sync_succeeded') {
       window.postMessage({ type: 'SUBVERIS_DETECTED_SUBSCRIPTIONS_UPDATED' }, window.location.origin);

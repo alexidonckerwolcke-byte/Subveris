@@ -576,7 +576,7 @@ const server = http.createServer(async (req, res) => {
 
           const { data: existingRows, error: lookupError } = await supabase
             .from('subscriptions')
-            .select('id')
+            .select('id, is_detected')
             .eq('user_id', user.id)
             .or(`name.ilike.${name},website_domain.ilike.${normalizedDomain || ''}`)
             .limit(1);
@@ -588,7 +588,39 @@ const server = http.createServer(async (req, res) => {
           let resolved = null;
           if (existingRows && existingRows.length > 0) {
             if (!isApprovedForSync) {
-              skipped += 1;
+              if (existingRows[0].is_detected !== true) {
+                skipped += 1;
+                continue;
+              }
+              const enrichment = {};
+              if (Number.isFinite(amountValue) && amountValue > 0) enrichment.amount = amountValue;
+              if (typeof item.currency === 'string' && /^[A-Z]{3}$/i.test(item.currency.trim())) {
+                enrichment.currency = item.currency.trim().toUpperCase();
+              }
+              if (typeof item.frequency === 'string' && item.frequency.trim()) {
+                enrichment.frequency = item.frequency.trim().toLowerCase();
+              }
+              if (typeof item.detectedRenewalDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.detectedRenewalDate)) {
+                enrichment.next_billing_at = item.detectedRenewalDate;
+              }
+              if (typeof item.planName === 'string' && item.planName.trim()) {
+                enrichment.description = item.planName.trim();
+              }
+              if (Object.keys(enrichment).length === 0) {
+                skipped += 1;
+                continue;
+              }
+              enrichment.updated_at = new Date().toISOString();
+              const { data, error } = await supabase
+                .from('subscriptions')
+                .update(enrichment)
+                .eq('id', existingRows[0].id)
+                .eq('is_detected', true)
+                .select();
+              if (!error) resolved = data?.[0] || null;
+              else console.warn('[Extension Sync] pending candidate enrichment failed:', error.message);
+              if (!resolved) skipped += 1;
+              else saved.push(resolved);
               continue;
             }
             const { data, error } = await supabase
@@ -1737,9 +1769,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
-    const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
-    const defaultRedirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
+    const googleClientId = (process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
+    const googleClientSecret = (process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
+    const defaultRedirectUri = (process.env.GOOGLE_REDIRECT_URI || process.env.GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob').trim();
     const requestedRedirectUri = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams.get('redirect_uri');
     const redirectUri = requestedRedirectUri || defaultRedirectUri;
     if (redirectUri !== defaultRedirectUri && !/^https:\/\/[a-z0-9]{32}\.chromiumapp\.org\/?$/.test(redirectUri)) {
@@ -1754,8 +1786,16 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const scope = 'https://www.googleapis.com/auth/gmail.metadata';
-    const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=${encodeURIComponent('select_account consent')}`;
+    const oauthParams = new URLSearchParams({
+      client_id: googleClientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/gmail.readonly',
+      access_type: 'offline',
+      include_granted_scopes: 'true',
+      prompt: 'select_account consent',
+    });
+    const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${oauthParams.toString()}`;
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ oauthUrl }));
@@ -1786,9 +1826,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
-    const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
-    const defaultRedirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
+    const googleClientId = (process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
+    const googleClientSecret = (process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
+    const defaultRedirectUri = (process.env.GOOGLE_REDIRECT_URI || process.env.GOOGLE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob').trim();
     const redirectUri = body.redirect_uri || defaultRedirectUri;
     if (redirectUri !== defaultRedirectUri && !/^https:\/\/[a-z0-9]{32}\.chromiumapp\.org\/?$/.test(redirectUri)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -1817,19 +1857,35 @@ const server = http.createServer(async (req, res) => {
 
       const tokenData = await tokenResponse.json();
 
-      if (!tokenData.access_token) {
+      if (!tokenResponse.ok || !tokenData.access_token) {
         throw new Error('No access token received');
+      }
+      const grantedScopes = typeof tokenData.scope === 'string'
+        ? tokenData.scope.split(/\s+/)
+        : ['https://www.googleapis.com/auth/gmail.readonly'];
+      if (!grantedScopes.includes('https://www.googleapis.com/auth/gmail.readonly')) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Google did not grant Gmail read-only access. Revoke Subveris in your Google Account and reconnect Gmail.' }));
+        return;
       }
 
       // Store in Supabase for future use
       if (supabase) {
+        const { data: existingTokens, error: existingTokenError } = await supabase
+          .from('user_oauth_tokens')
+          .select('refresh_token')
+          .eq('user_id', user.id)
+          .eq('provider', 'gmail')
+          .maybeSingle();
+        if (existingTokenError) throw existingTokenError;
+
         await supabase
           .from('user_oauth_tokens')
           .upsert({
             user_id: user.id,
             provider: 'gmail',
             access_token: tokenData.access_token,
-            refresh_token: tokenData.refresh_token || null,
+            refresh_token: tokenData.refresh_token || existingTokens?.refresh_token || null,
             expires_at: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null,
             updated_at: new Date()
           }, { onConflict: 'user_id,provider' });
@@ -1838,7 +1894,8 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         access_token: tokenData.access_token,
-        expires_in: tokenData.expires_in || 3600
+        expires_in: tokenData.expires_in || 3600,
+        scope: tokenData.scope,
       }));
     } catch (error) {
       console.error('[Server] Gmail token exchange error:', error);
@@ -1859,19 +1916,31 @@ const server = http.createServer(async (req, res) => {
     try {
       const { data: oauthTokens, error } = await supabase
         .from('user_oauth_tokens')
-        .select('refresh_token')
+        .select('access_token, refresh_token, expires_at')
         .eq('user_id', user.id)
         .eq('provider', 'gmail')
         .maybeSingle();
       if (error) throw error;
+
+      const accessTokenExpiry = oauthTokens?.expires_at ? new Date(oauthTokens.expires_at).getTime() : null;
+      const hasUsableAccessToken = Boolean(oauthTokens?.access_token && (!accessTokenExpiry || accessTokenExpiry > Date.now() + 30_000));
+      if (hasUsableAccessToken) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          access_token: oauthTokens.access_token,
+          expires_in: accessTokenExpiry ? Math.floor((accessTokenExpiry - Date.now()) / 1000) : 3600,
+          success: true,
+        }));
+        return;
+      }
       if (!oauthTokens?.refresh_token) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Gmail reauthorization required' }));
         return;
       }
 
-      const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
-      const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
+      const googleClientId = (process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
+      const googleClientSecret = (process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
       if (!googleClientId || !googleClientSecret) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Gmail OAuth not configured' }));
@@ -1926,12 +1995,14 @@ const server = http.createServer(async (req, res) => {
       if (supabase) {
         const { data, error } = await supabase
           .from('user_oauth_tokens')
-          .select('access_token')
+          .select('access_token, refresh_token, expires_at')
           .eq('user_id', user.id)
           .eq('provider', 'gmail')
           .maybeSingle();
 
-        const connected = !error && data?.access_token;
+        const accessTokenExpiry = data?.expires_at ? new Date(data.expires_at).getTime() : null;
+        const hasUsableAccessToken = Boolean(data?.access_token && (!accessTokenExpiry || accessTokenExpiry > Date.now() + 30_000));
+        const connected = !error && Boolean(data?.refresh_token || hasUsableAccessToken);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ connected }));
       } else {

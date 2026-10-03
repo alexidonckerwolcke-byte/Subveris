@@ -231,6 +231,7 @@ const ACCOUNT_STATE_KEYS = [
   'extensionSessionExpiresAt',
   'subscription_status',
   'detectedSubscriptions',
+  'gmailReauthorizationRequired',
   'detectedSubscription',
   'lastDetectedSubscriptionAt',
   'trackingPaused',
@@ -386,6 +387,8 @@ function loadKnownSubscriptions() {
         };
       });
 
+      retainPendingGmailReviewCandidates(existingSubs, merged);
+
       browser.storage.local.set({ detectedSubscriptions: merged }, () => {
         if (browser.runtime.lastError) {
           console.error('[Background] Failed to store hydrated subscriptions:', browser.runtime.lastError);
@@ -398,6 +401,41 @@ function loadKnownSubscriptions() {
     });
   });
 }
+
+function retainPendingGmailReviewCandidates(existingSubscriptions, refreshedSubscriptions) {
+  Object.entries(existingSubscriptions || {}).forEach(([serviceName, item]) => {
+    const isPendingGmailCandidate = item?.requiresReview === true && (
+      item.source === 'gmail-metadata-candidate' || item.source === 'gmail-inferred-review-candidate'
+    );
+    if (isPendingGmailCandidate && !refreshedSubscriptions[serviceName]) {
+      refreshedSubscriptions[serviceName] = item;
+    }
+  });
+  return refreshedSubscriptions;
+}
+
+globalThis.retainPendingGmailReviewCandidates = retainPendingGmailReviewCandidates;
+
+function mergePendingGmailCandidate(existing, candidate) {
+  return {
+    ...existing,
+    ...candidate,
+    serviceName: existing?.serviceName || candidate.serviceName,
+    domain: candidate.domain || existing?.domain || null,
+    amount: candidate.amount ?? existing?.amount ?? 0,
+    currency: candidate.amount !== null ? candidate.currency : (existing?.currency || candidate.currency),
+    frequency: candidate.frequency || existing?.frequency || 'monthly',
+    detectedRenewalDate: candidate.detectedRenewalDate || existing?.detectedRenewalDate || null,
+    planName: candidate.planName || existing?.planName || null,
+    detectedAt: existing?.detectedAt || candidate.detectedAt,
+    lastSeen: Date.now(),
+    requiresReview: true,
+    approvedForSync: false,
+    isDetectedCandidate: true,
+  };
+}
+
+globalThis.mergePendingGmailCandidate = mergePendingGmailCandidate;
 
 function addDetectedSubscription(serviceName, domain) {
   if (!serviceName) return;
@@ -1299,6 +1337,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 gmailAuthToken: tokenData.access_token,
                 gmailTokenExpiry: Date.now() + (tokenData.expires_in * 1000),
                 gmailUserUUID: result.supabaseUserUUID,
+                gmailReauthorizationRequired: false,
               }, () => {
                 console.log('[Background] ✅ Gmail authorized successfully');
                 scanGmailForSubscriptions(true);
@@ -1349,21 +1388,29 @@ function extractGmailAmount(text) {
     return null;
   }
 
-  const normalized = text.replace(/,/g, '.');
-  const matches = [...normalized.matchAll(/(?:total|amount|charged|payment|renewal|membership|subscription|receipt|invoice|charge)[^\d]{0,20}(?:[$€£¥])?\s*(\d+(?:\.\d{1,2})?)/gi)];
-  const directMatches = [...normalized.matchAll(/(?:[$€£¥])\s*(\d+(?:\.\d{1,2})?)/g)];
-  const candidateMatches = matches.length ? matches : directMatches;
-  if (!candidateMatches.length) {
-    return null;
-  }
+  const numberPattern = String.raw`((?:\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d{1,2})?)`;
+  const leadingCurrencyMatch = text.match(/(?:[$€£¥]\s*|\b(?:USD|EUR|GBP|CAD|AUD|NZD|JPY|CHF)\s*)((?:\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d{1,2})?)/i);
+  const trailingCurrencyMatch = text.match(/((?:\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d{1,2})?)\s*(?:[$€£¥]|\b(?:USD|EUR|GBP|CAD|AUD|NZD|JPY|CHF)\b)/i);
+  const labeledMatch = text.match(new RegExp(`(?:amount(?:\\s+(?:due|paid|charged))?|total(?:\\s+(?:due|paid))?|subtotal|price|cost|fee|charged|charge|paid|payment(?:\\s+(?:of|for))?)[^\\d]{0,12}${numberPattern}`, 'i'));
+  const rawValue = leadingCurrencyMatch?.[1] || trailingCurrencyMatch?.[1] || labeledMatch?.[1];
+  if (!rawValue) return null;
 
-  const firstValue = candidateMatches[0]?.[1];
-  if (!firstValue) {
-    return null;
+  let normalized = rawValue;
+  if (normalized.includes(',') && normalized.includes('.')) {
+    const decimalSeparator = normalized.lastIndexOf(',') > normalized.lastIndexOf('.') ? ',' : '.';
+    const thousandsSeparator = decimalSeparator === ',' ? '.' : ',';
+    normalized = normalized.replaceAll(thousandsSeparator, '').replace(decimalSeparator, '.');
+  } else if (normalized.includes(',')) {
+    const decimalDigits = normalized.length - normalized.lastIndexOf(',') - 1;
+    normalized = decimalDigits > 0 && decimalDigits <= 2
+      ? normalized.replace(',', '.')
+      : normalized.replace(/,/g, '');
+  } else if (normalized.includes('.')) {
+    const decimalDigits = normalized.length - normalized.lastIndexOf('.') - 1;
+    if (decimalDigits > 2) normalized = normalized.replace(/\./g, '');
   }
-
-  const numeric = Number.parseFloat(firstValue);
-  return Number.isFinite(numeric) ? numeric : null;
+  const amount = Number.parseFloat(normalized);
+  return Number.isFinite(amount) ? amount : null;
 }
 
 function extractGmailRenewalDate(text) {
@@ -1413,27 +1460,105 @@ function decodeGmailBody(data) {
 }
 
 function extractGmailBody(payload) {
-  if (!payload) return '';
+  if (!payload || payload.filename) return '';
   const parts = Array.isArray(payload.parts) ? payload.parts : [];
-  const ownBody = payload.body?.data ? decodeGmailBody(payload.body.data) : '';
+  const mimeType = String(payload.mimeType || '').toLowerCase();
+  const decodedBody = mimeType.startsWith('text/') && payload.body?.data
+    ? decodeGmailBody(payload.body.data)
+    : '';
+  const ownBody = mimeType === 'text/html'
+    ? decodedBody
+      .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<br\s*\/?>|<\/(?:p|div|tr|li)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;|&#160;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
+    : decodedBody;
   const childBodies = parts.map((part) => extractGmailBody(part)).filter(Boolean).join('\n');
   return [ownBody, childBodies].filter(Boolean).join('\n');
 }
+globalThis.extractGmailBody = extractGmailBody;
 
-function inferGmailServiceName(subject, from) {
+function inferGmailServiceName(subject, from, messageText = '') {
+  const genericSenderNames = /^(?:a|an|account|accounts|billing|customer service|example|help|info|mail|mailer|membership|member services|no[ -]?reply|notification|notifications|noreply|our|payment|payments|receipt|receipts|service|services|support|team|test|test account|test user|the|update|updates|your)$/i;
+  const cleanName = (value) => {
+    const cleaned = String(value || '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/["'<>]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+(?:billing|customer service|notifications?|no[ -]?reply|payments?|receipts?|services?|support|team|updates?)\s*$/i, '')
+      .replace(/^[\s:,-]+|[\s:,-]+$/g, '')
+      .trim();
+    const genericProviderPhrase = /^(?:example|subscription|membership|plan|monthly|annual|yearly|billing|payment|receipt|invoice|renewal|renewed|test)\b/i;
+    return cleaned && !genericSenderNames.test(cleaned) && !genericProviderPhrase.test(cleaned) ? cleaned : null;
+  };
+
+  const displayNameMatch = String(from || '').match(/^\s*(?:"([^"]+)"|([^<]+))\s*</);
+  const displayName = cleanName(displayNameMatch?.[1] || displayNameMatch?.[2]);
+  if (displayName) return displayName;
+
   const emailMatch = String(from || '').match(/<[^@>]+@([^>]+)>|\b[^\s@]+@([^\s>]+)\b/);
-  const senderDomain = emailMatch?.[1] || emailMatch?.[2] || '';
-  const domainName = senderDomain
-    .replace(/^mail\.|^email\.|^billing\.|^hello\.|^support\./i, '')
-    .split('.')[0]
-    .replace(/[-_]+/g, ' ')
-    .trim();
-  if (domainName && !/^(gmail|google|outlook|hotmail|yahoo|example)$/i.test(domainName)) {
-    return domainName.replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const senderDomain = (emailMatch?.[1] || emailMatch?.[2] || '').toLowerCase();
+  const senderAddress = String(from || '').match(/<([^@>]+)@[^>]+>|\b([^\s@<>]+)@[^\s@<>]+/);
+  const senderLocalPart = (senderAddress?.[1] || senderAddress?.[2] || '').toLowerCase();
+  const personalEmailDomains = new Set(['gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'yahoo.com', 'icloud.com', 'me.com', 'proton.me', 'protonmail.com']);
+  if (senderLocalPart && !personalEmailDomains.has(senderDomain)) {
+    const ignoredLocalTokens = new Set([
+      'account', 'accounts', 'alert', 'alerts', 'auto', 'billing', 'bot', 'contact', 'customer', 'donotreply',
+      'email', 'help', 'info', 'invoice', 'mail', 'mailer', 'marketing', 'member', 'membership', 'message', 'news', 'newsletter', 'no', 'noreply',
+      'notification', 'notifications', 'notify', 'order', 'payment', 'payments', 'receipt', 'receipts', 'renewal',
+      'service', 'services', 'support', 'team', 'update', 'updates', 'verify',
+    ]);
+    const localName = senderLocalPart
+      .replace(/\d+/g, '')
+      .split(/[._+-]+/)
+      .filter((token) => token && !ignoredLocalTokens.has(token))
+      .join(' ')
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const cleanedLocalName = cleanName(localName);
+    if (cleanedLocalName) return cleanedLocalName;
   }
 
-  const subjectMatch = String(subject || '').match(/(?:from|at|with)\s+([A-Za-z][A-Za-z0-9 &.'-]{2,40})/i);
-  return subjectMatch?.[1]?.trim() || 'Unrecognized subscription';
+  const ignoredDomainLabels = new Set([
+    'account', 'accounts', 'alert', 'alerts', 'app', 'apps', 'billing', 'email', 'info', 'mail', 'mailer', 'marketing',
+    'member', 'members', 'membership', 'message', 'messages', 'noreply', 'notify', 'notification', 'notifications',
+    'news', 'newsletter', 'newsletters', 'payments', 'receipt', 'receipts', 'service', 'services', 'support', 'team', 'update', 'updates', 'www',
+    'com', 'net', 'org', 'edu', 'gov', 'co', 'uk', 'us', 'ca', 'au', 'de', 'fr', 'nl', 'io', 'app', 'cloud',
+    'gmail', 'google', 'outlook', 'hotmail', 'yahoo', 'example', 'test',
+  ]);
+  const domainLabel = senderDomain.split('.').reverse().find((label) => !ignoredDomainLabels.has(label));
+  if (domainLabel) {
+    const domainName = domainLabel.replace(/[-_]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const cleanedDomainName = cleanName(domainName);
+    if (cleanedDomainName) return cleanedDomainName;
+  }
+
+  const normalizedSubject = String(subject || '').replace(/^\s*[#*]+\s*/, '').trim();
+  const subjectProviderMatch = normalizedSubject.match(/^([A-Z][A-Za-z0-9&.'’ -]{1,40}?)\s+(?:renewal|subscription|membership|plan)\b/i);
+  const subjectProvider = cleanName(subjectProviderMatch?.[1]);
+  if (subjectProvider && !/^(?:your|the|a|an|test|example)\b/i.test(subjectProvider)) return subjectProvider;
+
+  const text = `${subject || ''}\n${messageText || ''}`;
+  const providerPatterns = [
+    /\b(?:service|merchant|vendor|provider|brand|product|subscription|membership|plan)(?:\s+name)?\s*[:#=-]\s*([^\n,;]{2,60})/i,
+    /\b(?:you(?:'re| are) subscribed to|subscribed to|thanks for subscribing to|subscription for|membership with|service from|payment to)\s+([A-Z][A-Za-z0-9&.'’ -]{1,40}?)(?=\s+(?:has|is|was|will|renews?|renewed|renewal|charged|billed|payment|for|on)\b|[.,;:!?]|$)/i,
+    /\b(?:your|the)\s+(?!subscription\b|membership\b|plan\b)([A-Z][A-Za-z0-9&.'’ -]{1,40}?)\s+(?:subscription|membership|plan)\b/i,
+    /(?:^|[\n#*])\s*([A-Z][A-Za-z0-9&.'’ -]{1,40}?)\s+(?:renewal|subscription|membership|plan)\b/i,
+    /\b(?:subscription|membership|plan)\s+(?:from|for|with|at)\s+([A-Z][A-Za-z0-9&.'’ -]{1,40}?)(?=\s+(?:is|was|has|will|renews?|renewed|renewing|expires?|charged|billed|payment|for|on)\b|[.,;:!?]|$)/i,
+    /\b(?:welcome to|thanks for choosing|thank you for choosing|receipt from|payment to)\s+([A-Z][A-Za-z0-9&.'’ -]{1,40}?)(?=[.,;:!?]|\s+(?:account|subscription|membership|plan)\b|$)/i,
+    /\b(?:from|at|with)\s+([A-Z][A-Za-z0-9&.'’ -]{2,40}?)(?=\s+(?:subscription|membership|plan|receipt|invoice|payment|renewal)\b|[.,;:!?]|$)/i,
+  ];
+  for (const pattern of providerPatterns) {
+    const match = text.match(pattern);
+    const inferredName = cleanName(match?.[1]);
+    if (inferredName) return inferredName;
+  }
+
+  return 'Unrecognized subscription';
 }
 
 function getGmailSenderDomain(from) {
@@ -1441,16 +1566,35 @@ function getGmailSenderDomain(from) {
   return (emailMatch?.[1] || emailMatch?.[2] || '').toLowerCase();
 }
 
-function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
+function buildGmailMessageFullUrl(messageId) {
+  const url = new URL(`https://www.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}`);
+  url.searchParams.set('format', 'full');
+  return url.toString();
+}
+
+globalThis.buildGmailMessageFullUrl = buildGmailMessageFullUrl;
+
+function isGmailReadOnlyScopeError(status, reason, message) {
+  return Number(status) === 403 && /scope|insufficient\s+(?:authentication|permissions?)/i.test(`${reason || ''} ${message || ''}`);
+}
+
+globalThis.isGmailReadOnlyScopeError = isGmailReadOnlyScopeError;
+
+function buildGmailSubscriptionCandidate(subject, from, snippet, msgData, onRejected = () => {}) {
+  const reject = (reason) => {
+    onRejected(reason);
+    return null;
+  };
   const fullText = `${subject || ''} ${from || ''} ${snippet || ''}`.trim();
   if (!fullText) {
-    return null;
+    return reject('empty_metadata');
   }
 
   const senderDomain = getGmailSenderDomain(from);
   const lowerSubject = String(subject || '').toLowerCase();
+  const lowerSnippet = String(snippet || '').toLowerCase();
   if (senderDomain === 'subveris.com') {
-    return null;
+    return reject('internal_sender');
   }
 
   const servicePatterns = {
@@ -1499,35 +1643,65 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
     'Kindle Unlimited': ['kindle unlimited'],
   };
 
-  const lowerText = fullText.toLowerCase();
   let serviceName = null;
+  let isKnownServiceName = false;
   let matchedPatterns = [];
+  let snippetServiceName = null;
+  let snippetMatchedPatterns = [];
   for (const [name, patterns] of Object.entries(servicePatterns)) {
-    matchedPatterns = patterns.filter((pattern) => {
+    const strongMatches = patterns.filter((pattern) => {
       const normalizedPattern = pattern.toLowerCase();
-      return lowerSubject.includes(normalizedPattern) || senderDomain.includes(normalizedPattern.replace(/\s+/g, ''));
+      return lowerSubject.includes(normalizedPattern)
+        || senderDomain.includes(normalizedPattern.replace(/\s+/g, ''));
     });
-    if (matchedPatterns.length) {
+    if (strongMatches.length) {
       serviceName = name;
+      isKnownServiceName = true;
+      matchedPatterns = strongMatches;
       break;
+    }
+
+    const snippetMatches = patterns.filter((pattern) => lowerSnippet.includes(pattern.toLowerCase()));
+    if (!snippetServiceName && snippetMatches.length) {
+      snippetServiceName = name;
+      snippetMatchedPatterns = snippetMatches;
+    }
+  }
+  let explicitlyInferredServiceName = false;
+  if (!serviceName) {
+    const inferredServiceName = inferGmailServiceName(subject, from, fullText);
+    if (inferredServiceName !== 'Unrecognized subscription') {
+      serviceName = inferredServiceName;
+      explicitlyInferredServiceName = true;
+    } else if (snippetServiceName) {
+      serviceName = snippetServiceName;
+      isKnownServiceName = true;
+      matchedPatterns = snippetMatchedPatterns;
     }
   }
 
   const amount = extractGmailAmount(fullText);
   const renewalDate = extractGmailRenewalDate(fullText);
-  const hasBillingSignal = /receipt|invoice|renewal|billing|charge|subscription|membership|payment/i.test(fullText);
+  const hasSubscriptionLifecycleSignal = /\b(?:subscription|membership|plan)\b.{0,50}\b(?:renew(?:ed|ing|s)?|payment|charge|invoice|receipt|billing|billed|active|expires?|continues|monthly|annual|yearly|trial ends?)\b|\b(?:recurring payment|next billing|renewal (?:notice|confirmation|payment|invoice|completed|complete))\b/i.test(fullText);
+  const hasBillingSignal = /receipt|invoice|renewal|billing|charge|subscription|membership|payment/i.test(fullText)
+    || hasSubscriptionLifecycleSignal;
   const senderMatchesService = Boolean(serviceName && matchedPatterns.some((pattern) => senderDomain.includes(pattern.toLowerCase().replace(/\s+/g, ''))));
   const subjectMatchesService = Boolean(serviceName && matchedPatterns.some((pattern) => lowerSubject.includes(pattern.toLowerCase())));
   const hasFinancialEvidence = amount !== null || renewalDate !== null;
   const hasStrongContext = senderMatchesService || subjectMatchesService;
-  if (!serviceName && (!hasBillingSignal || (amount === null && renewalDate === null))) {
-    return null;
+  const snippetMatchesService = Boolean(serviceName && matchedPatterns.some((pattern) => lowerSnippet.includes(pattern.toLowerCase())));
+  const hasExplicitProviderName = explicitlyInferredServiceName;
+  if (!serviceName && (!hasBillingSignal || (amount === null && renewalDate === null && !hasSubscriptionLifecycleSignal))) {
+    return reject(!hasBillingSignal ? 'unrecognized_service_without_billing_signal' : 'unrecognized_service_without_billing_or_lifecycle_evidence');
   }
-  if (serviceName && (!hasBillingSignal || !hasStrongContext)) {
-    return null;
+  const hasInsufficientProviderEvidence = hasExplicitProviderName
+    ? !hasFinancialEvidence && !hasSubscriptionLifecycleSignal
+    : !hasStrongContext && (!snippetMatchesService || !hasFinancialEvidence);
+  if (serviceName && (!hasBillingSignal || hasInsufficientProviderEvidence)) {
+    return reject(!hasBillingSignal ? 'service_match_without_billing_signal' : 'insufficient_service_evidence');
   }
 
-  const detectedServiceName = serviceName || inferGmailServiceName(subject, from);
+  const detectedServiceName = serviceName || inferGmailServiceName(subject, from, fullText);
 
   return {
     serviceName: detectedServiceName,
@@ -1539,7 +1713,7 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData) {
     detectedRenewalDate: renewalDate,
     requiresReview: true,
     isDetectedCandidate: true,
-    source: serviceName ? 'gmail-metadata-candidate' : 'gmail-inferred-review-candidate',
+    source: isKnownServiceName ? 'gmail-metadata-candidate' : 'gmail-inferred-review-candidate',
     detectedAt: Date.now(),
     lastSeen: Date.now(),
     messageAgeDays: getGmailMessageAgeDays(msgData),
@@ -1604,14 +1778,21 @@ function refreshGmailTokenForAccount(userId, callback) {
       });
     }).catch((error) => {
       console.info('[Background] Gmail authorization could not be restored automatically:', error.message);
-      callback(null);
+      clearGmailAuthorization(() => {
+        publishGmailScanEvent('reauthorization_required', { reason: 'token_refresh_failed' });
+        callback(null);
+      });
     });
   });
 }
 
 function scanGmailForSubscriptions(force = false) {
-  browser.storage.local.get(['gmailAuthToken', 'gmailUserUUID', 'supabaseUserUUID', 'lastGmailScan', 'subscription_status', 'detectedSubscriptions'], (result) => {
+  browser.storage.local.get(['gmailAuthToken', 'gmailUserUUID', 'supabaseUserUUID', 'lastGmailScan', 'subscription_status', 'detectedSubscriptions', 'gmailReauthorizationRequired'], (result) => {
     publishGmailScanEvent('started', { forced: force });
+    if (result.gmailReauthorizationRequired) {
+      publishGmailScanEvent('reauthorization_required', { reason: 'gmail_readonly_scope_required' });
+      return;
+    }
     if (!isTierAllowed(String(result.subscription_status || 'free').toLowerCase())) {
       console.log('[Background] Gmail scanning requires Premium or Family plan');
       publishGmailScanEvent('skipped', { reason: 'plan_required' });
@@ -1643,7 +1824,7 @@ function scanGmailForSubscriptions(force = false) {
     }
 
     // Read the newest message IDs, then filter message content locally.
-    const scanWithToken = (activeToken) => fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=10', {
+    const scanWithToken = (activeToken, refreshAttempted = false) => fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=10', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${activeToken}`,
@@ -1670,8 +1851,12 @@ function scanGmailForSubscriptions(force = false) {
         let processedCount = 0;
         let candidateCount = 0;
         let noServiceMatchCount = 0;
+        let rejectedMessageCount = 0;
+        const candidateRejections = {};
         let staleOrDuplicateCount = 0;
         let failedMessageCount = 0;
+        const messageFailuresByStatus = {};
+        let requiresGmailReauthorization = false;
         const seenCandidateServices = new Set();
         let scanFinalized = false;
 
@@ -1707,7 +1892,10 @@ function scanGmailForSubscriptions(force = false) {
                       failedMessages: failedMessageCount,
                       candidates: candidateCount,
                       noServiceMatch: noServiceMatchCount,
+                      rejectedMessages: rejectedMessageCount,
+                      candidateRejections,
                       staleOrDuplicate: staleOrDuplicateCount,
+                      messageFailuresByStatus,
                       pendingApproval: true,
                       sync: syncResult,
                     });
@@ -1728,6 +1916,15 @@ function scanGmailForSubscriptions(force = false) {
         let messageIndex = 0;
 
         const processNextMessage = () => {
+          if (requiresGmailReauthorization) {
+            const remainingMessages = messageQueue.length - messageIndex;
+            failedMessageCount += remainingMessages;
+            if (remainingMessages > 0) {
+              messageFailuresByStatus['403'] = (messageFailuresByStatus['403'] || 0) + remainingMessages;
+            }
+            finalizeGmailScan();
+            return;
+          }
           if (messageIndex >= messageQueue.length) {
             finalizeGmailScan();
             return;
@@ -1735,7 +1932,7 @@ function scanGmailForSubscriptions(force = false) {
 
           const msg = messageQueue[messageIndex++];
 
-          fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject%2CFrom%2CDate`, {
+          fetch(buildGmailMessageFullUrl(msg.id), {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${activeToken}`,
@@ -1743,19 +1940,24 @@ function scanGmailForSubscriptions(force = false) {
             }
           }).then(async (response) => {
             if (!response.ok) {
-              const statusError = new Error(`Gmail message API returned ${response.status}`);
+              const errorBody = await response.json().catch(() => ({}));
+              const statusError = new Error(errorBody.error?.message || `Gmail message API returned ${response.status}`);
               statusError.status = response.status;
+              statusError.reason = errorBody.error?.errors?.[0]?.reason || null;
               throw statusError;
             }
             return response.json();
           })
             .then(msgData => {
               processedCount++;
-              const subject = msgData.payload?.headers?.find(h => h.name?.toLowerCase() === 'subject')?.value || msgData.snippet || '';
+              const subject = msgData.payload?.headers?.find(h => h.name?.toLowerCase() === 'subject')?.value || '';
               const from = msgData.payload?.headers?.find(h => h.name?.toLowerCase() === 'from')?.value || '';
-              const metadataText = `${subject} ${from} ${msgData.snippet || ''}`;
+              const messageContent = `${subject} ${from} ${msgData.snippet || ''} ${extractGmailBody(msgData.payload)}`;
 
-              const candidate = buildGmailSubscriptionCandidate(subject, from, metadataText, msgData);
+              let rejectionReason = null;
+              const candidate = buildGmailSubscriptionCandidate(subject, from, messageContent, msgData, (reason) => {
+                rejectionReason = reason;
+              });
               if (candidate) {
                 const duplicateInScan = seenCandidateServices.has(candidate.serviceName.toLowerCase());
                 if (!duplicateInScan) {
@@ -1767,19 +1969,25 @@ function scanGmailForSubscriptions(force = false) {
                     !sub.markedCancelled
                   );
 
-                  if (ageInDays === null || ageInDays > 90 || duplicate) {
+                  if (ageInDays === null || ageInDays > 90) {
                     staleOrDuplicateCount++;
                     console.log('[Background] Gmail candidate skipped as stale or duplicate:', candidate.serviceName, {
                       ageInDays,
-                      duplicate: Boolean(duplicate),
-                      alreadyPendingApproval: Boolean(duplicate?.requiresReview),
-                      existingSource: duplicate?.source || null,
-                      existingSubscriptionId: duplicate?.subscriptionId || null,
+                      duplicate: false,
                     });
-                    publishGmailScanEvent('candidate_skipped', {
-                      reason: duplicate ? (duplicate.requiresReview ? 'already_pending_approval' : 'duplicate') : 'stale_or_missing_date',
+                    publishGmailScanEvent('candidate_skipped', { reason: 'stale_or_missing_date', serviceName: candidate.serviceName });
+                  } else if (duplicate && duplicate.requiresReview === true) {
+                    candidateCount++;
+                    detectedSubs[duplicate.serviceName] = mergePendingGmailCandidate(duplicate, candidate);
+                    publishGmailScanEvent('candidate_updated', {
                       serviceName: candidate.serviceName,
+                      amount: detectedSubs[duplicate.serviceName].amount,
+                      detectedRenewalDate: detectedSubs[duplicate.serviceName].detectedRenewalDate,
+                      requiresReview: true,
                     });
+                  } else if (duplicate) {
+                    staleOrDuplicateCount++;
+                    publishGmailScanEvent('candidate_skipped', { reason: 'duplicate', serviceName: candidate.serviceName });
                   } else {
                     candidateCount++;
                     detectedSubs[candidate.serviceName] = {
@@ -1806,13 +2014,35 @@ function scanGmailForSubscriptions(force = false) {
                   }
                 }
               } else {
-                noServiceMatchCount++;
+                rejectedMessageCount++;
+                const reason = rejectionReason || 'unknown_rejection';
+                candidateRejections[reason] = (candidateRejections[reason] || 0) + 1;
+                if (reason.startsWith('unrecognized_service')) noServiceMatchCount++;
+                publishGmailScanEvent('candidate_rejected', { reason });
               }
 
               setTimeout(processNextMessage, 150);
             }).catch(err => {
               failedMessageCount++;
               const status = Number(err?.status || 0);
+              const statusKey = status ? String(status) : 'unknown';
+              messageFailuresByStatus[statusKey] = (messageFailuresByStatus[statusKey] || 0) + 1;
+              const errorMessage = String(err?.message || err || '');
+              const scopeDenied = isGmailReadOnlyScopeError(status, err?.reason, errorMessage);
+              const failureReason = scopeDenied ? 'gmail_readonly_scope_required' : status === 403 ? 'gmail_message_forbidden' : status === 401 ? 'gmail_authorization_expired' : 'gmail_message_unavailable';
+              publishGmailScanEvent('message_fetch_failed', {
+                status: status || null,
+                reason: failureReason,
+                requiresReauthorization: scopeDenied,
+              });
+              if (scopeDenied) {
+                requiresGmailReauthorization = true;
+                browser.storage.local.set({ gmailReauthorizationRequired: true }, () => {
+                  clearGmailAuthorization(() => {
+                    publishGmailScanEvent('reauthorization_required', { reason: 'gmail_readonly_scope_required' });
+                  });
+                });
+              }
               const isRecoverableMessageIssue = status === 401 || status === 403 || status === 404 || status === 429 || /deleted|not found|forbidden|unauthorized|rate limit|too many requests/i.test(String(err?.message || err || ''));
 
               if (isRecoverableMessageIssue) {
@@ -1836,21 +2066,22 @@ function scanGmailForSubscriptions(force = false) {
         }
       }).catch(async (err) => {
         if (err.status === 401) {
+          if (refreshAttempted) {
+            console.warn('[Background] Gmail rejected the refreshed access token; clearing it and requiring user authorization.');
+            clearGmailAuthorization(() => {
+              publishGmailScanEvent('reauthorization_required', { reason: 'refreshed_token_rejected' });
+              publishGmailScanEvent('skipped', { reason: 'gmail_reauthorization_required' });
+            });
+            return;
+          }
+
           console.info('[Background] Gmail access token expired; requesting refresh.');
-          browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl'], (authState) => {
-            const apiUrl = authState.subverisApiUrl || DEFAULT_API_URL;
-            const authToken = authState.supabaseAuthToken || authState.authToken;
-            fetch(`${apiUrl}/api/auth/gmail-refresh`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${authToken}` },
-            }).then(async (response) => {
-              const body = await response.json().catch(() => ({}));
-              if (!response.ok || !body.access_token) throw new Error(body.error || 'Gmail reauthorization required');
-              browser.storage.local.set({
-                gmailAuthToken: body.access_token,
-                gmailTokenExpiry: Date.now() + Number(body.expires_in || 3600) * 1000,
-              }, () => scanWithToken(body.access_token));
-            }).catch(() => publishGmailScanEvent('skipped', { reason: 'gmail_reauthorization_required' }));
+          refreshGmailTokenForAccount(result.supabaseUserUUID, (refreshedToken) => {
+            if (refreshedToken) {
+              scanWithToken(refreshedToken, true);
+              return;
+            }
+            publishGmailScanEvent('skipped', { reason: 'gmail_reauthorization_required' });
           });
           return;
         }

@@ -3,13 +3,13 @@
 ## 🎯 Goal
 Configure Supabase with Google OAuth credentials so the backend can generate OAuth URLs and exchange authorization codes for access tokens.
 
-The Gmail integration uses exactly one restricted scope:
+The Gmail integration uses exactly one restricted, read-only scope:
 
-`https://www.googleapis.com/auth/gmail.metadata`
+`https://www.googleapis.com/auth/gmail.readonly`
 
-The scanner uses `messages.list` and `messages.get?format=metadata` to inspect message IDs, headers, dates, and snippets. It uses only those fields to identify likely subscription receipts and renewal messages. Full message bodies are not requested or processed. Users must reauthorize Gmail after this scope changes.
+The scanner uses `messages.list` and `messages.get?format=full` to retrieve recent messages. The extension locally examines headers and decoded text/plain or text/html body parts to identify likely subscription receipts, providers, amounts, and renewal dates. Email bodies are processed transiently in the extension and are not included in sync requests; only extracted candidate fields are synced for user review. Attachments are not processed. The integration does not modify, send, delete, or label email. Users must disconnect and reauthorize Gmail after this scope changes.
 
-Do not request or configure `https://www.googleapis.com/auth/gmail.readonly` for the current implementation. It is broader than the scope used by the application and must be removed from the OAuth consent-screen configuration if it is present there.
+Because `gmail.readonly` is a restricted Google OAuth scope, configure it in the Google OAuth consent screen and complete Google's verification requirements before enabling it for public users. Google may require a security assessment depending on how restricted-scope data is stored or transmitted. Keep message bodies on the extension and do not add body-content logging or server sync.
 
 ## 📋 What You Need
 

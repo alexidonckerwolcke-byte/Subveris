@@ -11,9 +11,10 @@ const SUPABASE_SERVICE_ROLE_KEY = runtimeDeno?.env?.get("SUPABASE_SERVICE_ROLE_K
 const SUPABASE_ANON_KEY = runtimeDeno?.env?.get("SUPABASE_ANON_KEY") ?? "";
 
 // Google OAuth credentials
-const GOOGLE_CLIENT_ID = runtimeDeno?.env?.get("GOOGLE_CLIENT_ID") ?? "";
-const GOOGLE_CLIENT_SECRET = runtimeDeno?.env?.get("GOOGLE_CLIENT_SECRET") ?? "";
-const GOOGLE_REDIRECT_URI = runtimeDeno?.env?.get("GOOGLE_REDIRECT_URI") ?? "https://subveris.com/auth/callback";
+const GOOGLE_CLIENT_ID = (runtimeDeno?.env?.get("GOOGLE_CLIENT_ID") || runtimeDeno?.env?.get("GOOGLE_OAUTH_CLIENT_ID") || "").trim();
+const GOOGLE_OAUTH_CLIENT_ID = (runtimeDeno?.env?.get("GOOGLE_OAUTH_CLIENT_ID") || "").trim();
+const GOOGLE_CLIENT_SECRET = (runtimeDeno?.env?.get("GOOGLE_CLIENT_SECRET") || runtimeDeno?.env?.get("GOOGLE_OAUTH_CLIENT_SECRET") || "").trim();
+const GOOGLE_REDIRECT_URI = (runtimeDeno?.env?.get("GOOGLE_REDIRECT_URI") || runtimeDeno?.env?.get("GOOGLE_OAUTH_REDIRECT_URI") || "https://subveris.com/auth/callback").trim();
 
 // Client for auth verification
 let supabaseAuth: any = null;
@@ -1179,7 +1180,7 @@ async function loadSubscriptions(userId: string, page = 1, perPage = 1000, exclu
   if (excludeDetected) {
     query = query.eq("is_detected", false).gt("amount", 0);
   }
-  else query = query.gt("amount", 0);
+  else query = query.or("is_detected.eq.true,amount.gt.0");
   const { data, count, error } = await query.range(rangeStart, rangeEnd);
 
   if (error) {
@@ -1615,7 +1616,8 @@ function generateGmailOAuthUrl(userId: string, redirectUri = GOOGLE_REDIRECT_URI
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/gmail.metadata",
+    scope: "https://www.googleapis.com/auth/gmail.readonly",
+    include_granted_scopes: "true",
     state: userId, // Use userId as state for validation
     access_type: "offline",
     prompt: "select_account consent",
@@ -1765,10 +1767,16 @@ runtimeDeno?.serve?.(async (req: Request) => {
       try {
         const { data: userData, error } = await supabase
           .from("users")
-          .select("gmail_refresh_token")
+          .select("gmail_access_token, gmail_refresh_token, gmail_token_expiry")
           .eq("id", userId)
           .maybeSingle();
         if (error) throw error;
+
+        const accessTokenExpiry = userData?.gmail_token_expiry ? new Date(userData.gmail_token_expiry).getTime() : null;
+        const hasUsableAccessToken = Boolean(userData?.gmail_access_token && (!accessTokenExpiry || accessTokenExpiry > Date.now() + 30_000));
+        if (hasUsableAccessToken) {
+          return sendJson({ access_token: userData.gmail_access_token, expires_in: accessTokenExpiry ? Math.floor((accessTokenExpiry - Date.now()) / 1000) : 3600, success: true });
+        }
         if (!userData?.gmail_refresh_token) return sendJson({ error: "Gmail reauthorization required" }, { status: 401 });
 
         const tokenData = await refreshGmailAccessToken(userData.gmail_refresh_token);
@@ -1794,14 +1802,17 @@ runtimeDeno?.serve?.(async (req: Request) => {
       try {
         const { data: userData, error } = await supabase
           .from("users")
-          .select("gmail_access_token, gmail_refresh_token")
+          .select("gmail_access_token, gmail_refresh_token, gmail_token_expiry")
           .eq("id", userId)
           .maybeSingle();
 
         if (error) throw error;
 
+        const accessTokenExpiry = userData?.gmail_token_expiry ? new Date(userData.gmail_token_expiry).getTime() : null;
+        const hasUsableAccessToken = Boolean(userData?.gmail_access_token && (!accessTokenExpiry || accessTokenExpiry > Date.now() + 30_000));
+
         return sendJson({
-          connected: Boolean(userData?.gmail_access_token || userData?.gmail_refresh_token),
+          connected: Boolean(userData?.gmail_refresh_token || hasUsableAccessToken),
         });
       } catch (err) {
         console.error("[Gmail] Failed to check connection status:", err);
@@ -1866,6 +1877,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
           { error: "Gmail OAuth not configured" },
           { status: 500 }
         );
+      }
+      if (GOOGLE_OAUTH_CLIENT_ID && GOOGLE_CLIENT_ID !== GOOGLE_OAUTH_CLIENT_ID) {
+        console.error("[Gmail] GOOGLE_CLIENT_ID and GOOGLE_OAUTH_CLIENT_ID refer to different OAuth clients");
+        return sendJson({ error: "Conflicting Google OAuth client ID configuration" }, { status: 500 });
       }
 
       const { data: userPlan } = await supabase
@@ -1938,15 +1953,31 @@ runtimeDeno?.serve?.(async (req: Request) => {
         }
 
         const tokenData = await exchangeGmailCodeForToken(code, redirectUri);
+        const grantedScopes = typeof tokenData.scope === 'string'
+          ? tokenData.scope.split(/\s+/)
+          : ["https://www.googleapis.com/auth/gmail.readonly"];
+        if (!grantedScopes.includes("https://www.googleapis.com/auth/gmail.readonly")) {
+          return sendJson({
+            error: "Google did not grant Gmail read-only access. Revoke Subveris in your Google Account and reconnect Gmail.",
+            requiresReauthorization: true,
+          }, { status: 403 });
+        }
 
         // Optionally store in database (users table or separate table)
         if (supabase) {
+          const { data: existingTokens, error: existingTokenError } = await supabase
+            .from("users")
+            .select("gmail_refresh_token")
+            .eq("id", userId)
+            .maybeSingle();
+          if (existingTokenError) throw existingTokenError;
+
           await supabase
             .from("users")
             .update({
               gmail_access_token: tokenData.access_token,
               gmail_token_expiry: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
-              gmail_refresh_token: tokenData.refresh_token || null,
+              gmail_refresh_token: tokenData.refresh_token || existingTokens?.gmail_refresh_token || null,
             })
             .eq("id", userId)
             .throwOnError();
@@ -2055,6 +2086,24 @@ runtimeDeno?.serve?.(async (req: Request) => {
             const updatePayload: Record<string, any> = { is_detected: !isApprovedForSync };
             if (isApprovedForSync) updatePayload.status = "active";
             if (domain && normalizeDomain(existing.website_domain) !== domain) updatePayload.website_domain = domain;
+            if (!isApprovedForSync && existing.is_detected === true) {
+              const detectedAmount = Number(detected?.amount ?? detected?.detectedPrice ?? detected?.price);
+              if (Number.isFinite(detectedAmount) && detectedAmount > 0) updatePayload.amount = detectedAmount;
+              if (typeof detected?.currency === "string" && detected.currency.trim()) {
+                updatePayload.currency = detected.currency.trim().toUpperCase();
+              }
+              if (typeof detected?.frequency === "string" && detected.frequency.trim()) {
+                updatePayload.frequency = detected.frequency.trim().toLowerCase();
+              }
+              if (typeof detected?.detectedRenewalDate === "string" && detected.detectedRenewalDate.trim()) {
+                const parsedRenewal = toDateOnlyLocal(detected.detectedRenewalDate.trim());
+                if (parsedRenewal) updatePayload.next_billing_at = formatDateLocal(parsedRenewal);
+              }
+              if (typeof detected?.planName === "string" && detected.planName.trim()) {
+                updatePayload.description = detected.planName.trim();
+              }
+              updatePayload.updated_at = new Date().toISOString();
+            }
             const { error: updateError } = await supabase
               .from("subscriptions")
               .update(updatePayload)
@@ -7009,7 +7058,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       if (!includeDetected) {
         allSubscriptionsQuery = allSubscriptionsQuery.eq("is_detected", false);
       } else {
-        allSubscriptionsQuery = allSubscriptionsQuery.gt("amount", 0);
+        allSubscriptionsQuery = allSubscriptionsQuery.or("is_detected.eq.true,amount.gt.0");
       }
       const { data: allSubscriptions, error: subsError } = await allSubscriptionsQuery;
 

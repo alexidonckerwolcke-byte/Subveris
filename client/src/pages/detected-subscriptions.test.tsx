@@ -144,7 +144,7 @@ describe('DetectedSubscriptions', () => {
             id: 'gmail-candidate-1',
             name: 'Test Subscription',
             category: 'other',
-            amount: 4.99,
+            amount: 0,
             frequency: 'monthly',
             isDetected: true,
             status: 'active',

@@ -444,8 +444,8 @@ document.addEventListener('DOMContentLoaded', () => {
       discoverySection.style.display = 'block';
       
       if (result.gmailAuthToken) {
-        gmailStatus.textContent = '✅ Gmail metadata access authorized';
-        gmailStatus.style.color = '#28a745';
+        gmailStatus.textContent = 'Gmail access token stored; the next scan will verify it';
+        gmailStatus.style.color = '#4b5563';
         authorizeGmailBtn.textContent = '🔄 Reauthorize Gmail';
         authorizeGmailBtn.disabled = false;
       } else {

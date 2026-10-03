@@ -30,10 +30,10 @@
       </ul>
 
       <h3>3. How We Use Your Data</h3>
-      <p>We use data only to provide and improve the core functionality of the service: to detect and track subscriptions, to provide subscription insights, and to process payments. Google user data received through the Gmail metadata scope is used only for the Gmail subscription-detection feature that you explicitly authorize and to improve the accuracy and functionality of that feature. We do not sell your personal data to third parties.</p>
+      <p>We use data only to provide and improve the core functionality of the service: to detect and track subscriptions, to provide subscription insights, and to process payments. Google user data received through the Gmail read-only scope is used only for the Gmail subscription-detection feature that you explicitly authorize. We do not sell your personal data to third parties.</p>
 
       <h3>4. Gmail and Third-Party Services</h3>
-      <p>With your explicit Google OAuth authorization, Subveris uses the restricted Gmail metadata scope (<code>https://www.googleapis.com/auth/gmail.metadata</code>) to inspect recent receipt and renewal message metadata, including selected headers, dates, and Gmail-provided snippets. Full email bodies are not requested or processed. Google user data is processed for this feature only, is not used for advertising, profiling, unrelated analytics, or generalized AI/ML training, and is not transferred to an AI provider.</p>
+      <p>With your explicit Google OAuth authorization, Subveris uses the restricted Gmail read-only scope (<code>https://www.googleapis.com/auth/gmail.readonly</code>) to inspect recent messages, including headers and text/plain or text/html message content, to identify subscription services, payment amounts, and renewal dates. Message text is processed locally in the browser extension and is not stored or sent to Subveris servers; only extracted subscription-candidate details are synced to your account for review. Attachments are not processed. Gmail data is used only for this feature, not for advertising, profiling, unrelated analytics, or generalized AI/ML training, and is not sent to an AI provider. The integration does not modify, send, delete, or label email.</p>
       <p>We use Stripe to process payments. Our browser extension tracks website usage anonymously. Stripe has its own privacy policy—please review it for details.</p>
 
       <h3>5. How We Store Data</h3>

@@ -184,8 +184,9 @@ const DocsPage: React.FC = () => {
       <h3>How Gmail Integration Works</h3>
       <ul>
         <li><b>Privacy:</b> Uses OAuth - your account is logged in via Google's secure authentication</li>
-        <li><b>Metadata-only:</b> Uses the Gmail metadata scope to inspect selected headers, dates, and snippets; it does not request full message bodies</li>
-        <li><b>Automatic:</b> Checks recent message metadata periodically for likely receipts and renewals</li>
+        <li><b>Read-only access:</b> Uses Gmail read-only access to scan recent message headers and text content for receipts and renewals</li>
+        <li><b>Local processing:</b> Email text is scanned in the extension; only extracted candidate details are synced for review</li>
+        <li><b>Automatic:</b> Checks recent messages periodically for likely receipts and renewals</li>
         <li><b>Review:</b> Shows likely subscription matches as pending candidates for you to review and approve</li>
         <li><b>Control:</b> You can disconnect Gmail anytime in Settings → Connected Services</li>
       </ul>

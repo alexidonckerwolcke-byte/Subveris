@@ -116,8 +116,8 @@ Sign in with your account. The extension will automatically detect your login.
 2. Look for "Connected Services" card
 3. Click **"Connect Gmail Account"**
 4. The Google OAuth consent screen opens in English
-5. Expand the permission list and confirm it shows Gmail metadata access, then approve
-6. The extension scans recent Gmail message metadata periodically; it does not request full message bodies
+5. Expand the permission list and confirm it shows Gmail read-only access, then approve
+6. The extension scans recent Gmail message text locally; extracted candidate details are presented for review
 
 ### Step 4: Verify It's Working
 
@@ -125,7 +125,7 @@ Sign in with your account. The extension will automatically detect your login.
 2. Open the Subveris extension popup (toolbar icon)
 3. Look for "🔍 Auto Discovery Methods"
 4. You should see it's connected
-5. Review detected Gmail candidates in Subveris; Gmail metadata scans may take up to an hour between automatic scans
+5. Review detected Gmail candidates in Subveris; Gmail scans may take up to an hour between automatic scans
 
 ---
 

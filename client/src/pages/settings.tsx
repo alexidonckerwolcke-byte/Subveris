@@ -34,11 +34,13 @@ export default function Settings() {
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailExtensionAuthorized, setGmailExtensionAuthorized] = useState(false);
+  const [gmailReauthorizationRequired, setGmailReauthorizationRequired] = useState(false);
   const [gmailConnecting, setGmailConnecting] = useState(false);
   const { user, hasPassword } = useAuth();
   const { tier } = useSubscription();
   const gmailAllowed = tier === "premium" || tier === "family";
-  const gmailIsConnected = gmailConnected || gmailExtensionAuthorized;
+  const gmailIsConnected = gmailExtensionAuthorized;
+  const gmailNeedsReauthorization = gmailReauthorizationRequired || (gmailConnected && !gmailExtensionAuthorized);
   const userEmail = user?.email ?? "";
 
   // Check if 2FA is enabled when user data loads
@@ -56,6 +58,12 @@ export default function Settings() {
       if (event.data?.type === "SUBVERIS_GMAIL_AUTHORIZATION_RESTORED") {
         setGmailExtensionAuthorized(true);
         setGmailConnected(true);
+        setGmailReauthorizationRequired(false);
+        return;
+      }
+      if (event.data?.type === "SUBVERIS_GMAIL_REAUTHORIZATION_REQUIRED") {
+        setGmailExtensionAuthorized(false);
+        setGmailReauthorizationRequired(true);
         return;
       }
       if (event.data?.type !== "SUBVERIS_GMAIL_STATUS_RESULT" || event.data.requestId !== extensionRequestId) return;
@@ -64,7 +72,7 @@ export default function Settings() {
       if (extensionAuthorized) {
         setGmailConnected(true);
       }
-      console.info("[Subveris Gmail] Extension status:", event.data.authorized ? "authorized" : "not authorized");
+      console.info("[Subveris Gmail] Extension status:", event.data.authorized ? "access token stored; validity is checked during scan" : "no access token stored");
     };
     window.addEventListener("message", handleExtensionStatus);
     console.info("[Subveris Gmail] Checking extension authorization status");
@@ -146,15 +154,19 @@ export default function Settings() {
       if (!result.success) throw new Error(result.error || "Gmail authorization failed");
       setGmailExtensionAuthorized(true);
       setGmailConnected(true);
+      setGmailReauthorizationRequired(false);
       toast({
         title: "Gmail connected!",
         description: "Your inbox will now be scanned for subscription receipts.",
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to connect Gmail";
+      const extensionWasReloaded = /extension context invalidated|context.*invalidated/i.test(errorMessage);
       toast({
         title: "Connection failed",
-        description:
-          error instanceof Error ? error.message : "Failed to connect Gmail",
+        description: extensionWasReloaded
+          ? "The extension was reloaded. Refresh this Settings page, then reconnect Gmail."
+          : errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -193,6 +205,7 @@ export default function Settings() {
 
       setGmailConnected(false);
       setGmailExtensionAuthorized(false);
+      setGmailReauthorizationRequired(false);
       toast({
         title: "Gmail disconnected",
         description: extensionResult.success
@@ -293,10 +306,12 @@ export default function Settings() {
               <div>
                 <p className="font-medium">📧 Gmail</p>
                 <p className="text-sm text-muted-foreground">
-                  {!gmailAllowed && !gmailIsConnected
+                  {gmailNeedsReauthorization
+                    ? "Reconnect Gmail to grant read-only access for message scanning"
+                    : !gmailAllowed && !gmailIsConnected
                     ? "Premium feature - connect Gmail to scan receipts automatically"
                     : gmailConnected && gmailExtensionAuthorized
-                    ? "Connected - Gmail metadata is checked periodically"
+                    ? "Connected - recent Gmail messages are scanned periodically"
                     : gmailIsConnected
                       ? "Gmail access is connected; extension authorization needs attention"
                       : "Connect to auto-detect subscriptions from email receipts"}
@@ -310,13 +325,15 @@ export default function Settings() {
                   </div>
                 )}
                 <Button
-                  variant={gmailIsConnected ? "outline" : "default"}
+                  variant={gmailIsConnected && !gmailNeedsReauthorization ? "outline" : "default"}
                   size="sm"
-                  onClick={gmailIsConnected ? handleDisconnectGmail : handleConnectGmail}
-                  disabled={gmailConnecting || (!gmailIsConnected && !gmailAllowed)}
+                  onClick={gmailIsConnected && !gmailNeedsReauthorization ? handleDisconnectGmail : handleConnectGmail}
+                  disabled={gmailConnecting || ((!gmailIsConnected || gmailNeedsReauthorization) && !gmailAllowed)}
                 >
                   {gmailConnecting
                     ? "Please wait..."
+                    : gmailNeedsReauthorization
+                      ? "Reconnect Gmail"
                     : gmailIsConnected
                       ? "Disconnect"
                       : gmailAllowed ? "Connect Gmail" : "Premium required"}
