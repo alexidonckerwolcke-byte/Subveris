@@ -127,13 +127,41 @@ export default function Settings() {
     button?.click();
   };
 
-  const handleConnectGmail = async () => {
-    if (gmailExtensionAuthorized || gmailConnecting) {
+  const handleConnectGmail = async (forceReauthorize = false) => {
+    if ((!forceReauthorize && gmailExtensionAuthorized) || gmailConnecting) {
       return;
     }
 
     setGmailConnecting(true);
     try {
+      if (forceReauthorize) {
+        const disconnectResponse = await apiFetch("/api/auth/gmail-disconnect", { method: "POST" });
+        if (!disconnectResponse.ok) {
+          const data = await disconnectResponse.json().catch(() => ({}));
+          throw new Error(data.error || "Could not clear the previous Gmail authorization");
+        }
+
+        const disconnectRequestId = crypto.randomUUID();
+        await new Promise<void>((resolve) => {
+          const timeout = window.setTimeout(() => {
+            window.removeEventListener("message", handleDisconnectResult);
+            resolve();
+          }, 2000);
+          const handleDisconnectResult = (event: MessageEvent) => {
+            if (event.source !== window || event.origin !== window.location.origin) return;
+            if (event.data?.type !== "SUBVERIS_DISCONNECT_GMAIL_RESULT" || event.data.requestId !== disconnectRequestId) return;
+            window.clearTimeout(timeout);
+            window.removeEventListener("message", handleDisconnectResult);
+            resolve();
+          };
+          window.addEventListener("message", handleDisconnectResult);
+          window.postMessage({ type: "SUBVERIS_DISCONNECT_GMAIL", requestId: disconnectRequestId }, window.location.origin);
+        });
+        setGmailConnected(false);
+        setGmailExtensionAuthorized(false);
+        setGmailReauthorizationRequired(false);
+      }
+
       const requestId = crypto.randomUUID();
       const result = await new Promise<{ success?: boolean; error?: string }>((resolve, reject) => {
         const timeout = window.setTimeout(() => {
@@ -327,7 +355,7 @@ export default function Settings() {
                 <Button
                   variant={gmailIsConnected && !gmailNeedsReauthorization ? "outline" : "default"}
                   size="sm"
-                  onClick={gmailIsConnected && !gmailNeedsReauthorization ? handleDisconnectGmail : handleConnectGmail}
+                  onClick={gmailNeedsReauthorization ? () => handleConnectGmail(true) : gmailIsConnected ? handleDisconnectGmail : handleConnectGmail}
                   disabled={gmailConnecting || ((!gmailIsConnected || gmailNeedsReauthorization) && !gmailAllowed)}
                 >
                   {gmailConnecting
