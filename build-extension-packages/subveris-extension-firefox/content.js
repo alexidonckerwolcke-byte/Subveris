@@ -2,7 +2,7 @@
 // Safari 15+, Firefox, and Edge use 'browser' global
 // Chrome uses 'chrome' global, so provide it as 'browser' for compatibility
 const browser = globalThis.browser || globalThis.chrome;
-const EXTENSION_BUILD = '1.3.0';
+const EXTENSION_BUILD = '1.3.1';
 
 let startTime = Date.now();
 let cachedAuthToken = null;

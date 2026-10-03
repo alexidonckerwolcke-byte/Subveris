@@ -124,6 +124,13 @@ describe('buildDiscoverySyncPayload', () => {
     expect((globalThis as any).isGmailReadOnlyScopeError(401, 'unauthorized', 'Invalid credentials')).toBe(false);
   });
 
+  it('recognizes Chrome rejecting a second simultaneous Gmail OAuth flow', async () => {
+    await import('../extension/background.js');
+
+    expect((globalThis as any).isGmailOAuthFlowBusyError('Only one web auth flow is allowed at a time.')).toBe(true);
+    expect((globalThis as any).isGmailOAuthFlowBusyError('User did not approve access.')).toBe(false);
+  });
+
   it('extracts a subscription and price from a decoded Gmail text body', async () => {
     await import('../extension/background.js');
     const bodyData = btoa('Your Netflix subscription payment was $15.99.');

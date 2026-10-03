@@ -19,6 +19,7 @@ const browser = globalThis.browser || globalThis.chrome || {
 globalThis.browser = browser;
 globalThis.chrome = browser;
 const DEFAULT_API_URL = 'https://xuilgccacufwinvkocfl.supabase.co/functions/v1';
+let gmailOAuthFlowInProgress = false;
 
 function rehydrateAuthFromSubverisTabs() {
   if (!browser.tabs || typeof browser.tabs.query !== 'function') {
@@ -1273,17 +1274,27 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         console.info('[Background] Launching Google OAuth', { clientId: oauthClientId, redirectUri: oauthRedirectUri });
 
+        if (gmailOAuthFlowInProgress) {
+          sendResponse({ success: false, error: 'A Google sign-in window is already open. Finish or close it, then reconnect Gmail.' });
+          return;
+        }
+        gmailOAuthFlowInProgress = true;
+
         // Open OAuth URL in a new window
         browser.identity.launchWebAuthFlow({
           url: data.oauthUrl,
           interactive: true
         }, (redirectUrl) => {
           const launchError = browser.runtime.lastError;
+          gmailOAuthFlowInProgress = false;
           if (!redirectUrl) {
             const runtimeMessage = launchError?.message || 'OAuth flow ended without a callback';
+            const alreadyRunning = isGmailOAuthFlowBusyError(runtimeMessage);
             const errorMessage = /authorization page could not be loaded/i.test(runtimeMessage)
               ? `Google could not load OAuth client ${oauthClientId} with callback ${oauthRedirectUri}. Confirm this exact callback is authorized on that client and that the OAuth client is enabled.`
-              : runtimeMessage;
+              : alreadyRunning
+                ? 'A Google sign-in window is already open. Finish or close it, then reconnect Gmail.'
+                : runtimeMessage;
             const userDidNotApprove = /did not approve|access was denied|cancelled|canceled|aborted/i.test(errorMessage);
             if (userDidNotApprove) {
               console.info('[Background] Gmail OAuth was not completed because access was not approved.');
@@ -1576,6 +1587,12 @@ function isGmailReadOnlyScopeError(status, reason, message) {
 }
 
 globalThis.isGmailReadOnlyScopeError = isGmailReadOnlyScopeError;
+
+function isGmailOAuthFlowBusyError(message) {
+  return /only one web auth flow is allowed at a time/i.test(String(message || ''));
+}
+
+globalThis.isGmailOAuthFlowBusyError = isGmailOAuthFlowBusyError;
 
 function buildGmailSubscriptionCandidate(subject, from, snippet, msgData, onRejected = () => {}) {
   const reject = (reason) => {
