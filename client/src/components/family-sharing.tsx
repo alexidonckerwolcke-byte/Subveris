@@ -181,7 +181,6 @@ export function FamilySharing() {
     queryKey: ["/api/family-groups", selectedGroupId, "family-data"],
     enabled: effectiveShowFamilyData,
     refetchInterval: false,
-    refetchOnWindowFocus: false,
   });
 
   // Fetch personal subscriptions (always available)

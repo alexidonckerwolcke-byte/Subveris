@@ -3,7 +3,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DetectedSubscriptions from './detected-subscriptions';
 import { apiRequest } from '@/lib/queryClient';
-import { generateRecommendationsFromSubscriptions } from '@/lib/recommendations';
+import {
+  generateRecommendationsFromSubscriptions,
+  isPendingDetectedSubscription,
+} from '@/lib/recommendations';
 
 const { useFamilyDataModeMock } = vi.hoisted(() => ({ useFamilyDataModeMock: vi.fn() }));
 
@@ -134,6 +137,12 @@ describe('DetectedSubscriptions', () => {
     expect(recommendations.map((row) => row.subscriptionId)).toEqual(['sub-approved']);
   });
 
+  it('recognizes detected subscription flags in API and family-data formats', () => {
+    expect(isPendingDetectedSubscription({ isDetected: true })).toBe(true);
+    expect(isPendingDetectedSubscription({ is_detected: 'true' })).toBe(true);
+    expect(isPendingDetectedSubscription({ isDetected: false, is_detected: false })).toBe(false);
+  });
+
   it('keeps personal Gmail candidates visible when family data cannot be loaded', async () => {
     useFamilyDataModeMock.mockReturnValue({ familyGroupId: 'group-1', showFamilyData: true });
     vi.mocked(apiRequest).mockImplementation(async (method: string, url: string) => {
@@ -147,7 +156,7 @@ describe('DetectedSubscriptions', () => {
             amount: 0,
             frequency: 'monthly',
             isDetected: true,
-            status: 'active',
+            status: 'pending',
           }],
         } as Response;
       }
@@ -171,6 +180,7 @@ describe('DetectedSubscriptions', () => {
     );
 
     expect(await screen.findByText('Test Subscription')).toBeInTheDocument();
+    expect(await screen.findByText('Pending approval')).toBeInTheDocument();
   });
 
 });

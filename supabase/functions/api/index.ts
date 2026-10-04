@@ -1149,6 +1149,7 @@ function normalizeSubscriptionRow(sub: any) {
   const rawNextBillingDate = sub.next_billing_at || sub.next_billing_date;
   return {
     ...sub,
+    status: isPendingDetectedSubscription(sub) ? 'pending' : sub.status,
     userId: sub.user_id,
     billingMonth: sub.billing_month || sub.billingMonth,
     usageCount: sub.usage_count,
@@ -2083,8 +2084,10 @@ runtimeDeno?.serve?.(async (req: Request) => {
               continue;
             }
 
-            const updatePayload: Record<string, any> = { is_detected: !isApprovedForSync };
-            if (isApprovedForSync) updatePayload.status = "active";
+            const updatePayload: Record<string, any> = {
+              is_detected: !isApprovedForSync,
+              status: isApprovedForSync ? "active" : "pending",
+            };
             if (domain && normalizeDomain(existing.website_domain) !== domain) updatePayload.website_domain = domain;
             if (!isApprovedForSync && existing.is_detected === true) {
               const detectedAmount = Number(detected?.amount ?? detected?.detectedPrice ?? detected?.price);
@@ -2121,11 +2124,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
           const createdFrequency = typeof detected?.frequency === "string" && detected.frequency.trim()
             ? detected.frequency.trim().toLowerCase()
             : "monthly";
-          // Use the standard status value for pending rows; is_detected is the
-          // approval gate and avoids relying on a custom database status value.
-          const createdStatus = isApprovedForSync
-            ? (typeof detected?.status === "string" && detected.status.trim() ? detected.status.trim().toLowerCase() : "active")
-            : "active";
+          const createdStatus = isApprovedForSync ? "active" : "pending";
           const createdRenewal = typeof detected?.detectedRenewalDate === "string" && detected.detectedRenewalDate.trim()
             ? detected.detectedRenewalDate.trim()
             : null;
@@ -2143,7 +2142,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
               frequency: createdFrequency,
               status: createdStatus,
               website_domain: domain || null,
-              is_detected: true,
+              is_detected: !isApprovedForSync,
               next_billing_at: fallbackRenewal,
               description: typeof detected?.planName === 'string' && detected.planName.trim() ? detected.planName.trim() : null,
               created_at: new Date().toISOString(),

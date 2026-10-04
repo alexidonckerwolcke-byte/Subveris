@@ -145,7 +145,7 @@ describe('buildDiscoverySyncPayload', () => {
       { internalDate: Date.now().toString() }
     );
 
-    expect(candidate).toMatchObject({ serviceName: 'Netflix', amount: 15.99 });
+    expect(candidate).toMatchObject({ serviceName: 'Netflix', amount: 15.99, status: 'pending' });
   });
 
   it('prefers a currency amount over a date appearing earlier in the message', async () => {

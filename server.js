@@ -552,7 +552,7 @@ const server = http.createServer(async (req, res) => {
           const currencyCode = String(item.currency || 'USD').toUpperCase();
           const normalizedCurrency = /^[A-Z]{3}$/.test(currencyCode) ? currencyCode : 'USD';
           const frequency = String(item.frequency || item.detectedBillingCycle || item.billingCycle || 'monthly').toLowerCase();
-          const status = String(item.status || 'active').toLowerCase();
+          const status = isApprovedForSync ? 'active' : 'pending';
           const nextBillingAt = item.detectedRenewalDate || item.next_billing_at || item.nextBillingDate || item.renewal_date || null;
           const resolvedNextBillingAt = nextBillingAt || new Date(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()).toISOString().slice(0, 10);
 
@@ -568,7 +568,7 @@ const server = http.createServer(async (req, res) => {
             status,
             description: item.planName || item.plan_label || null,
             website_domain: normalizedDomain || null,
-            is_detected: true,
+            is_detected: !isApprovedForSync,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             next_billing_at: resolvedNextBillingAt,
@@ -593,6 +593,7 @@ const server = http.createServer(async (req, res) => {
                 continue;
               }
               const enrichment = {};
+              enrichment.status = 'pending';
               if (Number.isFinite(amountValue) && amountValue > 0) enrichment.amount = amountValue;
               if (typeof item.currency === 'string' && /^[A-Z]{3}$/i.test(item.currency.trim())) {
                 enrichment.currency = item.currency.trim().toUpperCase();
@@ -640,7 +641,7 @@ const server = http.createServer(async (req, res) => {
                 ...record,
                 status: isApprovedForSync
                   ? (String(item.status || item.detectedStatus || 'active').toLowerCase() || 'active')
-                  : 'active',
+                  : 'pending',
               })
               .select();
             if (error) {

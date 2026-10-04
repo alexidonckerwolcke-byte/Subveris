@@ -186,14 +186,12 @@ export default function Savings() {
     queryKey: ["/api/family-groups", familyGroupId, "family-data"],
     enabled: !!familyGroupId,
     refetchInterval: false,
-    refetchOnWindowFocus: false,
   });
 
   const { data: familySavingsResponse, isLoading: familySavingsLoading } = useQuery<any>({
     queryKey: ["/api/analytics/monthly-savings", "family", new Date().toISOString().slice(0, 7)],
     enabled: showFamilyData === true && !!user?.id,
     refetchInterval: false,
-    refetchOnWindowFocus: false,
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/analytics/monthly-savings?family=true");
       return response.json();

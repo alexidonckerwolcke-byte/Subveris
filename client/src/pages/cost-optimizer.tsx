@@ -35,7 +35,10 @@ import {
   getSubscriptionLastUsedDate,
   getSubscriptionUsageCount,
 } from "@/lib/health-score";
-import { generateRecommendationsFromSubscriptions } from "@/lib/recommendations";
+import {
+  generateRecommendationsFromSubscriptions,
+  isPendingDetectedSubscription,
+} from "@/lib/recommendations";
 
 interface HealthScore {
   subscriptionId: string;
@@ -369,6 +372,10 @@ export default function CostOptimizer() {
   );
 
   const subscriptions = showFamilyData ? familySubscriptions : personalSubscriptions;
+  const optimizationSubscriptions = useMemo(
+    () => (subscriptions || []).filter((sub) => !isPendingDetectedSubscription(sub)),
+    [subscriptions]
+  );
 
   // Helper to get current month total
   function getCurrentMonthAmount(monthlyData: any[] | undefined) {
@@ -390,32 +397,32 @@ export default function CostOptimizer() {
   // Calculate metrics
   const healthScores = useMemo(
     () =>
-      (subscriptions || [])
+      optimizationSubscriptions
         .filter((s) => s && s.status !== "deleted")
         .map(calculateHealthScore)
         .sort((a, b) => a.score - b.score),
-    [subscriptions]
+    [optimizationSubscriptions]
   );
 
   const priorityActions = useMemo(
-    () => generatePriorityActions(subscriptions || [], (amount, fromCurrency) => formatAmount(amount, fromCurrency as any)),
-    [subscriptions, formatAmount]
+    () => generatePriorityActions(optimizationSubscriptions, (amount, fromCurrency) => formatAmount(amount, fromCurrency as any)),
+    [optimizationSubscriptions, formatAmount]
   );
 
   const wasteItems = useMemo(
     () =>
-      (subscriptions || [])
+      optimizationSubscriptions
         .map(detectWaste)
         .filter((w): w is WasteDetection => w !== null),
-    [subscriptions]
+    [optimizationSubscriptions]
   );
 
   const monthlySavingsPotential = useMemo(() => {
-    return calculatePotentialSavings(subscriptions || []);
-  }, [subscriptions]);
+    return calculatePotentialSavings(optimizationSubscriptions);
+  }, [optimizationSubscriptions]);
 
   const usageSnapshot = useMemo(() => {
-    const activeSubscriptions = (subscriptions || []).filter((sub) => sub && sub.status !== "deleted");
+    const activeSubscriptions = optimizationSubscriptions.filter((sub) => sub && sub.status !== "deleted");
     const usageCount = activeSubscriptions.reduce((sum, sub) => sum + getSubscriptionUsageCount(sub), 0);
     const recentlyUsed = activeSubscriptions.filter((sub) => {
       const lastUsedDate = getSubscriptionLastUsedDate(sub);
@@ -428,7 +435,7 @@ export default function CostOptimizer() {
       activeSubscriptions: activeSubscriptions.length,
       recentlyUsed,
     };
-  }, [subscriptions]);
+  }, [optimizationSubscriptions]);
 
   const criticalCount = healthScores.filter((h) => h.category === "critical").length;
   const reviewCount = healthScores.filter((h) => h.category === "review").length;

@@ -49,7 +49,6 @@ export function useFamilyDataMode() {
   const { data: membershipData } = useQuery<any, Error>({
     queryKey: ["/api/family-groups/me/membership"],
     enabled: !!user?.id,
-    staleTime: 60 * 1000,
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/family-groups/me/membership');
       return response.json();
@@ -60,7 +59,6 @@ export function useFamilyDataMode() {
   const { data: familyGroups, isLoading: familyGroupsLoading } = useQuery<any[], Error>({
     queryKey: ["/api/family-groups"],
     enabled: !!user?.id,
-    staleTime: 60 * 1000,
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/family-groups');
       return response.json();
@@ -81,7 +79,6 @@ export function useFamilyDataMode() {
   const { data: familySettings, isLoading: familySettingsLoading } = useQuery<any, Error>({
     queryKey: ["/api/family-groups", familyGroupId, "settings"],
     enabled: !!familyGroupId,
-    staleTime: 60 * 1000,
     queryFn: async () => {
       if (!familyGroupId) return null;
       const response = await apiRequest('GET', `/api/family-groups/${familyGroupId}/settings`);

@@ -155,7 +155,6 @@ export default function Subscriptions() {
     queryKey: ["/api/family-groups", familyGroupId, "family-data"],
     enabled: !!familyGroupId,
     refetchInterval: false,
-    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!familyGroupId) return null;
       const response = await apiRequest('GET', `/api/family-groups/${familyGroupId}/family-data`);

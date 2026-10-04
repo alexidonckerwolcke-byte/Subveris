@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { apiFetch } from '@/lib/api';
-import { queryClient } from './queryClient';
+import { queryClient, restoreQueryCacheForUser } from './queryClient';
 
 interface AuthContextType {
   user: User | null;
@@ -189,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession()
       .then((result: { data: { session: Session | null } }) => {
         const session: Session | null = result.data.session;
+        restoreQueryCacheForUser(session?.user?.id ?? null);
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -229,17 +230,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
+        restoreQueryCacheForUser(session?.user?.id ?? null);
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
           queryClient.invalidateQueries();
         }
         setLoading(false);
-        
-        // Clear React Query cache when user logs out (session becomes null)
-        if (!session) {
-          queryClient.clear();
-        }
         
         // Extract AAL from JWT
         if (session?.access_token) {

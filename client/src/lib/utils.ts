@@ -36,6 +36,7 @@ export function getCategoryIcon(category: SubscriptionCategory) {
 
 export function getStatusColor(status: SubscriptionStatus): string {
   const colors: Record<SubscriptionStatus, string> = {
+    pending: "bg-chart-4/10 text-chart-4 border-chart-4/20",
     active: "bg-chart-2/10 text-chart-2 border-chart-2/20",
     unused: "bg-chart-4/10 text-chart-4 border-chart-4/20",
     "to-cancel": "bg-chart-5/10 text-chart-5 border-chart-5/20",

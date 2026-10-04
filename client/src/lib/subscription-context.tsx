@@ -90,16 +90,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   } | null>({
     queryKey: ["/api/user/premium-status"],
     queryFn: async () => {
-      try {
-        const res = await apiRequest("GET", "/api/user/premium-status");
-        return res.json();
-      } catch (error) {
-        console.error("Failed to fetch subscription status:", error);
-        return null;
-      }
+      const res = await apiRequest("GET", "/api/user/premium-status");
+      return res.json();
     },
     enabled: true, // Always enabled since we need to check auth status
-    retry: false,
     initialData: (() => {
       const cachedTier = getCachedTier(user?.id);
       if (cachedTier === "free") return undefined;
@@ -112,9 +106,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         stripeSubscriptionId: null,
       };
     })(),
-    staleTime: 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    initialDataUpdatedAt: 0,
   });
 
   const subscriptionStatus = subscriptionData ? {

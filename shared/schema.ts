@@ -8,7 +8,7 @@ export const authUsers = pgTable("auth.users", {
 });
 
 // Subscription status types
-export type SubscriptionStatus = "active" | "unused" | "to-cancel" | "canceled" | "deleted" | "cancelling";
+export type SubscriptionStatus = "pending" | "active" | "unused" | "to-cancel" | "canceled" | "deleted" | "cancelling";
 
 // Subscription categories
 export type SubscriptionCategory = 

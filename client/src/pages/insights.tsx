@@ -41,14 +41,12 @@ export default function Insights() {
       return response.json();
     },
     refetchInterval: false,
-    refetchOnWindowFocus: false,
   });
 
   const { data: familyData, isLoading: familyDataLoading, isFetching: familyDataFetching, refetch: refetchFamilyData } = useQuery<any>({
     queryKey: ["/api/family-groups", familyGroupId, "family-data"],
     enabled: !!familyGroupId,
     refetchInterval: false,
-    refetchOnWindowFocus: false,
   });
 
   const familySubscriptions = useMemo(() => getVisibleFamilySubscriptions(familyData, user?.id), [familyData, user?.id]);
@@ -60,13 +58,11 @@ export default function Insights() {
   const { data: personalMetrics, isLoading: personalMetricsLoading } = useQuery<any>({
     queryKey: ["/api/metrics"],
     refetchOnMount: true,
-    refetchOnWindowFocus: false,
   });
 
   const { data: personalBehavioralInsights, isLoading: personalBehavioralLoading, refetch: refetchBehavioral } = useQuery<OpportunityCost[]>({
     queryKey: ["/api/insights/behavioral"],
     refetchOnMount: true,
-    refetchOnWindowFocus: false,
   });
 
   // Family behavioral insights
@@ -78,7 +74,6 @@ export default function Insights() {
     },
     enabled: showFamilyData && !!familyGroupId,
     refetchOnMount: true,
-    refetchOnWindowFocus: false,
   });
 
   function computeBehavioralFromSubs(subs: any[] | undefined) {
@@ -142,7 +137,6 @@ export default function Insights() {
     // at runtime but now yields a compile error so we switch to the
     // equivalent boolean behaviour (refetch if stale).
     refetchOnMount: true,
-    refetchOnWindowFocus: false,
   });
 
   // Family cost analysis (load if in family mode)
@@ -150,7 +144,6 @@ export default function Insights() {
     queryKey: [`/api/analysis/cost-per-use?familyGroupId=${familyGroupId}`],
     enabled: showFamilyData && !!familyGroupId,
     refetchOnMount: true,
-    refetchOnWindowFocus: false,
   });
 
   const analysisLoading = showFamilyData
@@ -204,7 +197,6 @@ export default function Insights() {
   const { data: personalInsights, isLoading: personalInsightsLoading, refetch: refetchInsights } = useQuery<Insight[]>({
     queryKey: ["/api/insights"],
     refetchOnMount: true,
-    refetchOnWindowFocus: false,
   });
 
   const { data: generatedRecommendations, isLoading: recommendationsLoading } = useQuery<any[]>({

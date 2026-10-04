@@ -1,4 +1,4 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { dehydrate, hydrate, QueryClient, QueryFunction } from "@tanstack/react-query";
 import { apiFetch, clearStoredAuthState, fetchWithRemoteFallback, resolveApiUrl, resolveAuthToken } from "./api";
 import { supabase } from "./supabase";
 
@@ -61,7 +61,9 @@ async function throwIfResNotOk(res: Response) {
       // If we can't read the response, use a generic message
       errorMessage = `Request failed with status ${res.status}`;
     }
-    throw new Error(errorMessage);
+    const error = new Error(errorMessage) as Error & { status?: number };
+    error.status = res.status;
+    throw error;
   }
 }
 
@@ -111,8 +113,9 @@ export const getQueryFn: <T>(options: {
     if (supabase) {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error || !session) {
-        clearStoredAuthState();
-        return null;
+        const authError = new Error(error?.message || "Authentication session is unavailable") as Error & { status?: number };
+        authError.status = 401;
+        throw authError;
       }
     }
 
@@ -157,12 +160,80 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      refetchOnWindowFocus: true,
+      staleTime: 30_000,
+      retry: (failureCount, error) => {
+        const status = (error as Error & { status?: number })?.status;
+        if (status && status >= 400 && status < 500 && status !== 408 && status !== 429) return false;
+        return failureCount < 2;
+      },
     },
     mutations: {
       retry: false,
     },
   },
+});
+
+const QUERY_CACHE_PREFIX = "subveris.query-cache.v1:";
+let activeQueryCacheUserId: string | null = null;
+let restoringQueryCache = false;
+
+function getQueryCacheKey(userId: string) {
+  return `${QUERY_CACHE_PREFIX}${userId}`;
+}
+
+function persistQueryCache() {
+  if (typeof window === "undefined" || !activeQueryCacheUserId || restoringQueryCache) return;
+  try {
+    const cache = dehydrate(queryClient, {
+      shouldDehydrateQuery: (query) =>
+        query.state.status === "success" &&
+        typeof query.queryKey[0] === "string" &&
+        query.queryKey[0].startsWith("/api/"),
+    });
+    window.sessionStorage.setItem(getQueryCacheKey(activeQueryCacheUserId), JSON.stringify(cache));
+  } catch (error) {
+    console.warn("[QueryCache] Could not persist session query data:", error);
+  }
+}
+
+export function restoreQueryCacheForUser(userId: string | null) {
+  if (typeof window === "undefined" || activeQueryCacheUserId === userId) return;
+
+  const previousUserId = activeQueryCacheUserId;
+  let savedCache: string | null = null;
+  try {
+    savedCache = userId ? window.sessionStorage.getItem(getQueryCacheKey(userId)) : null;
+  } catch (error) {
+    console.warn("[QueryCache] Could not read session query data:", error);
+  }
+
+  restoringQueryCache = true;
+  activeQueryCacheUserId = userId;
+  queryClient.clear();
+  if (previousUserId && previousUserId !== userId) {
+    try {
+      window.sessionStorage.removeItem(getQueryCacheKey(previousUserId));
+    } catch (error) {
+      console.warn("[QueryCache] Could not clear previous user's cached data:", error);
+    }
+  }
+
+  if (savedCache && userId) {
+    try {
+      hydrate(queryClient, JSON.parse(savedCache));
+    } catch (error) {
+      console.warn("[QueryCache] Discarding invalid session query data:", error);
+      window.sessionStorage.removeItem(getQueryCacheKey(userId));
+    }
+  }
+
+  restoringQueryCache = false;
+  persistQueryCache();
+}
+
+queryClient.getQueryCache().subscribe((event) => {
+  if (event.type === "updated" && event.action.type === "success") {
+    persistQueryCache();
+  }
 });

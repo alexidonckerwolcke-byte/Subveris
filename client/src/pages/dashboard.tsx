@@ -12,6 +12,7 @@ import { shouldUseFamilyAwareSpending, useFamilyDataMode } from "@/hooks/use-fam
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
 import { calculatePotentialSavings } from "@/lib/health-score";
 import { getCurrentMonthFamilySpend } from "@/lib/family-metrics";
+import { isPendingDetectedSubscription } from "@/lib/recommendations";
 import { calculateMonthlySpendingSeries, normalizeMonthlySpendingSeries } from "@/lib/utils";
 import type { Subscription, MonthlySpending, SpendingByCategory } from "@shared/schema";
 
@@ -74,7 +75,6 @@ export default function Dashboard() {
       return response.json();
     },
     refetchInterval: false,
-    refetchOnWindowFocus: false,
   });
 
   const { data: personalSubscriptions = [], isLoading: subscriptionsLoading } = useQuery<Subscription[]>({
@@ -84,7 +84,6 @@ export default function Dashboard() {
       return response.json();
     },
     refetchInterval: false,
-    refetchOnWindowFocus: false,
   });
 
   const { data: detectedSubscriptionRows = [] } = useQuery<Subscription[]>({
@@ -94,7 +93,6 @@ export default function Dashboard() {
       return response.json();
     },
     refetchInterval: false,
-    refetchOnWindowFocus: false,
   });
 
   const { data: familyData } = useQuery<any>({
@@ -106,7 +104,6 @@ export default function Dashboard() {
       return response.json();
     },
     refetchInterval: false,
-    refetchOnWindowFocus: false,
   });
 
   const { data: monthlySpending, isLoading: monthlySpendingLoading } = useQuery<MonthlySpending[]>({
@@ -116,7 +113,6 @@ export default function Dashboard() {
       return response.json();
     },
     refetchInterval: false,
-    refetchOnWindowFocus: false,
   });
 
   const { data: categorySpending, isLoading: categorySpendingLoading } = useQuery<SpendingByCategory[]>({
@@ -126,7 +122,6 @@ export default function Dashboard() {
       return response.json();
     },
     refetchInterval: false,
-    refetchOnWindowFocus: false,
   });
 
   const familySubscriptions = useMemo(
@@ -200,7 +195,9 @@ export default function Dashboard() {
   const annualProjection = Math.round(totalMonthlySpend * 12 * 100) / 100;
   const activeSubscriptions = (familyAwareMode
     ? familySubscriptions
-    : (subscriptions || [])).filter((sub) => sub?.status === "active").length;
+    : (subscriptions || [])).filter(
+      (sub) => sub?.status === "active" && !isPendingDetectedSubscription(sub)
+    ).length;
   const detectedSubscriptions = (detectedSubscriptionRows || []).filter(
     (sub) => sub?.isDetected === true || (sub as any)?.is_detected === true
   ).length;

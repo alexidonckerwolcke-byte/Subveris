@@ -7,14 +7,14 @@ import { TooltipProvider } from "./components/ui/tooltip.js";
 import { SidebarProvider, SidebarTrigger } from "./components/ui/sidebar.js";
 import { AppSidebar } from "./components/app-sidebar.js";
 import { ThemeToggle } from "./components/theme-toggle.js";
-import { SubscriptionProvider } from "./lib/subscription-context.js";
-import { AuthProvider, useAuth } from "./lib/auth-context.js";
+import { SubscriptionProvider } from "@/lib/subscription-context";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OnboardingTutorial } from "./components/onboarding-tutorial.js";
 import { PostSignupFlow } from "./components/post-signup-flow.js";
 import { MFAChallengeModal } from "./components/mfa-challenge-modal.js";
 import { Button } from "./components/ui/button.js";
 import { useLocation } from "wouter";
-import { CurrencyProvider } from "./lib/currency-context.js";
+import { CurrencyProvider } from "@/lib/currency-context";
 import { ErrorBoundary } from "./components/error-boundary.js";
 import {
   DropdownMenu,

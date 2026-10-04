@@ -34,8 +34,13 @@ function createRecommendation(rec: AIRecommendation): AIRecommendation {
   };
 }
 
-function isPendingDetectedSubscription(sub: any): boolean {
-  return Boolean(sub?.isDetected === true || sub?.is_detected === true);
+export function isPendingDetectedSubscription(sub: any): boolean {
+  return Boolean(
+    sub?.isDetected === true ||
+    sub?.is_detected === true ||
+    sub?.isDetected === "true" ||
+    sub?.is_detected === "true"
+  );
 }
 
 export function generateRecommendationsFromSubscriptions(subs: any[] | undefined): AIRecommendation[] {

@@ -1726,7 +1726,7 @@ function buildGmailSubscriptionCandidate(subject, from, snippet, msgData, onReje
     amount,
     currency: 'USD',
     frequency: 'monthly',
-    status: 'active',
+    status: 'pending',
     detectedRenewalDate: renewalDate,
     requiresReview: true,
     isDetectedCandidate: true,
