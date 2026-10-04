@@ -95,7 +95,7 @@
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
-  --background: 215 15% 12%;
+  --background: 0 0% 0%;
   --foreground: 210 35% 95%;
   --surface: 216 30% 16%;
   --surface-border: 217 33% 24%;
@@ -178,7 +178,7 @@
 
   body {
     @apply font-sans antialiased text-foreground;
-    background: #ffffff;
+    background: hsl(var(--background));
     color: hsl(var(--foreground));
     min-height: 100vh;
     overflow-x: hidden;
@@ -187,7 +187,7 @@
   }
   #root {
     min-height: 100vh;
-    background: #ffffff;
+    background: hsl(var(--background));
   }
   /* premium glass-style container defaults */
   .card,
