@@ -16,4 +16,27 @@ describe("potential savings deletion filtering", () => {
 
     expect(savings).toBe(0);
   });
+
+  it("excludes detected candidates even when they would otherwise qualify as savings", () => {
+    const savings = calculatePotentialSavings([
+      {
+        id: "detected-camel-case",
+        name: "Netflix candidate",
+        status: "active",
+        isDetected: true,
+        amount: 20,
+        frequency: "monthly",
+      },
+      {
+        id: "detected-snake-case",
+        name: "Spotify candidate",
+        status: "active",
+        is_detected: "true",
+        amount: 10,
+        frequency: "monthly",
+      },
+    ]);
+
+    expect(savings).toBe(0);
+  });
 });

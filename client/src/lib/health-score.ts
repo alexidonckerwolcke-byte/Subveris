@@ -106,7 +106,9 @@ export function calculateHealthScore(sub: any): HealthScore {
  */
 export function getSubscriptionsForPotentialSavings(subscriptions: any[]): any[] {
   return subscriptions.filter((sub) => {
-    if (!sub || sub.status === "deleted" || sub.deleted_at || sub.deletedAt) return false;
+    const isDetected = sub?.isDetected === true || sub?.is_detected === true ||
+      sub?.isDetected === "true" || sub?.is_detected === "true";
+    if (!sub || isDetected || sub.status === "deleted" || sub.deleted_at || sub.deletedAt) return false;
     
     // Use health score if available
     const health = calculateHealthScore(sub);

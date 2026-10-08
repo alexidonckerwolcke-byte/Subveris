@@ -1,10 +1,11 @@
 import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/lib/currency-context";
+import { PER_PAGE } from "@/lib/constants";
 import {
   LayoutDashboard,
   CreditCard,
@@ -32,6 +33,10 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+
+function getLocalMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
 
 const mainNavItems = [
   {
@@ -107,15 +112,138 @@ const settingsItems = [
 
 export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
   const [location] = useLocation();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { showFamilyData } = useFamilyDataMode();
+  const { familyGroupId, showFamilyData } = useFamilyDataMode();
+  const [currentMonthKey, setCurrentMonthKey] = useState(() => getLocalMonthKey(new Date()));
+
+  useEffect(() => {
+    const now = new Date();
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const timeoutId = window.setTimeout(() => {
+      setCurrentMonthKey(getLocalMonthKey(new Date()));
+    }, nextMonthStart.getTime() - now.getTime() + 1);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [currentMonthKey]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const queries: Array<{ queryKey: unknown[]; url: string }> = [
+      { queryKey: ["/api/metrics"], url: "/api/metrics" },
+      { queryKey: ["/api/calendar-events"], url: "/api/calendar-events" },
+      { queryKey: ["/api/insights/behavioral"], url: "/api/insights/behavioral" },
+      { queryKey: ["/api/analysis/cost-per-use"], url: "/api/analysis/cost-per-use" },
+      { queryKey: ["/api/insights"], url: "/api/insights" },
+      { queryKey: ["/api/recommendations"], url: "/api/recommendations" },
+      { queryKey: ["/api/family-groups"], url: "/api/family-groups" },
+      { queryKey: ["/api/family-invitations"], url: "/api/family-invitations" },
+      { queryKey: ["/api/family-groups/me/membership"], url: "/api/family-groups/me/membership" },
+      { queryKey: ["/api/spending/monthly", false], url: "/api/spending/monthly" },
+      { queryKey: ["/api/spending/category", false], url: "/api/spending/category" },
+    ];
+
+    if (familyGroupId) {
+      queries.push(
+        {
+          queryKey: ["/api/family-groups", familyGroupId, "family-data"],
+          url: `/api/family-groups/${familyGroupId}/family-data`,
+        },
+        {
+          queryKey: ["/api/family-groups", familyGroupId, "family-data", "detected"],
+          url: `/api/family-groups/${familyGroupId}/family-data?includeDetected=true`,
+        },
+        {
+          queryKey: ["/api/family-groups", familyGroupId, "members"],
+          url: `/api/family-groups/${familyGroupId}/members`,
+        },
+        {
+          queryKey: ["/api/family-groups", familyGroupId, "settings"],
+          url: `/api/family-groups/${familyGroupId}/settings`,
+        },
+        {
+          queryKey: ["/api/family-groups", familyGroupId, "shared-subscriptions"],
+          url: `/api/family-groups/${familyGroupId}/shared-subscriptions`,
+        },
+        {
+          queryKey: ["/api/insights/behavioral", "family", familyGroupId],
+          url: "/api/insights/behavioral?family=true",
+        },
+        {
+          queryKey: [`/api/analysis/cost-per-use?familyGroupId=${familyGroupId}`],
+          url: `/api/analysis/cost-per-use?familyGroupId=${familyGroupId}`,
+        },
+        {
+          queryKey: ["/api/analytics/monthly-savings", "family", new Date().toISOString().slice(0, 7)],
+          url: "/api/analytics/monthly-savings?family=true",
+        },
+        {
+          queryKey: ["/api/spending/monthly", true],
+          url: "/api/spending/monthly?family=true",
+        },
+        {
+          queryKey: ["/api/spending/category", true],
+          url: "/api/spending/category?family=true",
+        },
+      );
+    }
+
+    const routeQueries = queries.map(({ queryKey, url }) =>
+      queryClient.prefetchQuery({
+        queryKey,
+        queryFn: async () => {
+          const response = await apiRequest("GET", url);
+          return response.json();
+        },
+      })
+    );
+
+    routeQueries.push(queryClient.prefetchInfiniteQuery({
+      queryKey: ["/api/subscriptions", PER_PAGE],
+      initialPageParam: 1,
+      queryFn: async ({ pageParam = 1 }) => {
+        const response = await apiRequest(
+          "GET",
+          `/api/subscriptions?page=${pageParam}&perPage=${PER_PAGE}&excludeDetected=true`
+        );
+        const items = await response.json();
+        const total = Number.parseInt(response.headers.get("x-total-count") || "0", 10);
+        return { items, total };
+      },
+      getNextPageParam: (lastPage, pages) => {
+        const loadedCount = pages.reduce((sum, page) => sum + page.items.length, 0);
+        return loadedCount < lastPage.total ? pages.length + 1 : undefined;
+      },
+    }));
+
+    void Promise.all(routeQueries);
+  }, [familyGroupId, queryClient, user?.id]);
+
+  useQuery({
+    queryKey: ["/api/subscriptions"],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/subscriptions");
+      return response.json();
+    },
+  });
+
+  useQuery({
+    queryKey: ["/api/subscriptions", "detected"],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/subscriptions?includeDetected=true");
+      return response.json();
+    },
+  });
 
   const savingsQuery = useQuery<{
     monthlySavings: number;
     ownerMonthlySavings?: number;
     memberMonthlySavings?: number;
   }>({
-    queryKey: ["/api/analytics/monthly-savings", showFamilyData],
+    queryKey: ["/api/analytics/monthly-savings", showFamilyData, currentMonthKey],
     enabled: !!user?.id,
     queryFn: async () => {
       let url = "/api/analytics/monthly-savings";

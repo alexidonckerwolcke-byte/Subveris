@@ -63,6 +63,8 @@ export default function Subscriptions() {
   const { currency } = useCurrency();
   const { limits, tier } = useSubscription();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
+  const subscriptionSourceKey = `${showFamilyData}:${familyGroupId || ""}`;
+  const previousSubscriptionSourceKey = useRef(subscriptionSourceKey);
   const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -110,8 +112,10 @@ export default function Subscriptions() {
   // Only purge paginated cache when the data source changes.
   // Search and category filtering happen client-side, so they should not force a new server fetch.
   useEffect(() => {
+    if (previousSubscriptionSourceKey.current === subscriptionSourceKey) return;
+    previousSubscriptionSourceKey.current = subscriptionSourceKey;
     queryClient.removeQueries({ queryKey: ["/api/subscriptions", PER_PAGE] });
-  }, [showFamilyData, familyGroupId]);
+  }, [queryClient, subscriptionSourceKey]);
 
   // Personal subscriptions (paginated)
   interface SubscriptionsPage {

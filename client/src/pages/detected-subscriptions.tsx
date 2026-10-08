@@ -32,7 +32,7 @@ export default function DetectedSubscriptions() {
   const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
 
   const { data: subscriptions = [], isLoading } = useQuery<Subscription[]>({
-    queryKey: ["/api/subscriptions"],
+    queryKey: ["/api/subscriptions", "detected"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/subscriptions?includeDetected=true");
       return response.json();

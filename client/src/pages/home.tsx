@@ -1,3 +1,4 @@
+import "./home.css";
 import { useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Link } from "wouter";
@@ -58,7 +59,7 @@ export default function HomePage() {
     visible: { opacity: 1, y: 0, filter: "blur(0px)" },
   };
 
-  const revealViewport = { once: false, amount: 0.5 };
+  const revealViewport = { once: true, amount: 0.3 };
   const revealTransition = { duration: 0.65, ease: [0.22, 1, 0.36, 1] };
 
   function DirectionalReveal({
@@ -179,14 +180,14 @@ export default function HomePage() {
 
   return (
     <motion.div
-      className="min-h-screen bg-white"
+      className="home-page min-h-screen bg-white"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
     >
       {/* Header */}
-      <header className="border-b border-border/40 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-4">
+      <header className="home-header border-b border-border/40 bg-white/90 backdrop-blur-sm sticky top-0 z-50">
+        <div className="home-header-inner container mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div className="flex shrink-0 items-center gap-1 sm:gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden shadow-sm">
               <img src="/assets/logo-icon.png" alt="Subveris Logo" width={40} height={40} className="h-full w-full object-cover" />
@@ -221,39 +222,49 @@ export default function HomePage() {
       </header>
 
       {/* 1️⃣ HERO SECTION */}
-      <DirectionalReveal className="container mx-auto px-4 py-32 text-center relative overflow-hidden bg-white">
+      <DirectionalReveal className="home-section home-hero relative overflow-hidden bg-white text-center">
         <div className="absolute inset-x-0 top-0 h-64 bg-white" />
 
         <motion.div
-          className="mx-auto max-w-4xl relative z-10"
+          className="home-hero-content mx-auto relative z-10"
           initial="hidden"
           whileInView="visible"
           viewport={revealViewport}
           variants={revealUp}
           transition={revealTransition}
         >
-          <Badge variant="secondary" className="mb-6 px-4 py-2 text-sm font-semibold">
+          <Badge variant="secondary" className="home-hero-kicker mb-6 px-4 py-2 text-sm font-semibold">
             <Sparkles className="h-3 w-3 mr-2" />
             The Subscription Optimization Platform
           </Badge>
 
-          <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-8 leading-tight">
-            Find the subscriptions you don't use
-            <br />
+          <h1 className="home-hero-title text-6xl md:text-7xl font-bold tracking-tighter mb-8 leading-tight">
+            Find the subscriptions you don't use{" "}
             <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">before they renew again.</span>
           </h1>
 
-          <p className="text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed font-light">
+          <p className="home-hero-copy text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed font-light">
             See your recurring spend, understand what each service costs per use, and review the subscriptions that may no longer earn their place in your budget.
             <br />
             <span className="font-semibold text-foreground">Start with the services you already pay for.</span>
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <Button size="lg" className="text-lg px-12 py-7 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-700 shadow-2xl hover:shadow-[0_30px_120px_rgba(59,130,246,0.18)] transition-all duration-300" onClick={() => setAuthModalOpen(true)}>
+          <div className="home-hero-actions flex flex-col sm:flex-row gap-4 justify-center mb-16">
+            <Button size="lg" className="text-lg px-12 py-7 bg-primary hover:bg-primary/90 transition-all duration-300" onClick={() => setAuthModalOpen(true)}>
               Get Started Free
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
+          </div>
+
+          <div className="home-hero-media">
+            <img
+              src="/assets/dashboard-hero.png"
+              alt="Subveris dashboard showing subscription spending and upcoming renewals"
+              width={3420}
+              height={1970}
+              fetchPriority="high"
+              decoding="async"
+            />
           </div>
 
           <motion.div
@@ -262,7 +273,7 @@ export default function HomePage() {
             viewport={revealViewport}
             variants={revealUp}
             transition={{ ...revealTransition, delay: 0.08 }}
-            className="mx-auto flex flex-wrap justify-center items-center gap-6 rounded-full border border-slate-200/70 bg-white px-6 py-4 shadow-lg shadow-slate-200/50 backdrop-blur-sm text-sm text-slate-600"
+            className="home-proof-line mx-auto flex flex-wrap justify-center items-center gap-6 rounded-full border border-slate-200/70 bg-white px-6 py-4 shadow-lg shadow-slate-200/50 backdrop-blur-sm text-sm text-slate-600"
           >
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-green-500" />
@@ -281,75 +292,11 @@ export default function HomePage() {
               <span>Simple setup</span>
             </div>
           </motion.div>
-
-          <div className="mt-16 grid gap-5 md:grid-cols-4 text-left">
-            {[{
-              icon: Shield,
-              title: 'No bank data required',
-              text: 'Subveris does not require bank credentials, payment details, or account linking to help you track and optimize recurring services.',
-              color: 'bg-emerald-100 text-emerald-700',
-            }, {
-              icon: Lock,
-              title: 'Protected access',
-              text: 'Sensitive actions use authenticated sessions and CSRF checks so your account and billing-related requests are not treated as anonymous.',
-              color: 'bg-blue-100 text-blue-700',
-            }, {
-              icon: Eye,
-              title: 'You control the data',
-              text: 'The product is built around the subscriptions you add and the usage signals you intentionally share, rather than hidden financial data collection.',
-              color: 'bg-violet-100 text-violet-700',
-            }, {
-              icon: TargetIcon,
-              title: 'Usage-based recommendations',
-              text: 'Recommendations are grounded in the subscriptions you maintain and the usage patterns you track, so decisions are based on real behavior.',
-              color: 'bg-amber-100 text-amber-700',
-            }].map((item, index) => (
-              <motion.div
-                key={item.title}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: false, amount: 0.7 }}
-                variants={revealUp}
-                transition={{ ...revealTransition, delay: 0.02 + index * 0.03 }}
-                className="rounded-3xl border border-border/40 bg-white/85 p-6 shadow-lg"
-              >
-                <div className={`mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl ${item.color}`}>
-                  <item.icon className="h-5 w-5" />
-                </div>
-                <h3 className="mb-2 text-lg font-semibold">{item.title}</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">{item.text}</p>
-              </motion.div>
-            ))}
-          </div>
-
-          <div className="mt-16 grid gap-5 sm:grid-cols-3 text-left">
-            {[
-              { icon: DollarSign, title: 'Cost Per Use Intelligence', text: 'Understand the real value of every subscription and uncover exactly which services are worth keeping.', color:'bg-primary/10 text-primary', iconColor:'text-primary' },
-              { icon: BarChart3, title: 'Renewal Risk Intelligence', text: 'Find subscriptions that are about to renew, flag services with low return, and keep your budget from leaking.', color:'bg-blue-500/10 text-blue-600', iconColor:'text-blue-600' },
-              { icon: Sparkles, title: 'Optimization Workflows', text: 'Turn insights into action with recommendations, plan change suggestions, and savings opportunities you can act on now.', color:'bg-green-500/10 text-green-600', iconColor:'text-green-600' },
-            ].map((item, index) => (
-              <motion.div
-                key={item.title}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: false, amount: 0.7 }}
-                variants={revealUp}
-                transition={{ ...revealTransition, delay: 0.02 + index * 0.03 }}
-                className="rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg"
-              >
-                <div className={`inline-flex items-center justify-center rounded-2xl p-3 mb-4 ${item.color}`}>
-                  <item.icon className={`h-6 w-6 ${item.iconColor}`} />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{item.text}</p>
-              </motion.div>
-            ))}
-          </div>
         </motion.div>
       </DirectionalReveal>
 
       {/* 2️⃣ PROBLEM SECTION */}
-      <DirectionalReveal id="problem" className="bg-white py-28" amount={0.22} delay={0}>
+      <DirectionalReveal id="problem" className="home-section home-problem bg-white py-28" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">
@@ -382,7 +329,7 @@ export default function HomePage() {
       </DirectionalReveal>
 
       {/* 3️⃣ FEATURES SECTION */}
-      <DirectionalReveal id="features" className="container mx-auto px-4 py-28" amount={0.22} delay={0}>
+      <DirectionalReveal id="features" className="home-section home-features container mx-auto px-4 py-28" amount={0.22} delay={0}>
         <div className="max-w-4xl mx-auto">
           <div>
             <Badge variant="outline" className="mb-6 max-w-full border-primary px-4 py-1 text-center text-primary whitespace-normal">Premium Features</Badge>
@@ -391,21 +338,7 @@ export default function HomePage() {
               Subveris combines clear data handling with practical analytics so you can make better decisions about recurring spending.
             </p>
           </div>
-          <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-border/30 bg-white shadow-2xl shadow-slate-200/50 mb-12">
-            <div className="bg-white p-4 sm:p-6">
-              <div className="relative overflow-hidden rounded-[1.75rem] border border-border/20 bg-white">
-                <img
-                  src="/assets/dashboard-hero.png"
-                  alt="Subveris dashboard screenshot"
-                  width={3420}
-                  height={1970}
-                  decoding="async"
-                  className="w-full rounded-[1.75rem] object-cover"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="grid md:grid-cols-3 gap-10">
+          <div className="home-feature-grid grid md:grid-cols-3 gap-10">
             {featureHighlights.map((feature, index) => (
               <motion.div
                 key={feature.title}
@@ -414,7 +347,7 @@ export default function HomePage() {
                 viewport={revealViewport}
                 variants={revealUp}
                 transition={{ ...revealTransition, delay: index * 0.03 }}
-                className="flex flex-col gap-6 rounded-3xl border border-border/40 bg-white p-8 shadow-lg transition-transform hover:-translate-y-1 dark:bg-slate-900/70"
+                className="home-feature-item flex flex-col gap-6 rounded-3xl border border-border/40 bg-white p-8 shadow-lg transition-transform hover:-translate-y-1 dark:bg-slate-900/70"
               >
                 <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <feature.icon className="h-7 w-7 text-primary" />
@@ -426,11 +359,73 @@ export default function HomePage() {
               </motion.div>
             ))}
           </div>
+          <div className="home-trust-grid mt-16 grid gap-5 md:grid-cols-4 text-left">
+            {[{
+              icon: Shield,
+              title: 'No bank data required',
+              text: 'Subveris does not require bank credentials, payment details, or account linking to help you track and optimize recurring services.',
+              color: 'bg-emerald-100 text-emerald-700',
+            }, {
+              icon: Lock,
+              title: 'Protected access',
+              text: 'Sensitive actions use authenticated sessions and CSRF checks so your account and billing-related requests are not treated as anonymous.',
+              color: 'bg-blue-100 text-blue-700',
+            }, {
+              icon: Eye,
+              title: 'You control the data',
+              text: 'The product is built around the subscriptions you add and the usage signals you intentionally share, rather than hidden financial data collection.',
+              color: 'bg-violet-100 text-violet-700',
+            }, {
+              icon: TargetIcon,
+              title: 'Usage-based recommendations',
+              text: 'Recommendations are grounded in the subscriptions you maintain and the usage patterns you track, so decisions are based on real behavior.',
+              color: 'bg-amber-100 text-amber-700',
+            }].map((item, index) => (
+              <motion.div
+                key={item.title}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: false, amount: 0.7 }}
+                variants={revealUp}
+                transition={{ ...revealTransition, delay: 0.02 + index * 0.03 }}
+                className="home-trust-item rounded-3xl border border-border/40 bg-white/85 p-6 shadow-lg"
+              >
+                <div className={`mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl ${item.color}`}>
+                  <item.icon className="h-5 w-5" />
+                </div>
+                <h3 className="mb-2 text-lg font-semibold">{item.title}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">{item.text}</p>
+              </motion.div>
+            ))}
+          </div>
+          <div className="home-capability-grid mt-16 grid gap-5 sm:grid-cols-3 text-left">
+            {[
+              { icon: DollarSign, title: 'Cost Per Use Intelligence', text: 'Understand the real value of every subscription and uncover exactly which services are worth keeping.', color:'bg-primary/10 text-primary', iconColor:'text-primary' },
+              { icon: BarChart3, title: 'Renewal Risk Intelligence', text: 'Find subscriptions that are about to renew, flag services with low return, and keep your budget from leaking.', color:'bg-blue-500/10 text-blue-600', iconColor:'text-blue-600' },
+              { icon: Sparkles, title: 'Optimization Workflows', text: 'Turn insights into action with recommendations, plan change suggestions, and savings opportunities you can act on now.', color:'bg-green-500/10 text-green-600', iconColor:'text-green-600' },
+            ].map((item, index) => (
+              <motion.div
+                key={item.title}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: false, amount: 0.7 }}
+                variants={revealUp}
+                transition={{ ...revealTransition, delay: 0.02 + index * 0.03 }}
+                className="home-capability-item rounded-3xl border border-border/40 bg-background/80 p-8 shadow-lg"
+              >
+                <div className={`inline-flex items-center justify-center rounded-2xl p-3 mb-4 ${item.color}`}>
+                  <item.icon className={`h-6 w-6 ${item.iconColor}`} />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
+                <p className="text-muted-foreground leading-relaxed">{item.text}</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </DirectionalReveal>
 
       {/* 4️⃣ COMPARISON SECTION */}
-      <DirectionalReveal id="comparison" className="bg-white py-28" amount={0.22} delay={0}>
+      <DirectionalReveal id="comparison" className="home-section home-comparison bg-white py-28" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">What Subveris shows you</h2>
@@ -439,7 +434,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto overflow-x-auto rounded-[2rem] shadow-2xl border border-slate-200/70 bg-white">
+          <div className="home-comparison-table max-w-4xl mx-auto overflow-x-auto rounded-[2rem] shadow-2xl border border-slate-200/70 bg-white">
             <table className="min-w-[560px] w-full text-left border-collapse">
               <thead>
                 <tr className="bg-white border-b border-slate-200/70">
@@ -461,7 +456,7 @@ export default function HomePage() {
       </DirectionalReveal>
 
       {/* 5️⃣ PRODUCT PROOF SECTION */}
-      <DirectionalReveal className="container mx-auto px-4 py-28" amount={0.22} delay={0}>
+      <DirectionalReveal className="home-section home-proof container mx-auto px-4 py-28" amount={0.22} delay={0}>
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: false, amount: 0.3 }} variants={revealUp} transition={{ ...revealTransition, duration: 0.65, delay: 0.05 }}>
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">See what Subveris actually does</h2>
@@ -500,7 +495,7 @@ export default function HomePage() {
               variants={revealUp}
               transition={{ ...revealTransition, duration: 0.65, delay: index * 0.08 }}
             >
-              <Card className="border-border/50 shadow-md hover:shadow-xl transition-all bg-white dark:bg-slate-900/70 h-full">
+              <Card className="home-proof-card border-border/50 shadow-md hover:shadow-xl transition-all bg-white dark:bg-slate-900/70 h-full">
                 <CardContent className="pt-8">
                   <div className={`mb-6 inline-flex h-12 w-12 items-center justify-center rounded-2xl ${item.color}`}>
                     <item.icon className="h-6 w-6" />
@@ -517,7 +512,7 @@ export default function HomePage() {
       </DirectionalReveal>
 
       {/* 8️⃣ BIG VISION SECTION */}
-      <DirectionalReveal className="bg-white py-28 border-y border-border/50" amount={0.22} delay={0}>
+      <DirectionalReveal className="home-section home-vision bg-white py-28 border-y border-border/50" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
           <motion.div
             className="max-w-3xl mx-auto text-center"
@@ -541,7 +536,7 @@ export default function HomePage() {
       </DirectionalReveal>
 
       {/* TRUSTED BY SECTION */}
-      <DirectionalReveal className="bg-white py-16">
+      <DirectionalReveal className="home-section home-trusted bg-white py-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h3 className="text-2xl font-bold mb-4">Built for trust and clarity</h3>
@@ -569,7 +564,7 @@ export default function HomePage() {
       </DirectionalReveal>
 
       {/* PRICING SECTION */}
-      <DirectionalReveal id="pricing" className="bg-white py-28" amount={0.22} delay={0}>
+      <DirectionalReveal id="pricing" className="home-section home-pricing bg-white py-28" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold mb-6 tracking-tight">
@@ -580,9 +575,9 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-16">
+          <div className="home-pricing-grid grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-16">
             {/* FREE PLAN */}
-            <Card className="relative flex flex-col transition-all border border-border/50 shadow-md hover:shadow-lg hover:border-primary/30 bg-white dark:bg-slate-900/70">
+            <Card className="home-plan-card home-plan-free relative flex flex-col transition-all border border-border/50 shadow-md hover:shadow-lg hover:border-primary/30 bg-white dark:bg-slate-900/70">
               <CardHeader className="text-center pb-6 pt-8">
                 <CardTitle className="text-3xl font-bold">Free</CardTitle>
                 <div className="mt-6">
@@ -643,7 +638,7 @@ export default function HomePage() {
             </Card>
 
             {/* PREMIUM PLAN */}
-            <Card className="relative flex flex-col transition-all border-2 border-primary shadow-2xl scale-105 bg-white hover:shadow-2xl">
+            <Card className="home-plan-card home-plan-premium relative flex flex-col transition-all border-2 border-primary shadow-2xl scale-105 bg-white hover:shadow-2xl">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <Badge className="bg-gradient-to-r from-primary to-blue-600 text-white px-4 py-2 font-semibold shadow-lg">
                   <Sparkles className="h-4 w-4 mr-2 fill-white" />
@@ -706,7 +701,7 @@ export default function HomePage() {
             </Card>
 
             {/* FAMILY PLAN */}
-            <Card className="relative flex flex-col transition-all border-2 border-purple-500/50 shadow-xl bg-white hover:shadow-xl hover:border-purple-500/80">
+            <Card className="home-plan-card home-plan-family relative flex flex-col transition-all border-2 border-purple-500/50 shadow-xl bg-white hover:shadow-xl hover:border-purple-500/80">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 font-semibold shadow-lg">
                   <Users className="h-4 w-4 mr-2" />
@@ -778,7 +773,7 @@ export default function HomePage() {
 
           {/* Feature Comparison Table */}
           <motion.div
-            className="max-w-6xl mx-auto"
+            className="home-pricing-table max-w-6xl mx-auto"
             initial="hidden"
             whileInView="visible"
             viewport={revealViewport}
@@ -864,7 +859,7 @@ export default function HomePage() {
 
           {/* FAQ for Pricing */}
           <motion.div
-            className="mt-20 max-w-3xl mx-auto"
+            className="home-pricing-faq mt-20 max-w-3xl mx-auto"
             initial="hidden"
             whileInView="visible"
             viewport={revealViewport}
@@ -935,7 +930,7 @@ export default function HomePage() {
       </DirectionalReveal>
 
       {/* 9️⃣ FAQ SECTION */}
-      <DirectionalReveal id="faq" className="container mx-auto px-4 py-28" amount={0.6} delay={0}>
+      <DirectionalReveal id="faq" className="home-section home-faq container mx-auto px-4 py-28" amount={0.6} delay={0}>
         <div className="text-center mb-20">
           <h2 className="text-5xl font-bold mb-6 tracking-tight">
             Common Questions
@@ -974,7 +969,7 @@ export default function HomePage() {
       </DirectionalReveal>
 
       {/* 🔟 FINAL CTA SECTION */}
-      <DirectionalReveal className="bg-white py-32 border-y border-border/50" amount={0.22} delay={0}>
+      <DirectionalReveal className="home-section home-cta bg-white py-32 border-y border-border/50" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-6xl font-bold mb-8 tracking-tight">
@@ -984,7 +979,7 @@ export default function HomePage() {
               Start saving money and gain complete control over your recurring spending.
             </p>
 
-            <div className="bg-white border border-border/50 rounded-lg p-6 mb-8 max-w-2xl mx-auto dark:bg-slate-900/70">
+            <div className="home-cta-proof bg-white border border-border/50 rounded-lg p-6 mb-8 max-w-2xl mx-auto dark:bg-slate-900/70">
               <div className="flex items-center justify-center gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-green-500" />
@@ -1024,7 +1019,7 @@ export default function HomePage() {
       </DirectionalReveal>
 
       {/* CONTACT SECTION */}
-      <DirectionalReveal className="bg-white py-20" amount={0.22} delay={0}>
+      <DirectionalReveal className="home-section home-contact bg-white py-20" amount={0.22} delay={0}>
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
@@ -1062,7 +1057,7 @@ export default function HomePage() {
       </DirectionalReveal>
 
       {/* Footer */}
-      <footer className="bg-background border-t border-border/40 py-12">
+      <footer className="home-footer bg-background border-t border-border/40 py-12">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-3">

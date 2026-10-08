@@ -112,6 +112,45 @@ describe('DetectedSubscriptions', () => {
     });
   });
 
+  it('loads detected subscriptions when the regular subscriptions cache is already populated', async () => {
+    const mockApiRequest = vi.mocked(apiRequest);
+    mockApiRequest.mockImplementation(async (method: string, url: string) => {
+      if (method === 'GET' && url === '/api/subscriptions?includeDetected=true') {
+        return {
+          ok: true,
+          json: async () => [{
+            id: 'detected-1',
+            name: 'Netflix',
+            category: 'streaming',
+            amount: 15.99,
+            frequency: 'monthly',
+            isDetected: true,
+            status: 'pending',
+          }],
+        } as Response;
+      }
+
+      return { ok: true, json: async () => [] } as Response;
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, staleTime: 30_000 },
+        mutations: { retry: false },
+      },
+    });
+    queryClient.setQueryData(['/api/subscriptions'], []);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DetectedSubscriptions />
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Netflix')).toBeInTheDocument();
+    expect(mockApiRequest).toHaveBeenCalledWith('GET', '/api/subscriptions?includeDetected=true');
+  });
+
   it('excludes pending detected subscriptions from AI recommendations', () => {
     const recommendations = generateRecommendationsFromSubscriptions([
       {
