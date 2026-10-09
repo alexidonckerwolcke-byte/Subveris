@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getZonedMonthKey, getZonedMonthKeyForDate, isValidTimeZone } from "../shared/month-boundary";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -9,60 +10,61 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 
 async function resetMonthlyBillingData() {
   const now = new Date();
-  const dayOfMonth = now.getDate();
-
-  // Only run on the first day of the month
-  if (dayOfMonth !== 1) {
-    console.log(`[Monthly Reset] Not the first day of month (day=${dayOfMonth}), skipping`);
-    return;
-  }
-
-  console.log("[Monthly Reset] Starting monthly billing_month reset on first day of month");
-
-async function resetMonthlyBillingData() {
-  const now = new Date();
-  const dayOfMonth = now.getDate();
-
-  // Only run on the first day of the month
-  if (dayOfMonth !== 1) {
-    console.log(`[Monthly Reset] Not the first day of month (day=${dayOfMonth}), skipping`);
-    return;
-  }
-
-  console.log("[Monthly Reset] Starting monthly billing_month reset on first day of month");
+  console.log("[Monthly Reset] Starting idempotent account-local billing_month reconciliation");
 
   try {
-    // Get current month in YYYY-MM format
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
-    console.log(`[Monthly Reset] Setting billing_month=${currentMonth} for subscriptions renewing in current month`);
-
-    // Update subscriptions that have renewal dates in the current month
-    // This includes subscriptions that renewed in the current month
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-
-    const { data, error } = await supabase
+    const { data: subscriptions, error } = await supabase
       .from("subscriptions")
-      .update({ billing_month: currentMonth })
-      .neq("status", "deleted")
-      .gte("next_billing_at", monthStart.toISOString())
-      .lte("next_billing_at", monthEnd.toISOString())
-      .select("id, name, next_billing_at");
+      .select("id, user_id, name, next_billing_at")
+      .neq("status", "deleted");
 
     if (error) {
-      console.error("[Monthly Reset] Error updating subscriptions:", error);
+      console.error("[Monthly Reset] Error fetching subscriptions:", error);
       return;
     }
 
-    console.log(`[Monthly Reset] Successfully updated ${data?.length || 0} subscriptions to billing_month=${currentMonth}`);
-    if (data && data.length > 0) {
-      console.log("[Monthly Reset] Updated subscriptions:", data.map(s => `${s.name} (${s.next_billing_at})`));
+    const timeZones = new Map<string, string>();
+    const updatesByMonth = new Map<string, string[]>();
+    for (const subscription of subscriptions || []) {
+      const userId = String(subscription.user_id || "");
+      if (!userId) continue;
+
+      let timeZone = timeZones.get(userId);
+      if (!timeZone) {
+        const { data: authData, error: authError } = await supabase.auth.admin.getUserById(userId);
+        const configuredTimeZone = authData?.user?.user_metadata?.timezone;
+        timeZone = !authError && isValidTimeZone(configuredTimeZone) ? configuredTimeZone : "UTC";
+        timeZones.set(userId, timeZone);
+      }
+
+      const currentMonth = getZonedMonthKey(now, timeZone);
+      const renewalDate = String(subscription.next_billing_at || "");
+      const renewalMonth = getZonedMonthKeyForDate(renewalDate, timeZone);
+
+      if (renewalMonth !== currentMonth) continue;
+      const ids = updatesByMonth.get(currentMonth) || [];
+      ids.push(subscription.id);
+      updatesByMonth.set(currentMonth, ids);
     }
+
+    let updatedCount = 0;
+    for (const [billingMonth, subscriptionIds] of updatesByMonth) {
+      const { error: updateError } = await supabase
+        .from("subscriptions")
+        .update({ billing_month: billingMonth })
+        .in("id", subscriptionIds);
+
+      if (updateError) {
+        console.error(`[Monthly Reset] Error setting billing_month=${billingMonth}:`, updateError);
+        continue;
+      }
+      updatedCount += subscriptionIds.length;
+    }
+
+    console.log(`[Monthly Reset] Reconciled ${updatedCount} subscription(s) using account-local months.`);
   } catch (err) {
     console.error("[Monthly Reset] Exception:", err);
   }
-}
 }
 
 resetMonthlyBillingData();

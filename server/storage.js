@@ -1,5 +1,15 @@
 import crypto from 'crypto';
 
+function getMonthKey(date, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}`;
+}
+
 export class MemStorage {
   constructor() {
     this.subscriptions = new Map();
@@ -24,11 +34,10 @@ export class MemStorage {
     return { ...record };
   }
 
-  async recordSubscriptionUsage(id) {
+  async recordSubscriptionUsage(id, timeZone = 'UTC', now = new Date()) {
     const rec = this.subscriptions.get(id);
     if (!rec) return null;
-    const now = new Date();
-    const ym = now.toISOString().substr(0, 7);
+    const ym = getMonthKey(now, timeZone);
     // reset monthly count if month changed
     if (rec.usageMonth !== ym) {
       rec.monthlyUsageCount = 0;
@@ -36,17 +45,19 @@ export class MemStorage {
     }
     rec.usageCount = (rec.usageCount || 0) + 1;
     rec.monthlyUsageCount = (rec.monthlyUsageCount || 0) + 1;
+    rec.lastUsedAt = now.toISOString();
     this.subscriptions.set(id, rec);
     return { ...rec };
   }
 
-  async updateSubscriptionUsage(id, newCount) {
+  async updateSubscriptionUsage(id, newCount, timeZone = 'UTC', now = new Date()) {
     const rec = this.subscriptions.get(id);
     if (!rec) return null;
-    const ym = new Date().toISOString().substr(0, 7);
+    const ym = getMonthKey(now, timeZone);
     rec.usageCount = newCount;
     rec.monthlyUsageCount = newCount;
     rec.usageMonth = ym;
+    rec.lastUsedAt = now.toISOString();
     this.subscriptions.set(id, rec);
     return { ...rec };
   }

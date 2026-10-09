@@ -1,5 +1,6 @@
 import type { FamilyGroup } from "@shared/schema";
 import { isSubscriptionBilledInMonth } from "./utils";
+import { getAccountMonthBounds, getAccountTimeZone } from "./account-time-zone";
 
 export interface FamilyMetrics {
   totalSubscriptions: number;
@@ -14,20 +15,20 @@ export interface FamilyMetrics {
  * can unit test it and keep the component cleaner.
  */
 export function getCurrentMonthFamilySpend(familyData: any, monthlySpending: Array<{ month?: string; amount?: number; isCurrentMonth?: boolean }> = []): number {
-  const fromSpendingSeries = Array.isArray(familyData?.spending) && familyData.spending.length > 0
-    ? familyData.spending.find((entry: any) => entry?.isCurrentMonth)
-    : undefined;
-
-  if (fromSpendingSeries && typeof fromSpendingSeries.amount === 'number') {
-    return Number(fromSpendingSeries.amount) || 0;
-  }
-
   const fromMonthlySeries = Array.isArray(monthlySpending) && monthlySpending.length > 0
     ? monthlySpending.find((entry: any) => entry?.isCurrentMonth)
     : undefined;
 
   if (fromMonthlySeries && typeof fromMonthlySeries.amount === 'number') {
     return Number(fromMonthlySeries.amount) || 0;
+  }
+
+  const fromSpendingSeries = Array.isArray(familyData?.spending) && familyData.spending.length > 0
+    ? familyData.spending.find((entry: any) => entry?.isCurrentMonth)
+    : undefined;
+
+  if (fromSpendingSeries && typeof fromSpendingSeries.amount === 'number') {
+    return Number(fromSpendingSeries.amount) || 0;
   }
 
   if (typeof familyData?.metrics?.totalMonthlySpending === 'number') {
@@ -37,7 +38,11 @@ export function getCurrentMonthFamilySpend(familyData: any, monthlySpending: Arr
   return 0;
 }
 
-export function computeFamilyMetrics(familyData: any): FamilyMetrics {
+export function computeFamilyMetrics(
+  familyData: any,
+  timeZone = familyData?.timeZone || getAccountTimeZone(),
+  now = new Date(),
+): FamilyMetrics {
   const isSubscriptionActiveLike = (sub: any) => {
     const status = String(sub?.status || '').trim().toLowerCase();
     return status === 'active' || status === 'unused' || status === 'to-cancel';
@@ -89,13 +94,12 @@ export function computeFamilyMetrics(familyData: any): FamilyMetrics {
     return amt;
   }
 
-  const now = new Date();
+  const { monthStart, nextMonthStart } = getAccountMonthBounds(now, timeZone);
+  const monthEnd = new Date(nextMonthStart.getTime() - 1);
 
   const isRenewingToday = (item: any) => {
     if (item.status !== 'active' && item.status !== 'unused' && item.status !== 'to-cancel') return false;
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    return isSubscriptionBilledInMonth(item, monthStart, monthEnd, now, true);
+    return isSubscriptionBilledInMonth(item, monthStart, monthEnd, now, true, undefined, timeZone);
   };
 
   const monthlyFromSubs = subs

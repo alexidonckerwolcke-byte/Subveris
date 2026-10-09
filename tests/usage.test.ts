@@ -70,4 +70,26 @@ describe("monthly usage tracking", () => {
     expect(after?.monthlyUsageCount).toBe(1);
     expect(after?.usageMonth).toBe(new Date().toISOString().substr(0, 7));
   });
+
+  it("uses the account timezone at a UTC month boundary", async () => {
+    const store = new MemStorage();
+    const sub = await store.createSubscription({
+      userId: "u1",
+      name: "Timezone Boundary",
+      category: "other",
+      amount: 7,
+      frequency: "monthly",
+      nextBillingDate: "2026-03-01",
+    });
+    const beforeLosAngelesMidnight = new Date("2026-03-01T07:30:00.000Z");
+
+    const updated = await store.recordSubscriptionUsage(
+      sub.id,
+      "America/Los_Angeles",
+      beforeLosAngelesMidnight,
+    );
+
+    expect(updated?.usageMonth).toBe("2026-02");
+    expect(updated?.monthlyUsageCount).toBe(1);
+  });
 });

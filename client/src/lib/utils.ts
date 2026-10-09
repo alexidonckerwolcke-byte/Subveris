@@ -13,6 +13,8 @@ import {
   Code,
 } from "lucide-react";
 import type { MonthlySpending, SubscriptionCategory, SubscriptionStatus } from "@shared/schema";
+import { getAccountTimeZone, getAccountMonthKey, getAccountMonthBounds } from "./account-time-zone";
+import { getZonedDateParts, getZonedDateString, getZonedMonthKey, getZonedLocalDateTime } from "@shared/month-boundary";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -144,13 +146,18 @@ export function calculateMonthlyCost(amount: number, frequency: string): number 
   }
 }
 
-export function normalizeMonthlySpendingSeries(data: MonthlySpending[] | undefined, months = 6): MonthlySpending[] {
-  const now = new Date();
+export function normalizeMonthlySpendingSeries(
+  data: MonthlySpending[] | undefined,
+  months = 6,
+  timeZone = getAccountTimeZone(),
+  now = new Date(),
+): MonthlySpending[] {
   const monthLabels: string[] = [];
+  const [currentYear, currentMonth] = getAccountMonthKey(now, timeZone).split("-").map(Number);
 
   for (let i = months; i >= 0; i--) {
-    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    monthLabels.push(monthDate.toLocaleString('en-US', { month: 'short', year: 'numeric' }));
+    const monthDate = new Date(Date.UTC(currentYear, currentMonth - 1 - i, 15));
+    monthLabels.push(monthDate.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }));
   }
 
   const monthAmountMap = new Map<string, number>(monthLabels.map((label) => [label, 0]));
@@ -283,30 +290,41 @@ export function getSubscriptionBillingMonth(sub: any): string | null {
   return `${match[1]}-${match[2]}`;
 }
 
+function getSubscriptionRenewalDayKey(sub: any, timeZone: string): string | null {
+  const rawDate = sub?.nextBillingDate || sub?.next_billing_at || sub?.next_billing_date || sub?.next_billing;
+  if (!rawDate) return null;
+  const dateOnly = String(rawDate).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (dateOnly) return dateOnly[1];
+  const parsed = parseSubscriptionRenewalDate(rawDate);
+  return parsed ? getZonedDateString(parsed, timeZone) : null;
+}
+
+function getNextMonthKey(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month, 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
 export function isSubscriptionBilledInCurrentMonth(sub: any, now = new Date(), renewalDate?: Date): boolean {
-  const targetMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const timeZone = getAccountTimeZone();
+  const targetMonth = getAccountMonthKey(now, timeZone);
   const billingMonth = getSubscriptionBillingMonth(sub);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  const renewal = renewalDate ?? parseSubscriptionRenewalDate(
-    (sub as any).nextBillingDate || (sub as any).next_billing_at || (sub as any).next_billing_date || (sub as any).next_billing,
-  );
-  if (!renewal) return false;
-
-  const renewalDay = parseDateOnlyLocal(renewal);
-  if (!renewalDay) return false;
+  const todayKey = getZonedDateString(now, timeZone);
+  const renewalDayKey = renewalDate
+    ? getZonedDateString(renewalDate, timeZone)
+    : getSubscriptionRenewalDayKey(sub, timeZone);
+  if (!renewalDayKey) return false;
+  const monthStartKey = `${targetMonth}-01`;
+  const nextMonthStartKey = `${getNextMonthKey(targetMonth)}-01`;
 
   if (billingMonth === targetMonth) {
-    if (renewalDay <= today) return true;
-    if (renewalDay > monthEnd) return true;
+    if (renewalDayKey <= todayKey) return true;
+    if (renewalDayKey >= nextMonthStartKey) return true;
     return false;
   }
 
-  if (renewalDay < monthStart) return false;
-  if (renewalDay > monthEnd) return false;
-  return renewalDay <= today;
+  if (renewalDayKey < monthStartKey || renewalDayKey >= nextMonthStartKey) return false;
+  return renewalDayKey <= todayKey;
 }
 
 export function isSubscriptionBilledInMonth(
@@ -316,30 +334,24 @@ export function isSubscriptionBilledInMonth(
   now = new Date(),
   isCurrentMonth = false,
 ): boolean {
-  const targetMonth = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`;
+  const timeZone = getAccountTimeZone();
+  const targetMonth = getZonedMonthKey(monthStart, timeZone);
   const billingMonth = getSubscriptionBillingMonth(sub);
-  const monthStartDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), 1);
-  const monthEndDate = new Date(monthEnd.getFullYear(), monthEnd.getMonth() + 1, 0, 23, 59, 59, 999);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  const renewalDate = parseSubscriptionRenewalDate(
-    (sub as any).nextBillingDate || (sub as any).next_billing_at || (sub as any).next_billing_date || (sub as any).next_billing,
-  );
-  if (!renewalDate) return false;
-
-  const renewalDay = parseDateOnlyLocal(renewalDate);
-  if (!renewalDay) return false;
+  const todayKey = getZonedDateString(now, timeZone);
+  const renewalDayKey = getSubscriptionRenewalDayKey(sub, timeZone);
+  if (!renewalDayKey) return false;
+  const monthStartKey = `${targetMonth}-01`;
+  const nextMonthStartKey = `${getNextMonthKey(targetMonth)}-01`;
 
   if (billingMonth === targetMonth) {
     if (!isCurrentMonth) return true;
-    if (renewalDay <= today) return true;
-    if (renewalDay > monthEndDate) return true;
+    if (renewalDayKey <= todayKey) return true;
+    if (renewalDayKey >= nextMonthStartKey) return true;
     return false;
   }
 
-  if (renewalDay < monthStartDate) return false;
-  if (renewalDay > monthEndDate) return false;
-  return isCurrentMonth ? renewalDay <= today : true;
+  if (renewalDayKey < monthStartKey || renewalDayKey >= nextMonthStartKey) return false;
+  return isCurrentMonth ? renewalDayKey <= todayKey : true;
 }
 
 export function calculateMonthlySpendingSeries(
@@ -348,46 +360,62 @@ export function calculateMonthlySpendingSeries(
   months = 6,
 ): MonthlySpending[] {
   const now = new Date();
+  const timeZone = getAccountTimeZone();
+  const currentParts = getZonedDateParts(now, timeZone);
+  const currentMonthKey = getAccountMonthKey(now, timeZone);
+  const todayKey = getZonedDateString(now, timeZone);
   const list = Array.isArray(subscriptions) ? subscriptions : [];
 
   return Array.from({ length: months + 1 }, (_, index) => {
-    const monthDate = new Date(now.getFullYear(), now.getMonth() - (months - index), 1);
-    const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-    const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59, 999);
-    const isCurrentMonth = monthDate.getFullYear() === now.getFullYear() && monthDate.getMonth() === now.getMonth();
+    const absoluteMonth = currentParts.month - 1 - (months - index);
+    const year = currentParts.year + Math.floor(absoluteMonth / 12);
+    const monthIndex = ((absoluteMonth % 12) + 12) % 12;
+    const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+    const monthStartKey = `${monthKey}-01`;
+    const nextMonthDate = new Date(Date.UTC(year, monthIndex + 1, 1));
+    const nextMonthKey = `${nextMonthDate.getUTCFullYear()}-${String(nextMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
+    const nextMonthStartKey = `${nextMonthKey}-01`;
+    const monthEndKey = `${monthKey}-${String(new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()).padStart(2, "0")}`;
+    const monthDate = new Date(Date.UTC(year, monthIndex, 15));
+    const isCurrentMonth = monthKey === currentMonthKey;
+
+    const dateOnlyKey = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
     const amount = list.reduce((total, subscription) => {
       const status = String(subscription?.status || '').toLowerCase();
       if (!['active', 'unused', 'to-cancel'].includes(status)) return total;
 
-      const renewalDate = parseSubscriptionRenewalDate(
-        subscription?.nextBillingDate || subscription?.next_billing_at || subscription?.next_billing_date || subscription?.next_billing,
-      );
-      if (!renewalDate) return total;
+      const renewalDayKey = getSubscriptionRenewalDayKey(subscription, timeZone);
+      if (!renewalDayKey || (isCurrentMonth && renewalDayKey > todayKey)) return total;
 
-      const renewalDay = parseDateOnlyLocal(renewalDate);
-      if (!renewalDay || (isCurrentMonth && renewalDay > parseDateOnlyLocal(now)!)) return total;
-
-      const createdDate = parseSubscriptionRenewalDate(subscription?.createdAt || subscription?.created_at);
-      if (createdDate && createdDate > monthEnd) return total;
+      const createdAt = subscription?.createdAt || subscription?.created_at;
+      if (createdAt) {
+        const createdDate = parseSubscriptionRenewalDate(createdAt);
+        const createdDateKey = String(createdAt).match(/^(\d{4}-\d{2}-\d{2})/)?.[1]
+          || (createdDate ? getZonedDateString(createdDate, timeZone) : null);
+        if (createdDateKey && createdDateKey >= nextMonthStartKey) return total;
+      }
 
       const frequency = String(subscription?.frequency || 'monthly').toLowerCase();
-      let occurrence = new Date(renewalDay);
+      let occurrence = parseDateOnlyLocal(renewalDayKey);
+      if (!occurrence) return total;
       let guard = 0;
-      while (occurrence > monthEnd && guard++ < 120) {
+      while (dateOnlyKey(occurrence) > monthEndKey && guard++ < 120) {
         occurrence = retreatDateByFrequency(occurrence, frequency);
       }
-      while (occurrence < monthStart && guard++ < 240) {
+      while (dateOnlyKey(occurrence) < monthStartKey && guard++ < 240) {
         occurrence = advanceDateByFrequency(occurrence, frequency);
       }
-      if (occurrence < monthStart || occurrence > monthEnd) return total;
+      const occurrenceKey = dateOnlyKey(occurrence);
+      if (occurrenceKey < monthStartKey || occurrenceKey > monthEndKey) return total;
 
       const monthlyCost = calculateMonthlyCost(Number(subscription?.amount) || 0, frequency);
       return total + convertAmount(monthlyCost, subscription?.currency || 'USD', 'USD');
     }, 0);
 
     return {
-      month: monthDate.toLocaleString('en-US', { month: 'short', year: 'numeric' }),
+      month: monthDate.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: "UTC" }),
       amount: Math.round(amount * 100) / 100,
     };
   });

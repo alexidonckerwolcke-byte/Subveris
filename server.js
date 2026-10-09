@@ -1385,43 +1385,86 @@ const server = http.createServer(async (req, res) => {
       const user = await getUser(req.headers.authorization);
       if (!user || !supabase) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ total: 0, byMonth: [] }));
+        res.end(JSON.stringify({ monthlySavings: 0, ownerMonthlySavings: 0, memberMonthlySavings: 0 }));
         return;
       }
 
       try {
-        const { data, error } = await supabase
-          .from('insights')
-          .select('potential_savings, created_at')
-          .eq('user_id', user.id);
+        const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        const query = requestUrl.searchParams;
+        const familyMode = query.get('family') === 'true';
+        const localDateMatch = /^(\d{4})-(\d{2})-\d{2}$/.exec(query.get('localDate') || '');
+        const year = localDateMatch ? Number(localDateMatch[1]) : new Date().getFullYear();
+        const month = localDateMatch ? Number(localDateMatch[2]) - 1 : new Date().getMonth();
+        const offsetFallback = Number(query.get('offsetMinutes')) || 0;
+        const monthStartOffset = Number(query.get('monthStartOffsetMinutes'));
+        const nextMonthOffset = Number(query.get('nextMonthOffsetMinutes'));
+        const startOffset = Number.isFinite(monthStartOffset) ? monthStartOffset : offsetFallback;
+        const endOffset = Number.isFinite(nextMonthOffset) ? nextMonthOffset : offsetFallback;
+        const monthStart = localDateMatch
+          ? new Date(Date.UTC(year, month, 1) + startOffset * 60 * 1000)
+          : new Date(year, month, 1);
+        const nextMonthStart = localDateMatch
+          ? new Date(Date.UTC(year, month + 1, 1) + endOffset * 60 * 1000)
+          : new Date(year, month + 1, 1);
 
-        if (error) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ total: 0, byMonth: [] }));
-          return;
+        let userIds = [user.id];
+        if (familyMode) {
+          const [{ data: ownedGroups }, { data: memberGroups }] = await Promise.all([
+            supabase.from('family_groups').select('id').eq('owner_id', user.id),
+            supabase.from('family_group_members').select('family_group_id').eq('user_id', user.id),
+          ]);
+          const groupIds = Array.from(new Set([
+            ...(ownedGroups || []).map((group) => group.id),
+            ...(memberGroups || []).map((membership) => membership.family_group_id),
+          ])).filter(Boolean);
+
+          if (groupIds.length > 0) {
+            const [{ data: members }, { data: groups }] = await Promise.all([
+              supabase.from('family_group_members').select('user_id').in('family_group_id', groupIds),
+              supabase.from('family_groups').select('owner_id').in('id', groupIds),
+            ]);
+            userIds = Array.from(new Set([
+              user.id,
+              ...(members || []).map((member) => member.user_id),
+              ...(groups || []).map((group) => group.owner_id),
+            ])).filter(Boolean);
+          }
         }
 
-        let total = 0;
-        const byMonth = {};
-        (data || []).forEach(insight => {
-          const savings = insight.potential_savings || 0;
-          total += savings;
-          const month = insight.created_at ? insight.created_at.substring(0, 7) : 'unknown';
-          byMonth[month] = (byMonth[month] || 0) + savings;
-        });
+        const { data: subscriptions, error } = await supabase
+          .from('subscriptions')
+          .select('amount, currency, frequency, status, deleted_at, canceled_at, cancellation_confirmed_at, user_id')
+          .in('user_id', userIds);
+        if (error) throw error;
+
+        const savingsByUser = {};
+        for (const subscription of subscriptions || []) {
+          const status = String(subscription.status || '').trim().toLowerCase();
+          if (status !== 'deleted' && status !== 'canceled' && !subscription.deleted_at) continue;
+          const savingsEventAt = subscription.deleted_at || subscription.cancellation_confirmed_at || subscription.canceled_at;
+          if (!savingsEventAt) continue;
+          const eventDate = new Date(savingsEventAt);
+          if (Number.isNaN(eventDate.getTime()) || eventDate < monthStart || eventDate >= nextMonthStart) continue;
+
+          const monthlyAmount = convertToUSD(
+            calculateMonthlyCost(Number(subscription.amount) || 0, subscription.frequency),
+            subscription.currency,
+          );
+          const subscriptionUserId = subscription.user_id || user.id;
+          savingsByUser[subscriptionUserId] = (savingsByUser[subscriptionUserId] || 0) + monthlyAmount;
+        }
+
+        const ownerMonthlySavings = Math.round((savingsByUser[user.id] || 0) * 100) / 100;
+        const monthlySavings = Math.round(Object.values(savingsByUser).reduce((sum, amount) => sum + amount, 0) * 100) / 100;
+        const memberMonthlySavings = Math.round((monthlySavings - ownerMonthlySavings) * 100) / 100;
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          total: parseFloat(total.toFixed(2)),
-          byMonth: Object.entries(byMonth).map(([month, amount]) => ({
-            month,
-            amount: parseFloat(amount.toFixed(2)),
-          })),
-        }));
+        res.end(JSON.stringify({ monthlySavings, ownerMonthlySavings, memberMonthlySavings }));
       } catch (error) {
         console.error('Error fetching monthly savings:', error);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ total: 0, byMonth: [] }));
+        res.end(JSON.stringify({ monthlySavings: 0, ownerMonthlySavings: 0, memberMonthlySavings: 0 }));
       }
       return;
     }

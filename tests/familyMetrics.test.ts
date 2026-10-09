@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeFamilyMetrics } from '../client/src/lib/family-metrics';
+import { computeFamilyMetrics, getCurrentMonthFamilySpend } from '../client/src/lib/family-metrics';
 
 // smoke tests for metrics logic used by the UI
 
@@ -62,5 +62,28 @@ describe('computeFamilyMetrics', () => {
     expect(m.totalSubscriptions).toBe(1);
     expect(m.activeSubscriptions).toBe(1);
     expect(m.totalMonthlySpending).toBeCloseTo(10);
+  });
+
+  it('uses the family timezone for month-boundary metrics', () => {
+    const data = {
+      timeZone: 'America/Los_Angeles',
+      subscriptions: [
+        { id: 'sub1', status: 'active', amount: 10, frequency: 'monthly', next_billing_at: '2026-02-28T20:00:00.000Z' },
+      ],
+      sharedSubscriptions: [],
+      members: [],
+    };
+
+    const metrics = computeFamilyMetrics(data, data.timeZone, new Date('2026-03-01T07:30:00.000Z'));
+    expect(metrics.totalMonthlySpending).toBeCloseTo(10);
+  });
+
+  it('prefers the dashboard monthly-spending series over embedded family fallback data', () => {
+    const spend = getCurrentMonthFamilySpend(
+      { spending: [{ amount: 100, isCurrentMonth: true }] },
+      [{ amount: 80, isCurrentMonth: true }],
+    );
+
+    expect(spend).toBe(80);
   });
 });

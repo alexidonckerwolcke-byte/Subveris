@@ -3,6 +3,8 @@ import { User, Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js
 import { supabase } from './supabase';
 import { apiFetch } from '@/lib/api';
 import { queryClient, restoreQueryCacheForUser } from './queryClient';
+import { getDetectedTimeZone, storeAccountTimeZone } from '@/lib/account-time-zone';
+import { isValidTimeZone } from '@shared/month-boundary';
 
 interface AuthContextType {
   user: User | null;
@@ -157,6 +159,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (!user) {
+      localStorage.removeItem('subveris.account-time-zone');
+      return;
+    }
+
+    const savedTimeZone = user.user_metadata?.timezone;
+    if (isValidTimeZone(savedTimeZone)) {
+      storeAccountTimeZone(savedTimeZone);
+      return;
+    }
+
+    const detectedTimeZone = getDetectedTimeZone();
+    storeAccountTimeZone(detectedTimeZone);
+    if (supabase) {
+      void supabase.auth.updateUser({ data: { timezone: detectedTimeZone } }).then(({ error }) => {
+        if (error) console.warn('[Auth] Failed to save account timezone:', error.message);
+      });
+    }
+  }, [user?.id, user?.user_metadata?.timezone]);
+
+  useEffect(() => {
+    if (!user) {
+      localStorage.removeItem('subveris.account-time-zone');
+      return;
+    }
+
+    const storedTimeZone = user.user_metadata?.timezone;
+    if (isValidTimeZone(storedTimeZone)) {
+      storeAccountTimeZone(storedTimeZone);
+      return;
+    }
+
+    const detectedTimeZone = getDetectedTimeZone();
+    storeAccountTimeZone(detectedTimeZone);
+    if (supabase) {
+      void supabase.auth.updateUser({ data: { timezone: detectedTimeZone } }).then(({ error }) => {
+        if (error) console.warn('[Auth] Failed to save account timezone:', error.message);
+      });
+    }
+  }, [user?.id, user?.user_metadata?.timezone]);
+
   const markPasswordConfigured = () => {
     if (!user) return;
     localStorage.setItem(`subveris.password-configured:${user.id}`, 'true');
@@ -256,6 +300,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }));
           // Store user UUID for browser extension
           localStorage.setItem('supabaseUserUUID', session.user.id);
+          const accountTimeZone = isValidTimeZone(session.user.user_metadata?.timezone)
+            ? session.user.user_metadata.timezone
+            : getDetectedTimeZone();
+          storeAccountTimeZone(accountTimeZone);
           // Store the Supabase Function base URL for browser extension requests.
           // Do not use the website origin here; the extension appends /api/... and expects
           // the Supabase Functions host, not the marketing site host.
@@ -272,7 +320,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             try {
               chromeGlobal.storage.local.set({
                 authToken: session.access_token,
-                supabaseUserUUID: session.user.id
+                supabaseUserUUID: session.user.id,
+                accountTimeZone,
               });
             } catch (e) {
               console.error('[Auth] Failed to sync to chrome storage:', e);

@@ -24,6 +24,9 @@ import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/lib/subscription-context";
+import { getAccountTimeZone, storeAccountTimeZone } from "@/lib/account-time-zone";
+import { isValidTimeZone } from "@shared/month-boundary";
+import { supabase } from "@/lib/supabase";
 
 export default function Settings() {
   const showGmailScanning = true;
@@ -37,11 +40,18 @@ export default function Settings() {
   const [gmailReauthorizationRequired, setGmailReauthorizationRequired] = useState(false);
   const [gmailConnecting, setGmailConnecting] = useState(false);
   const { user, hasPassword } = useAuth();
+  const [accountTimeZone, setAccountTimeZone] = useState(() => getAccountTimeZone());
+  const [savingTimeZone, setSavingTimeZone] = useState(false);
   const { tier } = useSubscription();
   const gmailAllowed = tier === "premium" || tier === "family";
   const gmailIsConnected = gmailExtensionAuthorized;
   const gmailNeedsReauthorization = gmailReauthorizationRequired || (gmailConnected && !gmailExtensionAuthorized);
   const userEmail = user?.email ?? "";
+
+  useEffect(() => {
+    const savedTimeZone = user?.user_metadata?.timezone;
+    if (isValidTimeZone(savedTimeZone)) setAccountTimeZone(savedTimeZone);
+  }, [user?.user_metadata?.timezone]);
 
   // Check if 2FA is enabled when user data loads
   useEffect(() => {
@@ -106,6 +116,31 @@ export default function Settings() {
       title: "Settings saved",
       description: "Your preferences have been updated successfully.",
     });
+  };
+
+  const handleSaveTimeZone = async () => {
+    const timeZone = accountTimeZone.trim();
+    if (!isValidTimeZone(timeZone)) {
+      toast({ title: "Invalid timezone", description: "Enter a valid IANA timezone, such as Europe/Brussels.", variant: "destructive" });
+      return;
+    }
+
+    setSavingTimeZone(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ data: { timezone: timeZone } });
+      if (error) throw error;
+      storeAccountTimeZone(timeZone);
+      setAccountTimeZone(timeZone);
+      toast({ title: "Timezone saved", description: "Monthly usage and reports will follow this timezone." });
+    } catch (error) {
+      toast({
+        title: "Could not save timezone",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingTimeZone(false);
+    }
   };
 
   const openEmailModal = () => {
@@ -312,6 +347,29 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               <CurrencySelector />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Account timezone</CardTitle>
+              <CardDescription>Monthly usage, savings, and reports follow this timezone.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="account-time-zone">IANA timezone</Label>
+                  <Input
+                    id="account-time-zone"
+                    value={accountTimeZone}
+                    onChange={(event) => setAccountTimeZone(event.target.value)}
+                    placeholder="Europe/Brussels"
+                    autoComplete="off"
+                  />
+                </div>
+                <Button onClick={handleSaveTimeZone} disabled={savingTimeZone}>
+                  {savingTimeZone ? "Saving..." : "Save timezone"}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

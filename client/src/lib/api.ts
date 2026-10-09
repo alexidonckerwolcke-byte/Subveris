@@ -1,4 +1,5 @@
 import { supabase, supabaseAnonKeyOverride as supabaseAnonKey } from "./supabase";
+import { getAccountTimeZone } from "./account-time-zone";
 
 const DEFAULT_REMOTE_API_BASE =
   'https://xuilgccacufwinvkocfl.supabase.co/functions/v1/api';
@@ -98,6 +99,12 @@ export async function resolveAuthToken(forceRefresh = false) {
 
 function normalizeBase(base: string) {
   return base.replace(/\/$/, "");
+}
+
+function appendAccountTimeZone(path: string) {
+  if (!path.startsWith("/api") || /(?:\?|&)timeZone=/.test(path)) return path;
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}timeZone=${encodeURIComponent(getAccountTimeZone())}`;
 }
 
 function withTimeout(ms: number, promise: Promise<Response>): Promise<Response> {
@@ -255,7 +262,7 @@ export async function apiFetch(input: string, init?: RequestInit) {
   // Ask Supabase for the current session so an inactive tab cannot reuse an expired bearer token.
   const token = await resolveAuthToken(true);
   const effectiveToken = token || supabaseAnonKey;
-  const primaryUrl = resolveApiUrl(input);
+  const primaryUrl = resolveApiUrl(appendAccountTimeZone(input));
   const mutationMethod = (init?.method || "GET").toUpperCase();
   const csrfHeaders: Record<string, string> = {};
 

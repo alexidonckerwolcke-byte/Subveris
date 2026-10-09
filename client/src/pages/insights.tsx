@@ -150,7 +150,9 @@ export default function Insights() {
     ? familyAnalysisLoading
     : personalSubscriptionsLoading && personalAnalysisLoading;
 
-  const computedFamilyCostAnalysis = showFamilyData ? computeCostPerUseFromSubs(familySubscriptions) : [];
+  const computedFamilyCostAnalysis = showFamilyData
+    ? computeCostPerUseFromSubs(familySubscriptions, familyData?.timeZone)
+    : [];
 
   function buildPerMemberAnalyses() {
     if (!showFamilyData || !familyData?.members || familyData.members.length === 0) return [];
@@ -167,7 +169,8 @@ export default function Insights() {
       const memberId = m.userId ?? m.user_id;
       const memberSubs = subs.filter((s: any) => s && (s.user_id === memberId || s.userId === memberId || s.owner_id === memberId));
       if (!memberSubs || memberSubs.length === 0) continue;
-      const analyses = computeCostPerUseFromSubs(memberSubs || []).map((a: any) => ({ ...a, name: `${memberName} — ${a.name}` }));
+      const analyses = computeCostPerUseFromSubs(memberSubs || [], familyData?.timeZone)
+        .map((a: any) => ({ ...a, name: `${memberName} — ${a.name}` }));
       perMember.push(...analyses);
     }
     return perMember;

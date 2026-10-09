@@ -1,0 +1,32 @@
+name: Monthly Subscription Cleanup
+
+on:
+  schedule:
+    # Cleanup is idempotent and evaluates each account's own month boundary.
+    - cron: '17 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Purge deleted subscriptions from previous months
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured in the production environment."
+            exit 1
+          fi
+          npm run update-statuses

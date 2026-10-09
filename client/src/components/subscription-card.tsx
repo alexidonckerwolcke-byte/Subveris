@@ -28,6 +28,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PER_PAGE as PER_PAGE_CONST } from "@/lib/constants";
 import type { Subscription, SubscriptionStatus } from "@shared/schema";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
+import { getAccountMonthKey } from "@/lib/account-time-zone";
 import { getCategoryIcon, getStatusColor, formatDate, isSubscriptionDeleted } from "@/lib/utils";
 import { useCurrency, type Currency } from "@/lib/currency-context";
 import { useAuth } from "@/lib/auth-context";
@@ -209,10 +210,7 @@ export function SubscriptionCard({
   const usageMonth = String(
     (subscription as any).usageMonth ?? (subscription as any).usage_month ?? ""
   ).slice(0, 7);
-  const currentUsageMonth = (() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  })();
+  const currentUsageMonth = getAccountMonthKey();
   const monthlyUsageCount = usageMonth && usageMonth !== currentUsageMonth
     ? 0
     : storedMonthlyUsageCount;

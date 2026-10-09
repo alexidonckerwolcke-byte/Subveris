@@ -378,10 +378,16 @@ export default function CostOptimizer() {
   );
 
   // Helper to get current month total
-  function getCurrentMonthAmount(monthlyData: any[] | undefined) {
+  function getCurrentMonthAmount(monthlyData: any[] | undefined, timeZone?: string) {
     if (!monthlyData || monthlyData.length === 0) return 0;
+    const currentEntry = monthlyData.find((entry) => entry?.isCurrentMonth);
+    if (currentEntry) return Number(currentEntry.amount) || 0;
     const now = new Date();
-    const currentMonthLabel = now.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+    const currentMonthLabel = now.toLocaleString('en-US', {
+      month: 'short',
+      year: 'numeric',
+      ...(timeZone ? { timeZone } : {}),
+    });
     const exactMatch = monthlyData.find((entry) => entry.month === currentMonthLabel);
     return exactMatch ? exactMatch.amount : 0;
   }
@@ -389,7 +395,7 @@ export default function CostOptimizer() {
   // Calculate current month spending same as dashboard
   const currentMonthSpending = useMemo(() => {
     if (showFamilyData && familyData?.spending) {
-      return getCurrentMonthAmount(familyData.spending);
+      return getCurrentMonthAmount(familyData.spending, familyData.timeZone);
     }
     return personalMetrics?.totalMonthlySpend || 0;
   }, [showFamilyData, familyData?.spending, personalMetrics?.totalMonthlySpend]);

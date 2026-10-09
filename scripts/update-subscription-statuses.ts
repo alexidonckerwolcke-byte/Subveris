@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getZonedMonthBounds, getZonedMonthKey, isValidTimeZone } from '../shared/month-boundary';
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -12,11 +13,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Configuration - adjust thresholds to taste
 const DAYS_TO_CANCEL = 60; // if unused for this many days, move to 'to-cancel'
 
-function getStartOfCurrentMonth(): string {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-}
-
 function daysSince(dateString?: string | null) {
   if (!dateString) return Infinity;
   const d = new Date(dateString);
@@ -25,16 +21,31 @@ function daysSince(dateString?: string | null) {
   return diff / (1000 * 60 * 60 * 24);
 }
 
-async function run() {
-  console.log('Starting subscription status reconciliation...');
+async function getAccountTimeZones(userIds: string[]): Promise<Map<string, string>> {
+  const timeZones = new Map<string, string>();
+  await Promise.all([...new Set(userIds.filter(Boolean))].map(async (userId) => {
+    try {
+      const { data, error } = await supabase.auth.admin.getUserById(userId);
+      const configuredTimeZone = data?.user?.user_metadata?.timezone;
+      timeZones.set(userId, !error && isValidTimeZone(configuredTimeZone) ? configuredTimeZone : 'UTC');
+      if (error) console.warn(`Could not load timezone for account ${userId}; using UTC.`, error.message);
+    } catch (error) {
+      console.warn(`Could not load timezone for account ${userId}; using UTC.`, error);
+      timeZones.set(userId, 'UTC');
+    }
+  }));
+  return timeZones;
+}
 
-  const monthStart = getStartOfCurrentMonth();
+async function run() {
+  const now = new Date();
+  console.log('Starting subscription status reconciliation...');
 
   // Keep deleted rows through the month they were deleted so savings and
   // monthly reports can include them. Purge them on the next month boundary.
   const { data: deletableSubscriptions, error: deletedFetchError } = await supabase
     .from('subscriptions')
-    .select('id, name, status, deleted_at')
+    .select('id, user_id, name, status, deleted_at')
     .or('status.eq.deleted,deleted_at.not.is.null');
 
   if (deletedFetchError) {
@@ -42,10 +53,19 @@ async function run() {
     process.exit(1);
   }
 
+  const deletionTimeZones = await getAccountTimeZones(
+    (deletableSubscriptions || []).map((subscription) => String(subscription.user_id || '')),
+  );
+
   const expiredDeletedIds = (deletableSubscriptions || [])
     .filter((subscription) => {
       if (subscription.status === 'deleted' && !subscription.deleted_at) return true;
-      return Boolean(subscription.deleted_at && subscription.deleted_at < monthStart);
+      if (!subscription.deleted_at) return false;
+      const deletedAt = new Date(subscription.deleted_at);
+      if (Number.isNaN(deletedAt.getTime())) return false;
+      const timeZone = deletionTimeZones.get(String(subscription.user_id || '')) || 'UTC';
+      const { monthStart } = getZonedMonthBounds(now, timeZone);
+      return deletedAt < monthStart;
     })
     .map((subscription) => subscription.id)
     .filter(Boolean);
@@ -61,11 +81,8 @@ async function run() {
       process.exit(1);
     }
 
-    console.log(`Purged ${expiredDeletedIds.length} subscription(s) deleted before ${monthStart}.`);
+    console.log(`Purged ${expiredDeletedIds.length} subscription(s) from prior account-local months.`);
   }
-
-  // Get current month in YYYY-MM format
-  const currentMonth = new Date().toISOString().slice(0, 7);
 
   const { data: subs, error } = await supabase
     .from('subscriptions')
@@ -81,6 +98,10 @@ async function run() {
     return;
   }
 
+  const subscriptionTimeZones = await getAccountTimeZones(
+    subs.map((subscription) => String(subscription.user_id || '')),
+  );
+
   let updatedCount = 0;
   let noChange = 0;
   const changes: Array<{id: string, from: string, to: string}> = [];
@@ -90,6 +111,8 @@ async function run() {
     const monthlyUsageCount = (s.monthly_usage_count ?? 0) as number;
     const usageMonth = s.usage_month as string | null;
     const lastUsed = s.last_used_at as string | null | undefined;
+    const timeZone = subscriptionTimeZones.get(String(s.user_id || '')) || 'UTC';
+    const currentMonth = getZonedMonthKey(now, timeZone);
 
     // Determine desired status
     let desiredStatus = currentStatus;

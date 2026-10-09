@@ -39,4 +39,13 @@ describe("potential savings deletion filtering", () => {
 
     expect(savings).toBe(0);
   });
+
+  it("converts potential savings into the selected display currency", () => {
+    const savings = calculatePotentialSavings(
+      [{ amount: 20, currency: "EUR", frequency: "monthly" }],
+      (amount, fromCurrency) => fromCurrency === "EUR" ? amount * 1.1 : amount
+    );
+
+    expect(savings).toBe(22);
+  });
 });

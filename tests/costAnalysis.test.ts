@@ -52,4 +52,33 @@ describe("computeCostPerUseFromSubs", () => {
     expect(result[0].costPerUse).toBeCloseTo(5);
     expect(result[0].valueRating).toBe("good");
   });
+
+  it("uses the family timezone when checking the current usage month", () => {
+    const result = computeCostPerUseFromSubs([{
+      id: "s5",
+      name: "Family timezone",
+      amount: 20,
+      frequency: "monthly",
+      status: "active",
+      usage_month: "2026-02",
+      monthly_usage_count: 4,
+    }], "America/Los_Angeles", new Date("2026-03-01T07:30:00.000Z"));
+
+    expect(result[0].usageCount).toBe(4);
+    expect(result[0].costPerUse).toBe(5);
+  });
+
+  it("excludes soft-deleted rows even if their status was not updated", () => {
+    const result = computeCostPerUseFromSubs([{
+      id: "s6",
+      name: "Soft deleted",
+      amount: 12,
+      frequency: "monthly",
+      status: "active",
+      deleted_at: "2026-10-01T12:00:00.000Z",
+      usage_count: 3,
+    }]);
+
+    expect(result).toEqual([]);
+  });
 });

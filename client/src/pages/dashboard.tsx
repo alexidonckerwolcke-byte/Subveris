@@ -62,7 +62,7 @@ function getUpcomingRenewals(subscriptions: Subscription[] = []) {
 }
 
 export default function Dashboard() {
-  const { formatAmount, convertAmount } = useCurrency();
+  const { formatAmount, convertAmount, currency: displayCurrency } = useCurrency();
   const { user } = useAuth();
   const { familyGroupId, showFamilyData, isFamilyGroupOwner } = useFamilyDataMode();
   const [, navigate] = useLocation();
@@ -139,7 +139,11 @@ export default function Dashboard() {
     ? familyData.byCategory
     : categorySpending;
 
-  const normalizedMonthlySpending = normalizeMonthlySpendingSeries(monthlySpendingData, 6);
+  const normalizedMonthlySpending = normalizeMonthlySpendingSeries(
+    monthlySpendingData,
+    6,
+    familyAwareMode ? familyData?.timeZone : undefined,
+  );
 
   const familyCurrentMonthSpend = useMemo(() => {
     if (!familyAwareMode) return 0;
@@ -202,8 +206,10 @@ export default function Dashboard() {
     (sub) => sub?.isDetected === true || (sub as any)?.is_detected === true
   ).length;
   const potentialSavings = useMemo(
-    () => calculatePotentialSavings(subscriptions || []),
-    [subscriptions]
+    () => calculatePotentialSavings(subscriptions || [], (amount, fromCurrency) =>
+      convertAmount(amount, (fromCurrency || "USD") as any, displayCurrency)
+    ),
+    [subscriptions, convertAmount, displayCurrency]
   );
   const unusedSubscriptionCount = metrics?.unusedSubscriptions ?? 0;
   const averageSubscriptionCost = activeSubscriptions > 0 ? Math.round((totalMonthlySpend / activeSubscriptions) * 100) / 100 : 0;

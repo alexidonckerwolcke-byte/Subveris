@@ -302,7 +302,7 @@ export function FamilySharing() {
   console.log('[FamilySharing] sharedIdsSet:', Array.from(sharedIdsSet));
 
   // Compute simple metrics client-side as a fallback when server doesn't provide precomputed metrics
-  const familyMetrics: FamilyMetrics = computeFamilyMetrics(familyData);
+  const familyMetrics: FamilyMetrics = computeFamilyMetrics(familyData, familyData?.timeZone);
   // whichever metrics object we display (server may eventually add metrics to the
   // family-data payload, so prefer that with a fallback to our computed values)
   const displayMetrics = familyData?.metrics ?? familyMetrics;
@@ -1135,7 +1135,8 @@ export function FamilySharing() {
                   ) : (
                     <CostPerUse
                       analyses={computeCostPerUseFromSubs(
-                        memberData.subscriptions.filter((s: any) => s && !isSubscriptionDeleted(s))
+                        memberData.subscriptions.filter((s: any) => s && !isSubscriptionDeleted(s)),
+                        familyData?.timeZone
                       )}
                       isLoading={false}
                     />

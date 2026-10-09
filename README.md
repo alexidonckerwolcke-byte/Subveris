@@ -216,11 +216,13 @@ The application automatically manages subscription statuses based on monthly usa
 
 ### Setting up Cron Job
 
-To set up automatic monthly status updates, add this to your crontab (run `crontab -e`):
+The repository includes a GitHub Actions workflow that purges deleted subscriptions at 00:05 local time in `Europe/Brussels` on the first day of each month, including CET/CEST changes. Since GitHub Actions cron is UTC-only, the workflow has two UTC trigger candidates and the cleanup script proceeds only when the configured local clock is on day 1 at hour 00. Configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the GitHub `production` environment. The workflow can also be run manually from the Actions tab.
+
+For a self-hosted deployment, add this to your crontab (run `crontab -e`) and ensure the host timezone is set to the timezone you want the cleanup to follow:
 
 ```bash
-# Run subscription status updates at 11:59 PM on the last day of every month
-59 23 L * * /path/to/subveris-2/cron-update-statuses.sh
+# Purge subscriptions deleted before the current local month
+5 0 1 * * /path/to/subveris-2/cron-update-statuses.sh
 ```
 
 Or run manually:

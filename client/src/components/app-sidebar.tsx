@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/lib/currency-context";
 import { PER_PAGE } from "@/lib/constants";
+import { getLocalDateQueryParams, getLocalMonthBounds, getLocalMonthKey } from "@/lib/savings-month";
 import {
   LayoutDashboard,
   CreditCard,
@@ -33,10 +34,6 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-
-function getLocalMonthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
 
 const mainNavItems = [
   {
@@ -119,7 +116,7 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
 
   useEffect(() => {
     const now = new Date();
-    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const nextMonthStart = getLocalMonthBounds(now).nextMonthStart;
     const timeoutId = window.setTimeout(() => {
       setCurrentMonthKey(getLocalMonthKey(new Date()));
     }, nextMonthStart.getTime() - now.getTime() + 1);
@@ -175,8 +172,8 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
           url: `/api/analysis/cost-per-use?familyGroupId=${familyGroupId}`,
         },
         {
-          queryKey: ["/api/analytics/monthly-savings", "family", new Date().toISOString().slice(0, 7)],
-          url: "/api/analytics/monthly-savings?family=true",
+          queryKey: ["/api/analytics/monthly-savings", true, currentMonthKey],
+          url: `/api/analytics/monthly-savings?family=true&${getLocalDateQueryParams()}`,
         },
         {
           queryKey: ["/api/spending/monthly", true],
@@ -218,7 +215,7 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
     }));
 
     void Promise.all(routeQueries);
-  }, [familyGroupId, queryClient, user?.id]);
+  }, [currentMonthKey, familyGroupId, queryClient, user?.id]);
 
   useQuery({
     queryKey: ["/api/subscriptions"],
@@ -246,10 +243,8 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
     queryKey: ["/api/analytics/monthly-savings", showFamilyData, currentMonthKey],
     enabled: !!user?.id,
     queryFn: async () => {
-      let url = "/api/analytics/monthly-savings";
-      if (showFamilyData) {
-        url += "?family=true";
-      }
+      const familyParam = showFamilyData ? "family=true&" : "";
+      const url = `/api/analytics/monthly-savings?${familyParam}${getLocalDateQueryParams()}`;
       const response = await apiRequest("GET", url);
       return await response.json();
     },

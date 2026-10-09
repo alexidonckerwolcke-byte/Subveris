@@ -889,9 +889,11 @@ function sendUsageTracking(domain, timeSpent, serviceName, serviceUrl, callback 
     }
 
     updateZeroUsageSignal(domain, timeSpent, (isZeroUsage) => {
-      browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl'], (result) => {
+      browser.storage.local.get(['authToken', 'supabaseAuthToken', 'subverisApiUrl', 'accountTimeZone'], (result) => {
         const token = result.supabaseAuthToken || result.authToken;
         const apiUrl = result.subverisApiUrl || DEFAULT_API_URL;
+        const accountTimeZone = result.accountTimeZone || 'UTC';
+        const timeZoneQuery = `timeZone=${encodeURIComponent(accountTimeZone)}`;
 
         if (!token) {
           console.error('[Background] ❌ No auth token found for TRACK_USAGE');
@@ -909,9 +911,9 @@ function sendUsageTracking(domain, timeSpent, serviceName, serviceUrl, callback 
         });
 
         const usageTrackingEndpoints = [
-          { key: 'EXTENSION_USAGE_SYNC', url: `${apiUrl}/api/extension/usage-sync` },
-          { key: 'LEGACY_TRACK_USAGE', url: `${apiUrl}/api/track-usage-for-all-members` },
-          { key: 'TRACK_USAGE_FALLBACK', url: `${apiUrl}/api/track-usage-by-domain` }
+          { key: 'EXTENSION_USAGE_SYNC', url: `${apiUrl}/api/extension/usage-sync?${timeZoneQuery}` },
+          { key: 'LEGACY_TRACK_USAGE', url: `${apiUrl}/api/track-usage-for-all-members?${timeZoneQuery}` },
+          { key: 'TRACK_USAGE_FALLBACK', url: `${apiUrl}/api/track-usage-by-domain?${timeZoneQuery}` }
         ];
 
         const tryUsageTrackingEndpoint = (index) => {

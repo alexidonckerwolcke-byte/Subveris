@@ -1,4 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
+import {
+  getZonedDateParts,
+  getZonedLocalDateTime,
+  getZonedMonthKey,
+  getZonedMonthBounds,
+  isValidTimeZone,
+} from "../../../shared/month-boundary.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -350,15 +357,28 @@ function toIsoDateString(value: Date): string {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
 }
 
-function getBillingMonth(value: Date): string {
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
+function getBillingMonth(value: Date, timeZone = "UTC"): string {
+  return getZonedMonthKey(value, timeZone);
 }
 
-function getLocalMonthRange(now: Date) {
+function getLocalMonthRange(now: Date, timeZone?: string) {
+  if (timeZone && isValidTimeZone(timeZone)) {
+    const { year, month, day } = getZonedDateParts(now, timeZone);
+    const monthStart = getZonedLocalDateTime(year, month - 1, 1, timeZone);
+    const nextMonthStart = getZonedLocalDateTime(year, month, 1, timeZone);
+    const today = getZonedLocalDateTime(year, month - 1, day, timeZone);
+    return { monthStart, monthEnd: new Date(nextMonthStart.getTime() - 1), today };
+  }
+
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   return { monthStart, monthEnd, today };
+}
+
+function getRequestTimeZone(url: URL): string | undefined {
+  const timeZone = url.searchParams.get("timeZone");
+  return isValidTimeZone(timeZone) ? timeZone : undefined;
 }
 
 async function sendZeroUsageAlertEmail(userId: string, domain: string): Promise<void> {
@@ -606,7 +626,7 @@ export function normalizeSubscriptionDate(sub: any): string | null {
     null
   );
   const dateStr = date instanceof Date ? date.toISOString() : (typeof date === 'string' ? date : null);
-  return dateStr && dateStr.trim() !== '' ? dateStr : null;
+    return dateStr && dateStr.trim() !== '' ? dateStr.split("T")[0] : null;
 }
 
 function normalizeSubscriptionStatus(status: any): string {
@@ -632,21 +652,44 @@ function isSubscriptionVisible(sub: any): boolean {
   return status === 'active' || status === 'unused' || status === 'to-cancel';
 }
 
-function isSubscriptionBilledInCurrentMonth(sub: any, now: Date, renewalDate?: Date): boolean {
-  const renewal = renewalDate ?? toDateOnlyLocal(normalizeSubscriptionDate(sub) || '');
-  if (!renewal) return false;
-
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  const renewalDay = toDateOnlyLocal(renewal);
-
-  if (!renewalDay) return false;
-  if (renewalDay < monthStart) return false;
-  if (renewalDay > monthEnd) return false;
-  return renewalDay <= now;
+function getSubscriptionDateKey(value: string | Date | null | undefined, timeZone: string): string | null {
+  if (!value) return null;
+  const dateOnlyMatch = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (dateOnlyMatch) return dateOnlyMatch[1];
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : getZonedDateString(parsed, timeZone);
 }
 
-function calculateTotalMonthlySpending(subscriptions: any[], monthStart: Date, monthEnd: Date, now: Date): number {
+function isSubscriptionBilledInCurrentMonth(
+  sub: any,
+  now: Date,
+  renewalDate?: Date,
+  timeZone = "UTC",
+): boolean {
+  const monthKey = getZonedMonthKey(now, timeZone);
+  const todayKey = getZonedDateString(now, timeZone);
+  const renewalDayKey = getSubscriptionDateKey(normalizeSubscriptionDate(sub) || renewalDate, timeZone);
+  if (!renewalDayKey) return false;
+
+  const monthStartKey = `${monthKey}-01`;
+  const monthParts = getZonedDateParts(now, timeZone);
+  const nextMonthKey = getZonedMonthKey(getZonedLocalDateTime(monthParts.year, monthParts.month, 1, timeZone), timeZone);
+  const nextMonthStartKey = `${nextMonthKey}-01`;
+  const billingMonth = getSubscriptionBillingMonth(sub);
+
+  if (billingMonth === monthKey) {
+    return renewalDayKey <= todayKey || renewalDayKey >= nextMonthStartKey;
+  }
+    return renewalDayKey >= monthStartKey && renewalDayKey < nextMonthStartKey && renewalDayKey <= todayKey.split("T")[0];
+}
+
+function calculateTotalMonthlySpending(
+  subscriptions: any[],
+  monthStart: Date,
+  monthEnd: Date,
+  now: Date,
+  timeZone = "UTC",
+): number {
   const renewalRelevantSubs = subscriptions.filter((sub: any) => {
     const status = normalizeSubscriptionStatus(sub.status);
     return (
@@ -660,10 +703,7 @@ function calculateTotalMonthlySpending(subscriptions: any[], monthStart: Date, m
     const renewalDateStr = normalizeSubscriptionDate(sub);
     if (!renewalDateStr) return sum;
 
-    const renewalDate = toDateOnlyLocal(renewalDateStr);
-    if (!renewalDate) return sum;
-
-    if (!isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, true, renewalDate)) {
+    if (!isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, true, undefined, timeZone)) {
       return sum;
     }
 
@@ -672,8 +712,8 @@ function calculateTotalMonthlySpending(subscriptions: any[], monthStart: Date, m
   }, 0);
 }
 
-function formatBillingMonth(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+function formatBillingMonth(date: Date, timeZone = "UTC"): string {
+  return getZonedMonthKey(date, timeZone);
 }
 
 function formatDateLocal(date: Date): string {
@@ -694,38 +734,26 @@ export function isSubscriptionBilledInMonth(
   monthEnd: Date,
   now: Date,
   isCurrentMonth: boolean,
-  renewalDate?: Date
+  renewalDate?: Date,
+  timeZone = "UTC",
 ): boolean {
-  const targetMonth = formatBillingMonth(monthStart);
+  const targetMonth = formatBillingMonth(monthStart, timeZone);
   const billingMonth = getSubscriptionBillingMonth(sub);
-  const monthStartDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), 1);
-  const monthEndDate = new Date(monthEnd.getFullYear(), monthEnd.getMonth() + 1, 0, 23, 59, 59, 999);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  let renewal: Date | undefined = renewalDate;
-  if (!renewal) {
-    const renewalDateStr = normalizeSubscriptionDate(sub);
-    if (!renewalDateStr) return false;
-    renewal = parseSubscriptionDate(renewalDateStr) || undefined;
-  }
-
-  if (!renewal || isNaN(renewal.getTime())) {
-    return false;
-  }
-
-  const renewalDay = toDateOnlyLocal(renewal);
-  if (!renewalDay) return false;
+  const renewalDayKey = getSubscriptionDateKey(normalizeSubscriptionDate(sub) || renewalDate, timeZone);
+  if (!renewalDayKey) return false;
+  const monthStartKey = `${targetMonth}-01`;
+  const monthParts = getZonedDateParts(monthStart, timeZone);
+  const nextMonthKey = getZonedMonthKey(getZonedLocalDateTime(monthParts.year, monthParts.month, 1, timeZone), timeZone);
+  const nextMonthStartKey = `${nextMonthKey}-01`;
+  const todayKey = getZonedDateString(now, timeZone);
 
   if (billingMonth === targetMonth) {
     if (!isCurrentMonth) return true;
-    if (renewalDay <= today) return true;
-    if (renewalDay > monthEndDate) return true;
-    return false;
+    return renewalDayKey <= todayKey || renewalDayKey >= nextMonthStartKey;
   }
 
-  if (renewalDay < monthStartDate) return false;
-  if (renewalDay > monthEndDate) return false;
-  return isCurrentMonth ? renewalDay <= today : true;
+  if (renewalDayKey < monthStartKey || renewalDayKey >= nextMonthStartKey) return false;
+  return isCurrentMonth ? renewalDayKey <= todayKey : true;
 }
 
 export function isSubscriptionScheduledInMonth(
@@ -735,28 +763,37 @@ export function isSubscriptionScheduledInMonth(
   now: Date,
   isCurrentMonth: boolean,
   renewalDate: Date,
+  timeZone = "UTC",
 ): boolean {
-  const renewalDay = toDateOnlyLocal(renewalDate);
-  if (!renewalDay || renewalDay > monthEnd) return false;
+  const renewalDayKey = getSubscriptionDateKey(normalizeSubscriptionDate(sub) || renewalDate, timeZone);
+  if (!renewalDayKey) return false;
+  const monthKey = formatBillingMonth(monthStart, timeZone);
+  const monthStartKey = `${monthKey}-01`;
+  const monthParts = getZonedDateParts(monthStart, timeZone);
+  const nextMonthKey = getZonedMonthKey(getZonedLocalDateTime(monthParts.year, monthParts.month, 1, timeZone), timeZone);
+  const nextMonthStartKey = `${nextMonthKey}-01`;
+  const monthEndKey = `${monthKey}-${String(new Date(Date.UTC(monthParts.year, monthParts.month, 0)).getUTCDate()).padStart(2, "0")}`;
+  if (renewalDayKey > monthEndKey) return false;
 
   const createdAt = sub.created_at || sub.createdAt;
   if (createdAt) {
-    const createdDate = toDateOnlyLocal(createdAt);
-    if (createdDate && createdDate > monthEnd) return false;
+    const createdDateKey = getSubscriptionDateKey(createdAt, timeZone);
+    if (createdDateKey && createdDateKey >= nextMonthStartKey) return false;
   }
 
-  if (isCurrentMonth && renewalDay > now) return false;
+  if (isCurrentMonth && renewalDayKey > getZonedDateString(now, timeZone)) return false;
 
   const frequency = String(sub.frequency || 'monthly').toLowerCase();
   if (frequency === 'weekly') return true;
   if (frequency === 'monthly') return true;
 
-  const renewalMonth = renewalDay.getFullYear() * 12 + renewalDay.getMonth();
-  const targetMonth = monthStart.getFullYear() * 12 + monthStart.getMonth();
+  const [renewalYear, renewalMonthNumber] = renewalDayKey.slice(0, 7).split("-").map(Number);
+  const renewalMonth = renewalYear * 12 + renewalMonthNumber - 1;
+  const targetMonth = monthParts.year * 12 + monthParts.month - 1;
   const monthsSinceRenewal = targetMonth - renewalMonth;
   if (frequency === 'quarterly') return monthsSinceRenewal % 3 === 0;
   if (frequency === 'yearly' || frequency === 'annual') return monthsSinceRenewal % 12 === 0;
-  return isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate);
+  return isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate, timeZone);
 }
 
 function getNestedFamilyGroup(m: any) {
@@ -936,17 +973,28 @@ function getRequestOffsetMinutes(url: URL): number {
   return Number.isFinite(offset) ? offset : 0;
 }
 
-function getMonthlySpendingBuckets(now: Date, monthsBack = 6): Array<{ monthStart: Date; monthEnd: Date; monthLabel: string; isCurrentMonth: boolean }> {
+function getMonthlySpendingBuckets(now: Date, monthsBack = 6, timeZone?: string): Array<{ monthStart: Date; monthEnd: Date; monthLabel: string; isCurrentMonth: boolean }> {
   const buckets: Array<{ monthStart: Date; monthEnd: Date; monthLabel: string; isCurrentMonth: boolean }> = [];
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const currentParts = timeZone && isValidTimeZone(timeZone)
+    ? getZonedDateParts(now, timeZone)
+    : { year: now.getFullYear(), month: now.getMonth() + 1 };
 
   for (let i = monthsBack; i >= 0; i--) {
-    const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+    const monthIndex = currentParts.month - 1 - i;
+    const bucketYear = currentParts.year + Math.floor(monthIndex / 12);
+    const normalizedMonthIndex = ((monthIndex % 12) + 12) % 12;
+    const monthStart = timeZone && isValidTimeZone(timeZone)
+      ? getZonedLocalDateTime(bucketYear, normalizedMonthIndex, 1, timeZone)
+      : new Date(bucketYear, normalizedMonthIndex, 1);
+    const nextMonthStart = timeZone && isValidTimeZone(timeZone)
+      ? getZonedLocalDateTime(bucketYear, normalizedMonthIndex + 1, 1, timeZone)
+      : new Date(bucketYear, normalizedMonthIndex + 1, 1);
+    const monthEnd = new Date(nextMonthStart.getTime() - 1);
     buckets.push({
       monthStart,
       monthEnd,
-      monthLabel: `${monthNames[monthStart.getMonth()]} ${monthStart.getFullYear()}`,
+      monthLabel: `${monthNames[normalizedMonthIndex]} ${bucketYear}`,
       isCurrentMonth: i === 0,
     });
   }
@@ -955,6 +1003,10 @@ function getMonthlySpendingBuckets(now: Date, monthsBack = 6): Array<{ monthStar
 }
 
 function getRequestLocalNow(url: URL): Date {
+  if (getRequestTimeZone(url)) {
+    return new Date();
+  }
+
   const localDate = url.searchParams.get("localDate");
   if (localDate) {
     const parsedLocalDate = toDateOnlyLocal(localDate);
@@ -1121,7 +1173,7 @@ function buildSubscriptionTotals(subscriptions: any[]) {
       return sum;
     }
 
-    if (isSubscriptionBilledInMonth(sub, new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999), now, true, nextBilling)) {
+    if (isSubscriptionBilledInMonth(sub, new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999), now, true, nextBilling, "UTC")) {
       const amount = Number(sub.amount) || 0;
       const frequency = (sub.frequency || "monthly").toLowerCase();
       const monthlyAmount = frequency === "yearly"
@@ -1315,7 +1367,7 @@ async function isUserFamilyGroupOwnerForSubscription(userId: string, memberUserI
   return !membershipError && Array.isArray(membership) && membership.length > 0;
 }
 
-async function updateSubscription(userId: string, subscriptionId: string, updates: any) {
+async function updateSubscription(userId: string, subscriptionId: string, updates: any, timeZone = "UTC") {
   console.log('[API] updateSubscription owner check', { userId, subscriptionId });
   const subscription = await getSubscriptionById(userId, subscriptionId);
   if (!subscription) {
@@ -1337,7 +1389,7 @@ async function updateSubscription(userId: string, subscriptionId: string, update
     console.warn('[API] Failed to delete stored renewal calendar events', { subscriptionId, userId, err });
   }
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = getBillingMonth(new Date(), timeZone);
   const normalizedUpdates = { ...updates };
   if (normalizedUpdates.monthly_usage_count !== undefined || normalizedUpdates.usage_month !== undefined) {
     const currentUsageMonth = normalizedUpdates.usage_month || currentMonth;
@@ -1462,7 +1514,7 @@ async function deleteSubscription(userId: string, subscriptionId: string) {
   return true;
 }
 
-async function incrementSubscriptionUsageCount(userId: string, subscriptionId: string) {
+async function incrementSubscriptionUsageCount(userId: string, subscriptionId: string, timeZone = "UTC") {
   const subscription = await getSubscriptionById(userId, subscriptionId);
   if (!subscription) {
     return null;
@@ -1480,7 +1532,7 @@ async function incrementSubscriptionUsageCount(userId: string, subscriptionId: s
 
   const currentUsage = Number((data as any)?.usage_count || 0);
   const currentMonthly = Number((data as any)?.monthly_usage_count || 0);
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = getBillingMonth(new Date(), timeZone);
 
   let nextMonthly = currentMonthly + 1;
   let usageMonth = (data as any)?.usage_month || currentMonth;
@@ -1493,20 +1545,20 @@ async function incrementSubscriptionUsageCount(userId: string, subscriptionId: s
     usage_count: currentUsage + 1,
     monthly_usage_count: nextMonthly,
     usage_month: usageMonth,
-    last_used_at: new Date().toISOString().split("T")[0],
+    last_used_at: new Date().toISOString(),
   };
 
   if (currentUsage + 1 > 0) {
     updates.status = "active";
   }
 
-  return updateSubscription(userId, subscriptionId, updates);
+  return updateSubscription(userId, subscriptionId, updates, timeZone);
 }
 
-function buildCostPerUseAnalysis(subscriptions: any[]) {
-  const currentMonth = getBillingMonth(new Date());
+function buildCostPerUseAnalysis(subscriptions: any[], timeZone = "UTC") {
+  const currentMonth = getBillingMonth(new Date(), timeZone);
   return (subscriptions || [])
-    .filter(sub => sub && sub.status !== 'deleted')
+    .filter(sub => sub && !isSubscriptionDeleted(sub))
     .map((sub: any) => {
     const amount = Number(sub.amount) || 0;
     const frequency = (sub.frequency || "monthly").toLowerCase();
@@ -1711,6 +1763,19 @@ runtimeDeno?.serve?.(async (req: Request) => {
     pathname = pathname.replace(/\/+$/, "") || "/";
     if (pathname === "") {
       pathname = "/";
+    }
+
+    const requestUserId = extractUserId(req);
+    if (requestUserId && !req.headers.get("x-test-user-id")) {
+      let accountTimeZone = "UTC";
+      try {
+        const { data: authData, error: authError } = await supabase.auth.admin.getUserById(requestUserId);
+        const savedTimeZone = authData?.user?.user_metadata?.timezone;
+        if (!authError && isValidTimeZone(savedTimeZone)) accountTimeZone = savedTimeZone;
+      } catch (error) {
+        console.warn("[API] Could not load account timezone; using UTC.", error);
+      }
+      url.searchParams.set("timeZone", accountTimeZone);
     }
 
     if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
@@ -2489,7 +2554,9 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
-        const currentMonth = new Date().toISOString().slice(0, 7);
+        const timeZone = getRequestTimeZone(url) || "UTC";
+        const now = new Date();
+        const currentMonth = getBillingMonth(now, timeZone);
         const existing = await getSubscriptionById(userId, subscriptionId);
         const existingMonth = (existing as any)?.usage_month || null;
         const normalizedMonthlyUsageCount = existingMonth === currentMonth
@@ -2499,8 +2566,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
           usage_count: normalizedMonthlyUsageCount,
           monthly_usage_count: normalizedMonthlyUsageCount,
           usage_month: currentMonth,
-          last_used_at: new Date().toISOString().split("T")[0],
-        });
+          last_used_at: now.toISOString(),
+        }, timeZone);
         return sendJson(updated || { success: true });
       } catch (err) {
         console.error("Error updating subscription usage:", err);
@@ -2524,7 +2591,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
-        const updated = await incrementSubscriptionUsageCount(userId, subscriptionId);
+        const updated = await incrementSubscriptionUsageCount(userId, subscriptionId, getRequestTimeZone(url) || "UTC");
         return sendJson(updated || { success: true });
       } catch (err) {
         console.error("Exception logging subscription usage:", err);
@@ -3392,11 +3459,11 @@ runtimeDeno?.serve?.(async (req: Request) => {
             status: "detected_pending_verification",
             usage_count: 0,
             monthly_usage_count: 0,
-            usage_month: getBillingMonth(now),
+            usage_month: getBillingMonth(now, getRequestTimeZone(url) || "UTC"),
             last_used_at: null,
             is_detected: true,
             website_domain: normalizedDiscoveredDomain,
-            billing_month: getBillingMonth(now),
+            billing_month: getBillingMonth(now, getRequestTimeZone(url) || "UTC"),
             description: detectedPlanName
               ? `Auto-discovered from extension scan: ${detectedPlanName}`
               : detectedServiceName
@@ -3488,7 +3555,8 @@ runtimeDeno?.serve?.(async (req: Request) => {
           const detectedBillingCycle = normalizeBillingCycle(body.detectedBillingCycle ?? body.billingCycle ?? null);
           const detectedRenewalDate = normalizeRenewalDate(body.detectedRenewalDate ?? body.nextRenewalDate ?? null);
 
-          const currentMonth = new Date().toISOString().slice(0, 7);
+          const timeZone = getRequestTimeZone(url) || "UTC";
+          const currentMonth = getBillingMonth(new Date(), timeZone);
           const currentMonthlyUsage = matchingSubscription.usage_month === currentMonth
             ? Number(matchingSubscription.monthly_usage_count || 0)
             : 0;
@@ -4165,7 +4233,7 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       const now = getRequestLocalNow(url);
-      const { monthStart, monthEnd } = getLocalMonthRange(now);
+      const { monthStart, monthEnd } = getLocalMonthRange(now, getRequestTimeZone(url));
       
       const allSubs: any[] = data || [];
       const activeSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.status) === "active");
@@ -4181,7 +4249,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       // Also includes subscriptions that have already renewed in this month (created_at day has passed).
       const dayOfMonth = now.getDate();
       
-      const totalCost = calculateTotalMonthlySpending(allSubs, monthStart, monthEnd, now);
+      const totalCost = calculateTotalMonthlySpending(allSubs, monthStart, monthEnd, now, getRequestTimeZone(url) || "UTC");
 
       // Potential savings are from unused and to-cancel subscriptions (if cancelled)
       const potentialSavings = [...unusedSubs, ...toCancelSubs].reduce((sum, s) => {
@@ -6148,6 +6216,19 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           const ownerIds = new Set((groupOwners || []).map((group: any) => String(group.owner_id)));
           const isOwner = ownerIds.has(String(userId));
 
+          if (familyMode && groupOwners?.length) {
+            const reportOwnerId = groupOwners.find((group: any) => String(group.owner_id) === String(userId))?.owner_id
+              || groupOwners[0].owner_id;
+            try {
+              const { data: ownerData, error: ownerError } = await supabase.auth.admin.getUserById(String(reportOwnerId));
+              const ownerTimeZone = ownerData?.user?.user_metadata?.timezone;
+              url.searchParams.set("timeZone", !ownerError && isValidTimeZone(ownerTimeZone) ? ownerTimeZone : "UTC");
+            } catch (error) {
+              console.warn("[spending/monthly] Could not load family owner timezone; using UTC.", error);
+              url.searchParams.set("timeZone", "UTC");
+            }
+          }
+
           const memberIds = Array.from(new Set([
             userId,
             ...(groupMembers || []).map((member: any) => member.user_id),
@@ -6208,7 +6289,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
 
         console.log(`[spending/monthly] Current date: ${now.toISOString()} (offsetMinutes=${offsetMinutes})`);
 
-        const monthBuckets = getMonthlySpendingBuckets(now, 6);
+        const monthBuckets = getMonthlySpendingBuckets(now, 6, getRequestTimeZone(url));
         for (const bucket of monthBuckets) {
           const { monthStart, monthEnd, monthLabel, isCurrentMonth } = bucket;
 
@@ -6241,7 +6322,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
             }
 
             let includeInMonthlySpend = false;
-            if (isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate)) {
+            if (isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate, getRequestTimeZone(url) || "UTC")) {
               includeInMonthlySpend = true;
               if (isCurrentMonth) {
                 console.log(`[spending/monthly] Include ${sub.name} (${renewalDateStr}): renews today or earlier in current month or already billed month`);
@@ -6547,6 +6628,15 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           return sendJson({ error: 'Family sharing not enabled for this group' }, { status: 403 });
         }
 
+        try {
+          const { data: ownerAuthData, error: ownerAuthError } = await supabase.auth.admin.getUserById(String(groupRow.owner_id));
+          const ownerTimeZone = ownerAuthData?.user?.user_metadata?.timezone;
+          url.searchParams.set("timeZone", !ownerAuthError && isValidTimeZone(ownerTimeZone) ? ownerTimeZone : "UTC");
+        } catch (error) {
+          console.warn("[Cost Per Use] Could not load family owner timezone; using UTC.", error);
+          url.searchParams.set("timeZone", "UTC");
+        }
+
         if (isOwner) {
           const { data: members, error: membersError } = await supabase
             .from("family_group_members")
@@ -6620,7 +6710,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         subscriptions = userSubs;
       }
 
-      const analysis = buildCostPerUseAnalysis(subscriptions)
+      const analysis = buildCostPerUseAnalysis(subscriptions, getRequestTimeZone(url) || "UTC")
         .sort((a, b) => (b.costPerUse || 0) - (a.costPerUse || 0))
         .slice(0, 12);
 
@@ -6639,15 +6729,63 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       const query = new URL(req.url).searchParams;
       const familyMode = query.get("family") === "true";
 
+      let timeZone = getRequestTimeZone(url);
+      if (familyMode) {
+        const { data: ownedGroup } = await supabase
+          .from("family_groups")
+          .select("owner_id")
+          .eq("owner_id", userId)
+          .limit(1)
+          .maybeSingle();
+        let familyOwnerId = ownedGroup?.owner_id;
+
+        if (!familyOwnerId) {
+          const { data: membership } = await supabase
+            .from("family_group_members")
+            .select("family_groups(owner_id)")
+            .eq("user_id", userId)
+            .limit(1)
+            .maybeSingle();
+          familyOwnerId = getNestedFamilyGroup(membership)?.owner_id;
+        }
+
+        if (familyOwnerId) {
+          try {
+            const { data: ownerData, error: ownerError } = await supabase.auth.admin.getUserById(String(familyOwnerId));
+            const ownerTimeZone = ownerData?.user?.user_metadata?.timezone;
+            timeZone = !ownerError && isValidTimeZone(ownerTimeZone) ? ownerTimeZone : "UTC";
+            url.searchParams.set("timeZone", timeZone);
+          } catch (error) {
+            console.warn("[Monthly Savings] Could not load family owner timezone; using UTC.", error);
+            timeZone = "UTC";
+            url.searchParams.set("timeZone", timeZone);
+          }
+        }
+      }
+
       const today = getRequestLocalNow(url);
-      const { monthStart, monthEnd } = getLocalMonthRange(today);
+      const localDateMatch = /^(\d{4})-(\d{2})-\d{2}$/.exec(query.get("localDate") || "");
+      const year = localDateMatch ? Number(localDateMatch[1]) : today.getFullYear();
+      const month = localDateMatch ? Number(localDateMatch[2]) - 1 : today.getMonth();
+      const fallbackOffset = getRequestOffsetMinutes(url);
+      const parsedStartOffset = Number(query.get("monthStartOffsetMinutes"));
+      const parsedNextOffset = Number(query.get("nextMonthOffsetMinutes"));
+      const monthStartOffset = Number.isFinite(parsedStartOffset) ? parsedStartOffset : fallbackOffset;
+      const nextMonthOffset = Number.isFinite(parsedNextOffset) ? parsedNextOffset : fallbackOffset;
+      const zonedMonthBounds = timeZone ? getZonedMonthBounds(today, timeZone) : null;
+      const monthStart = zonedMonthBounds?.monthStart ?? (localDateMatch
+        ? new Date(Date.UTC(year, month, 1) + monthStartOffset * 60 * 1000)
+        : getLocalMonthRange(today).monthStart);
+      const nextMonthStart = zonedMonthBounds?.nextMonthStart ?? (localDateMatch
+        ? new Date(Date.UTC(year, month + 1, 1) + nextMonthOffset * 60 * 1000)
+        : new Date(today.getFullYear(), today.getMonth() + 1, 1));
 
       const normalizeStatus = (status: any) => String(status || '').trim().toLowerCase();
       const isInCurrentMonth = (timestamp: string | undefined | null) => {
         if (!timestamp) return false;
         const parsed = new Date(timestamp);
         if (Number.isNaN(parsed.getTime())) return false;
-        return parsed >= monthStart && parsed < monthEnd;
+        return parsed >= monthStart && parsed < nextMonthStart;
       };
 
       let subscriptions: any[] = [];
@@ -6696,7 +6834,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
 
           const { data: subs, error } = await supabase
             .from("subscriptions")
-            .select("amount, currency, frequency, deleted_at, updated_at, status, user_id")
+            .select("amount, currency, frequency, deleted_at, canceled_at, cancellation_confirmed_at, status, user_id")
             .in("user_id", memberIds);
 
           if (error) {
@@ -6708,7 +6846,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         } else {
           const { data: subs, error } = await supabase
             .from("subscriptions")
-            .select("amount, currency, frequency, deleted_at, updated_at, status, user_id")
+            .select("amount, currency, frequency, deleted_at, canceled_at, cancellation_confirmed_at, status, user_id")
             .eq("user_id", userId);
 
           if (error) {
@@ -6721,7 +6859,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       } else {
         const { data: subs, error } = await supabase
           .from("subscriptions")
-          .select("amount, currency, frequency, deleted_at, updated_at, status, user_id")
+          .select("amount, currency, frequency, deleted_at, canceled_at, cancellation_confirmed_at, status, user_id")
           .eq("user_id", userId);
 
         if (error) {
@@ -6737,7 +6875,8 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
 
       for (const sub of subscriptions) {
         if (!isSubscriptionDeleted(sub)) continue;
-        if (!isInCurrentMonth(sub.deleted_at || sub.updated_at)) continue;
+        const savingsEventAt = sub.deleted_at || sub.cancellation_confirmed_at || sub.canceled_at;
+        if (!isInCurrentMonth(savingsEventAt)) continue;
 
         const monthlyAmount = convertToUSD(
           calculateMonthlyCost(Number(sub.amount) || 0, sub.frequency),
@@ -6893,6 +7032,16 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
 
       const memberIds = Array.from(new Set([ownerId, ...(members || []).map((m: any) => String(m.user_id))]));
 
+      let familyTimeZone = "UTC";
+      try {
+        const { data: ownerAuthData, error: ownerAuthError } = await supabase.auth.admin.getUserById(ownerId);
+        const savedOwnerTimeZone = ownerAuthData?.user?.user_metadata?.timezone;
+        if (!ownerAuthError && isValidTimeZone(savedOwnerTimeZone)) familyTimeZone = savedOwnerTimeZone;
+      } catch (error) {
+        console.warn("[Family Data] Could not load family owner timezone; using UTC.", error);
+      }
+      url.searchParams.set("timeZone", familyTimeZone);
+
       if (!showFamilyData && isOwner) {
         const { data: personalSubscriptions, error: personalSubsError } = await supabase
           .from("subscriptions")
@@ -6941,18 +7090,21 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           });
         }
 
-        const today = new Date();
-        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        const now = getRequestLocalNow(url);
+        const { monthStart, nextMonthStart } = getZonedMonthBounds(now, familyTimeZone);
         const thisMonthSavings = deletedSubscriptions
-          .filter((s: any) => s.deleted_at && new Date(s.deleted_at) >= monthStart && new Date(s.deleted_at) <= today)
+          .filter((s: any) => {
+            if (!s.deleted_at) return false;
+            const deletedAt = new Date(s.deleted_at);
+            return !Number.isNaN(deletedAt.getTime()) && deletedAt >= monthStart && deletedAt < nextMonthStart && deletedAt <= now;
+          })
           .reduce((sum: number, s: any) => {
             const monthlyAmount = calculateMonthlyCost(Number(s.amount) || 0, s.frequency);
             return sum + convertToUSD(monthlyAmount, s.currency);
           }, 0);
 
-        const now = getRequestLocalNow(url);
         const spending: Array<{ month: string; amount: number; isCurrentMonth: boolean }> = [];
-        const monthBuckets = getMonthlySpendingBuckets(now, 6);
+        const monthBuckets = getMonthlySpendingBuckets(now, 6, getRequestTimeZone(url));
 
         for (const bucket of monthBuckets) {
           const { monthStart, monthEnd, monthLabel, isCurrentMonth } = bucket;
@@ -6969,8 +7121,8 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
             if (!renewalDate) continue;
 
             if (isCurrentMonth) {
-              if (!isSubscriptionBilledInCurrentMonth(sub, now, renewalDate)) continue;
-            } else if (!isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate)) {
+              if (!isSubscriptionBilledInCurrentMonth(sub, now, renewalDate, getRequestTimeZone(url) || "UTC")) continue;
+            } else if (!isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate, getRequestTimeZone(url) || "UTC")) {
               continue;
             }
 
@@ -7000,7 +7152,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           const renewalDate = toDateOnlyLocal(renewalDateStr);
           if (!renewalDate) continue;
 
-          if (!isSubscriptionBilledInCurrentMonth(sub, now, renewalDate)) continue;
+          if (!isSubscriptionBilledInCurrentMonth(sub, now, renewalDate, getRequestTimeZone(url) || "UTC")) continue;
 
           const monthlyAmount = calculateMonthlyCost(Number(sub.amount) || 0, sub.frequency);
           const amountUsd = convertToUSD(monthlyAmount, sub.currency);
@@ -7031,6 +7183,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           subscriptions: allSubs,
           sharedSubscriptions: [],
           members: members || [],
+          timeZone: familyTimeZone,
           isOwner,
           isMember,
           groupOwnerId: groupRow.owner_id,
@@ -7180,18 +7333,21 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         });
       }
 
-      const today = new Date();
-      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const now = getRequestLocalNow(url);
+      const { monthStart, nextMonthStart } = getZonedMonthBounds(now, familyTimeZone);
       const thisMonthSavings = deletedSubscriptions
-        .filter((s: any) => s.deleted_at && new Date(s.deleted_at) >= monthStart && new Date(s.deleted_at) <= today)
+        .filter((s: any) => {
+          if (!s.deleted_at) return false;
+          const deletedAt = new Date(s.deleted_at);
+          return !Number.isNaN(deletedAt.getTime()) && deletedAt >= monthStart && deletedAt < nextMonthStart && deletedAt <= now;
+        })
         .reduce((sum: number, s: any) => {
           const monthlyAmount = calculateMonthlyCost(Number(s.amount) || 0, s.frequency);
           return sum + convertToUSD(monthlyAmount, s.currency);
         }, 0);
 
-      const now = getRequestLocalNow(url);
       const spending: Array<{ month: string; amount: number; isCurrentMonth: boolean }> = [];
-      const monthBuckets = getMonthlySpendingBuckets(now, 6);
+      const monthBuckets = getMonthlySpendingBuckets(now, 6, getRequestTimeZone(url));
 
       for (const bucket of monthBuckets) {
         const { monthStart, monthEnd, monthLabel, isCurrentMonth } = bucket;
@@ -7207,7 +7363,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           const renewalDate = toDateOnlyLocal(renewalDateStr);
           if (!renewalDate) continue;
 
-          if (!isSubscriptionScheduledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate)) {
+          if (!isSubscriptionScheduledInMonth(sub, monthStart, monthEnd, now, isCurrentMonth, renewalDate, getRequestTimeZone(url) || "UTC")) {
             continue;
           }
 
@@ -7237,7 +7393,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         const renewalDate = toDateOnlyLocal(renewalDateStr);
         if (!renewalDate) continue;
 
-        if (!isSubscriptionBilledInCurrentMonth(sub, now, renewalDate)) continue;
+        if (!isSubscriptionBilledInCurrentMonth(sub, now, renewalDate, getRequestTimeZone(url) || "UTC")) continue;
 
         const monthlyAmount = calculateMonthlyCost(Number(sub.amount) || 0, sub.frequency);
         const amountUsd = convertToUSD(monthlyAmount, sub.currency);
@@ -7296,6 +7452,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         sharedSubscriptions: sharedSubscriptionsWithCostSplits,
         costSplits: visibleCostSplits,
         members: members || [],
+        timeZone: familyTimeZone,
         isOwner,
         isMember: true,
         groupOwnerId: groupRow.owner_id,
@@ -7384,7 +7541,6 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       }
 
       try {
-        const url = new URL(req.url);
         const familyMode = url.searchParams.get('family') === 'true';
 
         let subscriptions: any[] = [];
@@ -7400,6 +7556,19 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           const { data: groupOwners } = await supabase.from('family_groups').select('id, owner_id').in('id', groupIds);
           const ownerIds = new Set((groupOwners || []).map((group: any) => String(group.owner_id)));
           const isOwner = ownerIds.has(String(userId));
+
+          if (familyMode && groupOwners?.length) {
+            const reportOwnerId = groupOwners.find((group: any) => String(group.owner_id) === String(userId))?.owner_id
+              || groupOwners[0].owner_id;
+            try {
+              const { data: ownerData, error: ownerError } = await supabase.auth.admin.getUserById(String(reportOwnerId));
+              const ownerTimeZone = ownerData?.user?.user_metadata?.timezone;
+              url.searchParams.set("timeZone", !ownerError && isValidTimeZone(ownerTimeZone) ? ownerTimeZone : "UTC");
+            } catch (error) {
+              console.warn("[spending/category] Could not load family owner timezone; using UTC.", error);
+              url.searchParams.set("timeZone", "UTC");
+            }
+          }
 
           const memberIds = Array.from(new Set([
             userId,
@@ -7454,7 +7623,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
 
         const offsetMinutes = getRequestOffsetMinutes(url);
         const now = getRequestLocalNow(url);
-        const { monthStart, monthEnd } = getLocalMonthRange(now);
+        const { monthStart, monthEnd } = getLocalMonthRange(now, getRequestTimeZone(url));
 
         const categoryMap = new Map<string, { amount: number; count: number }>();
 
@@ -7467,7 +7636,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           const renewalDateStr = normalizeSubscriptionDate(sub);
           if (renewalDateStr) {
             const renewalDate = toLocalDateTimeInOffset(renewalDateStr, offsetMinutes);
-            if (renewalDate && isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, true, renewalDate)) {
+            if (renewalDate && isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, true, renewalDate, getRequestTimeZone(url) || "UTC")) {
               includeInSpending = true;
             }
           }

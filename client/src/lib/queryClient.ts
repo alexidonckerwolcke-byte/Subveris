@@ -1,6 +1,7 @@
 import { dehydrate, hydrate, QueryClient, QueryFunction } from "@tanstack/react-query";
 import { apiFetch, clearStoredAuthState, fetchWithRemoteFallback, resolveApiUrl, resolveAuthToken } from "./api";
 import { supabase } from "./supabase";
+import { getAccountTimeZone } from "./account-time-zone";
 
 function buildQueryPath(queryKey: unknown[]) {
   const pathSegments = queryKey
@@ -40,6 +41,12 @@ function appendLocalTimeQuery(path: string) {
 
   const result = `${path}${separator}localDate=${encodeURIComponent(localDate)}&offsetMinutes=${encodeURIComponent(String(offsetMinutes))}`;
   return result;
+}
+
+function appendAccountTimeZone(path: string) {
+  if (!path.startsWith("/api") || /(?:\?|&)timeZone=/.test(path)) return path;
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}timeZone=${encodeURIComponent(getAccountTimeZone())}`;
 }
 
 async function throwIfResNotOk(res: Response) {
@@ -120,7 +127,7 @@ export const getQueryFn: <T>(options: {
     }
 
     const queryPath = buildQueryPath(queryKey as unknown[]);
-    const queryPathWithLocal = appendLocalTimeQuery(queryPath);
+    const queryPathWithLocal = appendAccountTimeZone(appendLocalTimeQuery(queryPath));
     
     // Always use the backend API directly, don't use the client-side Supabase bridge
     // The bridge has RLS and policy issues

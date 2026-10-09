@@ -1,7 +1,8 @@
 import { calculateMonthlyCost } from "./utils";
+import { getAccountMonthKey } from "./account-time-zone";
 
 export function getSubscriptionUsageCount(sub: any): number {
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = getAccountMonthKey();
   const usageMonth = (sub?.usage_month ?? sub?.usageMonth) as string | null;
   const monthlyUsageCount = (sub?.monthly_usage_count ?? sub?.monthlyUsageCount) as number | undefined;
   const directUsageCount = (sub?.usage_count ?? sub?.usageCount) as number | undefined;

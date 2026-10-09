@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,44 +28,14 @@ import {
 } from "recharts";
 import type { DashboardMetrics, MonthlySpending, Subscription } from "@shared/schema";
 import { useCurrency, type Currency } from "@/lib/currency-context";
-import { calculateMonthlyCost, calculateMonthlySpendingSeries, isSubscriptionBilledInMonth, isSubscriptionDeleted, normalizeMonthlySpendingSeries } from "@/lib/utils";
+import { calculateMonthlyCost, calculateMonthlySpendingSeries, isSubscriptionBilledInMonth, normalizeMonthlySpendingSeries } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
 import { calculatePotentialSavings } from "@/lib/health-score";
+import { getLocalDateQueryParams, getLocalMonthBounds, getLocalMonthKey, isSubscriptionSavingsEventInCurrentMonth } from "@/lib/savings-month";
+import { getAccountTimeZone } from "@/lib/account-time-zone";
+import { getCurrentMonthFamilySpend } from "@/lib/family-metrics";
  
-function isTimestampInCurrentMonth(timestamp?: string | null) {
-  if (!timestamp) return false;
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return false;
-  const now = new Date();
-  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return date >= currentMonth && date < nextMonth;
-}
-
-function getSubscriptionDeletedTimestamp(sub: Subscription) {
-  return (
-    (sub as any).deleted_at ||
-    (sub as any).deletedAt ||
-    (sub as any).updated_at ||
-    (sub as any).updatedAt ||
-    null
-  ) as string | null;
-}
-
-function isDeletedThisMonth(sub: Subscription) {
-  if (!isSubscriptionDeleted(sub)) return false;
-  const ts = getSubscriptionDeletedTimestamp(sub);
-  if (ts) {
-    const date = new Date(ts);
-    const now = new Date();
-    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    return date >= currentMonth && date < nextMonth;
-  }
-  return true;
-}
-
 function getSubscriptionStatus(sub: Subscription) {
   return String((sub as any).status || '').trim().toLowerCase();
 }
@@ -86,7 +56,7 @@ function normalizeSubscriptionForSavings(sub: Subscription) {
 
 function computeMonthlySavingsFromSubscriptions(subscriptions: Subscription[]) {
   const ownerSavings = subscriptions
-    .filter((sub) => isDeletedThisMonth(sub))
+    .filter((sub) => isSubscriptionSavingsEventInCurrentMonth(sub))
     .reduce((total, sub) => {
       const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
       return total + monthlyAmount;
@@ -95,10 +65,15 @@ function computeMonthlySavingsFromSubscriptions(subscriptions: Subscription[]) {
   return Math.round(ownerSavings * 100) / 100;
 }
 
-function getCurrentMonthAmount(monthlyData: MonthlySpending[] | undefined) {
+function getCurrentMonthAmount(
+  monthlyData: MonthlySpending[] | undefined,
+  timeZone = getAccountTimeZone(),
+) {
   if (!monthlyData || monthlyData.length === 0) return 0;
+  const currentEntry = monthlyData.find((entry: any) => entry?.isCurrentMonth);
+  if (currentEntry) return Number(currentEntry.amount) || 0;
   const now = new Date();
-  const currentMonthLabel = now.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+  const currentMonthLabel = now.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone });
   const exactMatch = monthlyData.find((entry) => entry.month === currentMonthLabel);
   return exactMatch ? exactMatch.amount : 0;
 }
@@ -121,10 +96,12 @@ function computeFamilySavingsBreakdown(
   subscriptions: Subscription[],
   currentUserId: string | undefined,
   convertAmountFn: (amount: number, fromCurrency?: any, toCurrency?: any) => number,
+  timeZone?: string,
 ) {
+  const now = new Date();
   const ownerSavings = subscriptions
     .filter((sub) => {
-      return getSubscriptionUserId(sub) === currentUserId && isDeletedThisMonth(sub);
+      return getSubscriptionUserId(sub) === currentUserId && isSubscriptionSavingsEventInCurrentMonth(sub, now, timeZone);
     })
     .reduce((total, sub) => {
       const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
@@ -134,7 +111,7 @@ function computeFamilySavingsBreakdown(
   const memberSavings = subscriptions
     .filter((sub) => {
       const subscriptionUserId = getSubscriptionUserId(sub);
-      return subscriptionUserId && subscriptionUserId !== currentUserId && isDeletedThisMonth(sub);
+      return subscriptionUserId && subscriptionUserId !== currentUserId && isSubscriptionSavingsEventInCurrentMonth(sub, now, timeZone);
     })
     .reduce((total, sub) => {
       const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
@@ -150,7 +127,7 @@ function computeFamilySavingsBreakdown(
 
 function computeDeletedSubscriptionSavings(subscriptions: Subscription[]) {
   return subscriptions
-    .filter((sub) => isSubscriptionDeleted(sub) && isDeletedThisMonth(sub))
+    .filter((sub) => isSubscriptionSavingsEventInCurrentMonth(sub))
     .reduce((total, sub) => {
       const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
       return total + monthlyAmount;
@@ -168,12 +145,13 @@ function resolveFamilySavingsValue(serverValue: unknown, fallbackValue?: number)
 }
 
 export default function Savings() {
+  const queryClient = useQueryClient();
   const { formatAmount, convertAmount, currency } = useCurrency();
   const { user } = useAuth();
-  const { familyGroupId, showFamilyData, isFamilyDataModeReady } = useFamilyDataMode();
-
-  const isFamilyMode = showFamilyData === true;
-  const isPersonalMode = showFamilyData === false;
+  const { familyGroupId, showFamilyData, isFamilyDataModeReady, isFamilyGroupOwner } = useFamilyDataMode();
+  const [currentMonthKey, setCurrentMonthKey] = useState(() => getLocalMonthKey());
+  const isFamilyMode = showFamilyData === true || Boolean(familyGroupId && !isFamilyGroupOwner);
+  const isPersonalMode = showFamilyData === false && !isFamilyMode;
   const familyModePending = !isFamilyDataModeReady;
 
   // Personal metrics (always load)
@@ -188,12 +166,31 @@ export default function Savings() {
     refetchInterval: false,
   });
 
+  const familyReportTimeZone = isFamilyMode ? familyData?.timeZone : undefined;
+  const familyMonthKey = familyReportTimeZone
+    ? getLocalMonthKey(new Date(), familyReportTimeZone)
+    : currentMonthKey;
+
+  useEffect(() => {
+    const now = new Date();
+    const nextMonthStart = getLocalMonthBounds(now, familyReportTimeZone).nextMonthStart;
+    const timeoutId = window.setTimeout(() => {
+      setCurrentMonthKey(getLocalMonthKey(new Date(), familyReportTimeZone));
+      void queryClient.invalidateQueries({ queryKey: ["/api/metrics"] });
+    }, nextMonthStart.getTime() - now.getTime() + 1);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [currentMonthKey, familyReportTimeZone, queryClient]);
+
   const { data: familySavingsResponse, isLoading: familySavingsLoading } = useQuery<any>({
-    queryKey: ["/api/analytics/monthly-savings", "family", new Date().toISOString().slice(0, 7)],
+    queryKey: ["/api/analytics/monthly-savings", "family", familyMonthKey],
     enabled: showFamilyData === true && !!user?.id,
     refetchInterval: false,
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/analytics/monthly-savings?family=true");
+      const response = await apiRequest(
+        "GET",
+        `/api/analytics/monthly-savings?family=true&${getLocalDateQueryParams(new Date(), familyReportTimeZone)}`
+      );
       return response.json();
     },
   });
@@ -205,7 +202,7 @@ export default function Savings() {
   const personalDeletedSavings = useMemo(() => {
     if (!personalSubscriptions || personalSubscriptions.length === 0) return 0;
     return Math.round(computeDeletedSubscriptionSavings(personalSubscriptions) * 100) / 100;
-  }, [personalSubscriptions]);
+  }, [currentMonthKey, personalSubscriptions]);
 
   const personalPotentialSavings = useMemo(() => {
     if (!personalSubscriptions || personalSubscriptions.length === 0) return 0;
@@ -227,30 +224,20 @@ export default function Savings() {
       };
     }
 
-    const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const currentUserId = user?.id;
-
-    const isDeletedThisMonth = (sub: Subscription) => {
-      if (!isSubscriptionDeleted(sub)) return false;
-      const ts = getSubscriptionDeletedTimestamp(sub);
-      if (!ts) return true;
-      const date = new Date(ts);
-      return date >= currentMonthStart && date < nextMonthStart;
-    };
+    const now = new Date();
 
     const potentialSavings = calculatePotentialSavings(familySubscriptions);
 
     const thisMonthSavings = familySubscriptions
-      .filter(isDeletedThisMonth)
+      .filter((sub) => isSubscriptionSavingsEventInCurrentMonth(sub, now, familyReportTimeZone))
       .reduce((sum: number, sub) => {
         const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
         return sum + convertAmount(monthlyAmount, (sub as any).currency || 'USD', 'USD');
       }, 0);
 
     const thisMonthSavingsOwner = familySubscriptions
-      .filter((sub) => isDeletedThisMonth(sub) && getSubscriptionUserId(sub) === currentUserId)
+      .filter((sub) => isSubscriptionSavingsEventInCurrentMonth(sub, now, familyReportTimeZone) && getSubscriptionUserId(sub) === currentUserId)
       .reduce((sum: number, sub) => {
         const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
         return sum + convertAmount(monthlyAmount, (sub as any).currency || 'USD', 'USD');
@@ -259,7 +246,7 @@ export default function Savings() {
     const thisMonthSavingsMembers = familySubscriptions
       .filter((sub) => {
         const subscriptionUserId = getSubscriptionUserId(sub);
-        return isDeletedThisMonth(sub) && subscriptionUserId && subscriptionUserId !== currentUserId;
+        return isSubscriptionSavingsEventInCurrentMonth(sub, now, familyReportTimeZone) && subscriptionUserId && subscriptionUserId !== currentUserId;
       })
       .reduce((sum: number, sub) => {
         const monthlyAmount = calculateMonthlyCost((sub as any).amount, (sub as any).frequency);
@@ -275,7 +262,7 @@ export default function Savings() {
       thisMonthSavingsMembers: Math.round(thisMonthSavingsMembers * 100) / 100,
       unusedSubscriptions,
     };
-  }, [familySubscriptions, user?.id, convertAmount]);
+  }, [familySubscriptions, user?.id, convertAmount, familyReportTimeZone]);
 
   // Personal behavioral insights (always load)
 
@@ -292,7 +279,7 @@ export default function Savings() {
     const hasServerFamilyMetrics = familyData?.metrics && typeof familyData.metrics.totalMonthlySpending === 'number';
     // Use server spending series for both owners and members
     const familyMonthlyData = familyData?.spending && familyData.spending.length > 0 ? familyData.spending : [];
-    const totalMonthlySpendFromSpendingData = getCurrentMonthAmount(familyMonthlyData);
+    const totalMonthlySpendFromSpendingData = getCurrentMonthAmount(familyMonthlyData, familyReportTimeZone);
 
     if (hasServerFamilyMetrics) {
       const totalMonthlySpend = familyMonthlyData.length > 0
@@ -341,11 +328,11 @@ export default function Savings() {
 
       if (subs.length > 0) {
         // Only include subscriptions renewing in the current month.
-        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        const { monthStart: currentMonthStart, nextMonthStart } = getLocalMonthBounds(now, familyReportTimeZone);
+        const currentMonthEnd = new Date(nextMonthStart.getTime() - 1);
         const totalMonthlySpend = subs.reduce((sum: number, s: Subscription) => {
           if (s.status !== 'active' && s.status !== 'unused' && s.status !== 'to-cancel' && s.status !== 'canceled') return sum;
-          if (!isSubscriptionBilledInMonth(s, currentMonthStart, currentMonthEnd, now, true)) return sum;
+          if (!isSubscriptionBilledInMonth(s, currentMonthStart, currentMonthEnd, now, true, undefined, familyReportTimeZone)) return sum;
           const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
           return sum + convertAmount(monthlyCost, (s as any).currency || 'USD', 'USD');
         }, 0);
@@ -359,22 +346,10 @@ export default function Savings() {
             return sum + convertAmount(monthlyCost, (s as any).currency || 'USD', 'USD');
           }, 0);
 
-        const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         const currentUserId = user?.id;
 
-        const isDeletedThisMonth = (s: Subscription) => {
-          if (!isSubscriptionDeleted(s)) return false;
-          const ts = getSubscriptionDeletedTimestamp(s);
-          if (ts) {
-            const d = new Date(ts);
-            return d >= currentMonth && d < nextMonth;
-          }
-          return true;
-        };
-
         const ownerSavings = subs
-          .filter((s) => isDeletedThisMonth(s) && getSubscriptionUserId(s) === currentUserId)
+          .filter((s) => isSubscriptionSavingsEventInCurrentMonth(s) && getSubscriptionUserId(s) === currentUserId)
           .reduce((sum: number, s) => {
             const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
             return sum + convertAmount(monthlyCost, (s as any).currency || 'USD', 'USD');
@@ -383,7 +358,7 @@ export default function Savings() {
         const memberSavings = subs
           .filter((s) => {
             const subscriptionUserId = getSubscriptionUserId(s);
-            return isDeletedThisMonth(s) && subscriptionUserId && subscriptionUserId !== currentUserId;
+            return isSubscriptionSavingsEventInCurrentMonth(s) && subscriptionUserId && subscriptionUserId !== currentUserId;
           })
           .reduce((sum: number, s) => {
             const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
@@ -391,22 +366,25 @@ export default function Savings() {
           }, 0);
 
         const thisMonthSavingsAmount = subs
-          .filter(isDeletedThisMonth)
+          .filter((s) => isSubscriptionSavingsEventInCurrentMonth(s))
           .reduce((sum: number, s) => {
             const monthlyCost = calculateMonthlyCost((s as any).amount, (s as any).frequency);
             return sum + convertAmount(monthlyCost, (s as any).currency || 'USD', 'USD');
           }, 0);
 
-        const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const previousMonthStart = getLocalMonthBounds(
+          new Date(currentMonthStart.getTime() - 1),
+          familyReportTimeZone,
+        ).monthStart;
         const currentMonthSubs = subs.filter((s) => {
           const ts = (s as any).created_at || (s as any).createdAt;
           const d = ts ? new Date(ts) : new Date();
-          return d >= currentMonth && d < nextMonth;
+          return d >= currentMonthStart && d < nextMonthStart;
         });
         const previousMonthSubs = subs.filter((s) => {
           const ts = (s as any).created_at || (s as any).createdAt;
           const d = ts ? new Date(ts) : new Date();
-          return d >= previousMonth && d < currentMonth;
+          return d >= previousMonthStart && d < currentMonthStart;
         });
 
         const previousMonthSpend = previousMonthSubs.reduce((sum: number, s: Subscription) => {
@@ -454,10 +432,14 @@ export default function Savings() {
     },
   });
 
+  const totalMonthlySpendForSavings = isFamilyMode
+    ? getCurrentMonthFamilySpend(familyData, personalSpending)
+    : Number(metrics?.totalMonthlySpend) || 0;
+
   const spendingLoading = familyModePending
     ? true
     : isFamilyMode
-      ? familyDataLoading
+      ? familyDataLoading || personalSpendingLoading
       : personalSpendingLoading;
 
   function computeMonthlySpendingFromFamilySubscriptions() {
@@ -471,7 +453,7 @@ export default function Savings() {
 
   // Normalize monthly spending into a fixed-length recent months series (defaults to 6 months)
   // Includes the current month and the previous months, with zero-fill for missing months.
-  const chartMonthlyData = normalizeMonthlySpendingSeries(effectiveMonthlySpending, 6);
+  const chartMonthlyData = normalizeMonthlySpendingSeries(effectiveMonthlySpending, 6, familyReportTimeZone);
 
   // Editable savings goal logic (store in user's selected currency)
   // Default goal is a fixed baseline; we no longer auto‑populate using
@@ -604,7 +586,12 @@ export default function Savings() {
     setDisplayInput(String(roundedDisplayVal));
   };
 
-  const fallbackFamilySavings = computeFamilySavingsBreakdown(familySubscriptions, user?.id, convertAmount);
+  const fallbackFamilySavings = computeFamilySavingsBreakdown(
+    familySubscriptions,
+    user?.id,
+    convertAmount,
+    familyReportTimeZone,
+  );
   const familySavings = isFamilyMode
     ? {
         totalSavings: resolveFamilySavingsValue(
@@ -716,11 +703,11 @@ export default function Savings() {
                   Monthly Spend
                 </span>
               </div>
-              {metricsLoading ? (
+              {(isFamilyMode ? familyModePending || personalSpendingLoading : metricsLoading) ? (
                 <Skeleton className="h-9 w-24" />
               ) : (
                 <span className="text-3xl font-bold text-chart-2 dark:text-foreground" data-testid="text-potential-savings">
-                    {formatAmount(metrics?.totalMonthlySpend ?? 0, 'USD')}
+                    {formatAmount(totalMonthlySpendForSavings, 'USD')}
                   <span className="text-sm font-normal text-muted-foreground">/mo</span>
                 </span>
               )}
