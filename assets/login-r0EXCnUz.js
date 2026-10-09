@@ -1,1 +1,0 @@
-import{I as n,j as a}from"./vendor-BF78n8ZM.js";import{A as i}from"./auth-modal-e7xaACyO.js";import"./index-BxZs0Qq3.js";import"./tabs-Hng3krDU.js";function u(){const[,o]=n();return a.jsx(i,{open:!0,defaultTab:"signin",onOpenChange:t=>{t||o("/")}})}export{u as default};
