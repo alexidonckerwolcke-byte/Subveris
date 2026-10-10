@@ -29,7 +29,7 @@ import { isValidTimeZone } from "@shared/month-boundary";
 import { supabase } from "@/lib/supabase";
 
 export default function Settings() {
-  const showGmailScanning = true;
+  const showGmailScanning = false;
   const { toast } = useToast();
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
