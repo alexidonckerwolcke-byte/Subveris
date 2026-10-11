@@ -410,3 +410,121 @@
 html {
   scroll-behavior: smooth;
 }
+
+/* Keep provider cancellation guides visually consistent with the editorial SEO pages. */
+.cancel-guide-page {
+  background: #fff !important;
+  color: #0f172a;
+}
+
+.cancel-guide-page > div {
+  gap: 2rem;
+}
+
+.cancel-guide-page > div > header {
+  border: 0;
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 0;
+  background: #fff;
+  padding: 1rem 0 2rem;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.cancel-guide-page > div > header > div:first-child {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: #047857;
+}
+
+.cancel-guide-page section {
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.cancel-guide-page section[class*="border-red-"] {
+  border-left: 3px solid #b45309;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: #fffbeb;
+}
+
+.cancel-guide-page section[class*="from-emerald-"] {
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.cancel-guide-page section[class*="from-emerald-"] h2,
+.cancel-guide-page section[class*="from-emerald-"] p {
+  color: #0f172a;
+}
+
+.cancel-guide-page > div > header + div > article > section,
+.cancel-guide-page > div > header + div > aside > section {
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  padding: 1.5rem 0;
+}
+
+.cancel-guide-page > div > div > article > section > div:first-child {
+  width: auto;
+  height: auto;
+  margin-bottom: 0.75rem;
+  border-radius: 0;
+  background: transparent;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+.cancel-guide-page > div > section:last-of-type {
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  border-radius: 0;
+  background: #f8fafc;
+  padding: 2rem 0;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+.cancel-guide-page > div > section:last-of-type h2,
+.cancel-guide-page > div > section:last-of-type p {
+  color: #0f172a;
+}
+
+.cancel-guide-page button[class*="rounded-full"] {
+  border-radius: 0.375rem;
+}
+
+html.dark .cancel-guide-page {
+  background: #fff !important;
+  color: #0f172a;
+}
+
+html.dark .cancel-guide-page > div > header,
+html.dark .cancel-guide-page section:not([class*="border-red-"]):not([class*="from-emerald-"]) {
+  border-color: #e2e8f0;
+  background: #fff;
+}
+
+html.dark .cancel-guide-page .dark\:text-slate-100 {
+  color: #0f172a;
+}
+
+html.dark .cancel-guide-page .dark\:text-slate-200 {
+  color: #334155;
+}
+
+html.dark .cancel-guide-page .dark\:text-slate-300 {
+  color: #475569;
+}
+
+html.dark .cancel-guide-page .dark\:text-emerald-300 {
+  color: #047857;
+}
