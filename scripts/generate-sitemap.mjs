@@ -7,6 +7,7 @@ const sitemapPath = path.resolve("client/public/sitemap.xml");
 const commonUrls = [
   "/",
   "/pricing",
+  "/best-subscription-trackers",
   "/docs",
   "/privacy",
   "/terms",
