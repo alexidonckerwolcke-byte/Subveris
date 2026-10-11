@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { usePageMeta } from "@/lib/usePageMeta";
 import { Button } from "@/components/ui/button";
+import { cancelPages } from "@/components/cancel-page-helpers";
 import { ArrowRight } from "lucide-react";
 
 const rankings = [
@@ -199,6 +200,20 @@ export default function BestSubscriptionTrackersPage() {
           </div>
         </section>
 
+        <section className="mx-auto max-w-6xl border-t border-slate-200 px-5 py-10 sm:px-8">
+          <h2 className="text-xl font-bold text-slate-950">Subscription cancellation guides</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            Find step-by-step information for reviewing and managing popular recurring services.
+          </p>
+          <nav aria-label="Subscription cancellation guides" className="mt-5 grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+            {cancelPages.map((page) => (
+              <Link key={page.href} href={page.href} className="text-sm text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950 hover:decoration-slate-900">
+                {page.label} cancellation guide
+              </Link>
+            ))}
+          </nav>
+        </section>
+
         <section id="faq" className="mx-auto max-w-6xl scroll-mt-8 border-t border-slate-200 px-5 py-10 sm:px-8">
           <h2 className="text-2xl font-bold tracking-tight text-slate-950">Frequently asked questions</h2>
           <div className="mt-4 max-w-4xl divide-y divide-slate-200">
@@ -209,6 +224,12 @@ export default function BestSubscriptionTrackersPage() {
               </details>
             ))}
           </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl border-t border-slate-200 px-5 py-8 sm:px-8">
+          <p className="text-sm text-slate-600">
+            Read our <Link href="/why-subveris-best-subscription-manager" className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900">in-depth Subveris product review</Link> for more on privacy, usage insights, and renewal planning.
+          </p>
         </section>
 
         <section className="border-t border-slate-200 bg-slate-50">

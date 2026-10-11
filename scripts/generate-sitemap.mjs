@@ -8,6 +8,7 @@ const commonUrls = [
   "/",
   "/pricing",
   "/best-subscription-trackers",
+  "/why-subveris-best-subscription-manager",
   "/docs",
   "/privacy",
   "/terms",

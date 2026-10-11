@@ -39,6 +39,7 @@ const Support = lazy(() => import("./pages/support.js"));
 const Files = lazy(() => import("./pages/files.js"));
 const HomePage = lazy(() => import("./pages/home.js"));
 const BestSubscriptionTrackersPage = lazy(() => import("./pages/best-subscription-trackers.js"));
+const WhySubverisBestSubscriptionManagerPage = lazy(() => import("./pages/why-subveris-best-subscription-manager.js"));
 const Privacy = lazy(() => import("./pages/privacy.js"));
 const Login = lazy(() => import("./pages/login.js"));
 const Cookies = lazy(() => import("./pages/cookies.js"));
@@ -97,6 +98,7 @@ function Router({ user }: { user: any }) {
     <Route key="contact" path="/contact" component={ContactPage} />,
     <Route key="docs" path="/docs" component={DocsPage} />,
     <Route key="best-subscription-trackers" path="/best-subscription-trackers" component={BestSubscriptionTrackersPage} />,
+    <Route key="why-subveris-best-subscription-manager" path="/why-subveris-best-subscription-manager" component={WhySubverisBestSubscriptionManagerPage} />,
     <Route key="cancel-netflix" path="/cancel-netflix" component={CancelNetflixPage} />,
     <Route key="cancel-amazon-prime" path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />,
     <Route key="cancel-spotify" path="/cancel-spotify" component={CancelSpotifyPage} />,
@@ -135,6 +137,7 @@ function Router({ user }: { user: any }) {
     <Route key="contact" path="/contact" component={ContactPage} />,
     <Route key="docs" path="/docs" component={DocsPage} />,
     <Route key="best-subscription-trackers" path="/best-subscription-trackers" component={BestSubscriptionTrackersPage} />,
+    <Route key="why-subveris-best-subscription-manager" path="/why-subveris-best-subscription-manager" component={WhySubverisBestSubscriptionManagerPage} />,
     <Route key="cancel-netflix" path="/cancel-netflix" component={CancelNetflixPage} />,
     <Route key="cancel-amazon-prime" path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />,
     <Route key="cancel-spotify" path="/cancel-spotify" component={CancelSpotifyPage} />,

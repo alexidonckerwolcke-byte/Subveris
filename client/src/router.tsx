@@ -13,6 +13,7 @@ const Support = lazy(() => import("./pages/support.js"));
 const Files = lazy(() => import("./pages/files.js"));
 const HomePage = lazy(() => import("./pages/home.js"));
 const BestSubscriptionTrackersPage = lazy(() => import("./pages/best-subscription-trackers.js"));
+const WhySubverisBestSubscriptionManagerPage = lazy(() => import("./pages/why-subveris-best-subscription-manager.js"));
 const Privacy = lazy(() => import("./pages/privacy.js"));
 const Login = lazy(() => import("./pages/login.js"));
 const Cookies = lazy(() => import("./pages/cookies.js"));
@@ -79,6 +80,7 @@ export function Router({ user }: { user: any }) {
             <Route path="/contact" component={ContactPage} />
             <Route path="/docs" component={DocsPage} />
             <Route path="/best-subscription-trackers" component={BestSubscriptionTrackersPage} />
+            <Route path="/why-subveris-best-subscription-manager" component={WhySubverisBestSubscriptionManagerPage} />
             <Route path="/cancel-netflix" component={CancelNetflixPage} />
             <Route path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />
             <Route path="/cancel-spotify" component={CancelSpotifyPage} />
@@ -115,6 +117,7 @@ export function Router({ user }: { user: any }) {
             <Route path="/contact" component={ContactPage} />
             <Route path="/docs" component={DocsPage} />
             <Route path="/best-subscription-trackers" component={BestSubscriptionTrackersPage} />
+            <Route path="/why-subveris-best-subscription-manager" component={WhySubverisBestSubscriptionManagerPage} />
             <Route path="/cancel-netflix" component={CancelNetflixPage} />
             <Route path="/cancel-amazon-prime" component={CancelAmazonPrimePage} />
             <Route path="/cancel-spotify" component={CancelSpotifyPage} />

@@ -1068,6 +1068,8 @@ export default function HomePage() {
             </div>
             
             <nav className="flex flex-wrap justify-center gap-8 text-sm font-medium text-muted-foreground">
+              <a href="/best-subscription-trackers" className="hover:text-foreground transition-colors">Subscription tracker rankings</a>
+              <a href="/why-subveris-best-subscription-manager" className="hover:text-foreground transition-colors">Subveris product review</a>
               <a href="/terms" className="hover:text-foreground transition-colors">Terms</a>
               <a href="/privacy" className="hover:text-foreground transition-colors">Privacy</a>
               <a href="/security" className="hover:text-foreground transition-colors">Security</a>

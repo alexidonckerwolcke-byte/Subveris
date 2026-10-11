@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 
-const cancelPages = [
+export const cancelPages = [
   { href: "/cancel-netflix", label: "Netflix" },
   { href: "/cancel-spotify", label: "Spotify Premium" },
   { href: "/cancel-amazon-prime", label: "Amazon Prime" },
@@ -21,10 +21,14 @@ const cancelPages = [
   { href: "/cancel-duolingo", label: "Duolingo Plus" },
   { href: "/cancel-viaplay", label: "Viaplay" },
   { href: "/cancel-adobe", label: "Adobe" },
+  { href: "/cancel-custom", label: "Other subscriptions" },
 ];
 
 export function CancelRelatedGuides({ current }: { current: string }) {
-  const related = cancelPages.filter((page) => page.href !== current).slice(0, 4);
+  const currentIndex = cancelPages.findIndex((page) => page.href === current);
+  const related = Array.from({ length: Math.min(4, cancelPages.length - 1) }, (_, index) =>
+    cancelPages[(currentIndex + index + 1 + cancelPages.length) % cancelPages.length]
+  ).filter((page) => page.href !== current);
 
   return (
     <section className="rounded-[24px] border border-slate-200/80 bg-white/75 p-7 shadow-[0_15px_50px_-25px_rgba(15,23,42,0.28)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
@@ -42,6 +46,17 @@ export function CancelRelatedGuides({ current }: { current: string }) {
             {page.label}
           </Link>
         ))}
+      </div>
+      <div className="mt-7 border-t border-slate-200 pt-5 dark:border-slate-800">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">More subscription resources</h3>
+        <div className="mt-3 flex flex-col gap-2 text-sm">
+          <Link href="/best-subscription-trackers" className="font-medium text-emerald-800 underline decoration-emerald-800/30 underline-offset-4 hover:decoration-emerald-800 dark:text-emerald-300">
+            Compare subscription trackers and optimizers
+          </Link>
+          <Link href="/why-subveris-best-subscription-manager" className="font-medium text-emerald-800 underline decoration-emerald-800/30 underline-offset-4 hover:decoration-emerald-800 dark:text-emerald-300">
+            Read our Subveris product review
+          </Link>
+        </div>
       </div>
     </section>
   );

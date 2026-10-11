@@ -103,6 +103,14 @@ export default function CancelCustomPage() {
         <Link href="/subscriptions" className="inline-block text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-300">
           Back to subscriptions
         </Link>
+        <nav aria-label="More subscription resources" className="flex flex-col gap-2 border-t border-slate-200 pt-5 text-sm dark:border-slate-800">
+          <Link href="/best-subscription-trackers" className="font-medium text-emerald-800 underline underline-offset-4 dark:text-emerald-300">
+            Compare subscription trackers and optimizers
+          </Link>
+          <Link href="/why-subveris-best-subscription-manager" className="font-medium text-emerald-800 underline underline-offset-4 dark:text-emerald-300">
+            Read our Subveris product review
+          </Link>
+        </nav>
       </div>
     </main>
   );
