@@ -561,6 +561,10 @@
   background: transparent;
 }
 
+.home-page .home-pricing-table .text-green-600 {
+  color: #15803d;
+}
+
 .home-page .home-pricing-faq .card,
 .home-page .home-faq .card,
 .home-page .home-contact .card {

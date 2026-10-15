@@ -46,15 +46,6 @@ export function useFamilyDataMode() {
     ? localStorage.getItem(`subveris-family-mode:${user.id}:${cachedGroupId}`) === "true"
     : false;
 
-  const { data: membershipData } = useQuery<any, Error>({
-    queryKey: ["/api/family-groups/me/membership"],
-    enabled: !!user?.id,
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/family-groups/me/membership');
-      return response.json();
-    },
-  });
-
   // Get family groups for this user, including groups where the user is a member.
   const { data: familyGroups, isLoading: familyGroupsLoading } = useQuery<any[], Error>({
     queryKey: ["/api/family-groups"],
@@ -65,7 +56,7 @@ export function useFamilyDataMode() {
     },
   });
 
-  const mergedFamilyGroups = mergeFamilyGroupsForUser(familyGroups || [], membershipData?.groups || []);
+  const mergedFamilyGroups = mergeFamilyGroupsForUser(familyGroups || []);
 
   // Prefer a group owned by the current user when both owner and member groups exist.
   const ownedFamilyGroup = mergedFamilyGroups.find((group) => {

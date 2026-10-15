@@ -82,16 +82,6 @@ export default defineConfig({
     emptyOutDir: true,
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
-      output: {
-        // Keep a single shared vendor chunk for all node_modules to avoid
-        // circular evaluation order problems between React, React Query, and
-        // other shared third-party modules.
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        },
-      },
       onwarn(warning, warn) {
         if (typeof warning.message === 'string' && warning.message.includes('A PostCSS plugin did not pass the `from` option to `postcss.parse`.')) {
           return;

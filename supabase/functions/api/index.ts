@@ -1338,6 +1338,41 @@ export async function getFamilyTrackableUserIds(userId: string, client: any = su
   return Array.from(trackableUserIds).filter(Boolean);
 }
 
+export async function loadFamilyGroupMembersWithEmails(members: any[], client: any = supabase) {
+  const missingEmailUserIds = Array.from(new Set(
+    (members || [])
+      .filter((member: any) => !member?.email && member?.user_id)
+      .map((member: any) => String(member.user_id)),
+  ));
+  const emailByUserId = new Map<string, string>();
+
+  if (missingEmailUserIds.length) {
+    const { data: users, error } = await client
+      .from("users")
+      .select("id, email")
+      .in("id", missingEmailUserIds);
+
+    if (error) {
+      console.error("Error fetching family member emails:", error);
+    } else {
+      for (const user of users || []) {
+        if (user?.id && user?.email) {
+          emailByUserId.set(String(user.id), user.email);
+        }
+      }
+    }
+  }
+
+  return (members || []).map((member: any) => ({
+    id: member.id,
+    familyGroupId: member.family_group_id,
+    userId: member.user_id,
+    role: member.role,
+    joinedAt: member.joined_at,
+    email: member.email || emailByUserId.get(String(member.user_id)) || null,
+  }));
+}
+
 async function isUserFamilyGroupOwnerForSubscription(userId: string, memberUserId: string) {
   if (!userId || !memberUserId || userId === memberUserId) {
     return false;
@@ -4291,19 +4326,22 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
       }
 
       try {
-        const { data: ownerGroups, error: ownerError } = await supabase
-          .from("family_groups")
-          .select("id,name,created_at,owner_id")
-          .eq("owner_id", userId);
+        const [ownerGroupsResult, memberRowsResult] = await Promise.all([
+          supabase
+            .from("family_groups")
+            .select("id,name,created_at,owner_id")
+            .eq("owner_id", userId),
+          supabase
+            .from("family_group_members")
+            .select("family_group_id, role, family_groups(id, name, created_at, owner_id)")
+            .eq("user_id", userId),
+        ]);
+        const { data: ownerGroups, error: ownerError } = ownerGroupsResult;
+        const { data: memberRows, error: memberError } = memberRowsResult;
 
         if (ownerError) {
           console.error("Error fetching owner groups:", ownerError);
         }
-
-        const { data: memberRows, error: memberError } = await supabase
-          .from("family_group_members")
-          .select("family_group_id, role, family_groups(id, name, created_at, owner_id)")
-          .eq("user_id", userId);
 
         if (memberError) {
           console.error("Error fetching member groups:", memberError);
@@ -4357,10 +4395,18 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
 
       try {
         // Get groups where user is owner
-        const { data: ownerGroups, error: ownerError } = await supabase
-          .from("family_groups")
-          .select("id, name, created_at")
-          .eq("owner_id", userId);
+        const [ownerGroupsResult, memberRowsResult] = await Promise.all([
+          supabase
+            .from("family_groups")
+            .select("id, name, created_at")
+            .eq("owner_id", userId),
+          supabase
+            .from("family_group_members")
+            .select("family_group_id, role, joined_at, family_groups(id, name, created_at, owner_id)")
+            .eq("user_id", userId),
+        ]);
+        const { data: ownerGroups, error: ownerError } = ownerGroupsResult;
+        const { data: memberRows, error: memberError } = memberRowsResult;
 
         if (ownerError) {
           console.error("Error fetching owned groups:", ownerError);
@@ -4368,11 +4414,6 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         }
 
         // Get groups where user is a member
-        const { data: memberRows, error: memberError } = await supabase
-          .from("family_group_members")
-          .select("family_group_id, role, joined_at, family_groups(id, name, created_at, owner_id)")
-          .eq("user_id", userId);
-
         if (memberError) {
           console.error("Error fetching member groups:", memberError);
           return sendJson({ groups: [], isMemberOfFamily: false, membershipCount: 0, membershipInfo: [] });
@@ -4744,29 +4785,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           return sendJson({ error: 'Failed to fetch family members' }, { status: 500 });
         }
 
-        // Fetch emails from auth service for members without email data
-        const membersWithEmails = await Promise.all((members || []).map(async (member: any) => {
-          let email = member.email;
-          
-          // If email is missing, try to fetch from auth service
-          if (!email) {
-            try {
-              const { data: userData } = await supabase.auth.admin.getUserById(member.user_id);
-              email = userData?.user?.email || null;
-            } catch (err) {
-              console.error(`Error fetching email for user ${member.user_id}:`, err);
-            }
-          }
-          
-          return {
-            id: member.id,
-            familyGroupId: member.family_group_id,
-            userId: member.user_id,
-            role: member.role,
-            joinedAt: member.joined_at,
-            email: email,
-          };
-        }));
+        const membersWithEmails = await loadFamilyGroupMembersWithEmails(members || []);
 
         return sendJson(membersWithEmails);
       } catch (error) {

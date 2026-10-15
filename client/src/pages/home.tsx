@@ -1,6 +1,6 @@
 import "./home.css";
 import { useEffect, useRef, useState } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,19 +70,16 @@ export default function HomePage() {
     ...props
   }: React.ComponentProps<typeof motion.section> & { amount?: number; delay?: number }) {
     const ref = useRef<HTMLElement | null>(null);
-    const enterOffset = Math.min(0.95, 0.9 + delay * 0.1);
-    const settleOffset = Math.max(0.3, 0.45 - amount * 0.1);
-    const { scrollYProgress } = useScroll({
-      target: ref,
-      offset: [`start ${enterOffset * 100}%`, `start ${settleOffset * 100}%`],
-    });
-    const y = useTransform(scrollYProgress, [0, 1], [12, 0]);
+    const isInView = useInView(ref, { once: true, amount });
     const { style, ...sectionProps } = props;
 
     return (
       <motion.section
         ref={ref}
-        style={{ ...style, y }}
+        initial={{ y: 12 }}
+        animate={{ y: isInView ? 0 : 12 }}
+        transition={{ ...revealTransition, delay }}
+        style={style}
         className={className}
         {...sectionProps}
       >
@@ -190,7 +187,10 @@ export default function HomePage() {
         <div className="home-header-inner container mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div className="flex shrink-0 items-center gap-1 sm:gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden shadow-sm">
-              <img src="/assets/logo-icon.png" alt="Subveris Logo" width={40} height={40} className="h-full w-full object-cover" />
+              <picture>
+                <source srcSet="/assets/logo-icon-64.webp" type="image/webp" />
+                <img src="/assets/logo-icon.png" alt="Subveris Logo" width={40} height={40} className="h-full w-full object-cover" />
+              </picture>
             </div>
             <span className="text-xl font-bold tracking-tight">Subveris</span>
           </div>
@@ -220,6 +220,8 @@ export default function HomePage() {
           </div>
         </div>
       </header>
+
+      <main id="main-content">
 
       {/* 1️⃣ HERO SECTION */}
       <DirectionalReveal className="home-section home-hero relative overflow-hidden bg-white text-center">
@@ -257,14 +259,18 @@ export default function HomePage() {
           </div>
 
           <div className="home-hero-media">
-            <img
-              src="/assets/dashboard-hero.png"
-              alt="Subveris dashboard showing subscription spending and upcoming renewals"
-              width={3420}
-              height={1970}
-              fetchPriority="high"
-              decoding="async"
-            />
+            <picture>
+              <source media="(max-width: 767px)" srcSet="/assets/dashboard-hero-768.webp" type="image/webp" />
+              <source srcSet="/assets/dashboard-hero.webp" type="image/webp" />
+              <img
+                src="/assets/dashboard-hero.png"
+                alt="Subveris dashboard showing subscription spending and upcoming renewals"
+                width={1600}
+                height={922}
+                fetchpriority="high"
+                decoding="async"
+              />
+            </picture>
           </div>
 
           <motion.div
@@ -1009,7 +1015,7 @@ export default function HomePage() {
               </p>
               <a
                 href="mailto:help.subveris@gmail.com"
-                className="text-primary font-semibold hover:underline text-sm"
+                className="text-sky-300 font-semibold hover:underline text-sm"
               >
                 help.subveris@gmail.com
               </a>
@@ -1055,6 +1061,7 @@ export default function HomePage() {
           </div>
         </div>
       </DirectionalReveal>
+      </main>
 
       {/* Footer */}
       <footer className="home-footer bg-background border-t border-border/40 py-12">
@@ -1062,7 +1069,10 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden shadow-sm">
-                <img src="/assets/logo-icon.png" alt="Subveris Logo" width={32} height={32} className="h-full w-full object-cover" />
+                <picture>
+                  <source srcSet="/assets/logo-icon-64.webp" type="image/webp" />
+                  <img src="/assets/logo-icon.png" alt="Subveris Logo" width={32} height={32} className="h-full w-full object-cover" />
+                </picture>
               </div>
               <span className="text-lg font-bold tracking-tight">Subveris</span>
             </div>
