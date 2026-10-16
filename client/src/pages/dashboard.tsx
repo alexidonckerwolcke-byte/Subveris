@@ -1,10 +1,9 @@
-import { useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { BarChart3, Calendar, Clock, DollarSign, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SpendingChart } from "@/components/spending-chart";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/lib/currency-context";
 import { useAuth } from "@/lib/auth-context";
@@ -15,6 +14,64 @@ import { getCurrentMonthFamilySpend } from "@/lib/family-metrics";
 import { isPendingDetectedSubscription } from "@/lib/recommendations";
 import { calculateMonthlySpendingSeries, normalizeMonthlySpendingSeries } from "@/lib/utils";
 import type { Subscription, MonthlySpending, SpendingByCategory } from "@shared/schema";
+
+const LazySpendingChart = lazy(() =>
+  import("@/components/spending-chart").then(({ SpendingChart }) => ({ default: SpendingChart }))
+);
+
+function DeferredSpendingChart({
+  monthlyData,
+  categoryData,
+  isLoading,
+  trendLabel,
+}: {
+  monthlyData: MonthlySpending[] | undefined;
+  categoryData: SpendingByCategory[] | undefined;
+  isLoading: boolean;
+  trendLabel: string;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    if (shouldLoad) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setShouldLoad(true);
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setShouldLoad(true);
+        observer.disconnect();
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [shouldLoad]);
+
+  return (
+    <div ref={containerRef} className="min-h-[420px]">
+      {shouldLoad ? (
+        <Suspense fallback={<div className="h-[420px] animate-pulse rounded-md bg-muted/40" />}>
+          <LazySpendingChart
+            monthlyData={monthlyData}
+            categoryData={categoryData}
+            isLoading={isLoading}
+            trendLabel={trendLabel}
+          />
+        </Suspense>
+      ) : (
+        <div className="h-[420px]" aria-hidden="true" />
+      )}
+    </div>
+  );
+}
 
 function parseBillingDate(date?: string | Date | null) {
   if (!date) return null;
@@ -336,7 +393,7 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent className="mt-6 p-0">
-                <SpendingChart
+                <DeferredSpendingChart
                   monthlyData={normalizedMonthlySpending}
                   categoryData={categorySpendingData}
                   isLoading={chartLoading}

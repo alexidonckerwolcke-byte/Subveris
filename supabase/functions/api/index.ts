@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import {
   getZonedDateParts,
+  getZonedDateString,
   getZonedLocalDateTime,
   getZonedMonthKey,
   getZonedMonthBounds,
@@ -726,6 +727,22 @@ function getSubscriptionBillingMonth(sub: any): string | null {
   const match = billingMonth.match(/^(\d{4})-(\d{1,2})$/);
   if (!match) return null;
   return `${match[1]}-${String(match[2]).padStart(2, '0')}`;
+}
+
+export function getBillingMonthForRenewalUpdate(
+  existingBillingMonth: string | null | undefined,
+  currentBillingMonth: string,
+  existingRenewal: Date | null,
+  parsedNewDate: Date | null,
+  today: Date | null,
+  isAutoAdvance: boolean,
+): string | null {
+  if (!parsedNewDate || !today) return null;
+  if (existingBillingMonth === currentBillingMonth) return currentBillingMonth;
+  if (isAutoAdvance && existingRenewal && existingRenewal <= today && parsedNewDate > today) {
+    return currentBillingMonth;
+  }
+  return parsedNewDate <= today ? currentBillingMonth : formatBillingMonth(parsedNewDate);
 }
 
 export function isSubscriptionBilledInMonth(
@@ -2459,12 +2476,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
             // editing its next renewal must not remove that month's spend.
             const isAutoAdvance = Boolean(body.autoAdvanced);
             const currentBillingMonth = formatBillingMonth(today);
-            const wasBilledThisMonth = existingSub.billing_month === currentBillingMonth;
-            if (wasBilledThisMonth || (isAutoAdvance && existingRenewal && existingRenewal <= today && parsedNewDate > today)) {
-              updates.billing_month = existingSub.billing_month || currentBillingMonth;
-            } else {
-              updates.billing_month = parsedNewDate <= today ? formatBillingMonth(today) : formatBillingMonth(parsedNewDate);
-            }
+            updates.billing_month = getBillingMonthForRenewalUpdate(
+              existingSub.billing_month,
+              currentBillingMonth,
+              existingRenewal,
+              parsedNewDate,
+              today,
+              isAutoAdvance,
+            ) || undefined;
             console.log(`[API] PATCH /subscriptions/${subscriptionId} computed billing_month:`, updates.billing_month, { autoAdvanced: isAutoAdvance });
           }
         } else {
