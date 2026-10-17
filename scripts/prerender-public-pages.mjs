@@ -156,15 +156,75 @@ try {
     return html;
   }
 
+  function assertRenderedPage(route, metadata, markup, html) {
+    const expectedCanonical = `https://subveris.com${route === "/" ? "/" : route}`;
+    if (metadata?.canonical && metadata.canonical !== expectedCanonical) {
+      throw new Error(`${route} React metadata canonical is ${metadata.canonical}; expected ${expectedCanonical}`);
+    }
+    if (!/<h1\b/i.test(markup)) {
+      throw new Error(`${route} has no H1 in its prerendered content`);
+    }
+    if (/https:\/\/www\.subveris\.com/i.test(markup)) {
+      throw new Error(`${route} contains a www Subveris URL in prerendered content`);
+    }
+
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+    const canonicalLinks = [...document.querySelectorAll('link[rel="canonical"]')];
+    const robots = document.querySelector('meta[name="robots"]')?.content || "";
+    const pageDescription = document.querySelector('meta[name="description"]')?.content || "";
+    const openGraphUrl = document.querySelector('meta[property="og:url"]')?.content || "";
+
+    if (canonicalLinks.length !== 1 || canonicalLinks[0].href !== expectedCanonical) {
+      throw new Error(`${route} generated canonical does not match ${expectedCanonical}`);
+    }
+    if (!document.title.trim() || !pageDescription.trim()) {
+      throw new Error(`${route} is missing its title or meta description`);
+    }
+    if (!robots.includes("index") || robots.includes("noindex")) {
+      throw new Error(`${route} must be indexable; received robots directive: ${robots}`);
+    }
+    if (openGraphUrl !== expectedCanonical) {
+      throw new Error(`${route} Open Graph URL does not match its canonical`);
+    }
+
+    for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
+      let schema;
+      try {
+        schema = JSON.parse(script.textContent || "");
+      } catch {
+        throw new Error(`${route} contains invalid JSON-LD`);
+      }
+      const inspect = (value) => {
+        if (typeof value === "string" && /^https?:\/\//i.test(value)) {
+          if (new URL(value).hostname.toLowerCase() === "www.subveris.com") {
+            throw new Error(`${route} JSON-LD contains a www Subveris URL`);
+          }
+        } else if (Array.isArray(value)) {
+          value.forEach(inspect);
+        } else if (value && typeof value === "object") {
+          Object.values(value).forEach(inspect);
+        }
+      };
+      inspect(schema);
+    }
+
+    dom.window.close();
+  }
+
+  let auditedCount = 0;
   for (const route of publicPaths) {
     const { markup, pageMeta } = renderer.renderPublicPage(route);
     const html = createHtml(route, pageMeta, markup, true);
+    assertRenderedPage(route, pageMeta, markup, html);
     const relativePath = route === "/" ? "index.html" : path.join(route.slice(1), "index.html");
     const outputPath = path.join(outputDir, relativePath);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, html);
+    auditedCount += 1;
     console.log(`Prerendered ${route} (${markup.length} HTML characters)`);
   }
+  console.log(`SEO prerender audit passed for ${auditedCount} public sitemap routes.`);
 
   const appShell = createHtml("/app", null, "", false);
   fs.writeFileSync(path.join(outputDir, "app-shell.html"), appShell);
