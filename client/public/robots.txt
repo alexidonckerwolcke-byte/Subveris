@@ -1,6 +1,35 @@
+# OAI-SearchBot can crawl public content; keep authenticated and API routes out.
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /auth/callback
+Disallow: /calendar
+Disallow: /cost-optimizer
+Disallow: /dashboard
+Disallow: /family-calendar
+Disallow: /family-sharing
+Disallow: /insights
+Disallow: /private
+Disallow: /savings
+Disallow: /settings
+Disallow: /subscriptions
+
+# Googlebot, Bingbot, and other crawlers are allowed unless a route is private.
 User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /api/
+Disallow: /auth/callback
+Disallow: /calendar
+Disallow: /cost-optimizer
+Disallow: /dashboard
+Disallow: /family-calendar
+Disallow: /family-sharing
+Disallow: /insights
 Disallow: /private
+Disallow: /savings
+Disallow: /settings
+Disallow: /subscriptions
 
 Sitemap: https://subveris.com/sitemap.xml
