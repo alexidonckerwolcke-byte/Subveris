@@ -12,6 +12,7 @@ import PricingPage from "../client/src/pages/pricing";
 import BestSubscriptionTrackersPage from "../client/src/pages/best-subscription-trackers";
 import WhySubverisBestSubscriptionManagerPage from "../client/src/pages/why-subveris-best-subscription-manager";
 import DocsPage from "../client/src/pages/docs";
+import SupportPage from "../client/src/pages/support";
 import { ContactPage } from "../client/src/pages/contact";
 import PrivacyPage from "../client/src/pages/privacy";
 import TermsPage from "../client/src/pages/terms";
@@ -44,6 +45,7 @@ const publicPages = new Map<string, React.ComponentType>([
   ["/best-subscription-trackers", BestSubscriptionTrackersPage],
   ["/why-subveris-best-subscription-manager", WhySubverisBestSubscriptionManagerPage],
   ["/docs", DocsPage],
+  ["/support", SupportPage],
   ["/contact", ContactPage],
   ["/privacy", PrivacyPage],
   ["/terms", TermsPage],

@@ -29,7 +29,7 @@ const CLIENT_ROUTES = new Set([
 const APP_SHELL_ROUTES = new Set([
   '/dashboard', '/subscriptions', '/detected-subscriptions', '/insights',
   '/cost-optimizer', '/savings', '/calendar', '/family-sharing', '/family-calendar',
-  '/settings', '/login', '/auth/callback', '/cancel-custom', '/support', '/files',
+  '/settings', '/login', '/auth/callback', '/cancel-custom', '/files',
 ]);
 let DIST_PATH = path.join(__dirname, STATIC_DIR);
 if (!fs.existsSync(DIST_PATH)) {

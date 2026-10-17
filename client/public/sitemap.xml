@@ -136,6 +136,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://subveris.com/support</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://subveris.com/terms</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>

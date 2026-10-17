@@ -77,6 +77,10 @@ try {
       title: "Contact Subveris | Subscription Management Support",
       description: "Contact the Subveris team for help with subscription tracking, usage insights, or your account.",
     },
+    "/support": {
+      title: "Subveris Support | Subscription Management Help",
+      description: "Get help with Subveris subscription tracking, usage insights, renewal management, and account questions.",
+    },
     "/privacy": {
       title: "Subveris Privacy Policy | Data and Account Privacy",
       description: "Read how Subveris handles account, subscription, and usage data and the controls available to users.",

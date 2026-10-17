@@ -138,7 +138,7 @@ function Router({ user }: { user: any }) {
   const publicRoutes = [
     <Route key="home" path="/" component={HomePage} />,
     <Route key="pricing" path="/pricing" component={PublicPricingPage} />,
-    <Route key="pricing" path="/pricing" component={Pricing} />,
+    <Route key="support" path="/support" component={Support} />,
     <Route key="login" path="/login" component={Login} />,
     <Route key="privacy" path="/privacy" component={Privacy} />,
     <Route key="cookies" path="/cookies" component={Cookies} />,
