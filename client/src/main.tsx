@@ -52,4 +52,17 @@ try {
 	console.warn("[react-debug] diagnostics failed", e);
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+const appRoot = document.getElementById("root")!;
+const prerenderedContent = document.getElementById("seo-prerender");
+const root = createRoot(appRoot);
+
+if (prerenderedContent) {
+	const observer = new MutationObserver(() => {
+		if (!appRoot.hasChildNodes()) return;
+		prerenderedContent.remove();
+		observer.disconnect();
+	});
+	observer.observe(appRoot, { childList: true });
+}
+
+root.render(<App />);

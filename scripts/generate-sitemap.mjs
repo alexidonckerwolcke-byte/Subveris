@@ -16,7 +16,9 @@ const commonUrls = [
   "/contact",
 ];
 
-const pageFiles = fs.readdirSync(pagesDir).filter((file) => file.startsWith("cancel-") && file.endsWith(".tsx"));
+const pageFiles = fs.readdirSync(pagesDir).filter((file) =>
+  file.startsWith("cancel-") && file.endsWith(".tsx") && file !== "cancel-custom.tsx"
+);
 const urls = [...commonUrls, ...pageFiles.map((file) => `/${path.basename(file, ".tsx")}`)].sort((a, b) => a.localeCompare(b));
 
 const lines = [
@@ -32,7 +34,6 @@ for (const url of urls) {
 
   lines.push("  <url>");
   lines.push(`    <loc>https://subveris.com${url}</loc>`);
-  lines.push(`    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>`);
   lines.push("    <changefreq>monthly</changefreq>");
   lines.push(`    <priority>${priority}</priority>`);
   lines.push("  </url>");

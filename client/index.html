@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#FF6B35" />
-    <meta name="description" content="Subveris helps you discover wasted subscriptions, optimize recurring payments, and save money with AI-powered subscription optimization." />
+    <meta name="description" content="Track subscriptions, record how often you use them, see cost per use, and review savings opportunities before renewal with Subveris." />
     <meta name="keywords" content="subscription optimization, recurring payments, save money, cancel subscriptions, subscription savings, subscription tracker" />
     
     <!-- Open Graph / Social Media Meta Tags -->
@@ -74,10 +74,40 @@
       }
     }
     </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Subveris",
+      "url": "https://subveris.com/",
+      "description": "Subscription tracking with usage-based cost-per-use insights and renewal management."
+    }
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Subveris",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Web",
+      "url": "https://subveris.com/",
+      "description": "A subscription management platform for tracking recurring costs, recording usage, analyzing cost per use, reviewing savings recommendations, and managing renewals.",
+      "featureList": [
+        "Subscription tracking",
+        "Usage tracking",
+        "Cost-per-use analysis",
+        "Savings recommendations",
+        "Renewal management"
+      ]
+    }
+    </script>
     
     <script src="/init.js" defer></script>
   </head>
   <body>
+    <div id="seo-prerender"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx" defer></script>
   </body>

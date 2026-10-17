@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCurrency } from "@/lib/currency-context";
+import { usePageMeta } from "@/lib/usePageMeta";
 
 interface Plan {
   name: string;
@@ -24,6 +25,12 @@ interface Plan {
 // Plans are now defined inside the component to use localized currency
 
 export default function PricingPage() {
+  usePageMeta({
+    title: "Subveris Pricing | Subscription Tracking Plans",
+    description: "Compare Subveris plans for subscription tracking, usage insights, cost-per-use analysis, and family spending management.",
+    canonical: "https://subveris.com/pricing",
+  });
+
   const { tier: currentTier, subscriptionStatus } = useSubscription();
   const { toast } = useToast();
   const { familyGroupId, isInFamily } = useFamilyDataMode();

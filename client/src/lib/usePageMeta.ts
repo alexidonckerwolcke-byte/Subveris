@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { createContext, useContext, useEffect } from "react";
 
-interface PageMetaParams {
+export interface PageMetaParams {
   title?: string;
   description?: string;
   keywords?: string;
@@ -11,6 +11,8 @@ interface PageMetaParams {
   publishedTime?: string;
   modifiedTime?: string;
 }
+
+export const PageMetaCollectorContext = createContext<((meta: PageMetaParams) => void) | null>(null);
 
 function setMetaTag(attribute: "name" | "property", key: string, value: string) {
   if (typeof document === "undefined") return;
@@ -47,6 +49,9 @@ export function usePageMeta({
   publishedTime,
   modifiedTime,
 }: PageMetaParams) {
+  const collectPageMeta = useContext(PageMetaCollectorContext);
+  collectPageMeta?.({ title, description, keywords, canonical, image, author, type, publishedTime, modifiedTime });
+
   useEffect(() => {
     if (typeof document === "undefined") return;
 

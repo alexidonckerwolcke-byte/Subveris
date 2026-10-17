@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run sitemap:build && vite build && node scripts/prerender-public-pages.mjs",
     "build:extension": "node scripts/build-extension-packages.mjs",
     "preview": "vite preview",
     "start": "node server.js",
@@ -13,7 +13,7 @@
     "cron:monthly": "npm run update-statuses",
     "sitemap:build": "node scripts/generate-sitemap.mjs",
     "cron:weekly-digest": "npx tsx script/send-weekly-digests.ts",
-    "predeploy": "npm run sitemap:build && npm run build",
+    "predeploy": "npm run build",
     "deploy": "gh-pages -d dist/public"
   },
   "dependencies": {

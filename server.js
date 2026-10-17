@@ -12,6 +12,25 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0';
 const STATIC_DIR = process.env.STATIC_DIR || 'dist/public';
+const CLIENT_ROUTES = new Set([
+  '/', '/dashboard', '/subscriptions', '/detected-subscriptions', '/insights',
+  '/cost-optimizer', '/savings', '/calendar', '/family-sharing', '/family-calendar',
+  '/settings', '/pricing', '/privacy', '/login', '/cookies', '/terms', '/security',
+  '/contact', '/docs', '/best-subscription-trackers',
+  '/why-subveris-best-subscription-manager', '/cancel-netflix', '/cancel-amazon-prime',
+  '/cancel-spotify', '/cancel-adobe', '/cancel-hellofresh', '/cancel-disney-plus',
+  '/cancel-youtube-premium', '/cancel-icloud', '/cancel-xbox-game-pass',
+  '/cancel-playstation-plus', '/cancel-hbo-max', '/cancel-viaplay',
+  '/cancel-tinder-gold', '/cancel-duolingo', '/cancel-microsoft-365',
+  '/cancel-canva-pro', '/cancel-linkedin-premium', '/cancel-nordvpn',
+  '/cancel-audible', '/cancel-readly', '/cancel-custom', '/support', '/files',
+  '/auth/callback', '/auth/callback/',
+]);
+const APP_SHELL_ROUTES = new Set([
+  '/dashboard', '/subscriptions', '/detected-subscriptions', '/insights',
+  '/cost-optimizer', '/savings', '/calendar', '/family-sharing', '/family-calendar',
+  '/settings', '/login', '/auth/callback', '/cancel-custom', '/support', '/files',
+]);
 let DIST_PATH = path.join(__dirname, STATIC_DIR);
 if (!fs.existsSync(DIST_PATH)) {
   const fallbackPath = path.join(__dirname, 'public');
@@ -2090,13 +2109,26 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Static file serving
+  const routePath = urlPath === '/' ? '/' : urlPath.replace(/\/+$/, '');
   if (urlPath === '/') urlPath = '/index.html';
 
   let filePath = path.join(DIST_PATH, urlPath);
+  let responseStatus = 200;
 
-  // If file doesn't exist and it's not an asset, serve index.html (SPA routing)
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+    filePath = path.join(filePath, 'index.html');
+  }
+
+  // Serve private routes from a noindex shell and unknown routes as real 404s.
   if (!fs.existsSync(filePath) && !path.extname(urlPath)) {
-    filePath = path.join(DIST_PATH, 'index.html');
+    if (APP_SHELL_ROUTES.has(routePath) && fs.existsSync(path.join(DIST_PATH, 'app-shell.html'))) {
+      filePath = path.join(DIST_PATH, 'app-shell.html');
+    } else if (CLIENT_ROUTES.has(routePath)) {
+      filePath = path.join(DIST_PATH, 'index.html');
+    } else {
+      filePath = path.join(DIST_PATH, '404.html');
+      responseStatus = 404;
+    }
   }
 
   // Security: prevent directory traversal
@@ -2120,6 +2152,8 @@ const server = http.createServer(async (req, res) => {
       '.css': 'text/css',
       '.js': 'application/javascript',
       '.json': 'application/json',
+      '.txt': 'text/plain; charset=utf-8',
+      '.xml': 'application/xml; charset=utf-8',
       '.svg': 'image/svg+xml',
       '.png': 'image/png',
       '.ico': 'image/x-icon',
@@ -2145,12 +2179,12 @@ const server = http.createServer(async (req, res) => {
       : 'public, max-age=31536000, immutable';
 
     let responseBody = data;
-    if (isHtmlResponse && filePath.endsWith(path.join(DIST_PATH, 'index.html'))) {
+    if (isHtmlResponse && ext === '.html') {
       const html = data.toString('utf-8');
       responseBody = Buffer.from(injectRuntimeConfig(html));
     }
 
-    res.writeHead(200, {
+    res.writeHead(responseStatus, {
       'Content-Type': contentType,
       'Cache-Control': cacheControl,
     });

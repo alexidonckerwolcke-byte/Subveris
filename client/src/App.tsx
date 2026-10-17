@@ -76,6 +76,14 @@ const ContactPage = lazy(async () => {
   return { default: mod.ContactPage };
 });
 
+function PublicPricingPage() {
+  return (
+    <SubscriptionProvider>
+      <Pricing />
+    </SubscriptionProvider>
+  );
+}
+
 function Router({ user }: { user: any }) {
   const authRoutes = [
     <Route key="dashboard" path="/" component={Dashboard} />,
@@ -129,6 +137,8 @@ function Router({ user }: { user: any }) {
 
   const publicRoutes = [
     <Route key="home" path="/" component={HomePage} />,
+    <Route key="pricing" path="/pricing" component={PublicPricingPage} />,
+    <Route key="pricing" path="/pricing" component={Pricing} />,
     <Route key="login" path="/login" component={Login} />,
     <Route key="privacy" path="/privacy" component={Privacy} />,
     <Route key="cookies" path="/cookies" component={Cookies} />,
