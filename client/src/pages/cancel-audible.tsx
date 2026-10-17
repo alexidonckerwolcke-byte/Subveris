@@ -60,9 +60,9 @@ export default function CancelAudiblePage() {
             <div className="flex gap-4">
               <AlertCircle className="h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400" />
               <div>
-                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">Use Your Credits or Lose Them</h2>
+                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">Review unused credits before canceling</h2>
                 <p className="mt-2 text-base leading-8 text-red-800 dark:text-red-300">
-                  Be incredibly careful: the moment you cancel your Audible membership, any unused audiobook credits you've accumulated disappear forever. Amazon will not carry them over and will not refund them. Go through your account right now and spend every single open credit on audiobooks. Books purchased with credits remain yours to keep and listen to forever inside the app, even after your paid subscription is completely dead.
+                  Before you confirm, check Audible's cancellation screen and membership terms for what happens to unused credits on your plan and marketplace. Membership credits and audiobooks you already purchased can be treated differently; do not assume either will be retained or removed without checking the terms shown for your account.
                 </p>
               </div>
             </div>
@@ -86,7 +86,7 @@ export default function CancelAudiblePage() {
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-emerald-50">
-            Tired of hidden charges and sneaky auto-renewals? Add your subscriptions to Subveris for free. Get an automatic alert before you get charged, so you never miss a cancellation deadline again.
+            Track Audible's renewal date and recorded listening alongside your other subscriptions, then review the membership before its next billing date.
           </p>
           <button
             type="button"

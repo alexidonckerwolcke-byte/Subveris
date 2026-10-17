@@ -59,9 +59,9 @@ export default function CancelReadlyPage() {
             <div className="flex gap-4">
               <AlertCircle className="h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400" />
               <div>
-                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">The 24-Hour Cutoff</h2>
+                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">Check the cutoff for your billing source</h2>
                 <p className="mt-2 text-base leading-8 text-red-800 dark:text-red-300">
-                  Readly enforces a strict cancellation deadline: you must cancel your subscription at least 24 hours before your next scheduled renewal date. Because it's an app people easily forget about after reading a few specific issues, always check your inbox for an official cancellation receipt email immediately after going through the steps. If you don't receive that email, the system might not have registered it, locking you into another paid month.
+                  Check the renewal date and any cancellation deadline shown in your Readly account or by the store or provider that bills you. Do not rely on a universal 24-hour rule. After canceling, verify the account shows a canceled state or end date and keep the confirmation for your records.
                 </p>
               </div>
             </div>
@@ -85,7 +85,7 @@ export default function CancelReadlyPage() {
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-emerald-50">
-            Tired of hidden charges and sneaky auto-renewals? Add your subscriptions to Subveris for free. Get an automatic alert before you get charged, so you never miss a cancellation deadline again.
+            Review Readly's recurring cost against the reading use you record, and check its account-specific renewal cutoff before the next period.
           </p>
           <button
             type="button"

@@ -105,7 +105,7 @@ export default function CancelHBOMaxPage() {
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-emerald-50">
-            Tired of hidden charges and sneaky auto-renewals? Add your subscriptions to Subveris for free. Get an automatic alert before you get charged, so you never miss a cancellation deadline again.
+            Record HBO Max's renewal date and who bills the plan so you can review the right account before the next charge.
           </p>
           <button
             type="button"

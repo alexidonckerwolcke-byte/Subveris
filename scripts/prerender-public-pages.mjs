@@ -188,6 +188,7 @@ try {
       throw new Error(`${route} Open Graph URL does not match its canonical`);
     }
 
+    const schemas = [];
     for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
       let schema;
       try {
@@ -195,6 +196,7 @@ try {
       } catch {
         throw new Error(`${route} contains invalid JSON-LD`);
       }
+      schemas.push(schema);
       const inspect = (value) => {
         if (typeof value === "string" && /^https?:\/\//i.test(value)) {
           if (new URL(value).hostname.toLowerCase() === "www.subveris.com") {
@@ -209,10 +211,43 @@ try {
       inspect(schema);
     }
 
+    if (route.startsWith("/cancel-")) {
+      const faqSchema = schemas.find((schema) => schema["@type"] === "FAQPage");
+      const faqSection = document.querySelector("#faq");
+      const questions = [...(faqSection?.querySelectorAll("h3") || [])];
+      const visibleFaqs = questions.map((heading) => ({
+        question: heading.textContent?.trim() || "",
+        answer: heading.parentElement?.querySelector("p")?.textContent?.trim() || "",
+      }));
+      const structuredFaqs = faqSchema?.mainEntity || [];
+
+      if (visibleFaqs.length !== 3 || structuredFaqs.length !== 3) {
+        throw new Error(`${route} must render exactly three visible FAQ items and matching FAQ JSON-LD`);
+      }
+      for (let index = 0; index < visibleFaqs.length; index += 1) {
+        if (
+          visibleFaqs[index].question !== structuredFaqs[index].name ||
+          visibleFaqs[index].answer !== structuredFaqs[index].acceptedAnswer?.text
+        ) {
+          throw new Error(`${route} visible FAQ content does not match its FAQ JSON-LD`);
+        }
+      }
+      const answers = structuredFaqs.map((faq) => faq.acceptedAnswer?.text || "");
+      if (new Set(answers).size !== answers.length) {
+        throw new Error(`${route} repeats an FAQ answer within the guide`);
+      }
+      const answerSignature = answers.join("\n");
+      if (cancellationFaqAnswerSets.has(answerSignature)) {
+        throw new Error(`${route} duplicates another cancellation guide's FAQ answers`);
+      }
+      cancellationFaqAnswerSets.add(answerSignature);
+    }
+
     dom.window.close();
   }
 
   let auditedCount = 0;
+  const cancellationFaqAnswerSets = new Set();
   for (const route of publicPaths) {
     const { markup, pageMeta } = renderer.renderPublicPage(route);
     const html = createHtml(route, pageMeta, markup, true);

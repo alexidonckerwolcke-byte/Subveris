@@ -31,9 +31,9 @@ const reasons = [
 ];
 
 const outcomes = [
-  "You can keep your current plan active until the next scheduled delivery window closes.",
-  "You must cancel before the 11:59 PM PST cutoff five days before your next box.",
-  "You will avoid further weekly charges once the cancellation is confirmed.",
+  "The next box may still be scheduled if its account-specific cutoff has passed.",
+  "Use the deadline shown for your next order and location; delivery cutoffs can vary.",
+  "After canceling, confirm the plan is inactive and no upcoming delivery remains scheduled.",
   "You regain control of your household food budget and recurring expenses.",
 ];
 

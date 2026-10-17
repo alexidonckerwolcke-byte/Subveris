@@ -60,9 +60,9 @@ export default function CancelMicrosoft365Page() {
             <div className="flex gap-4">
               <AlertCircle className="h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400" />
               <div>
-                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">The "Recurring Billing" Phrase</h2>
+                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">Turning off renewal versus ending access</h2>
                 <p className="mt-2 text-base leading-8 text-red-800 dark:text-red-300">
-                  Microsoft deliberately hides the hard "Cancel" button behind the confusing phrasing "Turn off recurring billing". This throws a lot of people off, making them think they are completely deleting their account or files. Don't worry: turning this off is exactly what you want. It means you keep full access to your software and files until your current paid period officially ends, after which it expires quietly without an automatic credit card charge.
+                  Microsoft may offer "Turn off recurring billing" instead of ending access immediately. Read the confirmation page for the effective date, billing change, and any access or storage impact for your plan. Turning off renewal is not the same as deleting your Microsoft account.
                 </p>
               </div>
             </div>
@@ -87,7 +87,7 @@ export default function CancelMicrosoft365Page() {
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-emerald-50">
-            Tired of hidden charges and sneaky auto-renewals? Add your subscriptions to Subveris for free. Get an automatic alert before you get charged, so you never miss a cancellation deadline again.
+            Keep Microsoft 365's renewal date and recorded use visible, then review the plan's value and storage implications before changing it.
           </p>
           <button
             type="button"

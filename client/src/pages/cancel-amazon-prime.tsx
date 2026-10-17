@@ -24,10 +24,10 @@ const steps = [
 ];
 
 const afterCancellation = [
-  "You'll continue to enjoy Prime benefits until the end of your current billing period.",
-  "Your membership won't renew automatically.",
-  "Once your membership expires, you'll lose access to Prime Video, Prime Gaming, Prime Reading, Amazon Music Prime, and free Prime shipping.",
-  "In some cases, you may be eligible for a full or partial refund depending on Amazon's policies.",
+  "Use the end date and refund option shown by Amazon; available choices can depend on recent use, plan, marketplace, and billing source.",
+  "Return to Prime Membership and verify that automatic renewal is off or that an end date is displayed.",
+  "Review which bundled Prime benefits will end on the date shown before completing cancellation.",
+  "If another provider billed the membership, confirm the change with that provider as well.",
 ];
 
 const reasons = [

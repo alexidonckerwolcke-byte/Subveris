@@ -9,12 +9,12 @@ const steps = [
   {
     title: "Step 1: Check your plan and commitment",
     description:
-      "Sign in to your Adobe account at adobe.com, open Manage Plan, and review your subscription type. If you chose an annual plan paid monthly, Adobe can charge 50% of the remaining contract value if you cancel early.",
+      "Sign in to your Adobe account at adobe.com, open Manage Plan, and review the plan name, billing term, renewal date, and any commitment shown. Annual plans billed monthly can have early-cancellation terms; use the amount Adobe displays for your specific plan and region.",
   },
   {
-    title: "Step 2: Use the plan switch trick to avoid fees",
+    title: "Step 2: Review the cancellation terms before confirming",
     description:
-      "If Adobe is trying to charge an early cancellation fee, switch to a cheaper plan such as Photography or a single app. After the change is processed, wait 24 hours and then cancel the new plan within its 14-day window to avoid the fee.",
+      "Read Adobe's final cancellation screen for any fee, remaining commitment, and access end date. If the amount is unexpected or unclear, pause and ask Adobe support to explain the terms before confirming. Do not switch plans as a workaround unless Adobe confirms how the new plan changes your commitment.",
   },
   {
     title: "Step 3: Confirm the cancellation",
@@ -31,9 +31,9 @@ const reasons = [
 ];
 
 const benefits = [
-  "You can keep your current plan until the end of the billing cycle.",
-  "You can avoid or reduce early termination fees by switching plans first.",
-  "You can cancel within the new plan's 14-day window without extra charges.",
+  "Access duration and refund eligibility depend on the plan and option Adobe displays before you confirm.",
+  "Any early-cancellation fee or remaining commitment should be shown for your specific plan before you confirm.",
+  "Do not rely on changing plans to avoid a fee; review the new plan's terms and ask Adobe to explain any unclear charge.",
   "You regain control over your software budget and recurring expenses.",
 ];
 

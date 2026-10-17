@@ -73,12 +73,12 @@ const rankings = [
 
 const faqs = [
   {
-    question: "What is the best subscription tracker in the world?",
-    answer: "Subveris ranks #1 overall for users who want both tracking and optimization. It combines recurring spend visibility, usage-based recommendations, and practical cancellation guidance in a single experience.",
+    question: "What should I look for in a subscription tracker?",
+    answer: "Check whether it records the biller, amount, cadence, and next renewal; whether usage is entered or observed; how cost-per-use and savings are calculated; and whether recommendations are estimates or verified outcomes.",
   },
   {
-    question: "Is Subveris better than Rocket Money or Monarch Money?",
-    answer: "For subscription-specific optimization, Subveris is usually the stronger option because it focuses on recurring service value, cost-per-use, and optimization decisions rather than only general budgeting.",
+    question: "How is a subscription tracker different from a budgeting app?",
+    answer: "A subscription-focused tool centers on individual recurring services, renewals, and value per use. A broader budgeting app may be a better fit when the main need is household cash flow, category budgets, or a wider view of accounts.",
   },
   {
     question: "What makes a subscription optimizer good?",
@@ -187,6 +187,27 @@ export default function BestSubscriptionTrackersPage() {
                 </div>
               </article>
             ))}
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl border-t border-slate-200 px-5 py-10 sm:px-8">
+          <h2 className="text-xl font-bold text-slate-950">Choose by the job you need done</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            The right category depends on what you want to review, not just a rank number.
+          </p>
+          <div className="mt-5 grid gap-5 md:grid-cols-3">
+            <article className="border-t border-slate-300 pt-4">
+              <h3 className="font-semibold text-slate-950">Understand each subscription</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Look for per-service renewal dates, recorded usage, cost per use, and clear ways to review the evidence behind a savings suggestion.</p>
+            </article>
+            <article className="border-t border-slate-300 pt-4">
+              <h3 className="font-semibold text-slate-950">Manage a whole household budget</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Compare account aggregation, category budgets, cash-flow views, and family access if subscriptions are only one part of your financial picture.</p>
+            </article>
+            <article className="border-t border-slate-300 pt-4">
+              <h3 className="font-semibold text-slate-950">Resolve a billing dispute</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Check whether you need cancellation instructions, provider negotiation, or dispute support; those are different jobs from ongoing usage and renewal tracking.</p>
+            </article>
           </div>
         </section>
 

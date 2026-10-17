@@ -60,9 +60,9 @@ export default function CancelNordVPNPage() {
             <div className="flex gap-4">
               <AlertCircle className="h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400" />
               <div>
-                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">The Multi-Step Confirmation Maze</h2>
+                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">Check the renewal price and billing source</h2>
                 <p className="mt-2 text-base leading-8 text-red-800 dark:text-red-300">
-                  NordVPN relies heavily on aggressive auto-renewals that automatically charge you the full, non-discounted retail price once your initial promotional contract ends. When you click cancel on their dashboard, they put you through a multi-page survey to make you stop. Even worse: they often send a confirmation email containing a final link. If you don't open that specific email and click that link within a certain timeframe, your cancellation is marked as void and they will bill you anyway.
+                  Review the next renewal date and price shown in your Nord Account before changing the plan. If Apple, Google Play, or another partner billed the purchase, manage it with that provider. Follow any confirmation steps displayed, then return to the account and verify auto-renewal is off; do not assume an email link is required unless the account explicitly says so.
                 </p>
               </div>
             </div>
@@ -75,7 +75,7 @@ export default function CancelNordVPNPage() {
               <li className="list-decimal leading-7">Navigate to the <strong>Billing</strong> section on the left sidebar.</li>
               <li className="list-decimal leading-7">Click on the <strong>Subscriptions</strong> tab at the top.</li>
               <li className="list-decimal leading-7">Click <strong>Manage</strong> next to <strong>Auto-Renewal</strong> and select <strong>Turn off auto-renewal</strong>.</li>
-              <li className="list-decimal leading-7"><strong>Crucial:</strong> Check your email inbox immediately for NordVPN's verification email and click the confirmation link inside to officially freeze your billing.</li>
+              <li className="list-decimal leading-7">Return to the Subscriptions page and confirm auto-renewal is off and the access end date is shown. Save any confirmation email if one is sent.</li>
             </ol>
           </section>
         </div>
@@ -87,7 +87,7 @@ export default function CancelNordVPNPage() {
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-emerald-50">
-            Tired of hidden charges and sneaky auto-renewals? Add your subscriptions to Subveris for free. Get an automatic alert before you get charged, so you never miss a cancellation deadline again.
+            Track NordVPN's renewal date and billing source alongside other services, and verify auto-renewal in the account that charges you.
           </p>
           <button
             type="button"

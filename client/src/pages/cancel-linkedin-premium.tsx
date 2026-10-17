@@ -60,9 +60,9 @@ export default function CancelLinkedInPremiumPage() {
             <div className="flex gap-4">
               <AlertCircle className="h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400" />
               <div>
-                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">The Disappearing InMail Credits</h2>
+                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">Review plan-specific credits before confirming</h2>
                 <p className="mt-2 text-base leading-8 text-red-800 dark:text-red-300">
-                  The absolute second you hit that final confirmation button to cancel LinkedIn Premium, any unused, accumulated InMail credits vanish instantly. Unlike other services where you can use what you paid for until the end of the month, LinkedIn strips them away immediately. Make sure to burn through every single open credit to pitch employers, network, or message clients before you start the cancellation process.
+                  Before confirming, read the cancellation screen for how your plan handles unused InMail credits and when Premium features end. Credit treatment can depend on the offer and billing arrangement, so rely on the terms shown for your account rather than assuming credits remain usable or disappear immediately.
                 </p>
               </div>
             </div>
@@ -91,7 +91,7 @@ export default function CancelLinkedInPremiumPage() {
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-emerald-50">
-            Tired of hidden charges and sneaky auto-renewals? Add your subscriptions to Subveris for free. Get an automatic alert before you get charged, so you never miss a cancellation deadline again.
+            Compare LinkedIn Premium's recorded use and renewal date with your other career-tool costs before deciding whether to keep it.
           </p>
           <button
             type="button"

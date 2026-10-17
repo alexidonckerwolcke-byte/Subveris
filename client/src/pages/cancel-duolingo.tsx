@@ -60,9 +60,9 @@ export default function CancelDuolingoPage() {
             <div className="flex gap-4">
               <AlertCircle className="h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400" />
               <div>
-                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">The Psychological Progress Threat</h2>
+                <h2 className="text-xl font-semibold text-red-900 dark:text-red-200">Your paid plan and learning account are separate</h2>
                 <p className="mt-2 text-base leading-8 text-red-800 dark:text-red-300">
-                  When you hit the cancel button, Duolingo deploys heavy psychological guilt-tripping tactics. They flash alarming warnings claiming you will lose your daily streak and entirely wipe out your hard-earned language progress. This is pure marketing psychology designed to scare you into maintaining your paid membership. Your language history, streaks, and data are 100% safe. Your account simply downgrades to the free, ad-supported tier once your current paid billing period runs out.
+                  Canceling the paid plan is different from deleting your Duolingo account. Review the confirmation screen for the plan end date and account changes, and keep your login if you want to continue with the free experience. If the subscription was purchased through Apple or Google Play, make the change in that store and verify it there.
                 </p>
               </div>
             </div>
@@ -79,9 +79,9 @@ export default function CancelDuolingoPage() {
           </section>
 
           <section className="rounded-[24px] border border-slate-200/80 bg-white/75 p-7 shadow-[0_15px_50px_-25px_rgba(15,23,42,0.28)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
-            <h2 className="text-2xl font-semibold tracking-tight">Your progress is always safe</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">Keep access to the account you want</h2>
             <p className="mt-3 text-base leading-8 text-slate-600 dark:text-slate-300">
-              Canceling your premium subscription does not delete or reset your learning progress. You can access all your completed lessons, streaks, and language data anytime by logging back into your free Duolingo account.
+              Use the same Duolingo login after the paid plan ends. If you are concerned about progress or account access, confirm the account and plan shown before approving cancellation; do not delete the account as a way to stop billing.
             </p>
           </section>
         </div>
@@ -93,7 +93,7 @@ export default function CancelDuolingoPage() {
         <section className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-br from-emerald-600 via-emerald-500 to-cyan-600 p-8 text-white shadow-[0_25px_90px_-35px_rgba(5,150,105,0.6)]">
           <h2 className="text-3xl font-semibold tracking-tight">Stop hidden charges before they happen</h2>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-emerald-50">
-            Tired of hidden charges and sneaky auto-renewals? Add your subscriptions to Subveris for free. Get an automatic alert before you get charged, so you never miss a cancellation deadline again.
+            Compare Duolingo's recurring cost with the usage you record, and review the paid plan when your learning routine changes.
           </p>
           <button
             type="button"
