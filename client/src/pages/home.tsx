@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { AuthModal } from "@/components/auth-modal";
 import { CurrencySelector } from "@/components/currency-selector";
 import { usePageMeta } from "@/lib/usePageMeta";
+import { PRODUCT_POSITIONING } from "@/lib/product-positioning";
 import {
   TrendingUp,
   Shield,
@@ -44,8 +45,8 @@ import {
 
 export default function HomePage() {
   usePageMeta({
-    title: "Subveris | Subscription Optimization to Save Money on Recurring Payments",
-    description: "Subveris helps you understand recurring spending, compare subscription value by usage, and review services that may no longer fit your budget.",
+    title: "Subveris | Subscription Tracking Through Usage and Cost per Use",
+    description: PRODUCT_POSITIONING.description,
     keywords: "subscription optimization, recurring payments, save money, cancel subscriptions, subscription savings, subscription tracker",
     canonical: "https://subveris.com/",
   });
@@ -123,12 +124,12 @@ export default function HomePage() {
     {
       icon: DollarSign,
       title: "Cost Per Use",
-      description: "Know what each subscription actually costs you per session so you can optimize spend and keep only the highest-value services.",
+      description: "Estimate what each subscription costs per recorded session and use that context when reviewing your recurring spend.",
     },
     {
       icon: Zap,
       title: "Optional Browser Signals",
-      description: "Add the optional cross-browser extension (Chrome, Edge, Firefox, Safari) when you want richer usage signals in your subscription overview.",
+      description: "Enable the optional browser extension when you want supported usage signals included in your subscription overview.",
     },
     {
       icon: Brain,
@@ -237,16 +238,16 @@ export default function HomePage() {
         >
           <Badge variant="secondary" className="home-hero-kicker mb-6 px-4 py-2 text-sm font-semibold">
             <Sparkles className="h-3 w-3 mr-2" />
-            The Subscription Optimization Platform
+            Subscription Tracking and Usage Insights
           </Badge>
 
           <h1 className="home-hero-title text-6xl md:text-7xl font-bold tracking-tighter mb-8 leading-tight">
-            Find the subscriptions you don't use{" "}
-            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">before they renew again.</span>
+            See what you pay, how you use it, and{" "}
+            <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">what renews next.</span>
           </h1>
 
           <p className="home-hero-copy text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed font-light">
-            See your recurring spend, understand what each service costs per use, and review the subscriptions that may no longer earn their place in your budget.
+            {PRODUCT_POSITIONING.short}
             <br />
             <span className="font-semibold text-foreground">Start with the services you already pay for.</span>
           </p>
@@ -369,7 +370,7 @@ export default function HomePage() {
             {[{
               icon: Shield,
               title: 'No bank data required',
-              text: 'Subveris does not require bank credentials, payment details, or account linking to help you track and optimize recurring services.',
+              text: 'You can add and review subscriptions without connecting a bank account. Optional browser usage signals can add context when you enable them.',
               color: 'bg-emerald-100 text-emerald-700',
             }, {
               icon: Lock,
@@ -406,9 +407,9 @@ export default function HomePage() {
           </div>
           <div className="home-capability-grid mt-16 grid gap-5 sm:grid-cols-3 text-left">
             {[
-              { icon: DollarSign, title: 'Cost Per Use Intelligence', text: 'Understand the real value of every subscription and uncover exactly which services are worth keeping.', color:'bg-primary/10 text-primary', iconColor:'text-primary' },
-              { icon: BarChart3, title: 'Renewal Risk Intelligence', text: 'Find subscriptions that are about to renew, flag services with low return, and keep your budget from leaking.', color:'bg-blue-500/10 text-blue-600', iconColor:'text-blue-600' },
-              { icon: Sparkles, title: 'Optimization Workflows', text: 'Turn insights into action with recommendations, plan change suggestions, and savings opportunities you can act on now.', color:'bg-green-500/10 text-green-600', iconColor:'text-green-600' },
+              { icon: DollarSign, title: 'Estimated Cost per Use', text: 'Compare subscription costs with the usage you record to get another perspective on recurring value.', color:'bg-primary/10 text-primary', iconColor:'text-primary' },
+              { icon: BarChart3, title: 'Renewal Review', text: 'See upcoming renewal dates alongside recorded usage so you can review services before they renew.', color:'bg-blue-500/10 text-blue-600', iconColor:'text-blue-600' },
+              { icon: Sparkles, title: 'Possible Savings', text: 'Review data-based recommendations and decide whether to keep, change, or cancel a service.', color:'bg-green-500/10 text-green-600', iconColor:'text-green-600' },
             ].map((item, index) => (
               <motion.div
                 key={item.title}
@@ -529,13 +530,13 @@ export default function HomePage() {
             transition={{ ...revealTransition, duration: 0.65, delay: 0.05 }}
           >
             <h2 className="text-5xl font-bold mb-8 tracking-tight">
-              The Future of Recurring Spending
+              A Clearer View of Your Subscriptions
             </h2>
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-              We believe recurring digital spending will define modern finances. Our mission is to build the infrastructure layer that helps people optimize, control, and understand every recurring payment—not just subscriptions.
+              Subveris brings subscription costs, recorded usage, and renewal dates together so people can review recurring services with better context.
             </p>
             <p className="text-lg text-foreground font-medium">
-              We're not just a tool. We're building the future of financial awareness.
+              A focused tool for subscription tracking and review.
             </p>
           </motion.div>
         </div>
@@ -979,10 +980,10 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-6xl font-bold mb-8 tracking-tight">
-              Start Optimizing Your Subscriptions Today
+              Start Tracking and Reviewing Your Subscriptions
             </h2>
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-              Start saving money and gain complete control over your recurring spending.
+              Record usage, estimate cost per use, and review upcoming renewals and possible savings.
             </p>
 
             <div className="home-cta-proof bg-white border border-border/50 rounded-lg p-6 mb-8 max-w-2xl mx-auto dark:bg-slate-900/70">

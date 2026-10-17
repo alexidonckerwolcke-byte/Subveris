@@ -5,8 +5,8 @@ const menuItems = [
   { label: "Getting Started", id: "getting-started" },
   { label: "User Guide", id: "user-guide" },
   { label: "Browser Extension", id: "browser-extension" },
-  { label: "How Subscription Optimization Works", id: "how-subscription-optimization-works" },
-  { label: "AI & Accuracy", id: "ai-accuracy" },
+  { label: "How Subscription Review Works", id: "how-subscription-optimization-works" },
+  { label: "Recommendations & Accuracy", id: "ai-accuracy" },
   { label: "API Documentation", id: "api-documentation" },
   { label: "Managing Your Account", id: "managing-your-account" },
   { label: "Troubleshooting", id: "troubleshooting" },
@@ -57,19 +57,19 @@ const DocsPage: React.FC = () => {
       </aside>
       <main className="prose min-w-0 max-w-none flex-1 px-4 py-8 dark:prose-invert sm:px-8 lg:prose-lg">
         <h1>Subveris Documentation</h1>
-        <p>Welcome to the official documentation for Subveris, your all-in-one subscription optimization and analytics platform. All information is available on this page.</p>
+        <p>Welcome to the official documentation for Subveris, a subscription tracking and review tool. Add recurring services, record usage, estimate cost per use, and review renewals and possible savings. A bank connection is not required.</p>
         <hr />
       <div ref={sectionRefs["getting-started"]} id="getting-started">
       <section>
       <h2>Getting Started</h2>
-      <p>Subveris is a modern SaaS platform that helps you optimize, analyze, and control your recurring subscriptions. Whether you have streaming services, SaaS tools, or memberships, Subveris gives you clarity and control.</p>
+      <p>Subveris helps you track recurring services, record how you use them, see estimated cost per use and upcoming renewals, and review possible savings. Browser-extension usage signals are optional, and you decide what to keep, change, or cancel.</p>
       <h3>What Subveris Does</h3>
       <ul>
-        <li>Brings all your subscriptions into one optimization workspace</li>
-        <li>Analyzes usage and cost per use to help you save money</li>
-        <li>Flags inactive subscriptions and suggests savings actions</li>
+        <li>Brings the recurring services you add into one tracking view</li>
+        <li>Compares costs with recorded usage to estimate cost per use</li>
+        <li>Highlights services you may want to review before renewal</li>
         <li>Integrates with Stripe for secure premium payments</li>
-        <li>Provides actionable insights to optimize your spending</li>
+        <li>Provides data-based recommendations to help you review recurring spending</li>
       </ul>
       <h3>What Subveris Does NOT Do</h3>
       <ul>
@@ -98,10 +98,10 @@ const DocsPage: React.FC = () => {
     <section>
       <h2>User Guide</h2>
       <h3>Dashboard Overview</h3>
-      <p>The dashboard is your command center for subscription optimization. Here's what you'll find:</p>
+      <p>The dashboard brings together the subscription details and usage information you choose to record. Here's what you'll find:</p>
       <ul>
         <li><b>Subscriptions Tab:</b> View all your subscriptions with cost, usage, and savings potential</li>
-        <li><b>Insights Tab:</b> Deep dive into analytics and AI recommendations to cut waste</li>
+        <li><b>Insights Tab:</b> Review analytics and recommendations based on your subscription and usage data</li>
         <li><b>Calendar Tab:</b> Track renewals and schedule savings actions before bills hit</li>
         <li><b>Family Sharing Tab:</b> Coordinate shared services and reduce collective spend (Premium feature)</li>
       </ul>
@@ -121,7 +121,7 @@ const DocsPage: React.FC = () => {
       <h3>Optimizing Usage</h3>
       <ul>
         <li>Log usage manually by clicking "Log Usage" on a subscription</li>
-        <li>Subveris uses your usage data to calculate cost per use and optimize your spend</li>
+        <li>Subveris uses recorded usage to estimate cost per use and help you review your spending</li>
         <li>Subscriptions with zero usage are flagged as potential cancellations
 </li>
       </ul>
@@ -137,7 +137,7 @@ const DocsPage: React.FC = () => {
     <div ref={sectionRefs["browser-extension"]} id="browser-extension">
     <section>
       <h2>Browser Extension</h2>
-      <p>The Subveris browser extension automatically discovers and tracks your subscriptions. It's currently available on Chrome, Edge, and Firefox. Safari support is coming soon.</p>
+      <p>The optional Subveris browser extension can add usage signals from supported service domains to your subscription overview. It is available on Chrome, Edge, and Firefox; Safari support is coming soon.</p>
       
       <h3>What the Extension Does</h3>
       <ul>
@@ -269,14 +269,14 @@ const DocsPage: React.FC = () => {
     <hr />
     <div ref={sectionRefs["how-subscription-optimization-works"]} id="how-subscription-optimization-works">
     <section>
-      <h2>How Subscription Optimization Works</h2>
-      <p>Subveris uses a combination of user input, smart analytics, and optional integrations to help you optimize your recurring spending, identify waste, and prioritize savings actions.</p>
+      <h2>How Subscription Review Works</h2>
+      <p>Subveris uses the subscription details and usage information you provide, along with optional integrations, to help you review recurring spending and possible savings.</p>
       <h3>Workflow Overview</h3>
       <ol>
         <li>Add Subscriptions: Enter details such as name, cost, renewal date, and category.</li>
         <li>Capture Usage: Log usage manually or connect supported integrations (where available).</li>
-        <li>Analyze: View cost per use, monthly spend, and get recommendations.</li>
-        <li>Take Action: Cancel, upgrade, or adjust subscriptions as needed.</li>
+        <li>Review: See estimated cost per use, monthly spend, renewal dates, and recommendations.</li>
+        <li>Decide: Choose whether to keep, change, or cancel a service, then complete changes with its provider.</li>
       </ol>
       <h3>Feature Logic</h3>
       <ul>
@@ -285,11 +285,11 @@ const DocsPage: React.FC = () => {
         <li>Premium Feature Reset: Canceling premium disables advanced analytics and prevents further Stripe billing.</li>
         <li>Stripe Webhook Integration: Ensures your premium status and billing are always in sync with your Stripe account.</li>
       </ul>
-      <h3>AI Limitations</h3>
+      <h3>Recommendation limits</h3>
       <ul>
-        <li>AI recommendations are based on your input and available usage data.</li>
+        <li>Recommendations are generated from subscription details and recorded usage; they are prompts for review, not guaranteed savings.</li>
         <li>Subveris cannot access or analyze your bank transactions directly.</li>
-        <li>AI cannot cancel subscriptions for you; it can only suggest actions.</li>
+        <li>Subveris does not cancel subscriptions for you; you complete any changes with the provider.</li>
       </ul>
       <h3>Required Inputs</h3>
       <ul>
@@ -301,17 +301,17 @@ const DocsPage: React.FC = () => {
     <hr />
     <div ref={sectionRefs["ai-accuracy"]} id="ai-accuracy">
     <section>
-      <h2>AI & Accuracy</h2>
+      <h2>Recommendations & Accuracy</h2>
       <h3>How Accurate Are the Analytics?</h3>
       <ul>
         <li>Analytics are only as accurate as the data you provide.</li>
-        <li>Integrations (where available) can improve accuracy by automating usage-based optimization.</li>
-        <li>AI suggestions are transparent and explainable—no "black box" decisions.</li>
+        <li>Optional supported browser signals can add usage context when enabled.</li>
+        <li>Recommendations are based on the subscription and usage information available in your account.</li>
       </ul>
       <h3>Limitations</h3>
       <ul>
         <li>Manual data entry may lead to incomplete analytics.</li>
-        <li>AI cannot predict future price changes or service disruptions.</li>
+        <li>Subveris cannot predict future price changes or service disruptions.</li>
         <li>Recommendations are suggestions, not financial advice.</li>
       </ul>
     </section>

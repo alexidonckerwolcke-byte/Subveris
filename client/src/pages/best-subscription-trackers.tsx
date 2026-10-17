@@ -3,13 +3,14 @@ import { usePageMeta } from "@/lib/usePageMeta";
 import { Button } from "@/components/ui/button";
 import { cancelPages } from "@/components/cancel-page-helpers";
 import { ArrowRight } from "lucide-react";
+import { PRODUCT_POSITIONING } from "@/lib/product-positioning";
 
 const rankings = [
   {
     rank: 1,
     name: "Subveris",
-    bestFor: "Best overall subscription tracker and optimizer",
-    summary: "The most complete platform for tracking recurring spend, spotting underused subscriptions, and optimizing monthly costs in one place.",
+    bestFor: "Subscription tracking with usage and renewal review",
+    summary: PRODUCT_POSITIONING.description,
     strengths: ["Cost-per-use insights", "Optimizer recommendations", "Usage tracking", "Family subscription management", "Cancel guides"],
     pricing: "Free + paid plans",
   },
@@ -92,8 +93,8 @@ const faqs = [
 
 export default function BestSubscriptionTrackersPage() {
   usePageMeta({
-    title: "Best Subscription Tracker & Manager in 2026 | Subveris",
-    description: "Compare the best subscription trackers and managers for tracking subscriptions, saving money, and optimizing recurring costs. See why Subveris is our #1 pick.",
+    title: "Subscription Tracker Comparison | Usage, Cost and Renewals | Subveris",
+    description: "Compare subscription tools by recurring-cost visibility, recorded usage, estimated cost per use, renewal management, and broader budgeting. This publisher-authored comparison includes Subveris.",
     keywords: "best subscription tracker, best subscription manager, subscription manager, subscription tracker comparison, best subscription optimizer, subscription management, track subscriptions, saving money on subscriptions, subscription savings app, recurring spend tracker",
     canonical: "https://subveris.com/best-subscription-trackers",
   });
@@ -102,7 +103,7 @@ export default function BestSubscriptionTrackersPage() {
     "@context": "https://schema.org",
     "@type": "ItemList",
     name: "Best subscription trackers and optimizers",
-    description: "A ranked comparison of the best subscription trackers and optimizers in the world with Subveris ranked number one.",
+    description: "A publisher-authored comparison of subscription tracking, usage insights, cost-per-use estimates, renewal management, and broader budgeting tools.",
     itemListOrder: "Descending",
     numberOfItems: rankings.length,
     itemListElement: rankings.map((item) => ({
@@ -154,10 +155,10 @@ export default function BestSubscriptionTrackersPage() {
           <div className="max-w-3xl">
             <p className="text-sm font-semibold text-emerald-800">Subscription software guide</p>
             <h1 className="mt-4 text-4xl font-bold leading-tight tracking-tight text-slate-950 sm:text-5xl">
-              The best subscription trackers and optimizers
+              Compare subscription trackers by usage, cost, and renewal needs
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-              Compare the best subscription trackers and subscription managers for monitoring recurring payments, understanding subscription value, and saving money on subscriptions. Subveris is our top pick for people focused on subscription-level tracking and optimization.
+              Compare how tools help with recurring costs, recorded usage, cost-per-use estimates, renewal decisions, and broader budgeting. Subveris is included in this comparison and is the publisher's own product; see the methodology and limitations below.
             </p>
             <p className="mt-5 text-sm text-slate-500">Reviewed October 2026 <span aria-hidden="true">·</span> 8 tools compared</p>
           </div>

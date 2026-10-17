@@ -1,6 +1,6 @@
 # Subveris
 
-Subscription management platform for tracking, analyzing, and optimizing recurring payments. Built with Supabase Auth, Supabase Database, and Stripe integration.
+Subveris is a subscription tracking and review tool. Add recurring services, record usage, estimate cost per use, and review renewals and possible savings. A bank connection is not required; browser-extension usage signals are optional. Built with Supabase Auth, Supabase Database, and Stripe integration.
 
 ## Setup
 

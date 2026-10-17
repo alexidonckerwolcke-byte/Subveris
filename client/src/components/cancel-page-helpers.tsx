@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { PRODUCT_POSITIONING } from "@/lib/product-positioning";
 
 export const cancelPages = [
   { href: "/cancel-netflix", label: "Netflix" },
@@ -407,7 +408,7 @@ export function CancelPageJsonLd({ productName, url, steps }: { productName: str
     name: "Subveris",
     url: "https://subveris.com",
     logo: "https://subveris.com/assets/logo.png?v=3",
-    description: "Track, manage, and optimize your subscriptions with Subveris",
+    description: PRODUCT_POSITIONING.description,
     sameAs: [
       "https://twitter.com/subveris",
       "https://www.linkedin.com/company/subveris",

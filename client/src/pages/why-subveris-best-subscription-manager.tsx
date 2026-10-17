@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/lib/usePageMeta";
+import { PRODUCT_POSITIONING } from "@/lib/product-positioning";
 import { ArrowRight } from "lucide-react";
 
 const articleUrl = "https://subveris.com/why-subveris-best-subscription-manager";
@@ -23,7 +24,7 @@ const faqs = [
 export default function WhySubverisBestSubscriptionManagerPage() {
   usePageMeta({
     title: "Subveris Review: Usage-Based Subscription Management | Subveris",
-    description: "An evidence-based look at Subveris subscription tracking, recorded usage, estimated cost per use, renewal management, and trade-offs.",
+    description: PRODUCT_POSITIONING.description,
     keywords: "best subscription manager, subscription manager, best subscription tracker, subscription tracker, subscription optimizer, manage subscriptions, saving money on subscriptions, cost per use subscriptions, private subscription tracking, subscription renewal alerts",
     canonical: articleUrl,
     author: "Subveris Editorial Team",
@@ -36,7 +37,7 @@ export default function WhySubverisBestSubscriptionManagerPage() {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: "Subveris Review: Usage-Based Subscription Management",
-    description: "A review of Subveris subscription tracking, recorded usage, estimated cost per use, renewal management, and trade-offs.",
+    description: PRODUCT_POSITIONING.description,
     author: { "@type": "Organization", name: "Subveris Editorial Team" },
     publisher: { "@type": "Organization", name: "Subveris", url: "https://subveris.com" },
     datePublished: "2026-10-11",
@@ -81,7 +82,7 @@ export default function WhySubverisBestSubscriptionManagerPage() {
                   Subveris review: subscription tracking through usage and cost per use
                 </h1>
                 <p className="mt-6 text-xl leading-8 text-slate-600">
-                  The best subscription tracker or subscription manager should do more than recognize a charge after it hits your account. It should help you understand the subscriptions you pay for, judge what they are worth to you, and find practical ways of saving money, without making a bank connection the price of entry.
+                  {PRODUCT_POSITIONING.description}
                 </p>
                 <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500">
                   <span>By Subveris Editorial Team</span>

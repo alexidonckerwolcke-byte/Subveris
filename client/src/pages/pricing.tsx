@@ -11,6 +11,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCurrency } from "@/lib/currency-context";
 import { usePageMeta } from "@/lib/usePageMeta";
+import { PRODUCT_POSITIONING } from "@/lib/product-positioning";
 
 interface Plan {
   name: string;
@@ -26,8 +27,8 @@ interface Plan {
 
 export default function PricingPage() {
   usePageMeta({
-    title: "Subveris Pricing | Subscription Tracking Plans",
-    description: "Compare Subveris plans for subscription tracking, usage insights, cost-per-use analysis, and family spending management.",
+    title: "Subveris Pricing | Subscription Tracking and Usage Insights",
+    description: `Compare Subveris plans. ${PRODUCT_POSITIONING.description}`,
     canonical: "https://subveris.com/pricing",
   });
 
@@ -45,9 +46,9 @@ export default function PricingPage() {
       tier: "free",
       price: "0,00 €",
       period: "forever",
-      description: "Perfect for getting started with subscription optimization",
+      description: "Track a few recurring services and review your spending and usage.",
       features: [
-        "Optimize up to 5 recurring services",
+        "Track up to 5 recurring services",
         "Cost-per-use analytics for up to 2 subscriptions",
         "Basic spending overview",
         "Monthly spending reports",
@@ -62,10 +63,10 @@ export default function PricingPage() {
       tier: "premium",
       price: "9,99 €",
       period: "per month",
-      description: "Continuous optimization for individual spending",
+      description: "Review usage, cost per use, and renewals across your subscriptions.",
       features: [
         "Unlimited subscriptions",
-        "AI-powered recommendations",
+        "Usage-based recommendations",
         "Optional browser usage signals",
         "Cost-per-use analytics",
         "Behavioral insights",
@@ -83,11 +84,11 @@ export default function PricingPage() {
       tier: "family",
       price: "14,99 €",
       period: "per month",
-      description: "Optimize shared family spending together",
+      description: "Share subscriptions and review household spending together.",
       features: [
         "All Premium Features",
         "Unlimited subscriptions",
-        "AI-powered recommendations",
+        "Usage-based recommendations",
         "Optional browser usage signals",
         "Cost-per-use analytics",
         "Behavioral insights",
@@ -422,10 +423,10 @@ export default function PricingPage() {
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl -z-10" />
           
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
-            Premium Plans
+            Plans for Subscription Tracking
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed mb-8">
-            Choose the perfect plan for your optimization goals. Upgrade, downgrade, or cancel anytime with complete flexibility.
+            {PRODUCT_POSITIONING.short} Compare plans for individual or shared subscription management.
           </p>
           {priceConfigError ? (
             <div className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 mb-8">
