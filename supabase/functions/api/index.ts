@@ -7,6 +7,7 @@ import {
   getZonedMonthBounds,
   isValidTimeZone,
 } from "../../../shared/month-boundary.ts";
+import { handleAffiliateApiRequest } from "./affiliate.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -1817,6 +1818,17 @@ runtimeDeno?.serve?.(async (req: Request) => {
       pathname = "/";
     }
 
+    const affiliateResponse = await handleAffiliateApiRequest(req, pathname, {
+      db: supabase,
+      authClient: supabaseAuth,
+      stripeSecretKey: runtimeDeno?.env?.get("STRIPE_SECRET_KEY") ?? "",
+      adminUserIds: (runtimeDeno?.env?.get("AFFILIATE_ADMIN_USER_IDS") ?? "")
+        .split(",")
+        .map((id: string) => id.trim().toLowerCase())
+        .filter(Boolean),
+    });
+    if (affiliateResponse) return sendCorsHeaders(affiliateResponse);
+
     const requestUserId = extractUserId(req);
     if (requestUserId && !req.headers.get("x-test-user-id")) {
       let accountTimeZone = "UTC";
@@ -3040,7 +3052,15 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
-        const [userResult, subscriptions, transactionsResult, insightsResult, planResult, notificationResult, familyMembershipResult, calendarResult] = await Promise.all([
+        const authToken = req.headers.get("authorization")?.replace(/^Bearer\s+/, "");
+        const { data: verifiedData, error: verifiedError } = authToken && supabaseAuth
+          ? await supabaseAuth.auth.getUser(authToken)
+          : { data: null, error: new Error("Missing access token") };
+        if (verifiedError || verifiedData?.user?.id !== userId) {
+          return sendJson({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const [userResult, subscriptions, transactionsResult, insightsResult, planResult, notificationResult, familyMembershipResult, calendarResult, affiliateProfileResult, affiliateAttributionResult, referredCommissionResult] = await Promise.all([
           supabase.from("users").select("id, email, currency").eq("id", userId).maybeSingle(),
           loadAllSubscriptions(userId),
           supabase.from("transactions").select("*").eq("user_id", userId),
@@ -3049,9 +3069,21 @@ runtimeDeno?.serve?.(async (req: Request) => {
           supabase.from("notification_preferences").select("*").eq("user_id", userId).maybeSingle(),
           supabase.from("family_group_members").select("*").eq("user_id", userId),
           supabase.from("subscription_calendar_events").select("*").eq("user_id", userId),
+          supabase.from("affiliates").select("id,creator_name,platform,audience_size,promotion_plan,status,applied_at,reviewed_at").eq("user_id", userId).maybeSingle(),
+          supabase.from("affiliate_attributions").select("id,affiliate_id,clicked_at,expires_at,locked_at,first_paid_at,first_paid_plan_type").eq("user_id", userId),
+          supabase.from("affiliate_commissions").select("id,amount_paid_cents,currency,commission_rate_bps,commission_amount_cents,commission_basis,status,paid_at,created_at").eq("referred_user_id", userId),
         ]);
 
-        const queryResults = [userResult, transactionsResult, insightsResult, planResult, notificationResult, familyMembershipResult, calendarResult];
+        const affiliateId = affiliateProfileResult.data?.id;
+        const [affiliateCodesResult, affiliatePayoutsResult, affiliateCommissionsResult] = affiliateId
+          ? await Promise.all([
+              supabase.from("affiliate_referral_codes").select("code,is_active,created_at,revoked_at").eq("affiliate_id", affiliateId),
+              supabase.from("affiliate_payouts").select("amount_cents,currency,paid_at,transaction_reference,notes,created_at").eq("affiliate_id", affiliateId),
+              supabase.from("affiliate_commissions").select("id,amount_paid_cents,currency,commission_rate_bps,commission_amount_cents,commission_basis,status,paid_at,created_at,reversal_reason").eq("affiliate_id", affiliateId),
+            ])
+          : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }];
+
+        const queryResults = [userResult, transactionsResult, insightsResult, planResult, notificationResult, familyMembershipResult, calendarResult, affiliateProfileResult, affiliateAttributionResult, referredCommissionResult, affiliateCodesResult, affiliatePayoutsResult, affiliateCommissionsResult];
         const failedResult = queryResults.find((result: any) => result.error);
         if (failedResult) {
           throw failedResult.error;
@@ -3067,6 +3099,12 @@ runtimeDeno?.serve?.(async (req: Request) => {
           notificationPreferences: notificationResult.data,
           familyGroupMemberships: familyMembershipResult.data || [],
           calendarEvents: calendarResult.data || [],
+          affiliateProfile: affiliateProfileResult.data,
+          affiliateAttributions: affiliateAttributionResult.data || [],
+          referredAffiliateCommissions: referredCommissionResult.data || [],
+          affiliateReferralCodes: affiliateCodesResult.data || [],
+          affiliateCommissions: affiliateCommissionsResult.data || [],
+          affiliatePayouts: affiliatePayoutsResult.data || [],
         };
 
         return sendJson(exportData, {
@@ -3193,6 +3231,13 @@ runtimeDeno?.serve?.(async (req: Request) => {
       }
 
       try {
+        const { data: verifiedData, error: verifiedError } = supabaseAuth.auth
+          ? await supabaseAuth.auth.getUser(authToken)
+          : { data: null, error: new Error("Supabase auth unavailable") };
+        if (verifiedError || verifiedData?.user?.id !== userId) {
+          return sendJson({ error: "Unauthorized" }, { status: 401 });
+        }
+
         // Delete child records before their referenced subscriptions and groups.
         const deleteResults = await Promise.all([
           supabase.from('subscription_calendar_events').delete().eq('user_id', userId),
@@ -5688,6 +5733,19 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         }
 
         console.log("[Stripe] Using customer ID:", customerId);
+        const { data: affiliateAttribution, error: affiliateAttributionError } = await supabase
+          .from("affiliate_attributions")
+          .select("id,affiliate_id,expires_at,first_paid_invoice_id,affiliates!inner(status)")
+          .eq("user_id", userId)
+          .gt("expires_at", new Date().toISOString())
+          .is("first_paid_invoice_id", null)
+          .eq("affiliates.status", "approved")
+          .maybeSingle();
+        if (affiliateAttributionError) {
+          console.error("[Stripe] Could not load locked affiliate attribution:", affiliateAttributionError.message);
+          return sendJson({ error: "Could not validate referral eligibility." }, { status: 500 });
+        }
+
         // Create checkout session
         const successUrl = "https://subveris.com/pricing?checkout=success";
         const cancelUrl = "https://subveris.com/pricing?checkout=cancel";
@@ -5695,22 +5753,29 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         console.log("[Stripe] Creating checkout session with:", { customerId, priceId, successUrl, cancelUrl });
 
         const auth = btoa(stripeSecretKey + ':');
+        const checkoutParams = new URLSearchParams({
+          customer: customerId,
+          "line_items[0][price]": priceId,
+          "line_items[0][quantity]": "1",
+          mode: "subscription",
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+          "metadata[user_id]": userId,
+          "subscription_data[metadata][user_id]": userId,
+        });
+        if (affiliateAttribution?.id) {
+          checkoutParams.set("metadata[affiliate_attribution_id]", affiliateAttribution.id);
+          checkoutParams.set("metadata[affiliate_id]", affiliateAttribution.affiliate_id);
+          checkoutParams.set("subscription_data[metadata][affiliate_attribution_id]", affiliateAttribution.id);
+          checkoutParams.set("subscription_data[metadata][affiliate_id]", affiliateAttribution.affiliate_id);
+        }
         const checkoutRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
           method: "POST",
           headers: {
             "Authorization": `Basic ${auth}`,
             "Content-Type": "application/x-www-form-urlencoded",
           },
-          body: new URLSearchParams({
-            customer: customerId,
-            "line_items[0][price]": priceId,
-            "line_items[0][quantity]": "1",
-            mode: "subscription",
-            success_url: successUrl,
-            cancel_url: cancelUrl,
-            "metadata[user_id]": userId,
-            "subscription_data[metadata][user_id]": userId,
-          }),
+          body: checkoutParams,
         });
 
         console.log("[Stripe] Checkout response status:", checkoutRes.status);

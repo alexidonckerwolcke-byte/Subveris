@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/api';
 import { queryClient, restoreQueryCacheForUser } from './queryClient';
 import { getDetectedTimeZone, storeAccountTimeZone } from '@/lib/account-time-zone';
 import { isValidTimeZone } from '@shared/month-boundary';
+import { getSafeReturnTo } from '@/lib/auth-redirect';
 
 interface AuthContextType {
   user: User | null;
@@ -441,13 +442,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async () => {
     if (!supabase) return { error: { message: 'Supabase not initialized' } as AuthError };
 
+    const returnTo = getSafeReturnTo(new URLSearchParams(window.location.search).get('next'));
+    const callbackUrl = new URL(window.location.hostname === 'localhost'
+      ? window.location.origin + '/auth/callback'
+      : 'https://subveris.com/auth/callback');
+    if (returnTo !== '/') {
+      window.sessionStorage.setItem('subveris.auth.returnTo', returnTo);
+    } else {
+      window.sessionStorage.removeItem('subveris.auth.returnTo');
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: window.location.hostname === 'localhost'
-          ? window.location.origin + '/auth/callback'
-          : 'https://subveris.com/auth/callback'
-      }
+      options: { redirectTo: callbackUrl.toString() }
     });
 
     return { error };

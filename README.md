@@ -2,6 +2,8 @@
 
 Subveris is a subscription tracking and review tool. Add recurring services, record usage, estimate cost per use, and review renewals and possible savings. A bank connection is not required; browser-extension usage signals are optional. Built with Supabase Auth, Supabase Database, and Stripe integration.
 
+Affiliate program setup, attribution policy, payout rules, and deployment steps are documented in [AFFILIATE_PROGRAM.md](AFFILIATE_PROGRAM.md).
+
 ## Setup
 
 ### Environment Variables

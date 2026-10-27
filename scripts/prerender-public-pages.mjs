@@ -264,6 +264,14 @@ try {
   const appShell = createHtml("/app", null, "", false);
   fs.writeFileSync(path.join(outputDir, "app-shell.html"), appShell);
 
+  const affiliateAdminShell = createHtml("/affiliate/admin", {
+    title: "Affiliate Program Administration | Subveris",
+    description: "Restricted Subveris affiliate program administration.",
+  }, "", false);
+  const affiliateAdminPath = path.join(outputDir, "affiliate", "admin", "index.html");
+  fs.mkdirSync(path.dirname(affiliateAdminPath), { recursive: true });
+  fs.writeFileSync(affiliateAdminPath, affiliateAdminShell);
+
   const notFound = renderer.renderNotFound("/not-found");
   const notFoundHtml = createHtml("/not-found", {
     title: "Page Not Found | Subveris",

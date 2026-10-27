@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { supabase } from '@/lib/supabase';
+import { getSafeReturnTo } from '@/lib/auth-redirect';
 
 const NEW_USER_THRESHOLD_MS = 5 * 60 * 1000;
 
@@ -16,8 +17,13 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
+      const searchReturnTo = new URLSearchParams(window.location.search).get('next');
+      const storedReturnTo = window.sessionStorage.getItem('subveris.auth.returnTo');
+      window.sessionStorage.removeItem('subveris.auth.returnTo');
+      const returnTo = getSafeReturnTo(searchReturnTo || storedReturnTo);
+      const loginUrl = `/login?next=${encodeURIComponent(returnTo)}`;
       if (!supabase) {
-        window.location.replace('/');
+        window.location.replace(returnTo);
         return;
       }
 
@@ -46,7 +52,7 @@ export default function AuthCallback() {
 
       if (session) {
         setStatus('Authentication successful. Redirecting...');
-        window.location.replace('/');
+        window.location.replace(returnTo);
         return;
       }
 
@@ -58,7 +64,7 @@ export default function AuthCallback() {
         setError(errorDescription || 'Authentication failed');
         setStatus('Redirecting to login...');
         setTimeout(() => {
-          window.location.replace('/login');
+          window.location.replace(loginUrl);
         }, 3000);
         return;
       }
@@ -67,13 +73,13 @@ export default function AuthCallback() {
         console.warn('Auth callback session check failed:', callbackError);
         setError('Authentication failed. Redirecting to login...');
         setTimeout(() => {
-          window.location.replace('/login');
+          window.location.replace(loginUrl);
         }, 3000);
         return;
       }
 
       setStatus('No active session found. Redirecting to login...');
-      setTimeout(() => setLocation('/login'), 500);
+      setTimeout(() => setLocation(loginUrl), 500);
     };
 
     handleAuthCallback();

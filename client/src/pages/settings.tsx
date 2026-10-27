@@ -590,7 +590,7 @@ export default function Settings() {
             <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/30 bg-destructive/5">
               <div>
                 <p className="font-medium text-destructive">Delete Account</p>
-                <p className="text-sm text-muted-foreground">Permanently delete your account and data</p>
+                <p className="text-sm text-muted-foreground">Delete your account and application data. Affiliate financial records may be retained for accounting and legal obligations.</p>
               </div>
               <Button variant="destructive" size="sm" onClick={openDeleteAccountModal} data-testid="button-delete-account">
                 Delete

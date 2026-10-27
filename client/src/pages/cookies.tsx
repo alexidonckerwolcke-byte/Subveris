@@ -1,5 +1,29 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+function AffiliateReferralStorageControl() {
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    setAllowed(window.localStorage.getItem("subveris.affiliate.referralConsent") === "accepted");
+  }, []);
+
+  const withdraw = () => {
+    window.localStorage.removeItem("subveris.affiliate.referralConsent");
+    window.localStorage.removeItem("subveris.affiliate.visitor");
+    window.localStorage.removeItem("subveris.affiliate.expiresAt");
+    window.dispatchEvent(new Event("subveris:affiliate-consent-revoked"));
+    setAllowed(false);
+  };
+
+  return (
+    <div className="mt-4 flex flex-col items-start gap-3">
+      <p className="text-sm text-muted-foreground">Referral storage permission: {allowed ? "allowed on this browser" : "not stored"}.</p>
+      {allowed ? <Button type="button" variant="outline" onClick={withdraw}>Withdraw referral tracking permission</Button> : null}
+    </div>
+  );
+}
 
 export default function Cookies() {
   return (
@@ -27,7 +51,7 @@ export default function Cookies() {
             <div>
               <h2 className="text-lg font-semibold">What Subveris currently uses</h2>
               <p className="mt-3 text-muted-foreground">
-                The current application uses Supabase Auth session storage in the browser, local and session storage for application state and security-session values, and browser extension storage for the extension session, plan status, tracking queue, and detected subscription data. The extension can also inspect existing browser cookies for supported services when its authenticated cookie scan runs.
+                The current application uses Supabase Auth session storage in the browser, local and session storage for application state and security-session values, and browser extension storage for the extension session, plan status, tracking queue, and detected subscription data. If you opt in after opening a creator referral link, Subveris also stores a first-party opaque visitor token for up to 30 days. The extension can also inspect existing browser cookies for supported services when its authenticated cookie scan runs.
               </p>
             </div>
 
@@ -54,10 +78,10 @@ export default function Cookies() {
             <div>
               <h2 className="text-lg font-semibold">Analytics and marketing</h2>
               <p className="mt-3 text-muted-foreground">
-                No Google Analytics, Hotjar, Meta Pixel, advertising network, retargeting tool, or other non-essential analytics or marketing-cookie tool was found in the current client, server, or extension code. Accordingly, this implementation does not currently set analytics or marketing cookies and does not currently present an opt-in cookie banner for them.
+                No Google Analytics, Hotjar, Meta Pixel, advertising network, or retargeting pixel is used. Affiliate attribution is a separate, first-party referral feature: it is not recorded until you opt in from a referral link, and it is not used for advertising or cross-site tracking.
               </p>
               <p className="mt-3 text-muted-foreground">
-                If a non-essential analytics, marketing, or advertising tool is added later, it must be added to this policy and blocked until valid consent is collected where required.
+                When you opt in, Subveris records the referral code, click time, expiry, and a hash of a random browser token. No IP address, device fingerprint, or user-agent identifier is stored for referral attribution. If you later register or sign in, the eligible referral can be attached to your account for commission calculation. The creator sees only an anonymized referral reference, not your account email, password, or payment details.
               </p>
             </div>
 
@@ -75,6 +99,7 @@ export default function Cookies() {
               <ul className="mt-3 list-disc space-y-2 pl-6 text-muted-foreground">
                 <li>Application-owned local A/B event and cron log records are pruned after 30 days.</li>
                 <li>Application session values last for the browser/session lifetime or until the application clears them; the exact Supabase Auth session lifetime is controlled by Supabase project settings.</li>
+                <li>The referral visitor token expires after the configured attribution window (initially 30 days). Its server-side hash is cleared after attribution or during retention cleanup after expiry. Click records are retained for up to 24 months for program reporting.</li>
                 <li>Extension session storage is kept until the extension session expires, the user logs out, storage is cleared, or the extension is removed. The server-issued expiry is stored with the session.</li>
                 <li>Third-party cookies or storage, including those used on Stripe-hosted payment pages, follow the applicable provider&apos;s policy and settings.</li>
               </ul>
@@ -83,8 +108,9 @@ export default function Cookies() {
             <div>
               <h2 className="text-lg font-semibold">Consent and withdrawing consent</h2>
               <p className="mt-3 text-muted-foreground">
-                The current implementation uses only storage needed for authentication, security, preferences, and requested extension functionality. It does not currently set non-essential analytics or marketing cookies, so there is no optional-cookie consent choice implemented at present. If optional cookies are introduced, Subveris must request opt-in consent before setting them and provide a way to withdraw consent that is as easy as giving it.
+                Referral attribution storage is optional and is requested only when you open a creator referral link. You can decline without affecting Subveris. You can withdraw permission below; this clears the local token and stops future referral capture. A referral attribution already attached to an account may remain in financial records needed to explain commissions, subject to applicable deletion and accounting requirements.
               </p>
+              <AffiliateReferralStorageControl />
               <p className="mt-3 text-muted-foreground">
                 You can withdraw Gmail access in Settings by disconnecting Gmail. You can clear application storage by signing out or using your browser&apos;s site-data controls, and you can clear extension storage by removing the extension or clearing its stored data.
               </p>

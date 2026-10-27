@@ -49,6 +49,8 @@ export default function Privacy() {
                 <li><strong>Google user data accessed through Gmail:</strong> when you connect Gmail, Subveris accesses Gmail messages and related metadata needed to identify subscription receipts, invoices, renewals, charges, service names, prices, currencies, and billing dates. Subveris does not access unrelated mailbox data beyond what is needed for this feature.</li>
                 <li>Usage data from our browser extension including time spent on subscription service websites and zero-usage patterns.</li>
                 <li>Billing and payment information for Premium purchases processed through Stripe.</li>
+                <li><strong>Affiliate referrals, if you opt in:</strong> an opaque first-party visitor token, referral code, click timestamp, and expiry. If you register or sign in with an eligible referral, the affiliate and referral timestamp are linked to your account. No IP address or device fingerprint is stored for affiliate attribution.</li>
+                <li><strong>Affiliate program records:</strong> creator application details, attributed registrations and payment references, commission amounts and statuses, and completed payout references where you participate as an approved creator.</li>
                 <li>Technical and security data generated when you use the service, such as IP address and request information in server logs, error logs, and authentication/session identifiers. We do not use this policy to claim collection of browser or device data that is not described elsewhere in the service.</li>
                 <li>Cookies and similar technologies used for authentication, security, preferences, and service operation.</li>
                 <li>Limited technical and subscription-usage data necessary to provide, secure, and improve the app’s core subscription-management functionality.</li>
@@ -60,6 +62,7 @@ export default function Privacy() {
               <ul className="mt-3 space-y-2 text-muted-foreground list-disc pl-6">
                 <li><strong>Contract performance:</strong> to create and maintain your account, provide subscription tracking and analytics, synchronize extension data, and deliver features you request.</li>
                 <li><strong>Consent:</strong> to scan Gmail after you authorize Google OAuth. You can withdraw that consent by disconnecting Gmail in Settings; this does not affect processing that occurred before withdrawal.</li>
+                <li><strong>Consent:</strong> to store optional affiliate referral attribution after you opt in on a creator referral link. You can withdraw browser-storage permission in the Cookie Policy; an attribution already locked to an account may remain in records needed to explain eligible payments and commissions.</li>
                 <li><strong>Legitimate interests:</strong> to secure the service, prevent abuse, troubleshoot errors, and improve Subveris, balanced against your privacy rights.</li>
                 <li><strong>Legal obligation:</strong> to retain or disclose information where required by tax, accounting, fraud-prevention, court, or other applicable legal requirements.</li>
               </ul>
@@ -80,6 +83,7 @@ export default function Privacy() {
                 user-facing subscription-detection and subscription-management features.
                 We may share the minimum data needed with service providers that operate Subveris, such as Supabase for database and authentication
                 services and Stripe for payment processing, solely to provide or improve Subveris features requested by you.
+                If you opt in to a creator referral, we use the referral event only to attribute an eligible new paying customer, calculate the configured commission, prevent duplicate or fraudulent credit, and maintain audit and payout records. Affiliates receive only an anonymized referral reference and their own commission data, not your email, account credentials, payment method, or private subscription details.
               </p>
             </div>
 
@@ -138,6 +142,7 @@ export default function Privacy() {
                 <li>Subveris personnel only where access is necessary to operate, support, or secure the service.</li>
                 <li><strong>Supabase:</strong> authentication, database hosting, backups, and hosted API infrastructure.</li>
                 <li><strong>Stripe:</strong> payment processing, customer records, invoices, and subscription billing. Stripe receives the payment and billing information required to process your purchase.</li>
+                <li><strong>Approved affiliates:</strong> receive a privacy-preserving referral reference and eligibility/commission status only. They do not receive your identity, account email, payment details, or subscription list.</li>
                 <li><strong>Google:</strong> Gmail API access only when you authorize Gmail scanning through OAuth.</li>
                 <li>We do not sell, rent, or disclose Google user data for advertising, data brokerage, credit decisions, lending, or generalized AI/ML training. Any additional processor will be identified in an updated version of this policy where applicable.</li>
               </ul>
@@ -160,6 +165,7 @@ export default function Privacy() {
                 <li>Gmail OAuth tokens are stored only for Gmail scanning and are deleted when you disconnect Gmail or delete your account. Extracted subscription details remain subject to the account retention period; full email content is not intentionally stored by the current Gmail integration.</li>
                 <li>When you disconnect Gmail, Subveris stops future Gmail scans and deletes the stored Gmail OAuth token. You may request deletion of extracted Gmail-derived subscription data by contacting us or deleting your Subveris account. Current pending detection candidates are also removed through the account deletion process.</li>
                 <li>Application-owned local cron logs and A/B event logs are pruned to retain no more than 30 days of entries. Supabase, hosting, and other provider-managed logs may have separate retention periods under their policies.</li>
+                <li>Affiliate click events and expired attributions without commissions are removed after 24 months when retention cleanup runs; visitor-token hashes are cleared after attribution or expiry cleanup. Rejected/inactive application details are redacted after 24 months or on account deletion. Commission, refund/dispute, audit, and completed-payout records currently have no automated expiry and are retained indefinitely in version one. A jurisdiction-specific financial retention and purge schedule must be approved before real payouts are enabled.</li>
                 <li>Supabase, Stripe, and Google may retain information under their own policies and legal obligations. This policy does not claim a 30-day deletion period for provider-managed backups or logs.</li>
               </ul>
             </div>

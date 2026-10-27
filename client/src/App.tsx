@@ -16,6 +16,7 @@ import { Button } from "./components/ui/button.js";
 import { useLocation } from "wouter";
 import { CurrencyProvider } from "@/lib/currency-context";
 import { ErrorBoundary } from "./components/error-boundary.js";
+import { AffiliateReferralCapture } from "./components/affiliate-referral-capture";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -35,6 +36,8 @@ const CostOptimizer = lazy(() => import("./pages/cost-optimizer.js"));
 const Savings = lazy(() => import("./pages/savings.js"));
 const Settings = lazy(() => import("./pages/settings.js"));
 const Pricing = lazy(() => import("./pages/pricing.js"));
+const AffiliatePage = lazy(() => import("./pages/affiliate.js"));
+const AffiliateAdminPage = lazy(() => import("./pages/affiliate-admin.js"));
 const Support = lazy(() => import("./pages/support.js"));
 const Files = lazy(() => import("./pages/files.js"));
 const HomePage = lazy(() => import("./pages/home.js"));
@@ -98,6 +101,8 @@ function Router({ user }: { user: any }) {
     <Route key="family-calendar" path="/family-calendar" component={FamilyCalendar} />,
     <Route key="settings" path="/settings" component={Settings} />,
     <Route key="pricing" path="/pricing" component={Pricing} />,
+    <Route key="affiliate" path="/affiliate" component={AffiliatePage} />,
+    <Route key="affiliate-admin" path="/affiliate/admin" component={AffiliateAdminPage} />,
     <Route key="privacy" path="/privacy" component={Privacy} />,
     <Route key="login" path="/login" component={Login} />,
     <Route key="cookies" path="/cookies" component={Cookies} />,
@@ -138,6 +143,8 @@ function Router({ user }: { user: any }) {
   const publicRoutes = [
     <Route key="home" path="/" component={HomePage} />,
     <Route key="pricing" path="/pricing" component={PublicPricingPage} />,
+    <Route key="affiliate" path="/affiliate" component={AffiliatePage} />,
+    <Route key="affiliate-admin" path="/affiliate/admin" component={AffiliateAdminPage} />,
     <Route key="support" path="/support" component={Support} />,
     <Route key="login" path="/login" component={Login} />,
     <Route key="privacy" path="/privacy" component={Privacy} />,
@@ -213,6 +220,17 @@ function AppContent() {
 
   if (loading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
+
+  if (location === "/affiliate" || location === "/affiliate/admin") {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Router user={user} />
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
   }
 
   if (!user) {
@@ -324,6 +342,7 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <CurrencyProvider>
+          <AffiliateReferralCapture />
           <AppContent />
         </CurrencyProvider>
       </AuthProvider>
