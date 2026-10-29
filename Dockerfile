@@ -29,6 +29,7 @@ ENV HOST=0.0.0.0
 COPY --from=builder /app/package.json /app/package-lock.json* ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/server ./server
 COPY --from=builder /app/public ./public
 
 EXPOSE 3000
@@ -38,4 +39,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "server.js"]
-

@@ -1,6 +1,6 @@
 # Runtime Validation Report
 
-**Generated**: 2026-10-29T21:00:12+01:00
+**Generated**: 2026-10-30T00:09:20+01:00
 **Target**: `/Users/alexidonckerwolcke/Subveris`
 
 ## Summary
@@ -27,6 +27,7 @@
 | Local API function serving | PASS | 0 | Supabase CLI 2.122.0 served the API function locally; `/stripe/config` returned the expected 500 because local Stripe price IDs are not configured. No hosted deployment was performed. |
 | Family recurring price configuration | PASS | 0 | Created an active €14.99/month recurring Test price for the configured Family product and set `STRIPE_FAMILY_PRICE_ID` in the linked Supabase project. Hosted `/stripe/config` returns the new price. No checkout session or payment was created. |
 | Live frontend rollout | BLOCKED | n/a | `gh-pages` publish completed, but `subveris.com` is served by Render and continues serving the old checkout bundle. Render has not rolled out the plan-key frontend. |
+| Render container startup fix | PASS | 0 | Added the missing `/app/server` copy to the runtime Docker stage. Docker image built successfully; the helper imported in the final image and the container started with `/api/health` returning HTTP 200. |
 
 **Overall**: PASS for the local bootstrap and formerly skipped test coverage. Hosted Stripe Checkout card entry and browser-based local UI journeys remain unverified.
 
@@ -76,6 +77,7 @@
 - The user's initial hosted deploy attempt with Supabase CLI 2.108.0 failed with a generic `Effect.tryPromise` error. No change was made during that attempt; a later approved Test-price and Supabase configuration update is recorded below.
 - The hosted API function was subsequently updated (active API function version 331 at the time checked), and the Family Stripe Test price setting was changed. A complete authenticated browser checkout has not been retried, and no Stripe Checkout session was created.
 - The repository's `npm run deploy` published `dist/public` to the GitHub `gh-pages` branch, but this is not the production site: `subveris.com` responds from Render and still serves `/assets/index-YxTrU6fS.js` with the old `{ priceId }` request. The source fix is on `main` commit `91f7b293`; Render deployment must complete before checkout can be verified.
+- The Render startup failure was caused by the runtime Docker stage copying `server.js` but omitting its imported `server/security-headers.js` helper. The runtime stage now copies `/app/server`; the image builds, the module imports successfully in the final image, and `/api/health` returned HTTP 200 from the container.
 - `git diff --check` — exit code 0.
 - Supabase `stripe-webhook` is active at version 105.
 - The winning `charge.dispute.closed` event was recorded against the test commission and restored it from `held` to `pending_review` without manual replay.
