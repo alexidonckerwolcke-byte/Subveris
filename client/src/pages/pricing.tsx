@@ -9,6 +9,7 @@ import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getStripePriceIds } from "@/lib/stripe-config";
 import { useCurrency } from "@/lib/currency-context";
 import { usePageMeta } from "@/lib/usePageMeta";
 import { PRODUCT_POSITIONING } from "@/lib/product-positioning";
@@ -117,24 +118,10 @@ export default function PricingPage() {
 
     const fetchStripeConfig = async () => {
       try {
-        const res = await apiRequest("GET", "/api/stripe/config");
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data?.error || "Failed to load Stripe configuration");
-        }
-
-        if (!data?.priceIds?.premium || !data?.priceIds?.family) {
-          throw new Error("Stripe price IDs are not configured.");
-        }
-
-        setPriceIdMap({
-          premium: data.priceIds.premium,
-          family: data.priceIds.family,
-        });
+        setPriceIdMap(await getStripePriceIds());
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to load Stripe checkout configuration.";
-        console.warn("[Pricing] Stripe config load failed:", errorMessage);
+        const errorMessage = err instanceof Error ? err.message : "Failed to load subscription pricing.";
+        console.warn("[Pricing] Pricing load failed:", errorMessage);
         setPriceConfigError(errorMessage);
       }
     };
@@ -430,7 +417,7 @@ export default function PricingPage() {
           </p>
           {priceConfigError ? (
             <div className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 mb-8">
-              <strong>Stripe pricing is not configured.</strong> {priceConfigError}
+              <strong>Unable to load subscription pricing.</strong> {priceConfigError}
             </div>
           ) : null}
           {currentTier === "premium" && (

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getStripePriceIds } from "@/lib/stripe-config";
 import { useSubscription } from "@/lib/subscription-context";
 import { formatDate } from "@/lib/utils";
 import {
@@ -38,21 +39,11 @@ export function SubscriptionManager() {
 
     const fetchStripeConfig = async () => {
       try {
-        const res = await apiRequest("GET", "/api/stripe/config");
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data?.error || "Failed to load Stripe configuration");
-        }
-
-        if (!data?.priceIds?.premium) {
-          throw new Error("Stripe premium price ID is not configured.");
-        }
-
-        setPremiumPriceId(data.priceIds.premium);
+        const priceIds = await getStripePriceIds();
+        setPremiumPriceId(priceIds.premium);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to load Stripe checkout configuration.";
-        console.warn("[SubscriptionManager] Stripe config load failed:", errorMessage);
+        const errorMessage = err instanceof Error ? err.message : "Failed to load subscription pricing.";
+        console.warn("[SubscriptionManager] Pricing load failed:", errorMessage);
         setPriceConfigError(errorMessage);
       }
     };
@@ -152,7 +143,7 @@ export function SubscriptionManager() {
       <CardContent className="space-y-6">
         {priceConfigError ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <strong>Stripe checkout is not configured.</strong> {priceConfigError}
+            <strong>Unable to load subscription pricing.</strong> {priceConfigError}
           </div>
         ) : null}
         {/* Current Plan Status */}
