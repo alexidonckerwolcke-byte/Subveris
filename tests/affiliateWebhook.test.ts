@@ -1,4 +1,7 @@
-import { getAffiliateTestWebhookAction } from "../supabase/functions/stripe-webhook/affiliate-test-mode";
+import {
+  getAffiliateTestWebhookAction,
+  getStripeTestWebhookRoute,
+} from "../supabase/functions/stripe-webhook/affiliate-test-mode";
 import { getInvoicePaymentReferences } from "../supabase/functions/stripe-webhook/invoice-payment-references";
 import { getStripeWebhookMode } from "../supabase/functions/stripe-webhook/stripe-mode";
 
@@ -14,6 +17,16 @@ describe("Stripe affiliate test-mode webhook routing", () => {
     expect(getAffiliateTestWebhookAction("checkout.session.completed")).toBeNull();
     expect(getAffiliateTestWebhookAction("customer.subscription.updated")).toBeNull();
     expect(getAffiliateTestWebhookAction("invoice.payment_failed")).toBeNull();
+  });
+
+  it("processes primary subscription events when Stripe itself is configured in test mode", () => {
+    expect(getStripeTestWebhookRoute("test", "checkout.session.completed")).toBe("primary");
+    expect(getStripeTestWebhookRoute("test", "customer.subscription.updated")).toBe("primary");
+  });
+
+  it("keeps test subscription events isolated when the primary Stripe mode is live", () => {
+    expect(getStripeTestWebhookRoute("live", "checkout.session.completed")).toBe("ignore");
+    expect(getStripeTestWebhookRoute("live", "invoice.payment_succeeded")).toBe("affiliate-only");
   });
 });
 

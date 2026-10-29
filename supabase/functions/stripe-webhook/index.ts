@@ -6,7 +6,10 @@
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
-import { getAffiliateTestWebhookAction } from "./affiliate-test-mode.ts";
+import {
+  getAffiliateTestWebhookAction,
+  getStripeTestWebhookRoute,
+} from "./affiliate-test-mode.ts";
 import { getInvoicePaymentReferences } from "./invoice-payment-references.ts";
 import { getStripeWebhookMode } from "./stripe-mode.ts";
 
@@ -205,19 +208,26 @@ Deno.serve(async (req) => {
       if (!testStripe) {
         return new Response("Stripe Test API key is not configured", { status: 500 });
       }
-      switch (getAffiliateTestWebhookAction(event.type)) {
-        case "paid-invoice":
-          await handleAffiliatePaidInvoice(event.data.object as Stripe.Invoice, testStripe, testStripeKey);
-          break;
-        case "payment-risk":
-          await handleAffiliatePaymentRiskEvent(event, event.type, testStripe);
-          break;
-        default:
-          console.log(`Ignoring test-mode event ${event.type}; only affiliate events are processed.`);
+      const testWebhookRoute = getStripeTestWebhookRoute(stripeMode, event.type);
+      if (testWebhookRoute === "affiliate-only") {
+        switch (getAffiliateTestWebhookAction(event.type)) {
+          case "paid-invoice":
+            await handleAffiliatePaidInvoice(event.data.object as Stripe.Invoice, testStripe, testStripeKey);
+            break;
+          case "payment-risk":
+            await handleAffiliatePaymentRiskEvent(event, event.type, testStripe);
+            break;
+        }
+        return new Response(JSON.stringify({ received: true }), {
+          headers: { "Content-Type": "application/json" },
+        });
       }
-      return new Response(JSON.stringify({ received: true }), {
-        headers: { "Content-Type": "application/json" },
-      });
+      if (testWebhookRoute === "ignore") {
+        console.log(`Ignoring test-mode event ${event.type}; the primary Stripe mode is live.`);
+        return new Response(JSON.stringify({ received: true }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Handle the event
@@ -283,6 +293,7 @@ Deno.serve(async (req) => {
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   let userId = session.metadata?.user_id;
   const customerId = session.customer as string | undefined;
+  const replacementFlow = Boolean(session.metadata?.replaces_subscription_id);
 
   if (!userId && customerId) {
     const { data: existing } = await supabase
@@ -321,6 +332,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const dryRun = Deno.env.get("DRY_RUN_WEBHOOK") === "1";
 
     if (!subscription) {
+      if (session.metadata?.replaces_subscription_id) {
+        throw new Error("Could not retrieve the new subscription before replacing the existing subscription.");
+      }
+
       const payload = {
         user_id: userId,
         stripe_customer_id: session.customer,
@@ -339,6 +354,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     }
 
     const planType = getPlanTypeFromSubscription(subscription);
+    const replacesSubscriptionId = session.metadata?.replaces_subscription_id;
+    if (replacesSubscriptionId) {
+      if (session.payment_status !== "paid" || subscription.status !== "active") {
+        console.warn("[Webhook] Currency replacement checkout is not paid and active; keeping the existing subscription.");
+        return;
+      }
+
+      await cancelReplacedSubscription(userId, replacesSubscriptionId, subscription);
+    }
+
     const upsertPayload = {
       user_id: userId,
       stripe_customer_id: session.customer,
@@ -388,11 +413,52 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     }
   } catch (error) {
     console.error("Error in handleCheckoutCompleted:", error);
+    if (replacementFlow) throw error;
+  }
+}
+
+async function cancelReplacedSubscription(
+  userId: string,
+  replacesSubscriptionId: string,
+  newSubscription: Stripe.Subscription,
+) {
+  const { data: previousSubscriptionRow, error } = await supabase
+    .from("user_subscriptions")
+    .select("stripe_customer_id,stripe_subscription_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(`Could not verify the subscription being replaced: ${error.message}`);
+  }
+
+  if (previousSubscriptionRow?.stripe_subscription_id === newSubscription.id) {
+    console.log("[Webhook] Currency replacement was already processed.");
+    return;
+  }
+  if (previousSubscriptionRow?.stripe_subscription_id !== replacesSubscriptionId) {
+    throw new Error("The subscription marked for replacement is no longer the user's current subscription.");
+  }
+
+  const oldSubscription = await stripe.subscriptions.retrieve(replacesSubscriptionId);
+  const oldCustomerId = typeof oldSubscription.customer === "string"
+    ? oldSubscription.customer
+    : oldSubscription.customer.id;
+  if (
+    oldCustomerId !== previousSubscriptionRow.stripe_customer_id ||
+    (oldSubscription.metadata?.user_id && oldSubscription.metadata.user_id !== userId)
+  ) {
+    throw new Error("The subscription marked for replacement does not match the user's Stripe account.");
+  }
+
+  if (oldSubscription.status !== "canceled") {
+    await stripe.subscriptions.cancel(replacesSubscriptionId);
+    console.log("[Webhook] Replaced the prior-currency subscription after paid checkout.");
   }
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   if (invoice.subscription) {
+    let replacementFlow = false;
     try {
       const subscription = await retrieveSubscriptionSafe(invoice.subscription as string);
       if (!subscription) {
@@ -401,6 +467,35 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       }
 
       const planType = getPlanTypeFromSubscription(subscription);
+      const replacesSubscriptionId = subscription.metadata?.replaces_subscription_id;
+      if (replacesSubscriptionId && subscription.status === "active") {
+        replacementFlow = true;
+        const userId = subscription.metadata?.user_id;
+        if (!userId) throw new Error("Replacement subscription is missing its user metadata.");
+
+        await cancelReplacedSubscription(userId, replacesSubscriptionId, subscription);
+        const customerId = typeof subscription.customer === "string"
+          ? subscription.customer
+          : subscription.customer.id;
+        const { error } = await supabase
+          .from("user_subscriptions")
+          .update({
+            user_id: userId,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscription.id,
+            stripe_price_id: getPriceIdFromSubscription(subscription) ?? null,
+            plan_type: planType,
+            status: subscription.status,
+            current_period_start: new Date((subscription.current_period_start as number) * 1000),
+            current_period_end: new Date((subscription.current_period_end as number) * 1000),
+            cancel_at_period_end: !!subscription.cancel_at_period_end,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+        if (error) throw new Error(`Could not save the replacement subscription: ${error.message}`);
+        return;
+      }
+
       const priceId = getPriceIdFromSubscription(subscription) ?? null;
       const updatePayload: any = {
         status: subscription.status,
@@ -424,6 +519,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       }
     } catch (error) {
       console.error("Error in handlePaymentSucceeded:", error);
+      if (replacementFlow) throw error;
     }
   }
 }

@@ -9,6 +9,10 @@ import {
 } from "../../../shared/month-boundary.ts";
 import { handleAffiliateApiRequest } from "./affiliate.ts";
 import { getStripePlanPriceIds, resolveStripeCheckoutPrice } from "./stripe-price.ts";
+import {
+  isStripeCustomerCurrencyConflict,
+  resolveStripeCustomerCurrencyTransition,
+} from "./stripe-currency-transition.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -5682,71 +5686,146 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           return sendJson({ error: "Stripe not configured" }, { status: 500 });
         }
 
-        // Get user's Stripe customer ID from user_subscriptions table
+        const stripeAuthorization = `Basic ${btoa(stripeSecretKey + ':')}`;
+        const stripePriceResponse = await fetch(`https://api.stripe.com/v1/prices/${encodeURIComponent(priceId)}`, {
+          headers: { Authorization: stripeAuthorization },
+        });
+        const stripePrice = await stripePriceResponse.json();
+        if (!stripePriceResponse.ok) {
+          console.error("[Stripe] Could not verify configured checkout price:", stripePrice.error?.message);
+          return sendJson({ error: "Could not verify the configured subscription price." }, { status: 500 });
+        }
+        if (!stripePrice.active || stripePrice.type !== "recurring" || !stripePrice.currency) {
+          console.error("[Stripe] Configured checkout price is not an active recurring price.");
+          return sendJson({ error: "The configured plan price is not an active recurring price." }, { status: 500 });
+        }
+
         const { data: subData, error: subError } = await supabase
           .from("user_subscriptions")
-          .select("stripe_customer_id")
+          .select("stripe_customer_id,stripe_subscription_id")
           .eq("user_id", userId)
-          .single();
+          .maybeSingle();
 
-        console.log("[Stripe] Sub query result:", { subError, customerId: subData?.stripe_customer_id });
+        if (subError) {
+          console.error("[Stripe] Could not load the user's existing subscription:", subError.message);
+          return sendJson({ error: "Could not verify your existing subscription." }, { status: 500 });
+        }
 
         let customerId = subData?.stripe_customer_id;
+        let replacesSubscriptionId: string | undefined;
 
-        // If no customer exist, get email and create one
+        if (customerId && subData?.stripe_subscription_id) {
+          const currentSubscriptionResponse = await fetch(
+            `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subData.stripe_subscription_id)}`,
+            { headers: { Authorization: stripeAuthorization } },
+          );
+          const currentSubscription = await currentSubscriptionResponse.json();
+          if (!currentSubscriptionResponse.ok) {
+            console.error("[Stripe] Could not verify existing subscription currency:", currentSubscription.error?.message);
+            return sendJson({ error: "Could not verify your existing subscription before changing plans." }, { status: 500 });
+          }
+
+          const currentPrice = currentSubscription.items?.data?.[0]?.price;
+          if (
+            currentSubscription.metadata?.user_id &&
+            currentSubscription.metadata.user_id !== userId
+          ) {
+            console.error("[Stripe] Existing subscription metadata does not match the authenticated user.");
+            return sendJson({ error: "Could not safely verify your existing subscription. Contact support." }, { status: 409 });
+          }
+
+          const currencyTransition = resolveStripeCustomerCurrencyTransition(
+            customerId,
+            {
+              id: currentSubscription.id,
+              customer: typeof currentSubscription.customer === "string"
+                ? currentSubscription.customer
+                : currentSubscription.customer?.id,
+              currency: currentPrice?.currency ?? null,
+              status: currentSubscription.status,
+            },
+            stripePrice.currency,
+          );
+          if ("error" in currencyTransition) {
+            return sendJson({ error: currencyTransition.error }, { status: currencyTransition.status });
+          }
+          if (!currencyTransition.useExistingCustomer) {
+            replacesSubscriptionId = currencyTransition.replacesSubscriptionId;
+            customerId = undefined;
+          }
+        }
+
         if (!customerId) {
-          console.log("[Stripe] No customer ID, fetching user email...");
           const { data: { user }, error: authError } = await supabase.auth.admin.getUserById(userId);
-          
+
           if (authError || !user?.email) {
             console.error("[Stripe] Auth error or no email:", { authError, email: user?.email });
             return sendJson({ error: "Could not retrieve user email" }, { status: 400 });
           }
 
-          console.log("[Stripe] Creating Stripe customer for:", user.email);
-          // Create Stripe customer
-          const auth = btoa(stripeSecretKey + ':');
-          const customerRes = await fetch("https://api.stripe.com/v1/customers", {
-            method: "POST",
-            headers: {
-              "Authorization": `Basic ${auth}`,
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              email: user.email,
-              "metadata[user_id]": userId,
-            }),
+          const currencyCustomerSearchUrl = new URL("https://api.stripe.com/v1/customers/search");
+          currencyCustomerSearchUrl.searchParams.set(
+            "query",
+            `metadata['user_id']:'${userId}' AND metadata['billing_currency']:'${stripePrice.currency}'`,
+          );
+          currencyCustomerSearchUrl.searchParams.set("limit", "1");
+          const currencyCustomerSearch = await fetch(currencyCustomerSearchUrl, {
+            headers: { Authorization: stripeAuthorization },
           });
-
-          if (!customerRes.ok) {
-            const customerError = await customerRes.text();
-            console.error("Failed to create Stripe customer:", customerRes.status, customerError);
-            return sendJson({ error: `Failed to create Stripe customer: ${customerError}` }, { status: 500 });
+          const searchResult = await currencyCustomerSearch.json();
+          if (!currencyCustomerSearch.ok) {
+            console.error("[Stripe] Could not look up a customer for the plan currency:", searchResult.error?.message);
+            return sendJson({ error: "Could not prepare billing for this account." }, { status: 500 });
           }
 
-          const customerData = await customerRes.json();
-          customerId = customerData.id;
-          console.log("[Stripe] Created customer:", customerId);
+          customerId = searchResult.data?.[0]?.id;
+          if (!customerId) {
+            const customerParams = new URLSearchParams({
+              email: user.email,
+              "metadata[user_id]": userId,
+              "metadata[billing_currency]": stripePrice.currency,
+            });
+            const customerRes = await fetch("https://api.stripe.com/v1/customers", {
+              method: "POST",
+              headers: {
+                Authorization: stripeAuthorization,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Idempotency-Key": `subveris-${userId}-${stripePrice.currency}`,
+              },
+              body: customerParams,
+            });
 
-          // Store customer ID in database
-          const customerRecord = {
-            user_id: userId,
-            stripe_customer_id: customerId,
-          };
-          const customerWrite = subData
-            ? await supabase
-                .from("user_subscriptions")
-                .update(customerRecord)
-                .eq("user_id", userId)
-            : await supabase
-                .from("user_subscriptions")
-                .insert({ id: generateId(), ...customerRecord });
-          const upsertError = customerWrite.error;
-          
-          console.log("[Stripe] Upsert customer ID result:", { upsertError });
+            if (!customerRes.ok) {
+              const customerError = await customerRes.text();
+              console.error("Failed to create Stripe customer:", customerRes.status, customerError);
+              return sendJson({ error: `Failed to create Stripe customer: ${customerError}` }, { status: 500 });
+            }
+
+            const customerData = await customerRes.json();
+            customerId = customerData.id;
+            console.log("[Stripe] Created billing customer for currency:", stripePrice.currency);
+          }
+
+          if (!replacesSubscriptionId) {
+            const customerRecord = {
+              user_id: userId,
+              stripe_customer_id: customerId,
+            };
+            const customerWrite = subData
+              ? await supabase
+                  .from("user_subscriptions")
+                  .update(customerRecord)
+                  .eq("user_id", userId)
+              : await supabase
+                  .from("user_subscriptions")
+                  .insert({ id: generateId(), ...customerRecord });
+            if (customerWrite.error) {
+              console.error("[Stripe] Could not save the Stripe customer:", customerWrite.error.message);
+              return sendJson({ error: "Could not prepare billing for this account." }, { status: 500 });
+            }
+          }
         }
 
-        console.log("[Stripe] Using customer ID:", customerId);
         const { data: affiliateAttribution, error: affiliateAttributionError } = await supabase
           .from("affiliate_attributions")
           .select("id,affiliate_id,expires_at,first_paid_invoice_id,affiliates!inner(status)")
@@ -5764,9 +5843,14 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         const successUrl = "https://subveris.com/pricing?checkout=success";
         const cancelUrl = "https://subveris.com/pricing?checkout=cancel";
 
-        console.log("[Stripe] Creating checkout session with:", { customerId, priceId, successUrl, cancelUrl });
+        console.log("[Stripe] Creating checkout session with:", {
+          usesSeparateCurrencyCustomer: Boolean(replacesSubscriptionId),
+          priceId,
+          currency: stripePrice.currency,
+          successUrl,
+          cancelUrl,
+        });
 
-        const auth = btoa(stripeSecretKey + ':');
         const checkoutParams = new URLSearchParams({
           customer: customerId,
           "line_items[0][price]": priceId,
@@ -5777,6 +5861,10 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
           "metadata[user_id]": userId,
           "subscription_data[metadata][user_id]": userId,
         });
+        if (replacesSubscriptionId) {
+          checkoutParams.set("metadata[replaces_subscription_id]", replacesSubscriptionId);
+          checkoutParams.set("subscription_data[metadata][replaces_subscription_id]", replacesSubscriptionId);
+        }
         if (affiliateAttribution?.id) {
           checkoutParams.set("metadata[affiliate_attribution_id]", affiliateAttribution.id);
           checkoutParams.set("metadata[affiliate_id]", affiliateAttribution.affiliate_id);
@@ -5786,7 +5874,7 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
         const checkoutRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
           method: "POST",
           headers: {
-            "Authorization": `Basic ${auth}`,
+            Authorization: stripeAuthorization,
             "Content-Type": "application/x-www-form-urlencoded",
           },
           body: checkoutParams,
@@ -5804,7 +5892,13 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
             const errorJson = JSON.parse(checkoutError);
             stripleErrorMsg = errorJson.error?.message || checkoutError;
           } catch {/* ignore */}
-          
+
+          if (isStripeCustomerCurrencyConflict(stripleErrorMsg)) {
+            return sendJson({
+              error: "Your Stripe account has another billing item in a different currency. Contact support so we can safely switch your subscription.",
+            }, { status: 409 });
+          }
+
           return sendJson({ error: `Stripe error: ${stripleErrorMsg}` }, { status: 500 });
         }
 
