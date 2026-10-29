@@ -26,6 +26,7 @@
 | Supabase API Edge Function type-check | PASS | 0 | `npx deno check --config supabase/functions/api/deno.json --no-lock supabase/functions/api/index.ts` passed after fixing affiliate click-result inference. |
 | Local API function serving | PASS | 0 | Supabase CLI 2.122.0 served the API function locally; `/stripe/config` returned the expected 500 because local Stripe price IDs are not configured. No hosted deployment was performed. |
 | Family recurring price configuration | PASS | 0 | Created an active €14.99/month recurring Test price for the configured Family product and set `STRIPE_FAMILY_PRICE_ID` in the linked Supabase project. Hosted `/stripe/config` returns the new price. No checkout session or payment was created. |
+| Live frontend rollout | BLOCKED | n/a | `gh-pages` publish completed, but `subveris.com` is served by Render and continues serving the old checkout bundle. Render has not rolled out the plan-key frontend. |
 
 **Overall**: PASS for the local bootstrap and formerly skipped test coverage. Hosted Stripe Checkout card entry and browser-based local UI journeys remain unverified.
 
@@ -74,6 +75,7 @@
 - Edge Function deploy preparation: configured Deno check passed; local Supabase CLI 2.122.0 served the API function. Four focused affiliate and checkout test files passed (35 tests), and the project TypeScript check passed. The local `/stripe/config` call returned HTTP 500 because local Stripe price IDs are not configured.
 - The user's initial hosted deploy attempt with Supabase CLI 2.108.0 failed with a generic `Effect.tryPromise` error. No change was made during that attempt; a later approved Test-price and Supabase configuration update is recorded below.
 - The hosted API function was subsequently updated (active API function version 331 at the time checked), and the Family Stripe Test price setting was changed. A complete authenticated browser checkout has not been retried, and no Stripe Checkout session was created.
+- The repository's `npm run deploy` published `dist/public` to the GitHub `gh-pages` branch, but this is not the production site: `subveris.com` responds from Render and still serves `/assets/index-YxTrU6fS.js` with the old `{ priceId }` request. The source fix is on `main` commit `91f7b293`; Render deployment must complete before checkout can be verified.
 - `git diff --check` — exit code 0.
 - Supabase `stripe-webhook` is active at version 105.
 - The winning `charge.dispute.closed` event was recorded against the test commission and restored it from `held` to `pending_review` without manual replay.
@@ -87,7 +89,7 @@
 - Account-deletion and family-sharing integration tests require `TEST_SUPABASE_URL`, `TEST_SUPABASE_SERVICE_ROLE_KEY`, and `TEST_SUPABASE_ANON_KEY`; the full run supplied temporary credentials from the local Supabase stack and removed all generated users afterward.
 - Supabase startup emits a non-fatal warning because `supabase/seed.sql` is not present; startup and all migrations still complete successfully.
 - Hosted Stripe Checkout card-entry UI was not verified in a browser during this validation; the payment/dispute/refund lifecycle was validated with Stripe Test API activity and webhook records.
-- Stripe Test checkout configuration is corrected on the linked Supabase project. A browser checkout retry is still needed to verify the end-to-end redirect; no payment was initiated.
+- Stripe Test checkout configuration is corrected on the linked Supabase project. The live Render frontend still needs deployment; after that, an authenticated browser checkout retry is needed to verify the end-to-end redirect. No payment or checkout session was initiated.
 - The new family-sharing and account-deletion flows are API-level E2E tests, not browser-based UI journeys. The previous signed-in production admin browser check remains separate evidence.
 - Node.js: available (v24.18.0).
 - Playwright: Chromium installation check succeeded. The production admin UI was checked in the integrated browser.
