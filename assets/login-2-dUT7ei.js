@@ -1,0 +1,1 @@
+import{d as e,b8 as a,j as r}from"./index-CdOmDpZ-.js";import{A as s}from"./auth-modal-IVkyQ3Jj.js";import"./tabs-BGLEp4mA.js";function f(){const[,t]=e(),n=a(new URLSearchParams(window.location.search).get("next"));return r.jsx(s,{open:!0,defaultTab:"signin",onOpenChange:o=>{o||t(n)}})}export{f as default};
