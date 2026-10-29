@@ -3,7 +3,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, TrendingDown, Minus, Lock, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Lock, ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "wouter";
 import { useState } from "react";
 import type { CostPerUseAnalysis } from "@shared/schema";
@@ -162,7 +162,6 @@ export function CostPerUse({ analyses, isLoading, showUpgradePrompt = false, tot
               </p>
               <Link href="/pricing">
                 <Button size="sm">
-                  <Sparkles className="h-3 w-3 mr-2" />
                   Upgrade to Premium
                 </Button>
               </Link>

@@ -54,12 +54,22 @@ Before making payouts, administrators must determine the identity, tax, invoicin
 
 7. In Stripe Test mode, create a test Premium customer through the normal Subveris Checkout flow after opting into a referral link. Verify one pending commission appears only after the paid invoice event. Resend the same event to verify idempotency; then test a refund and dispute. Never use live customer payments for validation.
 
+## Database integration test
+
+The out-of-order refund/dispute reconciliation migration has a Docker-backed PostgreSQL integration test. It starts a disposable PostgreSQL 17 container, applies the migration to a minimal affiliate schema fixture, and verifies event reconciliation, dispute resolution, refund reversal, idempotency, and Stripe event-time ordering:
+
+```sh
+npm run test:affiliate-risk:integration
+```
+
+The test removes its own container on exit and does not connect to or change the hosted Supabase project. This focused test does not replace the full local Supabase stack, which requires the application's base database schema.
+
 ## Files and operational notes
 
 The schema is introduced in `supabase/migrations/20261019_000000_create_affiliate_program.sql`. The Supabase API owns referral capture, customer attribution, admin authorization, dashboards, and exports in `supabase/functions/api/affiliate.ts`; it is routed from the existing API function. The existing `stripe-webhook` function creates and adjusts commissions. The UI is at `/affiliate` and `/affiliate/admin`.
 
 `AFFILIATE_ADMIN_USER_IDS` configures the affiliate administrators. Test-mode webhook support uses separate `STRIPE_TEST_WEBHOOK_SECRET`, `STRIPE_TEST_SECRET_KEY`, and Test price-ID variables; it does not replace the Live Stripe credentials. Creator-specific commission terms are stored as nullable overrides on each affiliate; changes and resets are audited. The admin route is hidden from ordinary navigation and independently enforced on every server operation; hiding a link is not its authorization boundary. No separate affiliate provider or automatic payout integration is used.
 
-Stripe invoice payment references are read from the invoice's paid `payments` entries, with support for legacy top-level fields. When Stripe omits payment details from the invoice event, the webhook retrieves paid Invoice Payments and expands their PaymentIntent/charge references. These references let later refund and dispute events find the correct commission.
+Stripe invoice payment references are read from the invoice's paid `payments` entries, with support for legacy top-level fields. When Stripe omits payment details from the invoice event, the webhook retrieves paid Invoice Payments and expands their PaymentIntent/charge references. These references let later refund and dispute events find the correct commission. Refund or dispute events that arrive before the first-payment commission are retained as unmatched webhook events and reconciled, in Stripe event-time order, when the commission is inserted.
 
 The program uses a global commission basis of actual Stripe amount paid after discounts, including tax. That choice is configurable in policy only after a migration change; the initial implementation intentionally fixes it for audit consistency. Review tax treatment, affiliate disclosures, cookies/consent, and record-retention periods with counsel/accounting for each operating jurisdiction before production payouts.

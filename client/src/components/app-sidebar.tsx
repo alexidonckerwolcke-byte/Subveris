@@ -7,6 +7,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/lib/currency-context";
 import { PER_PAGE } from "@/lib/constants";
 import { getLocalDateQueryParams, getLocalMonthBounds, getLocalMonthKey } from "@/lib/savings-month";
+import type { Subscription } from "@shared/schema";
 import {
   LayoutDashboard,
   CreditCard,
@@ -15,7 +16,7 @@ import {
   Settings,
   Wallet,
   PiggyBank,
-  Sparkles,
+  Search,
   HelpCircle,
   FileText,
   Zap,
@@ -49,7 +50,7 @@ const mainNavItems = [
   {
     title: "Detected",
     url: "/detected-subscriptions",
-    icon: Sparkles,
+    icon: Search,
   },
   {
     title: "Insights",
@@ -78,6 +79,11 @@ const mainNavItems = [
   },
 ];
 
+interface SubscriptionsPage {
+  items: Subscription[];
+  total: number;
+}
+
 const settingsItems = [
   {
     title: "Autopilot",
@@ -93,7 +99,7 @@ const settingsItems = [
   {
     title: "Pricing",
     url: "/pricing",
-    icon: Sparkles,
+    icon: CreditCard,
   },
   {
     title: "Support",
@@ -199,16 +205,16 @@ export function AppSidebar({ disabled = false }: { disabled?: boolean }) {
     routeQueries.push(queryClient.prefetchInfiniteQuery({
       queryKey: ["/api/subscriptions", PER_PAGE],
       initialPageParam: 1,
-      queryFn: async ({ pageParam = 1 }) => {
+      queryFn: async ({ pageParam = 1 }): Promise<SubscriptionsPage> => {
         const response = await apiRequest(
           "GET",
           `/api/subscriptions?page=${pageParam}&perPage=${PER_PAGE}&excludeDetected=true`
         );
-        const items = await response.json();
+        const items: Subscription[] = await response.json();
         const total = Number.parseInt(response.headers.get("x-total-count") || "0", 10);
         return { items, total };
       },
-      getNextPageParam: (lastPage, pages) => {
+      getNextPageParam: (lastPage: SubscriptionsPage, pages: SubscriptionsPage[]) => {
         const loadedCount = pages.reduce((sum, page) => sum + page.items.length, 0);
         return loadedCount < lastPage.total ? pages.length + 1 : undefined;
       },

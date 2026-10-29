@@ -11,6 +11,10 @@ function normalizeSubscriptionOwnerId(sub: any): string | undefined {
   return normalizeId(sub?.userId || sub?.user_id);
 }
 
+export function isSubscriptionOwnedByUser(sub: any, userId?: string): boolean {
+  return Boolean(userId && normalizeSubscriptionOwnerId(sub) === userId);
+}
+
 function normalizeMembershipUserId(member: any): string | undefined {
   return normalizeId(member?.userId || member?.user_id);
 }

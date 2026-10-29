@@ -2,15 +2,16 @@ import { SubscriptionCalendar } from "@/components/subscription-calendar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
 import type { Subscription, CalendarEvent } from "@shared/schema";
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { apiRequest } from "@/lib/queryClient";
-import { getVisibleFamilySubscriptions } from "@/lib/family-data";
+import { getVisibleFamilySubscriptions, isSubscriptionOwnedByUser } from "@/lib/family-data";
 import { advanceDateByFrequency, dedupeById, formatDateLocal, getAdvancedRenewalDateIfNeeded, isSubscriptionDeleted, parseDateOnlyLocal } from "@/lib/utils";
 
 export default function Calendar() {
   const queryClient = useQueryClient();
+  const autoAdvanceInProgress = useRef(false);
   const { user } = useAuth();
   const { familyGroupId, showFamilyData } = useFamilyDataMode();
 
@@ -113,67 +114,61 @@ export default function Calendar() {
 
   // Automatically advance nextBillingDate for subscriptions whose date is in the past.
   useEffect(() => {
-    if (!subscriptions || subscriptions.length === 0) return;
+    if (!subscriptions.length || autoAdvanceInProgress.current) return;
 
     const today = parseDateOnlyLocal(new Date());
     if (!today) return;
 
     // Process the currently visible subscriptions, including family member
-    // subscriptions when family mode is active.
+    // subscriptions when family mode is active. Only the account that owns
+    // each subscription can update its renewal date.
+    autoAdvanceInProgress.current = true;
     (async () => {
-      const updates: Array<Promise<any>> = [];
-      for (const sub of subscriptions) {
-        try {
-          // Normalize the billing date field (API may return next_billing_at or next_billing_date)
-          const billingDateField = (sub as any).nextBillingDate || (sub as any).next_billing_date || (sub as any).next_billing_at || (sub as any).next_billing || (sub as any).next_billingDate;
-          console.debug('[calendar] checking subscription for auto-advance', { id: sub.id, name: sub.name, status: sub.status, nextBillingDate: billingDateField, frequency: sub.frequency });
-          if (!billingDateField) continue;
-          let next = parseDateOnlyLocal(billingDateField);
-          if (!next) continue;
-          const raw = typeof billingDateField === 'string' ? billingDateField.split('T')[0] : formatDateLocal(next);
+      let didAdvance = false;
+      try {
+        for (const sub of subscriptions) {
+          try {
+            if (!isSubscriptionOwnedByUser(sub, user?.id)) continue;
 
-          // Only consider active/unused subscriptions
-          if (!(sub.status === 'active' || sub.status === 'unused')) continue;
+            const billingDateField = (sub as any).nextBillingDate || (sub as any).next_billing_date || (sub as any).next_billing_at || (sub as any).next_billing || (sub as any).next_billingDate;
+            if (!billingDateField) continue;
+            const renewalDate = parseDateOnlyLocal(billingDateField);
+            if (!renewalDate) continue;
+            const raw = typeof billingDateField === 'string' ? billingDateField.split('T')[0] : formatDateLocal(renewalDate);
 
-          const nextAdvanceDate = getAdvancedRenewalDateIfNeeded(billingDateField, sub.frequency || 'monthly', today);
-          if (!nextAdvanceDate) continue;
+            // Subscriptions marked to cancel may still renew until cancellation completes.
+            if (!(sub.status === 'active' || sub.status === 'unused' || sub.status === 'to-cancel')) continue;
 
-          const newDateStr = formatDateLocal(nextAdvanceDate);
-          if (newDateStr !== raw) {
-            console.log('[calendar] auto-advancing', sub.id, raw, '->', newDateStr);
-            updates.push(
-              updateRenewalDateMutation.mutateAsync({ subscriptionId: sub.id, newDate: newDateStr, autoAdvanced: true })
-                .then(res => {
-                  console.log('[calendar] auto-advance success', sub.id, newDateStr, res);
-                  return res;
-                })
-                .catch(err => {
-                  console.error('[calendar] auto-advance failed', sub.id, err);
-                  return Promise.reject(err);
-                })
-            );
+            const nextAdvanceDate = getAdvancedRenewalDateIfNeeded(billingDateField, sub.frequency || 'monthly', today);
+            if (!nextAdvanceDate) continue;
+
+            const newDateStr = formatDateLocal(nextAdvanceDate);
+            if (newDateStr !== raw) {
+              console.log('[calendar] auto-advancing', sub.id, raw, '->', newDateStr);
+              await updateRenewalDateMutation.mutateAsync({
+                subscriptionId: sub.id,
+                newDate: newDateStr,
+                autoAdvanced: true,
+              });
+              didAdvance = true;
+            }
+          } catch (err) {
+            console.error('[calendar] auto-advance failed', sub.id, err);
           }
-        } catch (err) {
-          console.warn('[calendar] failed to auto-advance for', sub.id, err);
         }
-      }
-
-      if (updates.length > 0) {
-        try {
-          await Promise.allSettled(updates);
-          // Invalidate subscription and calendar queries once updates complete
+      } finally {
+        autoAdvanceInProgress.current = false;
+        if (didAdvance) {
           queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
           queryClient.invalidateQueries({ queryKey: ["/api/calendar-events"] });
           if (familyGroupId) {
             queryClient.invalidateQueries({ queryKey: ["/api/family-groups", familyGroupId, "family-data"] });
           }
-        } catch (e) {
-          console.warn('[calendar] error awaiting auto-advance updates', e);
         }
       }
     })();
 
-  }, [subscriptions, updateRenewalDateMutation, queryClient, familyGroupId]);
+  }, [subscriptions, updateRenewalDateMutation, queryClient, familyGroupId, user?.id]);
 
   // Combine calendar events with subscription renewal dates using useMemo
   const calendarEventsWithRenewals = useMemo(() => {
@@ -195,7 +190,7 @@ export default function Calendar() {
     }
 
     const renewalEvents: CalendarEvent[] = subscriptions.reduce<CalendarEvent[]>((acc, sub) => {
-      if (!(sub.status === 'active' || sub.status === 'unused') || !sub.nextBillingDate) {
+      if (!(sub.status === 'active' || sub.status === 'unused' || sub.status === 'to-cancel') || !sub.nextBillingDate) {
         return acc;
       }
 

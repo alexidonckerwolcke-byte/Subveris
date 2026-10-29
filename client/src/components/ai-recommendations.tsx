@@ -3,7 +3,7 @@ import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
 import { Skeleton } from "./ui/skeleton.js";
 import {
-  Sparkles,
+  ListChecks,
   ArrowRight,
   TrendingDown,
   RefreshCw,
@@ -99,7 +99,7 @@ export function AIRecommendations({
       },
     };
     return configs[type] || {
-      icon: Sparkles,
+      icon: ArrowRight,
       label: type || "Recommendation",
       color: "bg-chart-2/10 text-chart-2",
     };
@@ -110,7 +110,7 @@ export function AIRecommendations({
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-chart-3/10">
-            <Sparkles className="h-4 w-4 text-chart-3" />
+            <ListChecks className="h-4 w-4 text-chart-3" />
           </div>
           <div>
             <CardTitle className="text-lg font-semibold">AI Recommendations</CardTitle>
@@ -138,7 +138,7 @@ export function AIRecommendations({
             displayRecommendations?.map((rec) => {
               if (!rec || !rec.type) return null;
               const config = getTypeConfig(rec.type);
-              const Icon = config?.icon || Sparkles;
+              const Icon = config?.icon || ArrowRight;
               return (
                 <div
                   key={rec.id}

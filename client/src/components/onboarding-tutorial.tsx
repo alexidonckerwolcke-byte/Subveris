@@ -126,7 +126,7 @@ const tutorialSteps: TutorialStep[] = [
             <p className="font-medium">📊 Spending trends by month and category</p>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <p className="font-medium">🤖 AI suggestions for better plans</p>
+            <p className="font-medium">AI suggestions for better plans</p>
           </div>
         </div>
       </div>

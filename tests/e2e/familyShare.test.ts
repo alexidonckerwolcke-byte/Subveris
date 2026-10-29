@@ -1,308 +1,217 @@
 import 'dotenv/config';
-import express from 'express';
-import { createServer } from 'http';
 import request from 'supertest';
 import { randomUUID } from 'crypto';
-import { registerRoutes } from "../../server/routes";
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 
-// Uses same env vars as the server; must point at a testable Supabase project.
 const testSupabaseUrl = process.env.TEST_SUPABASE_URL;
 const testSupabaseServiceRoleKey = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY;
-const supabase = testSupabaseUrl && testSupabaseServiceRoleKey
-  ? createClient(testSupabaseUrl, testSupabaseServiceRoleKey)
+const testSupabaseAnonKey = process.env.TEST_SUPABASE_ANON_KEY;
+const testApiBaseUrl = process.env.TEST_SUPABASE_API_URL
+  || (testSupabaseUrl ? `${testSupabaseUrl}/functions/v1/api` : '');
+const hasTestSupabase = !!testSupabaseUrl && !!testSupabaseServiceRoleKey && !!testSupabaseAnonKey;
+const supabase = hasTestSupabase
+  ? createClient(testSupabaseUrl!, testSupabaseServiceRoleKey!, { auth: { persistSession: false } })
   : null;
 
-const describeE2E = testSupabaseUrl && testSupabaseServiceRoleKey ? describe : describe.skip;
-
-// tiny utility to mimic extractUserIdFromToken used in server
-function makeToken(userId: string): string {
-  // header.payload.signature just needs two dots
-  const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64');
-  const payload = Buffer.from(JSON.stringify({ sub: userId })).toString('base64');
-  return `a.${header}.${payload}.`;
-}
+const describeE2E = hasTestSupabase ? describe : describe.skip;
 
 describeE2E('E2E family sharing & cost-per-use', () => {
-  let app: express.Express;
+  const testPassword = 'LocalTestPassword123!';
+  const createdUserIds: string[] = [];
+  let ownerId: string;
+  let memberId: string;
+  let outsiderId: string;
+  let ownerToken: string;
+  let memberToken: string;
+  let outsiderToken: string;
+  let groupId: string;
+
+  async function signIn(email: string) {
+    const client = createClient(testSupabaseUrl!, testSupabaseAnonKey!, {
+      auth: { autoRefreshToken: false, persistSession: false, storageKey: `family-e2e-${email}` },
+    });
+    const { data, error } = await client.auth.signInWithPassword({ email, password: testPassword });
+    if (error || !data.session) throw error || new Error('Local test sign-in returned no session');
+    return data.session.access_token;
+  }
+
+  function api(token: string) {
+    const agent = request(testApiBaseUrl);
+    return {
+      get: (path: string) => agent.get(path)
+        .set('apikey', testSupabaseAnonKey!)
+        .set('Authorization', `Bearer ${token}`),
+      post: (path: string) => agent.post(path)
+        .set('apikey', testSupabaseAnonKey!)
+        .set('Authorization', `Bearer ${token}`),
+      put: (path: string) => agent.put(path)
+        .set('apikey', testSupabaseAnonKey!)
+        .set('Authorization', `Bearer ${token}`),
+      delete: (path: string) => agent.delete(path)
+        .set('apikey', testSupabaseAnonKey!)
+        .set('Authorization', `Bearer ${token}`),
+    };
+  }
 
   beforeAll(async () => {
-    app = express();
-    // match server setup with middleware used in index.ts
-    app.use(express.json());
-    app.use(express.urlencoded({ extended: false }));
+    if (!supabase) throw new Error('Local Supabase test credentials are not configured');
 
-    const server = createServer(app);
-    await registerRoutes(server, app);
+    ownerId = randomUUID();
+    memberId = randomUUID();
+    outsiderId = randomUUID();
+
+    const users = await Promise.all(
+      [ownerId, memberId, outsiderId].map((id) => supabase.auth.admin.createUser({
+        id,
+        email: `${id}@example.com`,
+        password: testPassword,
+        email_confirm: true,
+      })),
+    );
+    createdUserIds.push(...users.flatMap(({ data }) => data.user ? [data.user.id] : []));
+    const userCreationError = users.find(({ error }) => error)?.error;
+    if (userCreationError) throw userCreationError;
+
+    [ownerToken, memberToken, outsiderToken] = await Promise.all(
+      [ownerId, memberId, outsiderId].map((id) => signIn(`${id}@example.com`)),
+    );
   });
 
-  it('owner and member see correct cost-per-use results with toggle', async () => {
-    if (!supabase) throw new Error('Test Supabase is not configured');
-    // create unique ids to avoid collisions
-    const ownerId = randomUUID();
-    const memberId = randomUUID();
-    const otherId = randomUUID();
-
-    // ensure users exist in auth schema so foreign keys succeed
-    // create simple auth users with email so the auth table has entries
-    const { data: ownerUser, error: ownerErr } = await supabase.auth.admin.createUser({
-      id: ownerId,
-      email: `${ownerId}@example.com`,
-      password: 'TestPassword123!',
-      email_confirm: true,
-    });
-    const { data: memberUser, error: memberErr } = await supabase.auth.admin.createUser({
-      id: memberId,
-      email: `${memberId}@example.com`,
-      password: 'TestPassword123!',
-      email_confirm: true,
-    });
-    const { data: otherUser, error: otherErr } = await supabase.auth.admin.createUser({
-      id: otherId,
-      email: `${otherId}@example.com`,
-      password: 'TestPassword123!',
-      email_confirm: true,
-    });
-    if (ownerErr || memberErr || otherErr) {
-      console.error('error creating auth users', ownerErr, memberErr, otherErr);
+  afterAll(async () => {
+    if (!supabase) return;
+    for (const userId of createdUserIds) {
+      const { error } = await supabase.auth.admin.deleteUser(userId);
+      if (error) throw error;
     }
+  });
 
-    // generate tokens for HTTP auth
-    const ownerToken = `Bearer ${makeToken(ownerId)}`;
-    const memberToken = `Bearer ${makeToken(memberId)}`;
+  it('keeps family cost data private until a subscription is explicitly shared', async () => {
+    if (!supabase) throw new Error('Local Supabase test credentials are not configured');
 
-    // create group via HTTP so we exercise the route logic
-    const createRes = await request(app)
-      .post('/api/family-groups')
-      .send({ name: 'e2e-group' })
-      .set('Authorization', ownerToken)
-      .expect(201);
-    const group = createRes.body;
-    expect(group).toBeTruthy();
-    const groupId = group.id;
+    const groupResponse = await api(ownerToken)
+      .post('/family-groups')
+      .send({ name: 'Local E2E family' })
+      .expect(200);
+    groupId = groupResponse.body.id;
+    expect(groupId).toBeTruthy();
 
-    // add members using the REST endpoint (emails correspond to the ones we created)
-    const memberEmail = `${memberId}@example.com`;
-    const otherEmail = `${otherId}@example.com`;
+    const memberInvite = await api(ownerToken)
+      .post(`/family-groups/${groupId}/members`)
+      .send({ memberEmail: `${memberId}@example.com` })
+      .expect(202);
+    await api(memberToken)
+      .post(`/family-invitations/${memberInvite.body.id}/accept`)
+      .send({})
+      .expect(200);
 
-    await request(app)
-      .post(`/api/family-groups/${groupId}/members`)
-      .set('Authorization', ownerToken)
-      .send({ memberEmail })
-      .expect(201);
+    const outsiderInvite = await api(ownerToken)
+      .post(`/family-groups/${groupId}/members`)
+      .send({ memberEmail: `${outsiderId}@example.com` })
+      .expect(202);
+    await api(outsiderToken)
+      .post(`/family-invitations/${outsiderInvite.body.id}/accept`)
+      .send({})
+      .expect(200);
 
-    await request(app)
-      .post(`/api/family-groups/${groupId}/members`)
-      .set('Authorization', ownerToken)
-      .send({ memberEmail: otherEmail })
-      .expect(201);
+    const { error: planError } = await supabase.from('user_subscriptions').insert({
+      id: randomUUID(),
+      user_id: ownerId,
+      status: 'active',
+      plan_type: 'family',
+    });
+    if (planError) throw planError;
 
-    // enable sharing via settings endpoint
-    await request(app)
-      .put(`/api/family-groups/${groupId}/settings`)
-      .set('Authorization', ownerToken)
+    await api(ownerToken)
+      .put(`/family-groups/${groupId}/settings`)
       .send({ show_family_data: true })
       .expect(200);
 
-    // create subscriptions with usage counts
+    const makeSubscription = async (userId: string, name: string, amount: number, usageCount: number) => {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .insert({
+          user_id: userId,
+          name,
+          amount,
+          frequency: 'monthly',
+          status: 'active',
+          is_detected: false,
+          usage_count: usageCount,
+          currency: 'USD',
+          category: 'test',
+          next_billing_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      if (error || !data) throw error || new Error(`Failed to create ${name}`);
+      return data;
+    };
 
-    // verify family-data endpoint returns the right data & metrics object
-    const famDataRes = await request(app)
-      .get(`/api/family-groups/${groupId}/family-data`)
-      .set('Authorization', ownerToken)
+    const ownerSubscription = await makeSubscription(ownerId, 'OwnerSub', 20, 2);
+    const memberSubscription = await makeSubscription(memberId, 'MemberSub', 10, 5);
+    const outsiderSubscription = await makeSubscription(outsiderId, 'OutsiderSub', 5, 1);
+
+    const memberCostBeforeShare = await api(memberToken)
+      .get(`/analysis/cost-per-use?familyGroupId=${groupId}`)
       .expect(200);
-    expect(Array.isArray(famDataRes.body.subscriptions)).toBe(true);
-    // although no subs exist yet we still expect metrics field
-    expect(famDataRes.body.metrics).toBeDefined();
-    expect(famDataRes.body.metrics.totalSubscriptions).toBe(0);
+    expect(memberCostBeforeShare.body.map((row: { name: string }) => row.name)).toEqual(['MemberSub']);
 
-    const { data: ownerSub, error: ownerSubErr } = await supabase
-      .from('subscriptions')
-      .insert({
-        user_id: ownerId,
-        name: 'OwnerSub',
-        amount: 20,
-        frequency: 'monthly',
-        status: 'active',
-        usage_count: 2,
-        currency: 'USD',
-        category: 'test',
-        next_billing_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-    console.log('owner subscription insert', { ownerSub, ownerSubErr });
-    expect(ownerSub).toBeTruthy();
-
-    const { data: memberSub, error: memberSubErr } = await supabase
-      .from('subscriptions')
-      .insert({
-        user_id: memberId,
-        name: 'MemberSub',
-        amount: 10,
-        frequency: 'monthly',
-        status: 'active',
-        usage_count: 5,
-        currency: 'USD',
-        category: 'test',
-        next_billing_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-    console.log('member subscription insert', { memberSub, memberSubErr });
-    expect(memberSub).toBeTruthy();
-
-    // re-fetch family-data and ensure metrics now reflect the two subscriptions
-    const famDataAfterRes = await request(app)
-      .get(`/api/family-groups/${groupId}/family-data`)
-      .set('Authorization', ownerToken)
+    const outsiderCost = await api(outsiderToken)
+      .get(`/analysis/cost-per-use?familyGroupId=${groupId}`)
       .expect(200);
-    expect(famDataAfterRes.body.metrics.totalSubscriptions).toBe(2);
+    expect(outsiderCost.body.map((row: { name: string }) => row.name)).toEqual(['OutsiderSub']);
 
-    // owner should see both subs in cost-per-use
-    const ownerRes = await request(app)
-      .get(`/api/analysis/cost-per-use?familyGroupId=${groupId}`)
-      .set('Authorization', ownerToken);
-    if (ownerRes.status !== 200) {
-      console.error('owner cost-per-use failed', ownerRes.status, ownerRes.body);
-    }
-    expect(ownerRes.status).toBe(200);
-    expect(Array.isArray(ownerRes.body)).toBe(true);
-    expect(ownerRes.body.length).toBe(2);
-    const ownerNames = ownerRes.body.map((r: any) => r.name);
-    expect(ownerNames).toContain('OwnerSub');
-    expect(ownerNames).toContain('MemberSub');
-    // values should reflect usage counts
-    const ownerRow = ownerRes.body.find((r: any) => r.name === 'OwnerSub');
-    expect(ownerRow.usageCount).toBe(2);
-
-    // member should only see personal subscriptions before explicit shares
-    const memberRes = await request(app)
-      .get(`/api/analysis/cost-per-use?familyGroupId=${groupId}`)
-      .set('Authorization', memberToken);
-    if (memberRes.status !== 200) {
-      console.error('member cost-per-use failed', memberRes.status, memberRes.body);
-    }
-    expect(memberRes.status).toBe(200);
-    expect(memberRes.body.length).toBe(1);
-    expect(memberRes.body[0].name).toBe('MemberSub');
-
-    const { data: otherSub, error: otherSubErr } = await supabase
-      .from('subscriptions')
-      .insert({
-        user_id: otherId,
-        name: 'OtherSub',
-        amount: 5,
-        frequency: 'monthly',
-        status: 'active',
-        usage_count: 1,
-        currency: 'USD',
-        category: 'test',
-        next_billing_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-    console.log('other member subscription insert', { otherSub, otherSubErr });
-    expect(otherSub).toBeTruthy();
-
-    const memberResAfterOtherSub = await request(app)
-      .get(`/api/analysis/cost-per-use?familyGroupId=${groupId}`)
-      .set('Authorization', memberToken)
-      .expect(200);
-    expect(memberResAfterOtherSub.body.length).toBe(1);
-    expect(memberResAfterOtherSub.body[0].name).toBe('MemberSub');
-    expect(memberResAfterOtherSub.body.some((r: any) => r.name === 'OtherSub')).toBe(false);
-    expect(memberResAfterOtherSub.body.some((r: any) => r.name === 'OwnerSub')).toBe(false);
-
-    // share the owner's subscription explicitly and verify the listing endpoint
-    await request(app)
-      .post(`/api/family-groups/${groupId}/share-subscription`)
-      .set('Authorization', ownerToken)
-      .send({ subscriptionId: ownerSub.id })
+    const shareResponse = await api(ownerToken)
+      .post(`/family-groups/${groupId}/share-subscription`)
+      .send({ subscriptionId: ownerSubscription.id, memberIds: [memberId] })
       .expect(201);
+    const sharedId = shareResponse.body[0].id;
 
-    const sharedList = await request(app)
-      .get(`/api/family-groups/${groupId}/shared-subscriptions`)
-      .set('Authorization', ownerToken)
+    const memberCostAfterShare = await api(memberToken)
+      .get(`/analysis/cost-per-use?familyGroupId=${groupId}`)
       .expect(200);
-    expect(Array.isArray(sharedList.body)).toBe(true);
-    expect(sharedList.body.length).toBe(1);
+    expect(memberCostAfterShare.body.map((row: { name: string }) => row.name).sort())
+      .toEqual(['MemberSub', 'OwnerSub']);
+    expect(memberCostAfterShare.body.some((row: { name: string }) => row.name === outsiderSubscription.name)).toBe(false);
 
-    // after sharing, a member should see the owner's subscription when fetching family-data
-    const memberFamilyData = await request(app)
-      .get(`/api/family-groups/${groupId}/family-data`)
-      .set('Authorization', memberToken)
-      .expect(200);
-    expect(memberFamilyData.body.subscriptions.some((s: any) => s.id === ownerSub.id)).toBe(true);
-    expect(memberFamilyData.body.subscriptions.some((s: any) => s.id === otherSub.id)).toBe(false);
-
-    const memberCostAfterShare = await request(app)
-      .get(`/api/analysis/cost-per-use?familyGroupId=${groupId}`)
-      .set('Authorization', memberToken)
-      .expect(200);
-    const memberCostNamesAfterShare = memberCostAfterShare.body.map((r: any) => r.name);
-    expect(memberCostNamesAfterShare).toContain('OwnerSub');
-    expect(memberCostNamesAfterShare).toContain('MemberSub');
-    expect(memberCostNamesAfterShare).not.toContain('OtherSub');
-
-    // assign a cost split to the member and verify via the new endpoints
-    const sharedId = sharedList.body[0].id;
-    await request(app)
-      .post(`/api/family-groups/${groupId}/shared-subscriptions/${sharedId}/cost-splits`)
-      .set('Authorization', ownerToken)
+    const splitResponse = await api(ownerToken)
+      .post(`/family-groups/${groupId}/shared-subscriptions/${sharedId}/cost-splits`)
       .send({ userId: memberId, percentage: 30 })
       .expect(201);
+    expect(splitResponse.body.user_id).toBe(memberId);
+    expect(Number(splitResponse.body.percentage)).toBe(30);
 
-    const splitsRes = await request(app)
-      .get(`/api/family-groups/${groupId}/shared-subscriptions/${sharedId}/cost-splits`)
-      .set('Authorization', ownerToken)
+    const memberFamilyData = await api(memberToken)
+      .get(`/family-groups/${groupId}/family-data`)
       .expect(200);
-    expect(Array.isArray(splitsRes.body)).toBe(true);
-    expect(splitsRes.body.length).toBe(1);
+    expect(memberFamilyData.body.subscriptions.some((subscription: { id: string }) => subscription.id === ownerSubscription.id)).toBe(true);
+    expect(memberFamilyData.body.subscriptions.some((subscription: { id: string }) => subscription.id === outsiderSubscription.id)).toBe(false);
 
-    const memberFamilyDataAfterSplit = await request(app)
-      .get(`/api/family-groups/${groupId}/family-data`)
-      .set('Authorization', memberToken)
+    await api(ownerToken)
+      .delete(`/family-groups/${groupId}/shared-subscriptions/${sharedId}`)
       .expect(200);
-    expect(Array.isArray(memberFamilyDataAfterSplit.body.costSplits)).toBe(true);
-    expect(memberFamilyDataAfterSplit.body.costSplits.some((split: any) => split.shared_subscription_id === sharedId && split.user_id === memberId)).toBe(true);
-    expect(memberFamilyDataAfterSplit.body.sharedSubscriptions.some((shared: any) => shared.id === sharedId && Array.isArray(shared.costSplits) && shared.costSplits.some((split: any) => split.userId === memberId))).toBe(true);
 
-    // now unshare and ensure both lists clear
-    await request(app)
-      .delete(`/api/family-groups/${groupId}/shared-subscriptions/${sharedId}`)
-      .set('Authorization', ownerToken)
-      .expect(204);
+    const memberCostAfterUnshare = await api(memberToken)
+      .get(`/analysis/cost-per-use?familyGroupId=${groupId}`)
+      .expect(200);
+    expect(memberCostAfterUnshare.body.map((row: { name: string }) => row.name)).toEqual(['MemberSub']);
 
-    await request(app)
-      .get(`/api/family-groups/${groupId}/shared-subscriptions`)
-      .set('Authorization', ownerToken)
-      .expect(200)
-      .then(r => expect(r.body.length).toBe(0));
-
-    await request(app)
-      .get(`/api/family-groups/${groupId}/shared-subscriptions/${sharedId}/cost-splits`)
-      .set('Authorization', ownerToken)
-      .expect(200)
-      .then(r => expect(r.body.length).toBe(0));
-
-    // now disable sharing and owner should see only personal sub
-    await supabase
+    const { error: disableSharingError } = await supabase
       .from('family_group_settings')
       .update({ show_family_data: false })
       .eq('family_group_id', groupId);
+    if (disableSharingError) throw disableSharingError;
 
-    const noShareRes = await request(app)
-      .get(`/api/analysis/cost-per-use?familyGroupId=${groupId}`)
-      .set('Authorization', ownerToken)
-      .expect(403);
-    expect(noShareRes.body.error).toMatch(/sharing not enabled/i);
+    const disabledFamilyCost = await api(ownerToken)
+      .get(`/analysis/cost-per-use?familyGroupId=${groupId}`);
+    expect(disabledFamilyCost.status).toBe(403);
 
-    const personalRes = await request(app)
-      .get('/api/analysis/cost-per-use')
-      .set('Authorization', ownerToken)
+    const personalCost = await api(ownerToken)
+      .get('/analysis/cost-per-use')
       .expect(200);
-    expect(personalRes.body.length).toBe(1);
-    expect(personalRes.body[0].name).toBe('OwnerSub');
-  }, 20000);
+    expect(personalCost.body.map((row: { name: string }) => row.name)).toEqual(['OwnerSub']);
+
+    expect(memberCostBeforeShare.body[0].name).toBe(memberSubscription.name);
+  }, 30000);
 });

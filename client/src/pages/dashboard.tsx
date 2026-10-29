@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { BarChart3, Calendar, Clock, DollarSign, Sparkles } from "lucide-react";
+import { BarChart3, Calendar, Clock, DollarSign, Search, TrendingDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
@@ -299,7 +299,7 @@ export default function Dashboard() {
       label: "Detected subscriptions",
       value: `${detectedSubscriptions}`,
       helper: "extension",
-      Icon: Sparkles,
+      Icon: Search,
       iconClass: "text-amber-500",
     },
     ...(familyAwareMode ? [{
@@ -345,7 +345,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-900/10 text-slate-900 shadow-lg shadow-slate-900/10 dark:bg-white/10 dark:text-white">
-                    <Sparkles className="h-7 w-7" />
+                    <TrendingDown className="h-7 w-7" />
                   </div>
                 </div>
               </CardHeader>

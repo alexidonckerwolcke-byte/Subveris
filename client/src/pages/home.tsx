@@ -21,10 +21,8 @@ import {
   Users,
   DollarSign,
   Check,
-  Sparkles,
   Gauge,
   Lock,
-  Brain,
   Target,
   Mail,
   Phone,
@@ -35,12 +33,10 @@ import {
   AlertCircle,
   PieChart,
   Calendar,
-  Bot,
   Eye,
   MessageCircle,
   X,
   Target as TargetIcon,
-  Lightbulb,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -132,7 +128,7 @@ export default function HomePage() {
       description: "Enable the optional browser extension when you want supported usage signals included in your subscription overview.",
     },
     {
-      icon: Brain,
+      icon: BarChart3,
       title: "Usage-Based Recommendations",
       description: "Subveris highlights possible savings using the subscription costs, usage frequency, recent activity, and cost per use recorded in your account.",
     },
@@ -237,7 +233,7 @@ export default function HomePage() {
           transition={revealTransition}
         >
           <Badge variant="secondary" className="home-hero-kicker mb-6 px-4 py-2 text-sm font-semibold">
-            <Sparkles className="h-3 w-3 mr-2" />
+            <BarChart3 className="h-3 w-3 mr-2" />
             Subscription Tracking and Usage Insights
           </Badge>
 
@@ -268,7 +264,7 @@ export default function HomePage() {
                 alt="Subveris dashboard showing subscription spending and upcoming renewals"
                 width={1600}
                 height={922}
-                fetchpriority="high"
+                {...{ fetchpriority: "high" }}
                 decoding="async"
               />
             </picture>
@@ -409,7 +405,7 @@ export default function HomePage() {
             {[
               { icon: DollarSign, title: 'Estimated Cost per Use', text: 'Compare subscription costs with the usage you record to get another perspective on recurring value.', color:'bg-primary/10 text-primary', iconColor:'text-primary' },
               { icon: BarChart3, title: 'Renewal Review', text: 'See upcoming renewal dates alongside recorded usage so you can review services before they renew.', color:'bg-blue-500/10 text-blue-600', iconColor:'text-blue-600' },
-              { icon: Sparkles, title: 'Possible Savings', text: 'Review data-based recommendations and decide whether to keep, change, or cancel a service.', color:'bg-green-500/10 text-green-600', iconColor:'text-green-600' },
+              { icon: TrendingUp, title: 'Possible Savings', text: 'Review data-based recommendations and decide whether to keep, change, or cancel a service.', color:'bg-green-500/10 text-green-600', iconColor:'text-green-600' },
             ].map((item, index) => (
               <motion.div
                 key={item.title}
@@ -648,7 +644,7 @@ export default function HomePage() {
             <Card className="home-plan-card home-plan-premium relative flex flex-col transition-all border-2 border-primary shadow-2xl scale-105 bg-white hover:shadow-2xl">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <Badge className="bg-gradient-to-r from-primary to-blue-600 text-white px-4 py-2 font-semibold shadow-lg">
-                  <Sparkles className="h-4 w-4 mr-2 fill-white" />
+                  <Star className="h-4 w-4 mr-2 fill-white" />
                   Popular
                 </Badge>
               </div>

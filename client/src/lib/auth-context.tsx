@@ -175,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const detectedTimeZone = getDetectedTimeZone();
     storeAccountTimeZone(detectedTimeZone);
     if (supabase) {
-      void supabase.auth.updateUser({ data: { timezone: detectedTimeZone } }).then(({ error }) => {
+      void supabase.auth.updateUser({ data: { timezone: detectedTimeZone } }).then(({ error }: { error: AuthError | null }) => {
         if (error) console.warn('[Auth] Failed to save account timezone:', error.message);
       });
     }
@@ -196,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const detectedTimeZone = getDetectedTimeZone();
     storeAccountTimeZone(detectedTimeZone);
     if (supabase) {
-      void supabase.auth.updateUser({ data: { timezone: detectedTimeZone } }).then(({ error }) => {
+      void supabase.auth.updateUser({ data: { timezone: detectedTimeZone } }).then(({ error }: { error: AuthError | null }) => {
         if (error) console.warn('[Auth] Failed to save account timezone:', error.message);
       });
     }

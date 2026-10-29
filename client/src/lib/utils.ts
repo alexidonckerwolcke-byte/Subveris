@@ -273,14 +273,53 @@ export function getAdvancedRenewalDateIfNeeded(date: string | Date | null | unde
   if (!today) return null;
   if (renewalDate >= today) return null;
 
-  let nextDate = new Date(renewalDate);
-  let attempts = 0;
-  while (nextDate < today && attempts < 100) {
-    nextDate = advanceDateByFrequency(nextDate, frequency || 'monthly');
-    attempts++;
+  const currentDate = parseDateOnlyLocal(renewalDate);
+  if (!currentDate) return null;
+  const normalizedFrequency = String(frequency || 'monthly').toLowerCase().trim();
+
+  if (normalizedFrequency === 'weekly') {
+    const elapsedDays = Math.floor(
+      (Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) -
+        Date.UTC(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())) /
+        86_400_000,
+    );
+    const periods = Math.max(1, Math.ceil(elapsedDays / 7));
+    const nextDate = new Date(currentDate);
+    nextDate.setDate(nextDate.getDate() + periods * 7);
+    return nextDate;
   }
 
-  return nextDate >= today ? nextDate : null;
+  const monthsPerPeriod =
+    normalizedFrequency === 'quarterly' ? 3 :
+    normalizedFrequency === 'yearly' || normalizedFrequency === 'annual' ? 12 : 1;
+  const elapsedMonths =
+    (today.getFullYear() - currentDate.getFullYear()) * 12 +
+    today.getMonth() - currentDate.getMonth();
+  let periods = Math.max(1, Math.ceil(elapsedMonths / monthsPerPeriod));
+  const isEndOfMonth = currentDate.getDate() === new Date(
+    currentDate.getFullYear(),
+    currentDate.getMonth() + 1,
+    0,
+  ).getDate();
+
+  const dateAtPeriod = (period: number) => {
+    const monthStart = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + period * monthsPerPeriod,
+      1,
+    );
+    const lastDay = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+    const day = isEndOfMonth ? lastDay : Math.min(currentDate.getDate(), lastDay);
+    return new Date(monthStart.getFullYear(), monthStart.getMonth(), day);
+  };
+
+  let nextDate = dateAtPeriod(periods);
+  while (nextDate < today) {
+    periods += 1;
+    nextDate = dateAtPeriod(periods);
+  }
+
+  return nextDate;
 }
 
 export function getSubscriptionBillingMonth(sub: any): string | null {
@@ -333,12 +372,15 @@ export function isSubscriptionBilledInMonth(
   monthEnd: Date,
   now = new Date(),
   isCurrentMonth = false,
+  renewalDate?: Date,
+  timeZone = getAccountTimeZone(),
 ): boolean {
-  const timeZone = getAccountTimeZone();
   const targetMonth = getZonedMonthKey(monthStart, timeZone);
   const billingMonth = getSubscriptionBillingMonth(sub);
   const todayKey = getZonedDateString(now, timeZone);
-  const renewalDayKey = getSubscriptionRenewalDayKey(sub, timeZone);
+  const renewalDayKey = renewalDate
+    ? getZonedDateString(renewalDate, timeZone)
+    : getSubscriptionRenewalDayKey(sub, timeZone);
   if (!renewalDayKey) return false;
   const monthStartKey = `${targetMonth}-01`;
   const nextMonthStartKey = `${getNextMonthKey(targetMonth)}-01`;

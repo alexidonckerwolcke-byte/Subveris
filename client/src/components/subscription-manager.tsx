@@ -67,7 +67,7 @@ export function SubscriptionManager() {
       }
 
       const res = await apiRequest("POST", "/api/stripe/create-checkout-session", {
-        priceId: premiumPriceId,
+        plan: "premium",
       });
       return res.json();
     },

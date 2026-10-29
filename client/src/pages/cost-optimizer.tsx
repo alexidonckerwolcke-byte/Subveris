@@ -20,7 +20,6 @@ import {
   Clock,
   DollarSign,
   RefreshCw,
-  Sparkles,
 } from "lucide-react";
 import type { AIRecommendation, Subscription } from "@shared/schema";
 import {
@@ -556,7 +555,7 @@ export default function CostOptimizer() {
               <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-2xl">
                   <div className="inline-flex items-center gap-2 rounded-full border border-slate-300/70 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-slate-200">
-                    <Sparkles className="h-3.5 w-3.5" />
+                    <TrendingUp className="h-3.5 w-3.5" />
                     Premium subscription intelligence
                   </div>
                   <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">

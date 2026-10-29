@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { getVisibleFamilySubscriptions } from '../client/src/lib/family-data';
+import { getVisibleFamilySubscriptions, isSubscriptionOwnedByUser } from '../client/src/lib/family-data';
 import { shouldUseFamilyAwareSpending } from '../client/src/hooks/use-family-data';
 import { computeFamilyMetrics, getCurrentMonthFamilySpend } from '../client/src/lib/family-metrics';
 
 describe('getVisibleFamilySubscriptions', () => {
+  it('only treats the current owner as eligible to update a family subscription', () => {
+    expect(isSubscriptionOwnedByUser({ user_id: 'owner-1' }, 'owner-1')).toBe(true);
+    expect(isSubscriptionOwnedByUser({ userId: 'owner-1' }, 'member-1')).toBe(false);
+    expect(isSubscriptionOwnedByUser({ id: 'without-owner' }, 'member-1')).toBe(false);
+  });
+
   it('normalizes snake_case website_domain in family-data subscriptions', () => {
     const familyData = {
       subscriptions: [

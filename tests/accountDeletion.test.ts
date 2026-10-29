@@ -1,86 +1,125 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createClient } from '@supabase/supabase-js';
 
-const TEST_SUPABASE_URL = process.env.TEST_SUPABASE_URL;
-const TEST_SUPABASE_SERVICE_ROLE_KEY = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY;
+const testSupabaseUrl = process.env.TEST_SUPABASE_URL;
+const testSupabaseServiceRoleKey = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY;
+const testSupabaseAnonKey = process.env.TEST_SUPABASE_ANON_KEY;
+const testApiBaseUrl = process.env.TEST_SUPABASE_API_URL
+  || (testSupabaseUrl ? `${testSupabaseUrl}/functions/v1/api` : '');
+const hasTestSupabase = !!testSupabaseUrl && !!testSupabaseServiceRoleKey && !!testSupabaseAnonKey;
+const supabase = hasTestSupabase
+  ? createClient(testSupabaseUrl!, testSupabaseServiceRoleKey!, { auth: { persistSession: false } })
+  : null;
 
-describe.skipIf(!TEST_SUPABASE_URL || !TEST_SUPABASE_SERVICE_ROLE_KEY)('Account Deletion', () => {
-  let testUserId: string;
+describe.skipIf(!hasTestSupabase)('Account Deletion', () => {
+  const email = `account-delete-${crypto.randomUUID()}@example.com`;
+  const password = 'LocalTestPassword123!';
+  let userId: string;
   let authToken: string;
-  const testServer = process.env.VITE_API_URL || 'http://localhost:3000';
+  let subscriptionId: string;
 
   beforeAll(async () => {
-    // Create test user and subscription
-    const signUpRes = await request(testServer)
-      .post('/auth/signup')
-      .send({
-        email: `test-delete-${Date.now()}@test.com`,
-        password: 'TempPassword123!',
-      });
+    if (!supabase) throw new Error('Local Supabase test credentials are not configured');
 
-    if (signUpRes.status === 200 && signUpRes.body?.session?.access_token) {
-      authToken = signUpRes.body.session.access_token;
-      testUserId = signUpRes.body.user?.id;
+    const { data: createdUser, error: createError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    if (createError || !createdUser.user) throw createError || new Error('Failed to create account-deletion test user');
+    userId = createdUser.user.id;
 
-      // Create a test subscription
-      await request(testServer)
-        .post('/api/subscriptions')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          name: 'Test Netflix',
-          amount: 9.99,
-          currency: 'USD',
-          frequency: 'monthly',
-          category: 'Entertainment',
-        });
-    }
+    const anonClient = createClient(testSupabaseUrl!, testSupabaseAnonKey!, {
+      auth: { autoRefreshToken: false, persistSession: false, storageKey: `account-deletion-${userId}` },
+    });
+    const { data: sessionData, error: signInError } = await anonClient.auth.signInWithPassword({ email, password });
+    if (signInError || !sessionData.session) throw signInError || new Error('Test user sign-in returned no session');
+    authToken = sessionData.session.access_token;
+
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .insert({
+        user_id: userId,
+        name: 'Local account deletion test',
+        category: 'test',
+        amount: 9.99,
+        currency: 'USD',
+        frequency: 'monthly',
+        next_billing_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+    if (subscriptionError || !subscription) throw subscriptionError || new Error('Failed to create test subscription');
+    subscriptionId = subscription.id;
   });
 
-  it('should verify subscriptions exist before deletion', async () => {
-    const res = await request(testServer)
-      .get('/api/subscriptions')
-      .set('Authorization', `Bearer ${authToken}`);
+  afterAll(async () => {
+    if (!supabase || !userId) return;
+    const { data, error: lookupError } = await supabase.auth.admin.getUserById(userId);
+    if (lookupError?.status === 404) return;
+    if (lookupError) throw lookupError;
+    if (!data.user) return;
+    const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
+    if (deleteError) throw deleteError;
+  });
 
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThan(0);
+  function api() {
+    const agent = request(testApiBaseUrl);
+    return {
+      get: (path: string) => agent.get(path)
+        .set('apikey', testSupabaseAnonKey!)
+        .set('Authorization', `Bearer ${authToken}`),
+      post: (path: string) => agent.post(path)
+        .set('apikey', testSupabaseAnonKey!)
+        .set('Authorization', `Bearer ${authToken}`),
+      delete: (path: string) => agent.delete(path)
+        .set('apikey', testSupabaseAnonKey!)
+        .set('Authorization', `Bearer ${authToken}`),
+    };
+  }
+
+  it('should verify subscriptions exist before deletion', async () => {
+    if (!supabase) throw new Error('Local Supabase test credentials are not configured');
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('user_id', userId);
+
+    if (error) throw error;
+    expect(data?.map((row) => row.id)).toContain(subscriptionId);
   });
 
   it('should delete account and all associated data', async () => {
-    const deleteRes = await request(testServer)
-      .delete('/api/account')
-      .set('Authorization', `Bearer ${authToken}`);
-
-    expect(deleteRes.status).toBe(200);
-    expect(deleteRes.body.success).toBe(true);
+    const response = await api()
+      .delete('/account')
+      .expect(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.success).toBe(true);
   });
 
   it('should verify no subscriptions exist after deletion', async () => {
-    // If the deletion worked, this token should be invalid or
-    // there should be no subscriptions accessible
-    const res = await request(testServer)
-      .get('/api/subscriptions')
-      .set('Authorization', `Bearer ${authToken}`);
+    if (!supabase) throw new Error('Local Supabase test credentials are not configured');
+    const [{ data: subscriptions, error: subscriptionError }, { data: authUser, error: authError }] = await Promise.all([
+      supabase.from('subscriptions').select('id').eq('user_id', userId),
+      supabase.auth.admin.getUserById(userId),
+    ]);
 
-    // Either unauthorized (token deleted) or empty array (user data gone)
-    if (res.status === 200) {
-      expect(res.body).toEqual([]);
-    } else {
-      expect([401, 403]).toContain(res.status);
-    }
+    if (subscriptionError) throw subscriptionError;
+    expect(subscriptions).toEqual([]);
+    expect(authUser.user).toBeNull();
+    expect(authError?.status).toBe(404);
   });
 
   it('should reject operations on deleted account', async () => {
-    const res = await request(testServer)
-      .post('/api/subscriptions')
-      .set('Authorization', `Bearer ${authToken}`)
+    const response = await api()
+      .post('/subscriptions')
       .send({
-        name: 'Should Fail',
+        name: 'Must not be created',
         amount: 5,
         currency: 'USD',
       });
 
-    // Should be unauthorized or forbidden
-    expect([401, 403, 404]).toContain(res.status);
+    expect([401, 403, 404]).toContain(response.status);
   });
 });

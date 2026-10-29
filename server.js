@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { setSecurityHeaders } from './server/security-headers.js';
 
 dotenv.config();
 
@@ -321,13 +322,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  if (process.env.NODE_ENV === 'production') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  }
+  setSecurityHeaders(res);
   
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');

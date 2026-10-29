@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, Sparkles, Shield, ArrowRight, Globe } from 'lucide-react';
+import { Check, Shield, ArrowRight, Globe } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useCurrency, type Currency } from '@/lib/currency-context';
 import {
@@ -186,7 +186,7 @@ export function PostSignupFlow({ open, onClose }: PostSignupFlowProps) {
                 {plan.popular && (
                   <div className="absolute -top-3 left-4">
                     <Badge className="gap-1">
-                      <Sparkles className="h-3 w-3" />
+                      <Check className="h-3 w-3" />
                       Most Popular
                     </Badge>
                   </div>

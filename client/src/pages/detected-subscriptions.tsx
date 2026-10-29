@@ -9,7 +9,7 @@ import { useSubscription } from "@/lib/subscription-context";
 import { PremiumGate } from "@/components/premium-gate";
 import { useFamilyDataMode } from "@/hooks/use-family-data";
 import { getVisibleFamilySubscriptions } from "@/lib/family-data";
-import { Sparkles, ExternalLink, Plus, ArrowRight } from "lucide-react";
+import { Search, ExternalLink, Plus, ArrowRight } from "lucide-react";
 import type { Subscription } from "@shared/schema";
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -211,7 +211,7 @@ export default function DetectedSubscriptions() {
                 Browser detection
               </p>
               <h1 className="mt-2 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-                <Sparkles className="h-8 w-8 text-amber-500" />
+                <Search className="h-8 w-8 text-amber-500" />
                 Detected Subscriptions
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -226,7 +226,7 @@ export default function DetectedSubscriptions() {
           <Card className="rounded-3xl shadow-sm">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-500">
-                <Sparkles className="h-5 w-5" />
+                <Search className="h-5 w-5" />
               </div>
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
@@ -327,7 +327,6 @@ export default function DetectedSubscriptions() {
                           {sub.name}
                         </h3>
                         <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                          <Sparkles className="h-3 w-3 mr-1" />
                           Detected
                         </span>
                       </div>
@@ -422,7 +421,7 @@ export default function DetectedSubscriptions() {
         <Card className="rounded-3xl border-slate-200/80 bg-gradient-to-br from-amber-50 via-slate-50 to-slate-50 p-6 shadow-sm dark:from-amber-950/20 dark:via-slate-900 dark:to-slate-900">
           <CardHeader className="p-0 mb-4">
             <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-amber-500" />
+              <Search className="h-5 w-5 text-amber-500" />
               How extension detection works
             </CardTitle>
           </CardHeader>

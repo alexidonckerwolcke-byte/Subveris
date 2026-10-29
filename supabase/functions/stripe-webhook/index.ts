@@ -548,6 +548,7 @@ async function handleAffiliatePaymentRiskEvent(
     p_payment_intent_id: paymentIntentId,
     p_dispute_outcome: outcome,
     p_reason: reason,
+    p_stripe_created_at: new Date(event.created * 1000).toISOString(),
   });
   if (error) throw new Error(`Affiliate payment risk processing failed: ${error.message}`);
 }

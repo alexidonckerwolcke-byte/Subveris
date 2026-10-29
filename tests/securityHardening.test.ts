@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import { apiFetch } from '../client/src/lib/api';
+import { createServer } from 'http';
+import { setSecurityHeaders } from '../server/security-headers.js';
 
 const testServer = process.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -149,32 +151,34 @@ describe('Security Hardening', () => {
   });
 
   describe('HTTP Security Headers', () => {
-    // Note: These headers are set in server.js for the Node dev server
-    // Run: npm run dev && curl -i http://localhost:3000 to verify
-    it.skip('should include X-Content-Type-Options header', async () => {
-      const res = await request(testServer)
-        .get('/');
+    async function getSecurityHeaders() {
+      const server = createServer((_req, res) => {
+        setSecurityHeaders(res);
+        res.end();
+      });
+      return request(server).get('/');
+    }
+
+    it('should include X-Content-Type-Options header', async () => {
+      const res = await getSecurityHeaders();
 
       expect(res.headers['x-content-type-options']).toBe('nosniff');
     });
 
-    it.skip('should include X-Frame-Options header', async () => {
-      const res = await request(testServer)
-        .get('/');
+    it('should include X-Frame-Options header', async () => {
+      const res = await getSecurityHeaders();
 
       expect(res.headers['x-frame-options']).toBe('DENY');
     });
 
-    it.skip('should include Referrer-Policy header', async () => {
-      const res = await request(testServer)
-        .get('/');
+    it('should include Referrer-Policy header', async () => {
+      const res = await getSecurityHeaders();
 
       expect(res.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
     });
 
-    it.skip('should include Permissions-Policy header', async () => {
-      const res = await request(testServer)
-        .get('/');
+    it('should include Permissions-Policy header', async () => {
+      const res = await getSecurityHeaders();
 
       expect(res.headers['permissions-policy']).toBeDefined();
       expect(res.headers['permissions-policy']).toContain('camera=()');

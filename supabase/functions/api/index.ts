@@ -8,6 +8,7 @@ import {
   isValidTimeZone,
 } from "../../../shared/month-boundary.ts";
 import { handleAffiliateApiRequest } from "./affiliate.ts";
+import { getStripePlanPriceIds, resolveStripeCheckoutPrice } from "./stripe-price.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -764,6 +765,23 @@ export function isSubscriptionBilledInMonth(
   const nextMonthKey = getZonedMonthKey(getZonedLocalDateTime(monthParts.year, monthParts.month, 1, timeZone), timeZone);
   const nextMonthStartKey = `${nextMonthKey}-01`;
   const todayKey = getZonedDateString(now, timeZone);
+  const rawRenewalDate = sub.nextBillingDate || sub.next_billing_at || sub.next_billing_date || sub.next_billing || renewalDate;
+  const renewalTimestamp = rawRenewalDate instanceof Date
+    ? rawRenewalDate
+    : typeof rawRenewalDate === 'string' && rawRenewalDate.includes('T')
+      ? new Date(rawRenewalDate)
+      : null;
+
+  if (
+    isCurrentMonth &&
+    isSubscriptionDeleted(sub) &&
+    renewalTimestamp &&
+    !Number.isNaN(renewalTimestamp.getTime()) &&
+    renewalTimestamp > now &&
+    renewalDayKey === todayKey
+  ) {
+    return false;
+  }
 
   if (billingMonth === targetMonth) {
     if (!isCurrentMonth) return true;
@@ -1834,10 +1852,14 @@ runtimeDeno?.serve?.(async (req: Request) => {
       let accountTimeZone = "UTC";
       try {
         const { data: authData, error: authError } = await supabase.auth.admin.getUserById(requestUserId);
+        if (authError || !authData?.user) {
+          return sendJson({ error: "Unauthorized" }, { status: 401 });
+        }
         const savedTimeZone = authData?.user?.user_metadata?.timezone;
-        if (!authError && isValidTimeZone(savedTimeZone)) accountTimeZone = savedTimeZone;
+        if (isValidTimeZone(savedTimeZone)) accountTimeZone = savedTimeZone;
       } catch (error) {
-        console.warn("[API] Could not load account timezone; using UTC.", error);
+        console.error("[API] Failed to verify authenticated user.", error);
+        return sendJson({ error: "Failed to verify authentication" }, { status: 500 });
       }
       url.searchParams.set("timeZone", accountTimeZone);
     }
@@ -5621,12 +5643,9 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
     }
 
     if (pathname === "/stripe/config" && req.method === "GET") {
-      const premiumPriceId = Deno?.env?.get("STRIPE_PREMIUM_PRICE_ID")
-        || Deno?.env?.get("VITE_STRIPE_PREMIUM_PRICE_ID")
-        || "";
-      const familyPriceId = Deno?.env?.get("STRIPE_FAMILY_PRICE_ID")
-        || Deno?.env?.get("VITE_STRIPE_FAMILY_PRICE_ID")
-        || "";
+      const { premium: premiumPriceId, family: familyPriceId } = getStripePlanPriceIds(
+        (name) => Deno?.env?.get(name),
+      );
 
       if (!premiumPriceId || !familyPriceId) {
         console.error("Stripe price IDs are not configured in runtime environment.");
@@ -5646,26 +5665,21 @@ const unusedSubs = allSubs.filter((s: any) => normalizeSubscriptionStatus(s.stat
 
       try {
         const body = await req.json();
-        const priceId = body.priceId;
-        console.log("[Stripe] priceId:", priceId);
-        
-        if (!priceId) {
-          return sendJson({ error: "Missing priceId" }, { status: 400 });
+        const priceResolution = resolveStripeCheckoutPrice(
+          body,
+          getStripePlanPriceIds((name) => Deno?.env?.get(name)),
+        );
+        if ("error" in priceResolution) {
+          return sendJson({ error: priceResolution.error }, { status: priceResolution.status });
         }
+        const { priceId } = priceResolution;
+        console.log("[Stripe] Selected configured checkout price:", priceId);
 
         const stripeSecretKey = Deno?.env?.get("STRIPE_SECRET_KEY") ?? "";
         console.log("[Stripe] Secret key configured:", !!stripeSecretKey);
         if (!stripeSecretKey) {
           console.error("STRIPE_SECRET_KEY not configured");
           return sendJson({ error: "Stripe not configured" }, { status: 500 });
-        }
-
-        const configuredPriceIds = [
-          Deno?.env?.get("STRIPE_PREMIUM_PRICE_ID"),
-          Deno?.env?.get("STRIPE_FAMILY_PRICE_ID"),
-        ].filter(Boolean);
-        if (configuredPriceIds.length > 0 && !configuredPriceIds.includes(priceId)) {
-          return sendJson({ error: "Invalid Stripe plan price configured." }, { status: 400 });
         }
 
         // Get user's Stripe customer ID from user_subscriptions table

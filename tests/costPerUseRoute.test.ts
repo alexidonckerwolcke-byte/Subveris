@@ -54,6 +54,10 @@ function makeFakeClient() {
         const data = defaultResult(table, chain._query);
         return { data, error: null };
       };
+      chain.maybeSingle = async () => {
+        const data = defaultResult(table, chain._query);
+        return { data, error: null };
+      };
       chain.then = (arg1: any, arg2?: any) => {
         const rows = defaultResult(table, chain._query);
         const result = { data: rows, error: null };

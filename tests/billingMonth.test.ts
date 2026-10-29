@@ -80,6 +80,26 @@ describe('billing month helpers', () => {
     expect(isSubscriptionBilledInMonth(sub, monthStart, monthEnd, now, true)).toBe(false);
   });
 
+  it('uses the supplied timezone and renewal date for family billing checks', () => {
+    const sub = { status: 'active' };
+    const monthStart = new Date('2026-05-01T07:00:00Z');
+    const monthEnd = new Date('2026-06-01T06:59:59.999Z');
+    const now = new Date('2026-05-01T07:30:00Z');
+    const renewalDate = new Date('2026-05-01T06:30:00Z');
+
+    expect(
+      isSubscriptionBilledInMonth(
+        sub,
+        monthStart,
+        monthEnd,
+        now,
+        true,
+        renewalDate,
+        'America/Los_Angeles',
+      ),
+    ).toBe(false);
+  });
+
   it('uses local month boundaries for the monthly reset', () => {
     const originalTz = process.env.TZ;
     process.env.TZ = 'America/Los_Angeles';
@@ -138,6 +158,22 @@ describe('billing month helpers', () => {
     expect(next).not.toBeNull();
     if (next) {
       expect(formatDateLocal(next)).toBe('2026-06-19');
+    }
+  });
+
+  it('keeps end-of-month monthly renewals on the end of the month after a missed cycle', () => {
+    const next = getAdvancedRenewalDateIfNeeded('2026-01-31', 'monthly', new Date('2026-03-01'));
+    expect(next).not.toBeNull();
+    if (next) {
+      expect(formatDateLocal(next)).toBe('2026-03-31');
+    }
+  });
+
+  it('advances overdue quarterly renewals by whole billing periods', () => {
+    const next = getAdvancedRenewalDateIfNeeded('2026-01-31', 'quarterly', new Date('2026-05-01'));
+    expect(next).not.toBeNull();
+    if (next) {
+      expect(formatDateLocal(next)).toBe('2026-07-31');
     }
   });
 });

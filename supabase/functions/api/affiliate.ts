@@ -1,4 +1,5 @@
 import {
+  type AffiliateClickCandidate,
   selectLatestEligibleAffiliateClick,
   normalizeAffiliateCode,
 } from "../../../shared/affiliate-policy.ts";
@@ -201,14 +202,16 @@ async function attachReferral(req: Request, user: any, deps: AffiliateDependenci
     .limit(100);
   if (clicksError) throw clicksError;
 
-  const selectedClick = selectLatestEligibleAffiliateClick(
-    (clicks || []).map((candidate: any) => ({
-      record: candidate,
-      affiliateUserId: String(candidate.affiliates?.user_id || ""),
-      affiliateStatus: String(candidate.affiliates?.status || ""),
-      clickedAt: candidate.created_at,
-      expiresAt: candidate.expires_at,
-    })),
+  type EligibleAffiliateClick = AffiliateClickCandidate & { record: any };
+  const eligibleClicks: EligibleAffiliateClick[] = (clicks || []).map((candidate: any) => ({
+    record: candidate,
+    affiliateUserId: String(candidate.affiliates?.user_id || ""),
+    affiliateStatus: String(candidate.affiliates?.status || ""),
+    clickedAt: candidate.created_at,
+    expiresAt: candidate.expires_at,
+  }));
+  const selectedClick = selectLatestEligibleAffiliateClick<EligibleAffiliateClick>(
+    eligibleClicks,
     String(user.id),
     now,
   );

@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link } from "wouter";
-import { Lock, Sparkles } from "lucide-react";
+import { Lock } from "lucide-react";
 import { useSubscription } from "@/lib/subscription-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,6 @@ export function PremiumGate({ children, feature, showBlurred = true }: PremiumGa
         </p>
         <Link href="/pricing">
           <Button>
-            <Sparkles className="h-4 w-4 mr-2" />
             Upgrade to Premium
           </Button>
         </Link>
@@ -70,7 +69,6 @@ export function FeatureLimitGate({ currentCount, maxAllowed, feature, children }
             </p>
             <Link href="/pricing">
               <Button>
-                <Sparkles className="h-4 w-4 mr-2" />
                 Upgrade to Premium
               </Button>
             </Link>
@@ -106,7 +104,6 @@ export function SubscriptionLimitGate({ currentCount, children }: SubscriptionLi
         </p>
         <Link href="/pricing">
           <Button>
-            <Sparkles className="h-4 w-4 mr-2" />
             Upgrade to Premium
           </Button>
         </Link>

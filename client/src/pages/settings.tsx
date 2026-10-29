@@ -413,7 +413,7 @@ export default function Settings() {
                 <Button
                   variant={gmailIsConnected && !gmailNeedsReauthorization ? "outline" : "default"}
                   size="sm"
-                  onClick={gmailNeedsReauthorization ? () => handleConnectGmail(true) : gmailIsConnected ? handleDisconnectGmail : handleConnectGmail}
+                  onClick={gmailNeedsReauthorization ? () => handleConnectGmail(true) : gmailIsConnected ? handleDisconnectGmail : () => handleConnectGmail()}
                   disabled={gmailConnecting || ((!gmailIsConnected || gmailNeedsReauthorization) && !gmailAllowed)}
                 >
                   {gmailConnecting

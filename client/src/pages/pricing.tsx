@@ -1,4 +1,4 @@
-import { Check, Sparkles, ArrowRight, Users } from "lucide-react";
+import { Check, ArrowRight, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -149,7 +149,7 @@ export default function PricingPage() {
         throw new Error("Stripe price ID is not configured.");
       }
       const res = await apiRequest("POST", "/api/stripe/create-checkout-session", {
-        priceId: selectedPriceId,
+        plan: tier,
       });
       return res.json();
     },
@@ -435,7 +435,7 @@ export default function PricingPage() {
           ) : null}
           {currentTier === "premium" && (
             <Badge className="inline-block px-6 py-2 text-base font-semibold bg-gradient-to-r from-primary to-blue-600">
-              <Sparkles className="h-4 w-4 mr-2 fill-white" />
+              <Check className="h-4 w-4 mr-2" />
               {subscriptionStatus?.cancelAtPeriodEnd 
                 ? "Premium (Ending Soon)" 
                 : "Premium Plan Active"
@@ -444,7 +444,7 @@ export default function PricingPage() {
           )}
           {currentTier === "family" && (
             <Badge className="inline-block px-6 py-2 text-base font-semibold bg-gradient-to-r from-purple-600 to-pink-600">
-              <Sparkles className="h-4 w-4 mr-2 fill-white" />
+              <Users className="h-4 w-4 mr-2" />
               {subscriptionStatus?.cancelAtPeriodEnd 
                 ? "Family (Ending Soon)"
                 : "Family Plan Active"
@@ -482,7 +482,7 @@ export default function PricingPage() {
                     </>
                   ) : (
                     <>
-                      <Sparkles className="h-4 w-4 mr-2 fill-white" />
+                      <Check className="h-4 w-4 mr-2" />
                       Recommended
                     </>
                   )}

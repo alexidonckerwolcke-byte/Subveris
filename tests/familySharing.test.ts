@@ -129,6 +129,10 @@ function makeFakeClient() {
         const data = defaultResult(table, chain);
         return { data, error: null };
       };
+      chain.maybeSingle = async () => {
+        const data = defaultResult(table, chain);
+        return { data, error: null };
+      };
       chain.then = (resolve: any) => {
         const data = defaultResult(table, chain);
         resolve({ data, error: null });
