@@ -1,6 +1,6 @@
 # Runtime Validation Report
 
-**Generated**: 2026-10-30T00:37:16+01:00
+**Generated**: 2026-11-09T20:58:00+01:00
 **Target**: `/Users/alexidonckerwolcke/Subveris`
 
 ## Summary
@@ -10,7 +10,7 @@
 | Production build | PASS | 0 | `npm run build`; Vite build and prerender audit passed for 30 routes. |
 | TypeScript check | PASS | 0 | `npx tsc --noEmit`; all project diagnostics are resolved. |
 | Affiliate/auth regression tests | PASS | 0 | 4 test files, 33 passed. |
-| Full Vitest suite | PASS | 0 | 37 files: 223 passed, none skipped; local Supabase-backed tests were enabled with disposable local credentials. |
+| Full Vitest suite | PASS | 0 | 40 files: 244 passed, none skipped; local Supabase-backed tests were enabled with disposable local credentials. |
 | Previously skipped security-header tests | PASS | 0 | All 4 header assertions passed against the same helper used by the Node server. |
 | Account deletion integration | PASS | 0 | 4 tests passed against the local API Edge Function, including deletion, data removal, and rejection of the deleted user's subsequent write. |
 | Family-sharing API E2E | PASS | 0 | Multi-step local Supabase flow passed: invitation/acceptance, family visibility, explicit sharing, cost split, unsharing, and privacy boundaries. |
@@ -19,6 +19,7 @@
 | Docker runtime | PASS | 0 | Installed Docker CLI, Compose, and Colima; engine responds to `docker info`, and `docker run --rm hello-world` succeeded. |
 | Affiliate risk-event PostgreSQL integration | PASS | 0 | `npm run test:affiliate-risk:integration` starts disposable PostgreSQL 17 in Docker, applies the risk-event migration, and verifies queued disputes, winning resolution, duplicate-event idempotency, refunds, and event-time ordering. |
 | Full local Supabase stack | PASS | 0 | `supabase start` applied all 36 migrations; database, Auth, and REST are healthy. `supabase db lint --local` reported no schema errors. |
+| Local Supabase E2E rerun | PASS | 0 | Started with `npx supabase start --exclude vector` because the optional vector container cannot mount the Colima host Docker socket. Local API was reachable; family-sharing and account-deletion E2E suites passed (5 tests). |
 | Clean local migration replay | PASS | 0 | With approval, `supabase db reset --local --yes` replayed all 36 migrations from an empty local database; 31 public tables were created and schema lint passed. |
 | AI-styled icon cleanup | PASS | 0 | Replaced sparkles/robot visuals across the product UI with neutral icons or removed redundant decoration; local homepage rendered successfully. |
 | Renewal date forwarding | PASS | 0 | Focused tests cover missed monthly and quarterly cycles, including preserving end-of-month renewal dates. The calendar advances billable `to-cancel` subscriptions, updates only owner records, and serializes automatic writes to avoid duplicate concurrent updates. |
@@ -53,6 +54,7 @@
 - Changed checkout callers to submit the requested plan instead of a client-cached Stripe price ID; the API now resolves the current configured price with the same environment precedence as `/stripe/config`.
 - Explicitly typed the eligible affiliate-click result to preserve its `record` property through the shared selector's generic inference and pass the Edge Function type-check.
 - Replaced the Family plan's configured one-time USD $15 price with an active €14.99/month recurring Stripe Test price; updated the linked Supabase function secret and verified the hosted config endpoint returns it.
+- Stabilized affiliate attribution test clicks by deriving their expiry from the current time, avoiding failures after the fixture's hard-coded expiry date.
 
 ## Test Evidence
 
@@ -67,9 +69,10 @@
 - Clean local database replay: `supabase db reset --local --yes` — exit code 0; all 36 migrations applied from an empty database. `supabase db lint --local` passed with no schema errors; Auth and REST returned HTTP 200.
 - Local schema lint: `supabase db lint --local` — exit code 0; no schema errors found.
 - Local migration history: 36 migration rows present after startup.
-- Full Vitest run with local Supabase, Edge Functions, the local Node server, and temporary local credentials: exit code 0; 223 passed, 0 skipped across 37 files.
+- Latest full Vitest run with local Supabase credentials: `npx vitest run` — exit code 0; 244 passed, 0 skipped across 40 files.
 - Account-deletion integration: 4 passed against the local Edge Function. It confirmed the old token is rejected after the account has been deleted.
 - Family-sharing API E2E: 1 passed against local Supabase; it verifies member privacy before and after explicit sharing, an outsider's personal-only view, cost allocation, and unsharing.
+- Latest local E2E rerun: `npx vitest run tests/e2e/familyShare.test.ts tests/accountDeletion.test.ts` with generated local Supabase credentials — exit code 0; 5 passed. Startup used `npx supabase start --exclude vector` to avoid the Colima socket mount failure for the optional vector service.
 - Security header tests: 4 passed; they exercise the shared helper wired into `server.js`.
 - Production build rerun after the bootstrap migration: `npm run build` — exit code 0; Vite build and prerender completed.
 - Focused billing-month tests: `npx vitest run tests/billingMonth.test.ts` — exit code 0; 13 passed, including explicit timezone and renewal-date coverage.

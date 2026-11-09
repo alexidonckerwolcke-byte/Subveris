@@ -221,8 +221,8 @@ describe('getVisibleFamilySubscriptions', () => {
   });
 
   it('counts a shared subscription in the current month spend for the member dashboard', () => {
-    const now = new Date();
-    const currentMonthDay = String(new Date(now.getFullYear(), now.getMonth(), 10).getDate()).padStart(2, '0');
+    const now = new Date('2026-11-15T12:00:00.000Z');
+    const currentMonthDay = '10';
     const familyData = {
       subscriptions: [
         {
@@ -259,7 +259,7 @@ describe('getVisibleFamilySubscriptions', () => {
       ],
     };
 
-    const metrics = computeFamilyMetrics(familyData);
+    const metrics = computeFamilyMetrics(familyData, 'UTC', now);
     expect(metrics.totalMonthlySpending).toBe(30);
   });
 

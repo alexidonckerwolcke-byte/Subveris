@@ -302,7 +302,7 @@ describe("affiliate API authorization", () => {
       id: "click-id",
       affiliate_id: "affiliate-id",
       created_at: "2026-10-10T12:00:00.000Z",
-      expires_at: "2026-11-09T12:00:00.000Z",
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
       affiliates: { user_id: "affiliate-user", status: "approved" },
     };
     let attributionInsert: any;
@@ -366,7 +366,7 @@ describe("affiliate API authorization", () => {
       id: "click-id",
       affiliate_id: "affiliate-id",
       created_at: "2026-10-10T12:00:00.000Z",
-      expires_at: "2026-11-09T12:00:00.000Z",
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
       affiliates: { user_id: "affiliate-user", status: "approved" },
     };
     let attributionReads = 0;
