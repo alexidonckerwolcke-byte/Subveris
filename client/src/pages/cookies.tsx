@@ -1,26 +1,37 @@
 import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  AFFILIATE_TRACKING_DISABLED_EVENT,
+  AFFILIATE_TRACKING_DISABLED_KEY,
+  clearAffiliateVisitorToken,
+  isAffiliateTrackingEnabled,
+} from "@/lib/affiliate-referral-storage";
 
 function AffiliateReferralStorageControl() {
-  const [allowed, setAllowed] = useState(false);
+  const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
-    setAllowed(window.localStorage.getItem("subveris.affiliate.referralConsent") === "accepted");
+    setEnabled(isAffiliateTrackingEnabled());
   }, []);
 
-  const withdraw = () => {
-    window.localStorage.removeItem("subveris.affiliate.referralConsent");
-    window.localStorage.removeItem("subveris.affiliate.visitor");
-    window.localStorage.removeItem("subveris.affiliate.expiresAt");
-    window.dispatchEvent(new Event("subveris:affiliate-consent-revoked"));
-    setAllowed(false);
+  const updatePreference = (nextEnabled: boolean) => {
+    if (nextEnabled) {
+      window.localStorage.removeItem(AFFILIATE_TRACKING_DISABLED_KEY);
+    } else {
+      window.localStorage.setItem(AFFILIATE_TRACKING_DISABLED_KEY, "true");
+      clearAffiliateVisitorToken();
+      window.dispatchEvent(new Event(AFFILIATE_TRACKING_DISABLED_EVENT));
+    }
+    setEnabled(nextEnabled);
   };
 
   return (
     <div className="mt-4 flex flex-col items-start gap-3">
-      <p className="text-sm text-muted-foreground">Referral storage permission: {allowed ? "allowed on this browser" : "not stored"}.</p>
-      {allowed ? <Button type="button" variant="outline" onClick={withdraw}>Withdraw referral tracking permission</Button> : null}
+      <p className="text-sm text-muted-foreground">Referral tracking is {enabled ? "on" : "off"} for this browser.</p>
+      <Button type="button" variant="outline" onClick={() => updatePreference(!enabled)}>
+        {enabled ? "Turn off referral tracking" : "Turn on referral tracking"}
+      </Button>
     </div>
   );
 }
@@ -35,7 +46,7 @@ export default function Cookies() {
           This policy explains the cookies and browser storage used by Subveris in plain language.
         </p>
         <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5 text-sm text-slate-300 shadow-lg shadow-slate-950/20">
-          Last updated: August 25, 2026
+          Last updated: November 10, 2026
         </div>
       </div>
 
@@ -51,7 +62,7 @@ export default function Cookies() {
             <div>
               <h2 className="text-lg font-semibold">What Subveris currently uses</h2>
               <p className="mt-3 text-muted-foreground">
-                The current application uses Supabase Auth session storage in the browser, local and session storage for application state and security-session values, and browser extension storage for the extension session, plan status, tracking queue, and detected subscription data. If you opt in after opening a creator referral link, Subveris also stores a first-party opaque visitor token for up to 30 days. The extension can also inspect existing browser cookies for supported services when its authenticated cookie scan runs.
+                The current application uses Supabase Auth session storage in the browser, local and session storage for application state and security-session values, and browser extension storage for the extension session, plan status, tracking queue, and detected subscription data. When referral tracking is on, opening a creator link stores a first-party opaque visitor token for up to 30 days. Referral tracking is on by default and can be turned off below. The extension can also inspect existing browser cookies for supported services when its authenticated cookie scan runs.
               </p>
             </div>
 
@@ -73,15 +84,18 @@ export default function Cookies() {
               <p className="mt-3 text-muted-foreground">
                 Subveris uses browser and extension storage to remember preferences and maintain the state needed for features you request. These values are not used by the current code for advertising. They are part of the application or extension experience rather than a separate optional analytics system.
               </p>
+              <p className="mt-3 text-muted-foreground">
+                Referral tracking uses browser storage when you open a creator link. It is enabled by default on this browser, and you can turn it off below. The legal basis and any consent requirements for this default-on behavior must be reviewed for each applicable jurisdiction before live rollout.
+              </p>
             </div>
 
             <div>
               <h2 className="text-lg font-semibold">Analytics and marketing</h2>
               <p className="mt-3 text-muted-foreground">
-                No Google Analytics, Hotjar, Meta Pixel, advertising network, or retargeting pixel is used. Affiliate attribution is a separate, first-party referral feature: it is not recorded until you opt in from a referral link, and it is not used for advertising or cross-site tracking.
+                No Google Analytics, Hotjar, Meta Pixel, advertising network, or retargeting pixel is used. Affiliate attribution is a separate, first-party referral feature. It starts automatically when you open a creator referral link while tracking is on; it is not used for advertising or cross-site tracking.
               </p>
               <p className="mt-3 text-muted-foreground">
-                When you opt in, Subveris records the referral code, click time, expiry, and a hash of a random browser token. No IP address, device fingerprint, or user-agent identifier is stored for referral attribution. If you later register or sign in, the eligible referral can be attached to your account for commission calculation. The creator sees only an anonymized referral reference, not your account email, password, or payment details.
+                When referral tracking is on, Subveris records the referral code, click time, expiry, and a hash of a random browser token. No IP address, device fingerprint, or user-agent identifier is stored for referral attribution. If you later register or sign in, the eligible referral can be attached to your account for commission calculation. The creator sees only an anonymized referral reference, not your account email, password, or payment details. You can turn off tracking below; this clears the browser token and prevents future referral capture on this browser.
               </p>
             </div>
 
@@ -106,9 +120,9 @@ export default function Cookies() {
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold">Consent and withdrawing consent</h2>
+              <h2 className="text-lg font-semibold">Referral tracking settings</h2>
               <p className="mt-3 text-muted-foreground">
-                Referral attribution storage is optional and is requested only when you open a creator referral link. You can decline without affecting Subveris. You can withdraw permission below; this clears the local token and stops future referral capture. A referral attribution already attached to an account may remain in financial records needed to explain commissions, subject to applicable deletion and accounting requirements.
+                Referral tracking starts automatically when you open a creator link while it is on. You can turn it off here without affecting other Subveris features. Turning it off clears the local token and stops future referral capture on this browser. A referral attribution already attached to an account may remain in financial records needed to explain commissions, subject to applicable deletion and accounting requirements.
               </p>
               <AffiliateReferralStorageControl />
               <p className="mt-3 text-muted-foreground">

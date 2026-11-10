@@ -16,7 +16,7 @@ const STATIC_DIR = process.env.STATIC_DIR || 'dist/public';
 const CLIENT_ROUTES = new Set([
   '/', '/dashboard', '/subscriptions', '/detected-subscriptions', '/insights',
   '/cost-optimizer', '/savings', '/calendar', '/family-sharing', '/family-calendar',
-  '/settings', '/pricing', '/privacy', '/login', '/cookies', '/terms', '/security',
+  '/settings', '/pricing', '/privacy', '/login', '/cookies', '/terms', '/security', '/affiliate',
   '/contact', '/docs', '/best-subscription-trackers',
   '/why-subveris-best-subscription-manager', '/cancel-netflix', '/cancel-amazon-prime',
   '/cancel-spotify', '/cancel-adobe', '/cancel-hellofresh', '/cancel-disney-plus',

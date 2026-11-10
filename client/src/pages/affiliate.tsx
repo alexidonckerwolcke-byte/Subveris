@@ -203,7 +203,7 @@ export default function AffiliatePage() {
               <div className="min-w-0 flex-1 space-y-2">
                 <Label htmlFor="affiliate-link">Your link</Label>
                 <Input id="affiliate-link" readOnly value={data.link || "No active referral code"} />
-                <p className="text-xs text-muted-foreground">{percent}% of the first collected Premium payment, within {data.rules.attributionWindowDays} days. The basis is the amount paid after discounts, including tax. Browser tracking requires visitor opt-in.</p>
+                <p className="text-xs text-muted-foreground">{percent}% of the first collected Premium payment, within {data.rules.attributionWindowDays} days. The basis is the amount paid after discounts, including tax. Referral tracking is on by default; visitors can turn it off in the Cookie Policy.</p>
               </div>
               <Button type="button" variant="outline" onClick={copyLink} disabled={!data.link} aria-label="Copy referral link">
                 {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}

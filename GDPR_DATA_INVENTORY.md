@@ -33,7 +33,7 @@ This inventory records what is evidenced by the current Subveris source code and
 | Request and error logs | `console.log`/`console.error` in the Node server and Edge Functions | Application logs are evidenced. Supabase/hosting retention is provider-controlled. |
 | Local cron logs | `logs/cron-status-updates.log`, `logs/cron-weekly-digest.log` | A cleanup script prunes entries older than 30 days before new cron entries are written. |
 | Local A/B event log | `ab-events.log` written by `/api/ab-event` | Server prunes JSON entries older than 30 days at startup and before appending. |
-| Cookies and browser storage | Supabase session storage, extension storage, and cookie scanning permission | The extension can inspect authentication cookies for supported services. A complete production cookie inventory still requires browser/provider inspection. |
+| Cookies and browser storage | Supabase session storage, extension storage, cookie scanning permission, and first-party affiliate referral token | Affiliate referral tracking stores an opaque visitor token for up to 30 days by default when a referral link is opened; visitors can turn tracking off in Cookie Policy. Legal basis and consent requirements for default-on behavior require jurisdiction-specific review before Live rollout. The extension can inspect authentication cookies for supported services. A complete production cookie inventory still requires browser/provider inspection. |
 
 ## Recipients and Processors Evidenced in Code
 

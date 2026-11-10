@@ -12,7 +12,7 @@ export default function Privacy() {
           This page explains what we collect, why we collect it, and the controls available to you.
         </p>
         <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5 text-sm text-slate-300 shadow-lg shadow-slate-950/20">
-          Effective date: September 13, 2026
+          Effective date: November 10, 2026
         </div>
       </div>
 
@@ -49,7 +49,7 @@ export default function Privacy() {
                 <li><strong>Google user data accessed through Gmail:</strong> when you connect Gmail, Subveris accesses Gmail messages and related metadata needed to identify subscription receipts, invoices, renewals, charges, service names, prices, currencies, and billing dates. Subveris does not access unrelated mailbox data beyond what is needed for this feature.</li>
                 <li>Usage data from our browser extension including time spent on subscription service websites and zero-usage patterns.</li>
                 <li>Billing and payment information for Premium purchases processed through Stripe.</li>
-                <li><strong>Affiliate referrals, if you opt in:</strong> an opaque first-party visitor token, referral code, click timestamp, and expiry. If you register or sign in with an eligible referral, the affiliate and referral timestamp are linked to your account. No IP address or device fingerprint is stored for affiliate attribution.</li>
+                <li><strong>Affiliate referrals, when tracking is enabled:</strong> an opaque first-party visitor token, referral code, click timestamp, and expiry when you open a creator referral link. Tracking is on by default and can be turned off on the Cookie Policy page. If you register or sign in with an eligible referral, the affiliate and referral timestamp are linked to your account. No IP address or device fingerprint is stored for affiliate attribution.</li>
                 <li><strong>Affiliate program records:</strong> creator application details, attributed registrations and payment references, commission amounts and statuses, and completed payout references where you participate as an approved creator.</li>
                 <li>Technical and security data generated when you use the service, such as IP address and request information in server logs, error logs, and authentication/session identifiers. We do not use this policy to claim collection of browser or device data that is not described elsewhere in the service.</li>
                 <li>Cookies and similar technologies used for authentication, security, preferences, and service operation.</li>
@@ -62,7 +62,7 @@ export default function Privacy() {
               <ul className="mt-3 space-y-2 text-muted-foreground list-disc pl-6">
                 <li><strong>Contract performance:</strong> to create and maintain your account, provide subscription tracking and analytics, synchronize extension data, and deliver features you request.</li>
                 <li><strong>Consent:</strong> to scan Gmail after you authorize Google OAuth. You can withdraw that consent by disconnecting Gmail in Settings; this does not affect processing that occurred before withdrawal.</li>
-                <li><strong>Consent:</strong> to store optional affiliate referral attribution after you opt in on a creator referral link. You can withdraw browser-storage permission in the Cookie Policy; an attribution already locked to an account may remain in records needed to explain eligible payments and commissions.</li>
+                <li><strong>Affiliate attribution:</strong> referral data is processed when tracking is on and you open a creator link. You can turn tracking off in the Cookie Policy; an attribution already locked to an account may remain in records needed to explain eligible payments and commissions. The legal basis and any consent requirements for this default-on behavior must be reviewed for each applicable jurisdiction before live rollout.</li>
                 <li><strong>Legitimate interests:</strong> to secure the service, prevent abuse, troubleshoot errors, and improve Subveris, balanced against your privacy rights.</li>
                 <li><strong>Legal obligation:</strong> to retain or disclose information where required by tax, accounting, fraud-prevention, court, or other applicable legal requirements.</li>
               </ul>
@@ -83,7 +83,7 @@ export default function Privacy() {
                 user-facing subscription-detection and subscription-management features.
                 We may share the minimum data needed with service providers that operate Subveris, such as Supabase for database and authentication
                 services and Stripe for payment processing, solely to provide or improve Subveris features requested by you.
-                If you opt in to a creator referral, we use the referral event only to attribute an eligible new paying customer, calculate the configured commission, prevent duplicate or fraudulent credit, and maintain audit and payout records. Affiliates receive only an anonymized referral reference and their own commission data, not your email, account credentials, payment method, or private subscription details.
+                When referral tracking is enabled and you open a creator link, we use the referral event only to attribute an eligible new paying customer, calculate the configured commission, prevent duplicate or fraudulent credit, and maintain audit and payout records. Tracking is on by default and can be turned off on the Cookie Policy page. Affiliates receive only an anonymized referral reference and their own commission data, not your email, account credentials, payment method, or private subscription details.
               </p>
             </div>
 
