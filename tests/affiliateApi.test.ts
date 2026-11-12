@@ -49,6 +49,110 @@ describe("affiliate API authorization", () => {
     expect(response?.status).toBe(403);
   });
 
+  it("rejects incomplete or future-dated manual payout details without writing", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    const authClient = makeAuthClient({ id: "admin-1" });
+    const deps = { db: { rpc, from: vi.fn() }, authClient, stripeSecretKey: "", adminUserIds: ["admin-1"] };
+    const affiliateId = "123e4567-e89b-42d3-a456-426614174000";
+    const commissionId = "123e4567-e89b-42d3-a456-426614174001";
+    const validBody = {
+      affiliateId,
+      commissionIds: [commissionId],
+      paidAt: "2026-10-01T12:00:00.000Z",
+      transactionReference: "test-transfer-reference",
+      reason: "Test validation only",
+    };
+    const invalidBodies = [
+      { ...validBody, commissionIds: [] },
+      { ...validBody, commissionIds: ["not-a-uuid"] },
+      { ...validBody, paidAt: "not-a-date" },
+      { ...validBody, paidAt: new Date(Date.now() + 60_000).toISOString() },
+      { ...validBody, transactionReference: " " },
+      { ...validBody, reason: "" },
+    ];
+
+    for (const body of invalidBodies) {
+      const response = await handleAffiliateApiRequest(
+        makeRequest("/affiliate/admin/payout", "POST", { authorization: "Bearer admin-test-token" }, body),
+        "/affiliate/admin/payout",
+        deps,
+      );
+      expect(response?.status).toBe(400);
+    }
+
+    expect(rpc).not.toHaveBeenCalledWith("affiliate_admin_record_payout", expect.anything());
+    expect(deps.db.from).not.toHaveBeenCalled();
+  });
+
+  it("prevents an affiliate from recording their own payout", async () => {
+    const affiliateId = "123e4567-e89b-42d3-a456-426614174000";
+    const affiliateQuery = {
+      select: vi.fn(() => affiliateQuery),
+      eq: vi.fn(() => affiliateQuery),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { user_id: "creator-1" }, error: null }),
+    };
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    const response = await handleAffiliateApiRequest(
+      makeRequest("/affiliate/admin/payout", "POST", { authorization: "Bearer creator-test-token" }, {
+        affiliateId,
+        commissionIds: ["123e4567-e89b-42d3-a456-426614174001"],
+        paidAt: "2026-10-01T12:00:00.000Z",
+        transactionReference: "test-transfer-reference",
+        reason: "Should be denied",
+      }),
+      "/affiliate/admin/payout",
+      {
+        db: { from: vi.fn(() => affiliateQuery), rpc },
+        authClient: makeAuthClient({ id: "creator-1" }),
+        stripeSecretKey: "",
+        adminUserIds: ["creator-1"],
+      },
+    );
+
+    expect(response?.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalledWith("affiliate_admin_record_payout", expect.anything());
+  });
+
+  it("passes valid payout details to the audited database function without processing a transfer", async () => {
+    const affiliateId = "123e4567-e89b-42d3-a456-426614174000";
+    const commissionId = "123e4567-e89b-42d3-a456-426614174001";
+    const affiliateQuery = {
+      select: vi.fn(() => affiliateQuery),
+      eq: vi.fn(() => affiliateQuery),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { user_id: "creator-1" }, error: null }),
+    };
+    const rpc = vi.fn().mockResolvedValue({ data: "123e4567-e89b-42d3-a456-426614174002", error: null });
+    const response = await handleAffiliateApiRequest(
+      makeRequest("/affiliate/admin/payout", "POST", { authorization: "Bearer admin-test-token" }, {
+        affiliateId,
+        commissionIds: [commissionId],
+        paidAt: "2026-10-01T12:00:00.000Z",
+        transactionReference: "test-transfer-reference",
+        notes: "Validation fixture only",
+        reason: "Test payout endpoint contract",
+      }),
+      "/affiliate/admin/payout",
+      {
+        db: { from: vi.fn(() => affiliateQuery), rpc },
+        authClient: makeAuthClient({ id: "admin-1" }),
+        stripeSecretKey: "",
+        adminUserIds: ["admin-1"],
+      },
+    );
+
+    expect(response?.status).toBe(200);
+    expect(await response?.json()).toEqual({ payoutId: "123e4567-e89b-42d3-a456-426614174002" });
+    expect(rpc).toHaveBeenCalledWith("affiliate_admin_record_payout", {
+      p_affiliate_id: affiliateId,
+      p_commission_ids: [commissionId],
+      p_paid_at: "2026-10-01T12:00:00.000Z",
+      p_transaction_reference: "test-transfer-reference",
+      p_notes: "Validation fixture only",
+      p_admin_user_id: "admin-1",
+      p_reason: "Test payout endpoint contract",
+    });
+  });
+
   it("allows an allowlisted admin user to read the affiliate admin overview", async () => {
     const authClient = { auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "admin-1" } }, error: null }) } };
     const makeTableQuery = (rows: any[] = []) => ({

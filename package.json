@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "start": "node server.js",
     "test:affiliate-risk:integration": "bash tests/integration/affiliate-risk-events.docker.sh",
+    "test:affiliate-payout:integration": "bash tests/integration/affiliate-payout-recording.docker.sh",
     "update-statuses": "tsx scripts/update-subscription-statuses.ts",
     "cron:monthly": "npm run update-statuses",
     "sitemap:build": "node scripts/generate-sitemap.mjs",
